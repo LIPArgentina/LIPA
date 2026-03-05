@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Visor de Planillas (múltiple) | LPI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&amp;display=swap" rel="stylesheet"/>
+<style>
+  :root{
+    --bg:#0a0a0a; --ink:#fff; --line:#ffffff22;
+    --gold:#ffd966; --gold-ink:#1b1600;
+  }
+  *{ box-sizing:border-box }
+  html,body{ height:100% }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  a{ color:inherit; text-decoration:none }
+  .container{ max-width:1400px; margin:0 auto; padding:   0px 0px 0px; }
+
+  /* Header simple */
+  header{ position:sticky; top:0; z-index:1000; background:#0a0a0a; border-bottom:1px solid var(--line);  position:relative;}
+  .hwrap{ display:flex; align-items:center; gap:12px; padding:10px 0; }
+  header img{ height:60px; width:auto; display:block }
+  .title{ margin:0; font-weight:900; letter-spacing:.06em; font-size:clamp(18px,3.8vw,26px); color:var(--gold); }
+  .spacer{ flex:1 }
+
+  #alert{ position:fixed; left:50%; transform:translateX(-50%); top:80px; z-index:2000; display:none;
+    background:#ff2d2d; color:#fff; padding:10px 14px; border-radius:8px; border:2px solid #ffb3b3; box-shadow:0 8px 24px rgba(0,0,0,.45); font-weight:900; }
+
+  /* Grid de boards (4 por fila) */
+  .grid-boards{ display:grid; gap:18px; grid-template-columns: repeat(4, 1fr); }
+  @media (max-width:1200px){ .grid-boards{ grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width:900px){ .grid-boards{ grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width:580px){ .grid-boards{ grid-template-columns: 1fr; } }
+
+  /* Card contenedor por equipo */
+  .card{ border:1px solid var(--line); border-radius:14px; padding:   6px; background:#0f0f11; box-shadow:0 10px 24px #0006; }
+  .card h2{ margin:0 0 4px; font-size:16px; letter-spacing:.04em; color:var(--gold); text-align:center; }
+
+  /* Tabla scaled 75% como te gustó */
+  .board{ zoom: 0.72; transform-origin: top left;  transform-origin: top center; max-width: 420px; margin:  0; }
+  .groups{ display:grid; gap: 14px; }
+  .group{ border:1px dashed #ffffff22; border-radius:12px; padding: 10px; background:#101217; }
+  .group h3{ margin:0 0 8px; font-size:14px; letter-spacing:.10em; text-transform:uppercase; opacity:.9; }
+  .grid{ display:grid; gap: 8px; grid-template-columns:1fr; }
+  .slot{
+    display:grid;
+    grid-template-columns: 56px 1fr;  /* número angosto + nombre ancho */
+    align-items:center;
+    gap: 8px;
+    border:1px solid #ffffff22;
+    border-radius:10px;
+    padding: 6px 10px;
+    background:#0f1116;
+  }
+  .nro{
+    width: 34px; height: 34px; display:grid; place-items:center; border-radius:9px;
+    background:var(--gold); color:var(--gold-ink); font-weight:900;
+    box-shadow:inset 0 -3px 0 #b28900;
+  }
+  .yellow-box{
+    min-height: 34px; display:flex; align-items:center; padding: 0 10px; border-radius:8px;
+    background:linear-gradient(180deg,#f9f1c4,#ffd966); color:#0b0900; font-weight:800;
+    box-shadow:inset 0 -3px 0 #b28900;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;
+  }
+
+  .actions{ margin-top:10px; display:flex; justify-content:center; }
+  .btn{ border:1px solid #b28900; background:#151518; color:#ffd966; font-weight:800; padding:6px 10px; border-radius:10px; cursor:pointer; }
+  .btn:hover{ background:#1b1e22; }
+.btn{background:#0b1224;color:#e2e8f0;border:1px solid rgba(255,255,255,.15);padding:6px 10px;border-radius:8px;cursor:pointer}
+.btn:hover{filter:brightness(1.1)}
+.btn.small{font-size:12px}
+@media print{ .actions{ display:none !important; } }
+
+/* === Ajuste para que el contenedor se achique al último ítem === */
+.container, .card, .board, .panel, .frame {
+  height: auto !important;
+  min-height: 0 !important;
+}
+.container { align-items: flex-start !important; }
+#boards { align-items: flex-start !important; }
+
+
+/* Botón volver arriba a la derecha */
+.top-right-actions{position:absolute;right:12px;top:12px;display:flex;gap:8px}
+.btn.volver{background:#0b1224;color:#e2e8f0;border:1px solid rgba(255,255,255,.15);padding:6px 12px;border-radius:8px;text-decoration:none;font-size:12px;line-height:1;display:inline-block}
+.btn.volver:hover{filter:brightness(1.1)}
+@media print{ .top-right-actions{ display:none !important; } }
+
+
+/* Botón dorado estilo "FIXTURE" */
+.btn-gold{
+  display:inline-block;
+  padding:8px 18px;
+  border-radius:14px;
+  background:linear-gradient(180deg, #ffd86a 0%, #e8b127 100%);
+  border:1px solid #8e6a12;
+  color:#111;
+  font-weight:800;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  text-decoration:none;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.6),
+    0 3px 8px rgba(0,0,0,.35);
+  transition:filter .15s ease, transform .05s ease;
+}
+.btn-gold:hover{ filter:brightness(1.05); }
+.btn-gold:active{
+  transform:translateY(1px);
+  box-shadow:
+    inset 0 1px 0 rgba(0,0,0,.15),
+    0 2px 6px rgba(0,0,0,.25);
+}
+
+
+/* Indicador verde/rojo (a la derecha del título) */
+.card{ position: relative; }
+.title-indicator{ position:absolute; right:12px; top:10px; }
+.fresh-indicator{ width:18px; height:18px; border-radius:9999px; border:1px solid rgba(255,255,255,.25); box-shadow:0 1px 2px rgba(0,0,0,.4); background:#a3a3a3; }
+.fresh-ok{ background:#22c55e !important; }
+.fresh-stale{ background:#ef4444 !important; }
+@media (max-width:480px){ .title-indicator{ right:8px; top:8px; } }
+
+
+/* Botón centrado en el header */
+.center-action{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:1001;text-align:center}
+.center-action-inner{display:flex;align-items:center;gap:8px;justify-content:center}
+.cruces-button-wrap{display:flex;flex-direction:column;align-items:center;text-align:center}
+.cruces-status-label{margin-top:4px;font-size:11px;color:var(--gold);text-align:center;display:block}
+@media (max-width:520px){
+  .center-action{top:60px}
+}
+@media print{ .center-action{ display:none !important; } }
+</style>
+</head>
+<body>
+<div id="alert" role="alert"></div>
+<header><div class="center-action"><div class="center-action-inner">
+<div class="cruces-button-wrap">
+<button type="button" class="btn-gold" id="btnHabilitarCruces">habilitar cruces</button>
+<div id="crucesStatusLabel" class="cruces-status-label">los cruces están deshabilitados</div>
+</div>
+<div id="globalJsIndicator" class="fresh-indicator fresh-stale" title="Comprobando fecha de planillas…"></div>
+</div>
+</div>
+<div class="container hwrap">
+<a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
+<h1 class="title">VISOR DE PLANILLAS</h1>
+<div class="spacer"></div>
+</div>
+<div class="top-right-actions">
+<a class="btn-gold volver" href="../admin.html">volver</a>
+</div>
+</header>
+<div class="container">
+<main>
+<section aria-label="Planillas por equipo" class="grid-boards" id="boards">
+<!-- Se generan por JS -->
+</section>
+</main>
+</div>
+
+
+  <script src="visor_planillas.js"></script>
+</body>
+</html>

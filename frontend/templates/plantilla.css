@@ -1,0 +1,240 @@
+body {
+    background-color: black;
+    font-family: sans-serif;
+    color: white;
+    margin: 0;
+  }
+
+  /* Header con logo (izquierda) + acciones (derecha) */
+  header {
+    position: static;
+    background: rgba(0,0,0,.85);
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+  }
+  header .logo-link img {
+    height: 70px;
+    display: block;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,.5));
+  }
+  .main-container{
+    max-width: 1100px;
+    width: min(100%, 1100px);
+    margin-inline: auto;   
+    padding-inline: clamp(12px, 3vw, 24px);
+    box-sizing: border-box;
+  }
+  .main-container{
+    justify-content: center; 
+ 
+}
+  .team-name{
+    margin-left: 12px;
+    font-weight: 900;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #f3e7aa; /* dorado suave */
+    font-size: 18px;
+    white-space: nowrap;
+  }
+  .header-actions{
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .user-badge{
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.12);
+    color: #ffcc00;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  .btn-logout{
+    background: transparent;
+    color: #ffd966;
+    border: 1px solid rgba(255,255,255,.25);
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-logout:hover{ background: rgba(255,255,255,.08); }
+
+  .main-container { display: flex; gap: 50px; }
+  h2 { text-align: center; margin-bottom: 10px; color: #ffef5e; }
+  .group-title { text-align: center; margin: 0px 0 0px; color: #ffef5e; font-weight: bold; }
+  .jugadores-container { display: flex; flex-direction: column; gap: 6px; }
+  .fila { display: flex; align-items: center; cursor: grab; }
+  .numero { width: 20px; height: 20px; background-color: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-right: 5px; flex-shrink: 0; color: black; }
+  .jugador { background-color: #ffef5e; border-radius: 5px; height: 20px; min-width: 220px; padding: 0 10px; display: flex; align-items: center; font-size: 12px; overflow: hidden; white-space: nowrap; color: black; }
+  .extra-column { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .group-container { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 250px; }
+  .fila-extra { display: flex; align-items: center; margin-bottom: 1px; }
+  .white-box { width: 20px; height: 20px; background-color: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-right: 5px; color: black; }
+  .yellow-box { background-color: #ffef5e; border-radius: 5px; height: 20px; min-width: 200px; padding: 0 5px; display: flex; align-items: center; font-size: 12px; cursor: pointer; color: black; transition: background 0.12s, outline 0.12s; }
+  .yellow-box.over { outline: 2px dashed #000; }
+  .yellow-box.valid { outline: 2px solid green; }
+  .yellow-box.invalid { outline: 2px solid red; }
+  .yellow-box.repeated { background-color: orange; color: black; }
+  .yellow-box-free { background-color: #ffef5e; border-radius: 5px; height: 20px; min-width: 200px; padding: 0 5px; display: flex; align-items: center; font-size: 12px; cursor: pointer; color: black; }
+
+  #alert {
+    position: fixed;
+    top: 100px;                 /* debajo del header fijo */
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff2d2d;        /* rojo más vivo */
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 8px;
+    border: 2px solid #ffb3b3;  /* contorno para contraste */
+    box-shadow: 0 8px 24px rgba(0,0,0,.45);
+    font-weight: 900;
+    letter-spacing: .02em;
+    display: none;
+    z-index: 2000;              /* por encima del header (1000) */
+}
+
+  /* Papelera */
+  #trash {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background-color: red;
+    border-radius: 50%;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 100;
+    font-size: 24px;
+    transition: transform .12s, box-shadow .12s;
+  }
+  #trash.over { transform: scale(1.1); box-shadow: 0 0 10px #fff; }
+
+/* --- Recuadre de columnas y botón abajo --- */
+.jugadores-container, .extra-column{
+  border:1px solid #ffffff22;
+  border-radius:12px;
+  padding:12px;
+  background:#0f0f11;
+  box-shadow:0 10px 24px rgba(0,0,0,.35);
+}
+.extra-column .send-wrap{ margin-top:16px; display:flex; justify-content:center; }
+.btn-enviar{
+  padding:10px 14px; border-radius:10px; border:1px solid #b28900;
+  background:#151518; color:#ffd966; font-weight:800; cursor:pointer;
+}
+.btn-enviar:hover{ background:#1b1e22; }
+
+
+
+/* === LPI: Estética del popup de login/contraseña (oscuro + dorado) === */
+dialog.modal { padding: 0; border: none; background: transparent; }
+dialog.modal::backdrop { background: rgba(0,0,0,.55); }
+.modal__panel{
+  background:#0f1115;
+  border:1px solid #ffffff22;
+  border-radius:18px;
+  min-width: min(92vw, 560px);
+  color:#e9e9e9;
+  box-shadow: 0 18px 40px rgba(0,0,0,.55);
+  font-family: inherit;
+}
+.modal__header{ padding:18px 20px; border-bottom:1px solid #ffffff1a; }
+.modal__header h3{ margin:0; color:#ffd24d; letter-spacing:.02em; }
+.modal__body{ padding:18px 20px; }
+.field__label{ display:block; color:#cfcfcf; font-weight:700; margin:10px 0 6px; }
+.field__control{
+  width:100%;
+  background:#151821;
+  border:1px solid #2a2f3a;
+  color:#e9e9e9;
+  padding:10px 12px;
+  border-radius:12px;
+  outline:none;
+}
+.field__control:focus{ border-color:#caa64d; box-shadow:0 0 0 3px rgba(202,166,77,.15); }
+.modal__footer{ padding:16px 20px; border-top:1px solid #ffffff1a; display:flex; gap:10px; justify-content:flex-end; }
+.btn{ font-weight:800; border-radius:14px; padding:10px 14px; cursor:pointer; }
+.btn-ghost{ background:transparent; color:#e9e9e9; border:1px solid #3a3f49; }
+.btn-ghost:hover{ background:#171a22; }
+.btn-primary{ background:linear-gradient(180deg,#f1cc4d,#caa64d); border:1px solid #b28900; color:#111; }
+.btn-primary:hover{ filter:brightness(0.95); }
+.error{ color:#ff6b6b; margin-top:8px; }
+.success{ color:#4cd964; margin-top:8px; }
+
+
+  /* --- Botón centrado en el header --- */
+  .header-middle{
+    flex: 1;
+    display: flex;
+    justify-content: center;
+  }
+  .btn-cruces{
+    background: transparent;
+    color: #ffd966;
+    border: 1px solid rgba(255,255,255,.25);
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn-cruces:hover{ background: rgba(255,255,255,.08); }
+
+
+  .btn-cruces.is-disabled{ opacity:.5; pointer-events:none; filter:grayscale(0.2); }
+
+/* Touch & Tap fallbacks */
+.tap-selecting { outline: 2px solid #4cd964 !important; }
+.tap-hint { outline: 2px dashed #888 !important; }
+.noselect, .fila, .yellow-box, .yellow-box-free { -webkit-user-select: none; user-select: none; }
+/* Prevent default touch gestures during pointer-drag on coarse pointers;
+   allow tapping to still click buttons/links quickly */
+@media (pointer: coarse){
+  .fila, .yellow-box, .yellow-box-free { touch-action: manipulation; }
+}
+
+dialog.modal { padding: 0 !important; }
+  .modal__panel{
+    width: min(96vw, 300px) !important;
+    box-sizing: border-box !important;
+  }
+  .modal__header, .modal__body, .modal__footer{
+    box-sizing: border-box !important;
+  }
+  .field__control{
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  dialog.modal .modal__panel input{
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .field__toggle{
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    font-size: .9rem;
+    color: #cfcfcf;
+    margin: 6px 0 12px;
+    user-select: none;
+  }
+
+/* Centrar y limitar tamaño del modal */
+  dialog#passModal { position: fixed; inset: 0; margin: auto; transform: none; max-height: 90vh; overflow: auto; }
+  dialog#passModal::backdrop { background: rgba(0,0,0,.55); }
+
+.field__toggle input[type="checkbox"]{
+  accent-color: #d4af37;  /* dorado en vez de rojo */
+}

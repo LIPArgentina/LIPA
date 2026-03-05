@@ -1,0 +1,30 @@
+// Generado automáticamente
+window.LPI_PLANILLA = {
+  "team": "babylon",
+  "createdAt": "2025-11-18T03:39:16.268Z",
+  "individuales": [
+    "javier Martino",
+    "Matias Pompillo",
+    "Thiago Martino",
+    "Manuel Diaz",
+    "Federico Gonzalez",
+    "Demian Ledesma",
+    "Rafel galeano"
+  ],
+  "pareja1": [
+    "Matias Pompillo",
+    "Matías Bidarra"
+  ],
+  "pareja2": [
+    "Marcelo Elizaga",
+    "Eduardo Gorosito"
+  ],
+  "suplentes": [
+    "Hernan Diaz",
+    "Diego Becerra"
+  ],
+  "capitan": [
+    "Matias Pompillo",
+    "javier Martino"
+  ]
+};

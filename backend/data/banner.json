@@ -1,0 +1,29 @@
+{
+  "banners": [
+    {
+      "text": "Bienvenidos a la liga de pool independiente",
+      "link": null
+    },
+    {
+      "text": "Te invitamos a participar del torneo femenino",
+      "link": {
+        "href": "http://google.com",
+        "label": "click aquí"
+      }
+    },
+    {
+      "text": "Te invitamos a participar del torneo juvenil",
+      "link": {
+        "href": "http://www.google.com.ar",
+        "label": "click aquí"
+      }
+    },
+    {
+      "text": "Insumos para pool y billar",
+      "link": {
+        "href": "http://google.com",
+        "label": "ww.KAMUI.com"
+      }
+    }
+  ]
+}

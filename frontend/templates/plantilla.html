@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+  <link rel="stylesheet" href="./plantilla.css" />
+<!-- Cargar el archivo de jugadores del equipo actual (seguro, sin document.write) -->
+
+<meta charset="utf-8"/>
+<title>Planilla Liga Drag &amp; Drop</title>
+
+<!-- Helpers unificados -->
+
+</head>
+<body>
+<header>
+<a aria-label="Ir al inicio" class="logo-link" href="../index.html">
+<img alt="Logo LPI" src="../logo_liga.png"/>
+</a>
+<span class="team-name" id="teamNameBadge"></span>
+<div class="header-middle"><a class="btn-cruces" id="btnVerCruces" href="../cruces/cruces_fecha.html">ver cruces</a></div>
+<div class="header-actions" id="headerActions"></div>
+</header>
+<div id="alert"></div>
+<div class="main-container">
+<!-- Tabla Jugadores (ORIGINALES) -->
+<div class="jugadores-container">
+<h2>JUGADORES</h2>
+<div class="fila" draggable="true"><div class="numero">1</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">2</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">3</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">4</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">5</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">6</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">7</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">8</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">9</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">10</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">11</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">12</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">13</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">14</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">15</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">16</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">17</div><div class="jugador"></div></div>
+<div class="fila" draggable="true"><div class="numero">18</div><div class="jugador"></div></div>
+</div>
+<!-- Planilla Liga (ORIGINAL) -->
+<div class="extra-column">
+<h2>PLANILLA LIGA</h2>
+<!-- === Bloque Capitán (DnD limpio) === -->
+<div class="group-container" data-group="capitan">
+<div class="group-title">CAPITÁN</div>
+<div class="fila-extra"><div class="white-box">1</div><div class="yellow-box-free" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">2</div><div class="yellow-box-free" data-player="" draggable="true"></div></div>
+</div>
+<div class="group-container" data-group="individual">
+<div class="group-title">INDIVIDUALES</div>
+<div class="fila-extra"><div class="white-box">1</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">2</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">3</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">4</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">5</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">6</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">7</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+</div>
+<div class="spacer"></div>
+<div class="group-container" data-group="pareja1">
+<div class="group-title">PAREJA 1</div>
+<div class="fila-extra"><div class="white-box">1</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">2</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+</div>
+<div class="big-spacer"></div>
+<div class="group-container" data-group="pareja2">
+<div class="group-title">PAREJA 2</div>
+<div class="fila-extra"><div class="white-box">1</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">2</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+</div>
+<div class="spacer"></div>
+<div class="group-container" data-free="true" data-group="suplentes">
+<div class="group-title">SUPLENTES</div>
+<div class="fila-extra"><div class="white-box">1</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+<div class="fila-extra"><div class="white-box">2</div><div class="yellow-box" data-player="" draggable="true"></div></div>
+</div>
+<div class="send-wrap"><button class="btn-enviar" id="btnEnviar">Enviar planilla</button></div>
+</div>
+</div>
+<!-- Papelera -->
+<div id="trash">🗑️</div>
+
+
+<!-- ===== Modal Cambiar contraseña (Equipo) ===== -->
+<dialog class="modal" id="passModal">
+<form autocomplete="off" class="modal__panel" id="passForm" method="dialog" style="min-width:320px;">
+<div class="modal__header"><h3>Cambiar contraseña</h3></div>
+<div class="modal__body">
+<label class="field__label">Contraseña actual</label>
+<input class="field__control" id="oldPass" type="password"/>
+<label class="field__toggle" for="toggle_oldPass">
+<input data-toggle="#oldPass" id="toggle_oldPass" type="checkbox"/> Mostrar
+        </label>
+<label class="field__label">Nueva contraseña</label>
+<input class="field__control" id="newPass" type="password">
+<label class="field__toggle" for="toggle_newPass">
+<input data-toggle="#newPass" id="toggle_newPass" type="checkbox"/> Mostrar
+        </label>
+<label class="field__label">Repetir nueva contraseña</label>
+<input class="field__control" id="newPass2" type="password">
+<label class="field__toggle" for="toggle_newPass2">
+<input data-toggle="#newPass2" id="toggle_newPass2" type="checkbox"/> Mostrar
+        </label>
+<p class="error" id="passError" style="display:none;color:#ff6b6b;margin-top:8px;">Revisá los campos</p>
+<p class="success" id="passSuccess" style="display:none;color:#4cd964;margin-top:8px;">¡Contraseña actualizada!</p>
+</input></input></div>
+<div class="modal__footer">
+<button class="btn btn-ghost" value="cancel">Cancelar</button>
+<button class="btn btn-primary" id="submitPass" value="confirm">Guardar</button>
+</div>
+</form>
+</dialog>
+
+
+
+
+<!-- Unificador: usar un solo evento para cargar lista de jugadores -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <script src="./plantilla.js"></script>
+</body>
+</html>

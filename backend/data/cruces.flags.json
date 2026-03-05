@@ -1,0 +1,38 @@
+{
+  "*:2025-11-12": {
+    "enabled": false,
+    "expiresAt": null
+  },
+  "*:2025-11-13": {
+    "enabled": false,
+    "expiresAt": null
+  },
+  "*:2025-11-14": {
+    "enabled": true,
+    "expiresAt": 1763307703573
+  },
+  "*:2025-11-17": {
+    "enabled": true,
+    "expiresAt": 1763590343870
+  },
+  "*:2025-11-18": {
+    "enabled": true,
+    "expiresAt": 1763610058461
+  },
+  "*:2025-11-19": {
+    "enabled": true,
+    "expiresAt": 1763749345997
+  },
+  "*:2025-11-20": {
+    "enabled": true,
+    "expiresAt": 1763825061234
+  },
+  "*:2025-12-01": {
+    "enabled": true,
+    "expiresAt": 1764803798409
+  },
+  "*:2026-03-05": {
+    "enabled": true,
+    "expiresAt": 1772843131857
+  }
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.com/LIGA/frontend/admin.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/admin_bk.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/index.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/primera.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/segunda.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/tercera.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/a.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/babylon.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/dogos.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/el-trebol-de-pacheco.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/el-trebol.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/nuevo-3.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/nuevo-4.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/nuevo.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/nuevo2.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/prueba.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/takos.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/equipos/v.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/fecha/planilla_liga.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/fecha/visor_planillas.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/fixture/fixture.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/fixture/fixture_vuelta.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/tablas/posiciones_grupo_a.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/tablas/posiciones_grupo_b.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/tablas/tabla_grupo_a.html</loc></url>
+  <url><loc>https://example.com/LIGA/frontend/templates/plantilla.html</loc></url>
+</urlset>
