@@ -134,5 +134,13 @@ window.LPI_USERS = [
     "email": "",
     "phone": "",
     "slug": "prueba2"
+  },
+  {
+    "username": "PRUEBA 3",
+    "role": "team",
+    "captain": "",
+    "email": "",
+    "phone": "",
+    "slug": "prueba3"
   }
 ];

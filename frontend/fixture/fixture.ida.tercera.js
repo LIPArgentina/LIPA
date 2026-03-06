@@ -1,7 +1,7 @@
 window.LPI_FIXTURE = {
   "fechas": [
     {
-      "date": "2025-08-12",
+      "date": "2026-03-10",
       "tablas": [
         {
           "grupo": "A",

@@ -29,10 +29,24 @@
     main{margin-top:160px;text-align:center;padding:20px;}
     h1{
       color:var(--gold);
-      font-size:36px;
+      font-size:72px;
       text-transform:uppercase;
       text-shadow:0 2px 8px rgba(0,0,0,.5);
     }
+  
+    .proximamente{
+      margin-top:20px;
+      font-size:42px;
+      color:#ffffff;
+      letter-spacing:4px;
+      animation:blinkGlow 1.5s infinite alternate;
+      text-shadow:0 0 6px #fff,0 0 12px #ffcc00,0 0 18px #ffcc00;
+    }
+    @keyframes blinkGlow{
+      from{opacity:0.3; transform:scale(0.98);}
+      to{opacity:1; transform:scale(1);}
+    }
+
   </style>
 </head>
 <body>
@@ -44,6 +58,7 @@
 
   <main>
     <h1>Primera División</h1>
+    <div class="proximamente">PROXIMAMENTE</div>
   </main>
 </body>
 </html>

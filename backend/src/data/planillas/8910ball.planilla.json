@@ -1,0 +1,29 @@
+{
+  "team": "8910ball",
+  "createdAt": "2026-03-06T21:14:56.932Z",
+  "individuales": [
+    "jugador 1",
+    "jugador 2",
+    "jugador 3",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "pareja1": [
+    "jugador 8",
+    "jugador 9"
+  ],
+  "pareja2": [
+    "jugador 10",
+    "jugador 11"
+  ],
+  "suplentes": [
+    "jugador 12",
+    "jugador 13"
+  ],
+  "capitan": [
+    "jugador 1",
+    ""
+  ]
+}

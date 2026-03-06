@@ -8,6 +8,7 @@ module.exports = function createCrucesRouter(deps) {
   const { DATA_DIR, FRONTEND_DIR, FRONTEND_FECHA } = deps;
 
   const router = express.Router();
+  const PLANILLAS_DIR = path.join(__dirname, '..', 'data', 'planillas');
 
   // ====== API: Validar planilla (cruces) — V2-LITE ======
   router.post('/validar-planilla-v2-lite', async (req, res) => {
@@ -116,7 +117,7 @@ module.exports = function createCrucesRouter(deps) {
     writeJSON(CRUCES_FLAGS_FILE, obj);
   }
 
-  let CRUCES_FLAGS = readCrucesFlags(); // { ":": { enabled:boolean, expiresAt:number|null } }
+  let CRUCES_FLAGS = readCrucesFlags();
 
   function keyCruces(team, fechaKey) {
     return `${String(team || '*').toLowerCase().trim()}:${String(fechaKey || 'default')}`;
@@ -128,7 +129,7 @@ module.exports = function createCrucesRouter(deps) {
     return Date.now() < Number(entry.expiresAt);
   }
 
-  function ttlMs() { return 48 * 60 * 60 * 1000; } // 48 horas
+  function ttlMs() { return 48 * 60 * 60 * 1000; }
 
   const CRUCES_CLIENTS = new Set();
 
@@ -139,10 +140,40 @@ module.exports = function createCrucesRouter(deps) {
     }
   }
 
-  // Habilitar/deshabilitar (si enabled es null/undefined, se interpreta como "toggle")
+  function buildStatusFor(team, fechaKey) {
+    const t = String(team || '').toLowerCase().trim();
+    const fk = String(fechaKey || 'default').trim();
+
+    const kTeamDate = keyCruces(t, fk);
+    const kAllDate = keyCruces('*', fk);
+    const kTeamAny = keyCruces(t, 'default');
+
+    const cand = [CRUCES_FLAGS[kTeamDate], CRUCES_FLAGS[kAllDate], CRUCES_FLAGS[kTeamAny]];
+    let picked = null;
+    for (const c of cand) {
+      if (c && isEnabledNow(c)) { picked = c; break; }
+    }
+
+    const enabled = !!(picked && isEnabledNow(picked));
+    const now = Date.now();
+    const remainingMs = enabled && picked && picked.expiresAt
+      ? Math.max(0, Number(picked.expiresAt) - now)
+      : 0;
+
+    return {
+      ok: true,
+      enabled,
+      expiresAt: picked ? (picked.expiresAt || null) : null,
+      remainingMs,
+    };
+  }
+
   router.post('/cruces/enable', (req, res) => {
     try {
       let { team = '*', fechaKey = 'default', enabled } = req.body || {};
+      team = String(team || '*').toLowerCase().trim();
+      fechaKey = String(fechaKey || 'default').trim();
+
       const k = keyCruces(team, fechaKey);
       const current = CRUCES_FLAGS[k] || { enabled: false, expiresAt: null };
 
@@ -169,29 +200,36 @@ module.exports = function createCrucesRouter(deps) {
 
   router.get('/cruces/status', (req, res) => {
     try {
-      const { team = '*', fechaKey = 'default' } = req.query || {};
-      const kTeamDate = keyCruces(team, fechaKey);
-      const kAllDate = keyCruces('*', fechaKey);
-      const kTeamAny = keyCruces(team, 'default');
+      const { team: teamQuery = '*', fechaKey = 'default' } = req.query || {};
 
-      const cand = [CRUCES_FLAGS[kTeamDate], CRUCES_FLAGS[kAllDate], CRUCES_FLAGS[kTeamAny]];
-      let picked = null;
-      for (const c of cand) {
-        if (c && isEnabledNow(c)) { picked = c; break; }
-      }
-      const enabled = !!(picked && isEnabledNow(picked));
-      const now = Date.now();
-      const remainingMs = enabled && picked && picked.expiresAt
-        ? Math.max(0, Number(picked.expiresAt) - now)
-        : 0;
+      const authTeamRaw =
+        (req.user && (req.user.team || req.user.slug)) ||
+        req.team ||
+        (req.auth && (req.auth.team || req.auth.slug)) ||
+        (req.session && (req.session.team || req.session.slug)) ||
+        null;
+
+      const authTeam = authTeamRaw ? String(authTeamRaw).toLowerCase().trim() : null;
+      const requestedTeam = String(teamQuery || '*').toLowerCase().trim();
 
       res.set('Cache-Control', 'no-store');
-      return res.json({
-        ok: true,
-        enabled,
-        expiresAt: picked ? (picked.expiresAt || null) : null,
-        remainingMs,
-      });
+
+      // Visor admin/global
+      if (!authTeam && requestedTeam === '*') {
+        return res.json(buildStatusFor('*', fechaKey));
+      }
+
+      // Plantillas/equipos sin contexto auth firme: permitir lectura de estado
+      // para el team pedido. Esto mantiene funcionando "ver cruces".
+      if (!authTeam && requestedTeam !== '*') {
+        return res.json(buildStatusFor(requestedTeam, fechaKey));
+      }
+
+      if (requestedTeam !== '*' && requestedTeam !== authTeam) {
+        return res.status(403).json({ ok: false, error: 'No autorizade para este equipo' });
+      }
+
+      return res.json(buildStatusFor(authTeam, fechaKey));
     } catch (err) {
       console.error('GET /cruces/status', err);
       return res.status(500).json({ ok: false, error: 'Error interno' });
@@ -210,6 +248,39 @@ module.exports = function createCrucesRouter(deps) {
     } catch (err) {
       console.error('GET /cruces/stream', err);
       try { res.status(500).end(); } catch (e) {}
+    }
+  });
+
+  // ====== API: Leer planilla privada para cruces ======
+  // Usa exactamente el mismo origen que el visor admin:
+  // backend/src/data/planillas/<equipo>.planilla.json
+  router.get('/cruces/planilla', async (req, res) => {
+    try {
+      const team = String(req.query?.team || '').toLowerCase().trim();
+
+      if (!/^[a-z0-9-]+$/.test(team)) {
+        return res.status(400).json({ ok: false, error: 'team_invalido' });
+      }
+
+      const filePath = path.join(PLANILLAS_DIR, `${team}.planilla.json`);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ ok: false, error: 'planilla_no_encontrada' });
+      }
+
+      const raw = await fs.promises.readFile(filePath, 'utf8');
+      const json = JSON.parse(raw);
+
+      return res.json({
+        team,
+        capitan: Array.isArray(json.capitan) ? json.capitan : [],
+        individuales: Array.isArray(json.individuales) ? json.individuales : [],
+        pareja1: Array.isArray(json.pareja1) ? json.pareja1 : [],
+        pareja2: Array.isArray(json.pareja2) ? json.pareja2 : [],
+        suplentes: Array.isArray(json.suplentes) ? json.suplentes : []
+      });
+    } catch (err) {
+      console.error('GET /cruces/planilla', err);
+      return res.status(500).json({ ok: false, error: 'error_interno' });
     }
   });
 

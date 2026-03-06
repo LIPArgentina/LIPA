@@ -6,6 +6,8 @@ const createEquiposRouter = require('./equipos.routes');
 const createFechasRouter = require('./fechas.routes');
 const createCrucesRouter = require('./cruces.routes');
 
+const createTeamPlayersRouter = require('./teamPlayers.routes');
+
 module.exports = function createApiRouter(deps) {
   const { DATA_DIR } = deps;
 
@@ -30,6 +32,8 @@ module.exports = function createApiRouter(deps) {
   router.get('/health', (req, res) => {
     res.json({ ok: true, variant: 'noauth-hard' });
   });
+
+router.use(createTeamPlayersRouter(deps));
 
   return router;
 };

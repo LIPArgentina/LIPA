@@ -185,31 +185,116 @@ function pickBestByClosestDate(matches) {
   return dayMatches.sort((a, b) => new Date(a.date) - new Date(b.date))[0];
 }
 
-  // ---------------- CARGAR PLANILLAS DESDE ../fecha/ ----------------
-  async function loadFirstExistingPlanilla(base, slug) {
-    const urls = [
-      `${base}${slug}.planilla.js`,
-      `${base}${slug.toLowerCase()}.planilla.js`
-    ];
-    for (const url of urls) {
-      try {
-        const data = await loadGlobalScript(url, 'LPI_PLANILLA');
-        if (data && data.capitan !== undefined) {
-          console.log(`Planilla cargada: ${url}`);
-          return data;
-        }
-      } catch (e) {
-        console.warn(`No encontrado: ${url}`);
+
+  function getStoredCrucesTeam() {
+    try {
+      const qs = new URLSearchParams(location.search).get('team');
+      if (qs) {
+        const clean = normPlanillaSlug(qs);
+        try { sessionStorage.setItem('lpi_cruces_team', clean); } catch(_){}
+        try { localStorage.setItem('lpi_cruces_team', clean); } catch(_){}
+        try {
+          const url = new URL(location.href);
+          url.searchParams.delete('team');
+          history.replaceState({}, '', url.pathname + url.search + url.hash);
+        } catch(_){}
+        return clean;
       }
-    }
-    return {
-      team: slug,
-      capitan: [],
-      individuales: Array(7).fill(''),
-      pareja1: [],
-      pareja2: [],
-      suplentes: []
+    } catch(_) {}
+
+    try {
+      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+      if (sess && sess.slug) return normPlanillaSlug(sess.slug);
+    } catch(_) {}
+
+    try {
+      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+      if (sess2 && (sess2.slug || sess2.team)) return normPlanillaSlug(sess2.slug || sess2.team);
+    } catch(_) {}
+
+    try {
+      const saved = sessionStorage.getItem('lpi_cruces_team') || localStorage.getItem('lpi_cruces_team') || '';
+      if (saved) return normPlanillaSlug(saved);
+    } catch(_) {}
+
+    return '';
+  }
+
+  async function checkCrucesEnabled(teamSlug) {
+    const app = document.getElementById('app-root');
+    const grid = document.getElementById('crucesGrid');
+    const cta = document.getElementById('validateCta');
+    const err = document.getElementById('appError');
+
+    const block = (title, msg) => {
+      if (grid) grid.innerHTML = '';
+      if (cta) cta.style.display = 'none';
+      if (err) err.style.display = 'none';
+      if (app) {
+        app.innerHTML = `
+          <div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+            <div style="max-width:560px;margin:0 auto;text-align:center;background:#151617;border:1px solid #ffffff10;border-radius:18px;padding:28px 24px;box-shadow:0 10px 40px #00000040;">
+              <h2 style="margin:0 0 10px;color:#ffe65a;font-size:28px;font-weight:900;">${title}</h2>
+              <p style="margin:0;color:#e9e9e9;font-size:16px;line-height:1.5;">${msg}</p>
+            </div>
+          </div>
+        `;
+      }
+      return false;
     };
+
+    if (!teamSlug) {
+      return block('Cruces no disponibles', 'No se pudo identificar el equipo para mostrar los cruces.');
+    }
+
+    try {
+      const fechaKey = new Date().toISOString().slice(0,10);
+      const qs = new URLSearchParams({ team: teamSlug, fechaKey });
+      const r = await fetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (!j || !j.enabled) {
+        return block('Cruces no habilitados', 'El administrador todavía no habilitó los cruces para esta fecha.');
+      }
+      return true;
+    } catch (e) {
+      return block('No se pudo verificar el acceso', 'Probá nuevamente en unos minutos.');
+    }
+  }
+
+  // ---------------- CARGAR PLANILLAS DESDE BACKEND (MISMO ORIGEN QUE VISOR) ----------------
+  async function loadFirstExistingPlanilla(slug) {
+    const team = normPlanillaSlug(slug);
+
+    try {
+      const r = await fetch('/api/cruces/planilla?team=' + encodeURIComponent(team), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+
+      const data = await r.json();
+
+      return {
+        team: data.team || team,
+        capitan: Array.isArray(data.capitan) ? data.capitan : [],
+        individuales: Array.isArray(data.individuales) ? data.individuales : Array(7).fill(''),
+        pareja1: Array.isArray(data.pareja1) ? data.pareja1 : [],
+        pareja2: Array.isArray(data.pareja2) ? data.pareja2 : [],
+        suplentes: Array.isArray(data.suplentes) ? data.suplentes : []
+      };
+    } catch (e) {
+      console.warn('No se pudo cargar planilla desde backend para', team, e);
+      return {
+        team,
+        capitan: [],
+        individuales: Array(7).fill(''),
+        pareja1: [],
+        pareja2: [],
+        suplentes: []
+      };
+    }
   }
 
   // ---------------- RENDER ----------------
@@ -649,8 +734,7 @@ btn.onclick = async () => {
     document.getElementById('app-root').appendChild(loading);
 
     try {
-      const urlParams = new URLSearchParams(location.search);
-      const teamSlug = urlParams.get('team');
+      const teamSlug = getStoredCrucesTeam();
       if (!teamSlug) throw new Error('Falta equipo');
 
       const [fixtureData] = await Promise.all([
@@ -668,9 +752,8 @@ btn.onclick = async () => {
 
       const isLocal = normPlanillaSlug(local.name) === normPlanillaSlug(teamSlug);
 
-      const planillaBase = '../fecha/';
-      const localPlan = await loadFirstExistingPlanilla(planillaBase, local.teamSlug);
-      const visitantePlan = await loadFirstExistingPlanilla(planillaBase, visitante.teamSlug);
+      const localPlan = await loadFirstExistingPlanilla(local.teamSlug);
+      const visitantePlan = await loadFirstExistingPlanilla(visitante.teamSlug);
 
 renderSide('planilla-root-left',  localPlan,     visitante.name, match.date, local.name);
 renderSide('planilla-root-right', visitantePlan, local.name,     match.date, visitante.name);
@@ -701,19 +784,20 @@ renderSide('planilla-root-right', visitantePlan, local.name,     match.date, vis
   }
 
   // ---------------- INIT ----------------
-window.addEventListener('load', () => {
-  bootCruces().catch(console.error);
+window.addEventListener('load', async () => {
+  const teamSlug = getStoredCrucesTeam();
+  const allowed = await checkCrucesEnabled(teamSlug);
+
+  if (allowed) {
+    bootCruces().catch(console.error);
+  }
 
   // === BOTÓN VOLVER ===
   const volverBtn = document.getElementById('btnVolver');
   if (volverBtn) {
     volverBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      // Opción A: volver a la página anterior del navegador:
       window.history.back();
-
-      // Opción B: ir siempre al inicio:
-      // window.location.href = '../index.html';
     });
   }
 });

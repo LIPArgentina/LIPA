@@ -14,8 +14,10 @@ const rateLimit = require('express-rate-limit');
 
 const createApiRouter = require('./routes');
 const { readJSON } = require('./utils/fileStorage'); // usamos helper común
+const adminPlanillasRouter = require('./routes/admin.planillas');
 
 const app = express();
+app.use(adminPlanillasRouter);
 
 // Confiar en proxy (útil si está detrás de nginx / render / railway, etc.)
 app.set('trust proxy', 1);

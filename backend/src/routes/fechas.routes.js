@@ -5,9 +5,35 @@ const fs = require('fs');
 const { requireTeam } = require('../middleware/auth');
 
 module.exports = function createFechasRouter(deps) {
-  const { FRONTEND_DIR, FRONTEND_FECHA } = deps;
+  const { FRONTEND_DIR, FRONTEND_FECHA, DATA_DIR } = deps;
 
   const router = express.Router();
+  const PRIVATE_PLANILLAS_DIR = path.join(__dirname, '..', 'data', 'planillas');
+
+  async function ensureDir(dir) {
+    await fs.promises.mkdir(dir, { recursive: true });
+  }
+
+  function normalizePlanillaPayload(input, authSlug) {
+    if (!input || typeof input !== 'object') return null;
+    return {
+      team: String(input.team || authSlug || '').trim().toLowerCase(),
+      createdAt: input.createdAt || new Date().toISOString(),
+      individuales: Array.isArray(input.individuales) ? input.individuales.map(x => String(x || '').trim()) : [],
+      pareja1: Array.isArray(input.pareja1) ? input.pareja1.map(x => String(x || '').trim()) : [],
+      pareja2: Array.isArray(input.pareja2) ? input.pareja2.map(x => String(x || '').trim()) : [],
+      suplentes: Array.isArray(input.suplentes) ? input.suplentes.map(x => String(x || '').trim()) : [],
+      capitan: Array.isArray(input.capitan) ? input.capitan.map(x => String(x || '').trim()) : [],
+    };
+  }
+
+  function extractPlanFromContent(content) {
+    if (typeof content !== 'string' || !content.trim()) return null;
+    const m = content.match(/window\.LPI_PLANILLA\s*=\s*([\s\S]*?)\s*;\s*$/);
+    if (!m) return null;
+    try { return JSON.parse(m[1]); } catch (_) { return null; }
+  }
+
 
   // ====== API: Validación (fecha/*.validacion.js) ======
   router.post('/validar', async (req, res) => {
@@ -82,69 +108,111 @@ module.exports = function createFechasRouter(deps) {
     }
   });
 
-  // ====== API: Guardar PLANILLA ======
+  // ====== API: Guardar PLANILLA (privada, en JSON) ======
   router.post('/save-planilla', requireTeam, async (req, res) => {
     try {
       const { path: relPath, content, team } = req.body || {};
+      const authSlug = String((req.user && req.user.slug) || '').trim().toLowerCase();
 
-      // El equipo autenticado manda
-      const authSlug = req.user && req.user.slug;
-
-      // Permitimos que el frontend mande path o team, pero siempre validamos
-      const targetSlug =
+      const targetSlug = String(
         (typeof team === 'string' && team) ||
-        (typeof relPath === 'string' ? relPath.replace(/^fecha\//,'').replace(/\.planilla\.js$/,'') : null);
+        (typeof relPath === 'string'
+          ? relPath.replace(/^fecha\//,'').replace(/\.planilla\.(js|json)$/,'')
+          : '') ||
+        authSlug
+      ).trim().toLowerCase();
 
       if (!authSlug) return res.status(401).json({ ok:false, error:'no autenticade' });
       if (!targetSlug || targetSlug !== authSlug) {
         return res.status(403).json({ ok:false, error:'No podés guardar la planilla de otro equipo' });
       }
 
-      // Si te mandan "content" lo usamos. Si te mandan "plan" (JSON), generamos el JS.
-      let finalContent = null;
-      if (typeof content === 'string' && content.trim()) {
-        finalContent = content;
+      let plan = null;
+      if (req.body && typeof req.body.planilla === 'object' && req.body.planilla) {
+        plan = req.body.planilla;
       } else if (req.body && typeof req.body.plan === 'object' && req.body.plan) {
-        finalContent = 'window.LPI_PLANILLA = ' + JSON.stringify(req.body.plan, null, 2) + ';\n';
-      } else {
-        return res.status(400).json({ ok:false, error:'Faltan campos (content o plan)' });
+        plan = req.body.plan;
+      } else if (typeof content === 'string' && content.trim()) {
+        plan = extractPlanFromContent(content);
       }
 
-      // Guardamos en frontend/fecha/<slug>.planilla.js (para que el visor lo cargue por <script>)
-      const filename = `${authSlug}.planilla.js`;
-      const absPath = path.join(FRONTEND_FECHA, filename);
-      const dir = path.dirname(absPath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      if (!plan || typeof plan !== 'object') {
+        return res.status(400).json({ ok:false, error:'Faltan campos (planilla/plan) o el content es inválido' });
+      }
 
-      // Backup simple
+      const finalPlan = normalizePlanillaPayload(plan, authSlug);
+      finalPlan.team = authSlug;
+
+      await ensureDir(PRIVATE_PLANILLAS_DIR);
+
+      const filename = `${authSlug}.planilla.json`;
+      const absPath = path.join(PRIVATE_PLANILLAS_DIR, filename);
+      const dir = path.dirname(absPath);
+      await ensureDir(dir);
+
       const bakPath = absPath + '.bak';
       if (fs.existsSync(absPath)) {
         try { await fs.promises.copyFile(absPath, bakPath); } catch (_) {}
       }
 
-      // Escritura atómica: tmp -> rename
       const tmpPath = absPath + '.tmp';
-      await fs.promises.writeFile(tmpPath, finalContent, 'utf8');
+      await fs.promises.writeFile(tmpPath, JSON.stringify(finalPlan, null, 2), 'utf8');
       await fs.promises.rename(tmpPath, absPath);
 
-      return res.json({ ok: true, message: 'Planilla guardada', file: filename });
+      // Intentar borrar la versión pública vieja para no exponer la formación
+      const legacyJsPath = path.join(FRONTEND_FECHA, `${authSlug}.planilla.js`);
+      const legacyBakPath = legacyJsPath + '.bak';
+      const legacyTmpPath = legacyJsPath + '.tmp';
+      for (const legacyPath of [legacyJsPath, legacyBakPath, legacyTmpPath]) {
+        try {
+          if (fs.existsSync(legacyPath)) await fs.promises.unlink(legacyPath);
+        } catch (_) {}
+      }
+
+     return res.json({
+  ok: true,
+  message: 'Planilla guardada',
+  file: filename,
+});
     } catch (err) {
       console.error('Error al guardar planilla:', err);
       res.status(500).json({ ok: false, error: 'Error interno' });
     }
   });
 
-// ====== API: Listar planillas existentes ======
+  // ====== API: Obtener PLANILLA del equipo autenticado ======
+  router.get('/team/planilla', requireTeam, async (req, res) => {
+    try {
+      const authSlug = String((req.user && req.user.slug) || '').trim().toLowerCase();
+      if (!authSlug) return res.status(401).json({ ok:false, error:'no autenticade' });
+
+      const absPath = path.join(PRIVATE_PLANILLAS_DIR, `${authSlug}.planilla.json`);
+      if (!fs.existsSync(absPath)) {
+        return res.status(404).json({ ok:false, error:'No existe planilla guardada' });
+      }
+
+      const raw = await fs.promises.readFile(absPath, 'utf8');
+      const planilla = JSON.parse(raw);
+
+      res.set('Cache-Control', 'no-store');
+      return res.json({ ok:true, planilla });
+    } catch (err) {
+      console.error('GET /team/planilla', err);
+      return res.status(500).json({ ok:false, error:'Error interno' });
+    }
+  });
+
+// ====== API: Listar planillas existentes (privadas en JSON) ======
 router.get('/planillas', async (req, res) => {
   try {
-    const files = await fs.promises.readdir(FRONTEND_FECHA);
+    await ensureDir(PRIVATE_PLANILLAS_DIR);
+    const files = await fs.promises.readdir(PRIVATE_PLANILLAS_DIR);
 
-    // Filtrar solo archivos .planilla.js
     const planillas = files
-      .filter(f => f.endsWith('.planilla.js'))
+      .filter(f => f.endsWith('.planilla.json'))
       .map(f => ({
         file: f,
-        team: f.replace('.planilla.js', '') // opcional, para que el frontend lo use como nombre
+        team: f.replace('.planilla.json', '')
       }));
 
     return res.json(planillas);

@@ -12,33 +12,55 @@
   }
   function computeSlug(){
     try{
-      var qs = new URLSearchParams(location.search).get('team');
-      if (qs) return localSlugify(qs);
-    }catch(_){}
-    var m = (location.pathname||'').match(/\/equipos\/([^\/]+)\.html$/i);
-    if (m) return localSlugify(m[1]);
-    try{
       var sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
       if (sess && sess.slug) return localSlugify(sess.slug);
     }catch(_){}
+    try{
+      var sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+      if (sess2 && (sess2.slug || sess2.team)) return localSlugify(sess2.slug || sess2.team);
+    }catch(_){}
+    var m = (location.pathname||'').match(/\/equipos\/([^\/]+)\.html$/i);
+    if (m) return localSlugify(m[1]);
     var file = (location.pathname.split('/').pop()||'').replace(/\.html$/i,'');
     if (file) return localSlugify(file);
     return '';
   }
+
   var slug = computeSlug();
   if (!slug){ console.warn('No se pudo determinar el slug del equipo'); return; }
-  var s = document.createElement('script');
-  s.src = '../equipos/' + slug + '.players.js';
-  s.async = false;
-  s.onload = function(){
-    window.__LPI_players_ready = true;
-    document.dispatchEvent(new Event('lpi:players-ready'));
-  };
-  s.onerror = function(){ console.error('No se pudo cargar jugadores:', s.src); };
-  document.head.appendChild(s);
+
+  fetch('/api/team/players', {
+    method: 'GET',
+    cache: 'no-store',
+    credentials: 'same-origin'
+  })
+    .then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data){
+      window.LPI_PLAYERS = Array.isArray(data && data.players) ? data.players : [];
+      if (data && data.teamName) {
+        window.LPI_TEAM_NAME = window.LPI_TEAM_NAME || {};
+        window.LPI_TEAM_NAME[slug] = data.teamName;
+      }
+      window.__LPI_players_ready = true;
+      document.dispatchEvent(new Event('lpi:players-ready'));
+    })
+    .catch(function(err){
+      console.error('No se pudo cargar jugadores por API:', err);
+    });
 })();
 
-;
+(function(){
+  try{
+    const url = new URL(location.href);
+    if (url.searchParams.has('team')) {
+      url.searchParams.delete('team');
+      history.replaceState({}, '', url.pathname + url.search + url.hash);
+    }
+  }catch(_){ }
+})();
 
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
@@ -57,20 +79,20 @@
         .replace(/-+/g,'-');
     }
     function deriveTeam(){
-      const qs = new URLSearchParams(location.search).get('team');
-      if (qs) return slugify(qs);
-      const m = location.pathname.match(/\/equipos\/([^\/]+)\.html$/i);
-      if (m) return slugify(m[1]);
       try {
         const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
         if (sess && sess.slug) return slugify(sess.slug);
       } catch(_) {}
+      try {
+        const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+        if (sess2 && (sess2.slug || sess2.team)) return slugify(sess2.slug || sess2.team);
+      } catch(_) {}
+      const m = location.pathname.match(/\/equipos\/([^\/]+)\.html$/i);
+      if (m) return slugify(m[1]);
       const file = (location.pathname.split('/').pop()||'').replace(/\.html$/i,'');
       if (file) return slugify(file);
       return '';
     }
-
-;
 
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
@@ -197,7 +219,6 @@ setTimeout(() => {
 }, 2000);
 }
 
-
 let draggedPlayer = null;
 let originBox = null;
 const trash = document.getElementById('trash');
@@ -269,7 +290,6 @@ document.querySelectorAll('.yellow-box').forEach(box => {
       return;
     }
 
-
     const groupContainer = box.closest('.group-container');
     const counts = computeCountsExcludingOrigin();
     const countDragged = counts[draggedPlayer] || 0;
@@ -310,7 +330,6 @@ document.querySelectorAll('.yellow-box').forEach(box => {
       updateRepeatedHighlight();
       return;
     }
-
 
     const groupContainer = box.closest('.group-container');
     const counts = computeCountsExcludingOrigin();
@@ -355,8 +374,6 @@ trash.addEventListener('drop', e => {
   trash.style.display = 'none';
 });
 
-;
-
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
     const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
@@ -365,22 +382,12 @@ trash.addEventListener('drop', e => {
 
 // Carga de nombres hacia la columna "JUGADORES" (robusta, espera a que estén listos)
 (function() {
-  function getParam(name) {
-    try { const url = new URL(window.location.href); return url.searchParams.get(name) || null; }
-    catch (_) { return null; }
-  }
-  function getHashParam(name) {
-    try { const m = location.hash.match(new RegExp(name + "=([^&]+)")); return m ? decodeURIComponent(m[1]) : null; }
-    catch (_) { return null; }
-  }
   function selectPlayers() {
     if (Array.isArray(window.LPI_PLAYERS)) return window.LPI_PLAYERS;
     if (Array.isArray(window.LPI_JUGADORES)) return window.LPI_JUGADORES;
     const map = window.LPI_TEAM_PLAYERS;
     if (map && typeof map === "object") {
-      const fromQS = getParam("team") || getHashParam("team");
-      if (fromQS && Array.isArray(map[fromQS])) return map[fromQS];
-      const prefer = [ deriveTeam(), 'plantilla_patched', 'babylon' ];
+      const prefer = [ deriveTeam() ];
       for (const k of prefer) if (Array.isArray(map[k])) return map[k];
       const keys = Object.keys(map);
       for (const k of keys) if (Array.isArray(map[k])) return map[k];
@@ -410,8 +417,6 @@ trash.addEventListener('drop', e => {
     }
   });
 })();
-
-;
 
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
@@ -522,8 +527,6 @@ trash.addEventListener('drop', e => {
   } else { wireSubmit(); }
 })();
 
-;
-
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
     const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
@@ -556,8 +559,6 @@ trash.addEventListener('drop', e => {
     }
   });
 })();
-
-;
 
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
@@ -599,8 +600,6 @@ trash.addEventListener('drop', e => {
 
 })();
 
-;
-
 async function savePlanilla(){
     const pick = (group) => {
       const sel = `.group-container[data-group="${group}"] .yellow-box`;
@@ -619,14 +618,11 @@ async function savePlanilla(){
       capitan: pickFree()
     };
 
-    const content = `// Generado automáticamente\nwindow.LPI_PLANILLA = ${JSON.stringify(payloadObj, null, 2)};`;
-    const pathRel = `fecha/${team}.planilla.js`;
-
     try {
       const r = await fetch('/api/save-planilla', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: pathRel, content })
+        headers: LPI_getAuthHeaders(),
+        body: JSON.stringify({ planilla: payloadObj })
       });
       if (!r.ok) {
         const t = await r.text().catch(()=> '');
@@ -646,8 +642,6 @@ async function savePlanilla(){
     }
   }
 
-;
-
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
     const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
@@ -658,8 +652,6 @@ document.addEventListener('DOMContentLoaded', function(){
   var btn = document.getElementById('btnEnviar');
   if (btn) btn.addEventListener('click', savePlanilla);
 });
-
-;
 
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
@@ -674,8 +666,8 @@ document.addEventListener('DOMContentLoaded', function(){
       .trim().replace(/\s+/g,'-').replace(/-+/g,'-');
   }
   function getSlug(){
-    try{ const q = new URLSearchParams(location.search).get('team'); if (q) return slugify(q); }catch(_){}
     try{ const sess = JSON.parse(localStorage.getItem('lpi.session')||sessionStorage.getItem('lpi.session')||'null'); if (sess && sess.slug) return slugify(sess.slug); }catch(_){}
+    try{ const sess2 = JSON.parse(localStorage.getItem('lpi_team_session')||sessionStorage.getItem('lpi_team_session')||'null'); if (sess2 && (sess2.slug || sess2.team)) return slugify(sess2.slug || sess2.team); }catch(_){}
     const f = (location.pathname.split('/').pop()||'').replace(/\.html$/i,''); if (f) return slugify(f);
     return '';
   }
@@ -704,8 +696,6 @@ document.addEventListener('DOMContentLoaded', function(){
   // Reintentar cuando el players.js haya cargado y expuesto NAMES
   document.addEventListener('lpi:players-ready', setBadge, { once: true });
 })();
-
-;
 
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
@@ -740,8 +730,6 @@ document.addEventListener('DOMContentLoaded', function(){
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initFree);
   else initFree();
 })();
-
-;
 
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
@@ -849,8 +837,6 @@ document.addEventListener('DOMContentLoaded', function(){
   document.addEventListener('pointerup', onPointerUp, { passive: false });
   document.addEventListener('pointercancel', onPointerUp, { passive: false });
 })();
-
-;
 
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
@@ -1003,38 +989,39 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 })();
 
-;
-
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
     const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
     return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
   }
 
-// Propaga ?team y lo guarda para que cruces_fecha.html lo tome
+// Guarda el team para cruces y evita exponerlo en la URL pública
 (function(){
   try{
     const params = new URLSearchParams(location.search);
-    const team = params.get('team');
+    const teamFromUrl = params.get('team');
+    const team = teamFromUrl || (typeof deriveTeam === 'function' ? deriveTeam() : '');
     if (team) {
       localStorage.setItem('team', team);
+      sessionStorage.setItem('lpi_cruces_team', team);
+      localStorage.setItem('lpi_cruces_team', team);
     }
-    // Actualiza el botón "ver curces" para incluir ?team=...
+
     const btn = document.querySelector('.btn-cruces');
     if (btn) {
-      const url = new URL(btn.getAttribute('href'), location.href);
-      // solo agrega si no está ya
-      if (team && !url.searchParams.get('team')) {
-        url.searchParams.set('team', team);
-      }
-      btn.setAttribute('href', url.pathname + url.search);
+      btn.setAttribute('href', '../cruces/cruces_fecha.html');
+      btn.addEventListener('click', function(){
+        const currentTeam = (typeof deriveTeam === 'function' ? deriveTeam() : team || '');
+        if (currentTeam) {
+          try { sessionStorage.setItem('lpi_cruces_team', currentTeam); } catch(_){}
+          try { localStorage.setItem('lpi_cruces_team', currentTeam); } catch(_){}
+        }
+      });
     }
   }catch(e){ /* no-op */ }
 })();
 
-;
-
-// === Autocarga de planilla por defecto (hoy o mañana) ===
+// === Autocarga de planilla por defecto (hoy o mañana) vía API privada ===
 (function(){
   function sameDay(a,b){
     return a && b &&
@@ -1046,14 +1033,14 @@ document.addEventListener('DOMContentLoaded', function(){
     if (!createdAt) return false;
     const d = new Date(createdAt);
     if (isNaN(d)) return false;
-    const now = new Date();               // hora local del navegador
+    const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate()+1);
     return sameDay(d, now) || sameDay(d, tomorrow);
   }
   function setBox(el, name){
     if (!el) return;
-    const value = (name || "").trim();
+    const value = (name || '').trim();
     el.dataset.player = value;
     el.textContent = value;
   }
@@ -1071,24 +1058,22 @@ document.addEventListener('DOMContentLoaded', function(){
       fillGroup('pareja1',     plan.pareja1      || [], false);
       fillGroup('pareja2',     plan.pareja2      || [], false);
       fillGroup('suplentes',   plan.suplentes    || [], false);
-    } catch(_) { /* silencio */ }
+    } catch(_) { }
   }
-  function tryAutoload(){
-    var team = (typeof deriveTeam === 'function') ? deriveTeam() : '';
-    if (!team) return; // silencio si no hay team
-    var s = document.createElement('script');
-    s.src = '/frontend/fecha/' + team + '.planilla.js';
-    s.async = true;
-    s.onload = function(){
-      try {
-        var p = window.LPI_PLANILLA;
-        if (p && shouldLoad(p.createdAt)) {
-          applyPlanilla(p);
-        }
-      } catch(_) { /* silencio */ }
-    };
-    s.onerror = function(){ /* silencio */ };
-    document.head.appendChild(s);
+  async function tryAutoload(){
+    try {
+      const r = await fetch('/api/team/planilla', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: LPI_getAuthHeaders()
+      });
+      if (!r.ok) return;
+      const j = await r.json().catch(() => ({}));
+      const p = j && j.planilla;
+      if (p && shouldLoad(p.createdAt)) {
+        applyPlanilla(p);
+      }
+    } catch(_) { }
   }
   if (document.readyState !== 'loading') {
     tryAutoload();
@@ -1096,8 +1081,6 @@ document.addEventListener('DOMContentLoaded', function(){
     document.addEventListener('DOMContentLoaded', tryAutoload);
   }
 })();
-
-;
 
 // === Control remoto de "ver cruces" (habilitado por admin) ===
 (function(){
@@ -1108,17 +1091,19 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   function deriveTeam(){
     try {
-      const qs = new URLSearchParams(location.search).get('team');
-      if (qs) return slugify(qs);
+      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+      if (sess && sess.slug) return slugify(sess.slug);
+    } catch(_) {}
+    try {
+      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+      if (sess2 && (sess2.slug || sess2.team)) return slugify(sess2.slug || sess2.team);
     } catch(_) {}
     try {
       const m = location.pathname.match(/\/equipos\/([^\/]+)\.html$/i);
       if (m) return slugify(m[1]);
     } catch(_) {}
-    try {
-      const sess = JSON.parse(localStorage.getItem('lpi_team_session')||'{}');
-      if (sess && sess.team) return slugify(sess.team);
-    } catch(_) {}
+    const file = (location.pathname.split('/').pop()||'').replace(/\.html$/i,'');
+    if (file) return slugify(file);
     return '';
   }
 
