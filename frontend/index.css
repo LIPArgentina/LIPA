@@ -1,3 +1,10 @@
+
+/* Tamaño proporcional del logo en todas las pantallas */
+.hero__logo{
+  width: clamp(180px, 18vw, 260px);
+  height: auto;
+}
+
 /* Tamaño más grande del modal de Banner */
 #bannerModal .modal__panel {
   width: min(1000px, 96vw);
@@ -177,9 +184,7 @@
     padding: 1.3rem 1rem 2rem;
   }
 
-  .hero__logo {
-    max-width: 170px;
-  }
+  
 
   .title {
     font-size: 1.15rem;
