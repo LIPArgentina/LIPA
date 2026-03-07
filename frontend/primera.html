@@ -33,13 +33,20 @@
       text-transform:uppercase;
       text-shadow:0 2px 8px rgba(0,0,0,.5);
     }
-  
+
+    /* Texto PROXIMAMENTE con efecto brillante/sintilante */
     .mensaje{
       margin-top:20px;
       font-size:22px;
       color:#ffffff;
-      letter-spacing:1px;
-      opacity:0.9;
+      letter-spacing:2px;
+      animation:blinkGlow 1.5s infinite alternate;
+      text-shadow:0 0 6px #fff,0 0 12px #ffcc00,0 0 18px #ffcc00;
+    }
+
+    @keyframes blinkGlow{
+      from{opacity:0.35; transform:scale(0.98);}
+      to{opacity:1; transform:scale(1);}
     }
   </style>
 </head>
