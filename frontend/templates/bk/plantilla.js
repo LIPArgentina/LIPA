@@ -1153,23 +1153,3 @@ document.addEventListener('DOMContentLoaded', function(){
 
   setInterval(refresh, 15000);
 })();
-
-
-// ===== Ajuste visual mobile: el mensaje de éxito no empuja el layout =====
-document.addEventListener("DOMContentLoaded", function () {
-  const posibles = [
-    document.getElementById("mensaje-exito"),
-    document.querySelector(".success-message"),
-    document.querySelector(".mensaje-exito")
-  ].filter(Boolean);
-
-  posibles.forEach(el => {
-    el.style.position = "fixed";
-    el.style.left = "50%";
-    el.style.bottom = "16px";
-    el.style.transform = "translateX(-50%)";
-    el.style.zIndex = "9999";
-    el.style.margin = "0";
-  });
-});
-
