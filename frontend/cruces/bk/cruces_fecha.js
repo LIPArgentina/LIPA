@@ -1,6 +1,40 @@
 /* cruces_fecha.js — FINAL: TRIÁNGULOS ARRIBA, PUNTOS ABAJO, PAREJAS 1 SELECT, RUTA ../fecha/ */
 (() => {
-  'use strict';  // ---------------- UTILS ----------------
+  'use strict';
+
+  // --- ESCALADO GLOBAL: ajusta la "hoja" al ancho del viewport ---
+  const DESIGN_WIDTH = 650;  // ancho ideal del layout en escritorio
+
+    function applyPageScale() {
+    const vw = window.innerWidth || document.documentElement.clientWidth || DESIGN_WIDTH;
+    const outerW = window.outerWidth || vw;
+
+    // Heurística: si el viewport interno es chico pero la ventana externa es grande,
+    // asumimos que es emulación (DevTools / modo compatibilidad).
+    const isEmulated = (outerW - vw > 200) && (outerW > 900);
+
+    let scale;
+    if (isEmulated) {
+      // En modo emulado no escalamos para que el header llegue a los bordes
+      scale = 1;
+    } else {
+      // Lógica de escalado original
+      scale = vw / DESIGN_WIDTH;
+      if (scale > 1) scale = 1;      // en escritorio no agrandamos
+      if (scale < 0.4) scale = 0.4;  // límite para no quedar microscópico
+
+      // achicamos todo un 10% extra
+      scale *= 0.9;
+    }
+
+    document.documentElement.style.setProperty('--page-scale', String(scale));
+  }
+
+  window.addEventListener('resize', applyPageScale);
+  window.addEventListener('orientationchange', applyPageScale);
+  window.addEventListener('DOMContentLoaded', applyPageScale);
+
+  // ---------------- UTILS ----------------
   const dtf = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' });
 
   const normalize = (s = '', { stripHyphens = false } = {}) => {
