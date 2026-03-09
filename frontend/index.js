@@ -187,7 +187,7 @@ function goToBanner(index, restartTimer = false) {
     if (banners.length > 1) {
       bannerState.intervalId = setInterval(() => {
         goToBanner(bannerState.currentIndex + 1, false);
-      }, 4000); // 4 segundos
+      }, 6000); // 4 segundos
     }
   }
 }
