@@ -1,28 +1,29 @@
 {
   "banners": [
     {
-      "text": "Bienvenidos a la liga de pool independiente",
+      "text": "LA LIGA INDEPENDIENTE DE POOL LES DA LA BIENVENIDA!",
       "link": null
     },
     {
-      "text": "Te invitamos a participar del torneo femenino",
+      "text": "9 de marzo reunión de capitanes en El Trebol de Moreno - 20hr",
+      "link": null
+    },
+    {
+      "text": "16 de marzo comienza la Superliga de 2da división.   \\n17 de marzo comienza la Superliga de 3ra división.",
+      "link": null
+    },
+    {
+      "text": "Seguinos a todos lados con Instagram y no te pierdas de nada...",
       "link": {
-        "href": "http://google.com",
-        "label": "click aquí"
+        "href": "https://www.instagram.com/liga.de.pool.independiente.ar?igsh=MWRmbmk3YmNjOGFteA==",
+        "label": ">>CLICK AQUÍ<<"
       }
     },
     {
-      "text": "Te invitamos a participar del torneo juvenil",
+      "text": "Reviví cada fecha con fotos y videos en nuestro FACEBOOK...",
       "link": {
-        "href": "http://www.google.com.ar",
-        "label": "click aquí"
-      }
-    },
-    {
-      "text": "Insumos para pool y billar",
-      "link": {
-        "href": "http://google.com",
-        "label": "ww.KAMUI.com"
+        "href": "https://www.instagram.com/liga.de.pool.independiente.ar",
+        "label": ">>CLICK AQUÍ<<"
       }
     }
   ]

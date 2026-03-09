@@ -2,7 +2,7 @@ const path = require('path');
 const { readJSON, writeJSON } = require('../utils/fileStorage');
 
 const DEFAULT_BANNERS = [
-  { text: 'Bienvenidxs a la Liga de Pool Independiente', link: null }
+  { text: 'Algo salió mal, contacte al administrador.', link: null }
 ];
 
 function validateLink(linkObj) {

@@ -96,7 +96,7 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const bannerModuleHandler = (req, res) => {
   try {
     const data = readJSON(path.join(DATA_DIR, 'banner.json'), {
-      text: 'Bienvenidxs a la Liga de Pool Independiente',
+      text: 'Algo salió mal, contacte al administrador.',
       link: null,
     });
     const body = `export const BANNER_CONFIG = ${JSON.stringify(data, null, 2)};\n`;
