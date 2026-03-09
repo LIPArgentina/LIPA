@@ -538,3 +538,193 @@ dialog.modal { padding: 0 !important; }
   }
 }
 
+
+/* ===== Limpieza del espacio inferior ===== */
+html, body{
+  min-height: 0;
+}
+
+body{
+  height: auto !important;
+}
+
+.main-container,
+.jugadores-container,
+.extra-column,
+.group-container{
+  margin-bottom: 0 !important;
+}
+
+.send-wrap,
+.extra-column .send-wrap{
+  margin-bottom: 0 !important;
+}
+
+#mensaje-exito,
+.success-message,
+.mensaje-exito{
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 16px !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+  z-index: 9999 !important;
+}
+
+/* ===== Ajuste extra mobile ===== */
+@media (max-width: 768px){
+  body{
+    padding-bottom: 4px !important;
+  }
+
+  header{
+    margin-bottom: 6px !important;
+  }
+
+  .main-container{
+    align-items: start !important;
+    padding-bottom: 2px !important;
+  }
+
+  .jugadores-container,
+  .extra-column{
+    padding-bottom: 4px !important;
+  }
+
+  .send-wrap,
+  .extra-column .send-wrap{
+    margin-top: 6px !important;
+    padding-bottom: 0 !important;
+  }
+
+  .spacer,
+  .big-spacer{
+    height: 1px !important;
+    min-height: 1px !important;
+  }
+}
+
+/* celulares muy chicos */
+@media (max-width: 420px){
+  .jugador,
+  .yellow-box,
+  .yellow-box-free{
+    font-size: clamp(7px, 2.35vw, 10px) !important;
+  }
+
+  .main-container{
+    padding-bottom: 0 !important;
+  }
+}
+
+/* ===== Header ultra compacto para móvil ===== */
+@media (max-width: 768px){
+
+  header{
+    padding:6px 8px;
+    gap:4px;
+  }
+
+  header .logo-link img{
+    height:30px;
+  }
+
+  .team-name{
+    font-size:12px;
+    margin-right:4px;
+  }
+
+  .header-actions{
+    gap:4px;
+  }
+
+  .header-actions a,
+  .header-actions button{
+    font-size:10px;
+    padding:3px 6px;
+    border-radius:10px;
+    line-height:1;
+  }
+
+  .header-middle button{
+    font-size:10px;
+    padding:3px 6px;
+  }
+
+}
+
+/* ===== Icono contraseña en móvil ===== */
+
+/* ===== Icono contraseña estilo botón Volver ===== */
+@media (max-width: 768px){
+
+  #headerActions a:first-child,
+  #headerActions button:first-child{
+
+    font-size:0 !important;
+
+    width:30px !important;
+    height:30px !important;
+    padding:0 !important;
+
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+
+    background:#000 !important;
+    border:1px solid #d4af37 !important;
+    border-radius:999px !important;
+
+    color:#fff !important;
+  }
+
+  #headerActions a:first-child::before,
+  #headerActions button:first-child::before{
+    content:"🔑";
+    font-size:15px;
+  }
+
+}
+
+  #headerActions a:first-child::before,
+  #headerActions button:first-child::before{
+    content:"🔑";
+    font-size:15px;
+  }
+
+}
+
+@media (max-width: 768px){
+
+  header{
+    display:flex;
+    align-items:center;
+    flex-wrap:nowrap;
+    justify-content:space-between;
+    gap:6px;
+  }
+
+  .header-middle{
+    margin-left:auto;
+    margin-right:4px;
+  }
+
+  .header-actions{
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+
+}
+@media (max-width: 768px){
+
+  .header-middle,
+  .header-actions{
+    width:auto !important;
+  }
+
+  header{
+    flex-wrap:nowrap !important;
+  }
+
+}

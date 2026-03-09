@@ -263,7 +263,6 @@ dialog.modal { padding: 0 !important; }
 
   .header-middle,
   .header-actions{
-    width: 100%;
     justify-content: center;
     margin-left: 0;
   }
@@ -614,6 +613,149 @@ body{
 
   .main-container{
     padding-bottom: 0 !important;
+  }
+}
+
+/* ===== Header ultra compacto para móvil ===== */
+@media (max-width: 768px){
+
+  header{
+    padding:6px 8px;
+    gap:4px;
+  }
+
+  header .logo-link img{
+    height:30px;
+  }
+
+  .team-name{
+    font-size:12px;
+    margin-right:4px;
+  }
+
+  .header-actions{
+    gap:4px;
+  }
+
+  .header-actions a,
+  .header-actions button{
+    font-size:10px;
+    padding:3px 6px;
+    border-radius:10px;
+    line-height:1;
+  }
+
+  .header-middle button{
+    font-size:10px;
+    padding:3px 6px;
+  }
+
+}
+
+/* ===== Icono contraseña en móvil ===== */
+@media (max-width: 768px){
+
+  #headerActions a[href*="password"],
+  #headerActions a[href*="contraseña"]{
+    font-size:0;
+    padding:4px 8px;
+    position:relative;
+  }
+
+  #headerActions a[href*="password"]::before,
+  #headerActions a[href*="contraseña"]::before{
+    content:"🔑";
+    font-size:16px;
+  }
+
+}
+
+
+/* ===== Override final header mobile estable ===== */
+@media (max-width: 768px){
+  header{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    flex-wrap:nowrap !important;
+    gap:6px !important;
+    overflow:hidden;
+  }
+
+  header .logo-link{
+    flex:0 0 auto;
+  }
+
+  header .logo-link img{
+    height:30px !important;
+  }
+
+  .team-name{
+    flex:0 1 auto;
+    min-width:0;
+    font-size:12px !important;
+    white-space:nowrap !important;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    margin-right:4px !important;
+  }
+
+  .header-middle{
+    flex:0 1 auto !important;
+    width:auto !important;
+    min-width:0;
+    margin-left:auto !important;
+    margin-right:4px !important;
+  }
+
+  .btn-cruces{
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    font-size:10px !important;
+    padding:6px 10px !important;
+    white-space:nowrap !important;
+  }
+
+  .header-actions{
+    flex:0 0 auto !important;
+    width:auto !important;
+    display:flex !important;
+    align-items:center !important;
+    gap:4px !important;
+    min-width:0;
+  }
+
+  .header-actions a,
+  .header-actions button{
+    font-size:10px !important;
+    line-height:1 !important;
+    padding:3px 6px !important;
+    border-radius:10px !important;
+    white-space:nowrap !important;
+  }
+
+  #headerActions a:first-child,
+  #headerActions button:first-child{
+    width:30px !important;
+    height:30px !important;
+    padding:0 !important;
+    font-size:0 !important;
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    background:#000 !important;
+    border:1px solid #d4af37 !important;
+    border-radius:999px !important;
+    color:#fff !important;
+    flex:0 0 auto !important;
+  }
+
+  #headerActions a:first-child::before,
+  #headerActions button:first-child::before{
+    content:"🔑";
+    font-size:15px !important;
+    line-height:1 !important;
   }
 }
 
