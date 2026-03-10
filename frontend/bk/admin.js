@@ -43,7 +43,7 @@ const FILES = {
   tercera:  BASE + 'usuarios.tercera.js',
 };
 const EQUIPOS_DIR = 'equipos/';
-const SLOTS = 20;
+const SLOTS = 18;
 const LS_KEY = 'lpi_admin_roster_v1';
 
 /* ====== Helpers ====== */
@@ -58,30 +58,8 @@ function slugify(s){
 }
 function readLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }catch{ return {}; } }
 function writeLS(obj){ try{ localStorage.setItem(LS_KEY, JSON.stringify(obj||{})); }catch{} }
-function getDraftKey(div, team){ return div + '/' + team; }
-function getDraft(div, team){
-  const s = readLS();
-  const draft = s.drafts?.[getDraftKey(div, team)];
-  return Array.isArray(draft) ? draft.slice(0, SLOTS) : Array(SLOTS).fill('');
-}
-function hasDraft(div, team){
-  const s = readLS();
-  const draft = s.drafts?.[getDraftKey(div, team)];
-  return Array.isArray(draft) && draft.some(v => (v || '').trim() !== '');
-}
-function setDraft(div, team, arr){
-  const s = readLS();
-  s.drafts = s.drafts || {};
-  s.drafts[getDraftKey(div, team)] = (arr || []).slice(0, SLOTS);
-  writeLS(s);
-}
-function clearDraft(div, team){
-  const s = readLS();
-  if (s.drafts) {
-    delete s.drafts[getDraftKey(div, team)];
-  }
-  writeLS(s);
-}
+function getDraft(div, team){ const s=readLS(); return (s.drafts?.[div+'/'+team]||Array(SLOTS).fill('')); }
+function setDraft(div, team, arr){ const s=readLS(); s.drafts=s.drafts||{}; s.drafts[div+'/'+team]=arr; writeLS(s); }
 function setLast(div,team){ const s=readLS(); s.division=div; s.team=team; writeLS(s); }
 function getLast(){ const s=readLS(); return { division: s.division||'primera', team: s.team||null }; }
 
@@ -184,59 +162,6 @@ function fillTeamSelect(){
     sel.appendChild(opt);
   });
 }
-function getSelectedTeamSlug(){ return $('#teamSelect')?.value || ''; }
-function refreshDraftButtons(){
-  const teamSlug = getSelectedTeamSlug();
-  const has = teamSlug ? hasDraft(_activeDiv, teamSlug) : false;
-  const btnLoad = $('#btnLoadDraft');
-  const btnDiscard = $('#btnDiscardDraft');
-  if (btnLoad) btnLoad.disabled = !has;
-  if (btnDiscard) btnDiscard.disabled = !has;
-}
-function toggleImportBox(force){
-  const box = $('#importBox');
-  if (!box) return;
-  const open = typeof force === 'boolean' ? force : box.hasAttribute('hidden');
-  if (open) box.removeAttribute('hidden');
-  else box.setAttribute('hidden', 'hidden');
-}
-function importPlayersFromTextarea(){
-  const ta = $('#importPlayersText');
-  if (!ta) return;
-  const raw = ta.value || '';
-  const items = raw
-    .split(/\r?\n|;/)
-    .map(s => s.replace(/^\s*\d+[.)-]?\s*/, '').trim())
-    .filter(Boolean)
-    .slice(0, SLOTS);
-  const vals = items.concat(Array(Math.max(0, SLOTS - items.length)).fill(''));
-  setCurrentValues(vals);
-  saveDraftNow();
-  refreshDraftButtons();
-  toggleImportBox(false);
-  toast(`Se importaron ${items.length} jugador(es)`);
-}
-function loadDraftIntoForm(){
-  const teamSlug = getSelectedTeamSlug();
-  if (!teamSlug || !hasDraft(_activeDiv, teamSlug)) {
-    toast('No hay borrador para este equipo');
-    refreshDraftButtons();
-    return;
-  }
-  const vals = getDraft(_activeDiv, teamSlug);
-  while (vals.length < SLOTS) vals.push('');
-  setCurrentValues(vals);
-  toast('Borrador cargado');
-  refreshDraftButtons();
-}
-async function discardDraftForCurrentTeam(){
-  const teamSlug = getSelectedTeamSlug();
-  if (!teamSlug) return;
-  clearDraft(_activeDiv, teamSlug);
-  refreshDraftButtons();
-  await changeTeam();
-  toast('Borrador descartado');
-}
 
 /* === Cargar jugadores desde /equipos/<slug>.players.js o .json === */
 function getPlayersFromGlobal(slug){
@@ -280,9 +205,15 @@ async function loadPlayersForTeam(slug){
 async function changeTeam(){
   const teamSlug = $('#teamSelect').value;
   let vals = await loadPlayersForTeam(teamSlug);
-  while (vals.length < SLOTS) vals.push('');
+
+  // Si hay draft en localStorage, lo priorizamos
+  const draft = getDraft(_activeDiv, teamSlug);
+  if (Array.isArray(draft) && draft.some(v => (v||'').trim() !== '')) {
+    vals = draft.slice(0, SLOTS);
+    while (vals.length < SLOTS) vals.push('');
+  }
+
   buildPlayersUI(vals);
-  refreshDraftButtons();
   setLast(_activeDiv, teamSlug);
 }
 function saveDraftNow(){
@@ -302,10 +233,9 @@ async function saveRoster(){
     });
     const json = await resp.json().catch(()=> ({}));
     if(!resp.ok || !json.ok){ throw new Error(json?.error || 'Error al guardar'); }
+    // mantener en memoria el global para navegación inmediata
     window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
     window.LPI_TEAM_PLAYERS[teamSlug] = players.slice(0,SLOTS);
-    clearDraft(_activeDiv, teamSlug);
-    refreshDraftButtons();
     toast('Guardado correctamente');
   }catch(e){
     console.warn(e); toast('Error al guardar');
@@ -355,14 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnSaveTeams').addEventListener('click', saveTeams);
   $('#btnSaveRoster').addEventListener('click', saveRoster);
   $('#teamSelect').addEventListener('change', changeTeam);
-  $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());
-  $('#btnApplyImport')?.addEventListener('click', importPlayersFromTextarea);
-  $('#btnCancelImport')?.addEventListener('click', () => toggleImportBox(false));
-  $('#btnLoadDraft')?.addEventListener('click', loadDraftIntoForm);
-  $('#btnDiscardDraft')?.addEventListener('click', discardDraftForCurrentTeam);
 
+  // Render vacío y cargar división inicial
   buildPlayersUI(Array(SLOTS).fill(''));
-  refreshDraftButtons();
   const last = getLast();
   loadDivision(last.division || 'primera');
 });

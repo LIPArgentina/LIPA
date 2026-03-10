@@ -1,11 +1,11 @@
 window.LPI_USERS = [
   {
-    "username": "BABYLON",
+    "username": "IMPERIO SUR",
     "role": "team",
-    "captain": "javier martino",
+    "captain": "",
     "email": "",
-    "phone": "1151610569",
-    "slug": "babylon"
+    "phone": "",
+    "slug": "imperiosur"
   },
   {
     "username": "TAKO'S",
@@ -80,12 +80,12 @@ window.LPI_USERS = [
     "slug": "imperiosur"
   },
   {
-    "username": "HOMERO",
+    "username": "PR BAR",
     "role": "team",
     "captain": "",
     "email": "",
     "phone": "",
-    "slug": "homero"
+    "slug": "prbar"
   },
   {
     "username": "OLDIE'S",
@@ -120,27 +120,19 @@ window.LPI_USERS = [
     "slug": "heaven"
   },
   {
-    "username": "prueba",
+    "username": "WHY NOT",
     "role": "team",
     "captain": "",
     "email": "",
     "phone": "",
-    "slug": "prueba"
+    "slug": "whynot"
   },
   {
-    "username": "prueba 2",
+    "username": "ANEXO",
     "role": "team",
     "captain": "",
     "email": "",
     "phone": "",
-    "slug": "prueba2"
-  },
-  {
-    "username": "PRUEBA 3",
-    "role": "team",
-    "captain": "",
-    "email": "",
-    "phone": "",
-    "slug": "prueba3"
+    "slug": "anexo"
   }
 ];
