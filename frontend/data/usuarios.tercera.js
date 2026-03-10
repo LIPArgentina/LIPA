@@ -72,14 +72,6 @@ window.LPI_USERS = [
     "slug": "duckhunter"
   },
   {
-    "username": "IMPERIO SUR",
-    "role": "team",
-    "captain": "",
-    "email": "",
-    "phone": "",
-    "slug": "imperiosur"
-  },
-  {
     "username": "PR BAR",
     "role": "team",
     "captain": "",
