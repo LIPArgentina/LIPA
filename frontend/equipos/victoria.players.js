@@ -10,14 +10,14 @@ window.LPI_TEAM_PLAYERS["victoria"] = [
   "Martin Eduardo Tedesco",
   "Damian Gonzalez",
   "Gaston Cordoba",
-  "Carlos Eduardo Varela",
   "Mariano Barreiro",
   "Fernando Victor Caceres",
   "Fernando Morel",
   "Dario Vicente Sierra",
   "Cristian Panettieri",
-  "Luis Marcelo Ortiz",
-  "Hector Cardozo",
+  "",
+  "",
+  "",
   "",
   ""
 ];

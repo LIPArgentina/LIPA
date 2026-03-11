@@ -14,9 +14,9 @@ window.LPI_TEAM_PLAYERS["chuavechito"] = [
   "Joel Luciano Paz",
   "Damian Ponce De Leon",
   "Ruben Sanchez",
-  "Marino Zalazar",
-  "Marino Musso",
-  "Enzo Muiz",
+  "Martin Zalazar",
+  "Martin Musso",
+  "Enzo Ruiz",
   "Cristian Gomez",
   "Rodolfo Remeima",
   ""

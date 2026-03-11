@@ -2,7 +2,7 @@ window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
 window.LPI_TEAM_PLAYERS["prbar"] = [
   "Adrian Indart",
   "Dario Duarte",
-  "Elias Sacoritti",
+  "Elias Saccoritti",
   "Claudio Furlan",
   "Federico Aguilar",
   "Florencia Casabona",

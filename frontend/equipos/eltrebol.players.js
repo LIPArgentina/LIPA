@@ -10,7 +10,7 @@ window.LPI_TEAM_PLAYERS["eltrebol"] = [
   "Javier Correa",
   "Roberto Ponce",
   "Federico Paglione",
-  "Ailen Itela",
+  "Ailen Irala",
   "Edgar Vela",
   "Ezequiel Alacer",
   "Maximiliano Suarez",

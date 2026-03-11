@@ -3,7 +3,6 @@ window.LPI_TEAM_PLAYERS["8910ball"] = [
   "Walter René Sosa",
   "Alejandro Bonini",
   "Edgardo Rodriguez",
-  "Alejandro Bonini",
   "Ricardo Pereyra",
   "Diego Sosa",
   "Bruno Torba",
@@ -19,5 +18,6 @@ window.LPI_TEAM_PLAYERS["8910ball"] = [
   "Luis Otranto",
   "Gabriel Marzullo",
   "Dante Desposito",
+  "",
   ""
 ];

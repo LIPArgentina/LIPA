@@ -1,7 +1,7 @@
 window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
 window.LPI_TEAM_PLAYERS["academiadepool"] = [
   "Fabian Egüez",
-  "Joel Korolnic",
+  "Joel Koruluk",
   "Gabriel Zambianchi",
   "Cristian Georgiovitch",
   "Fernando Ruiz",
@@ -13,11 +13,11 @@ window.LPI_TEAM_PLAYERS["academiadepool"] = [
   "Fernando Kowalczuk",
   "Gerardo Cardozo",
   "Hernan Cardozo",
-  "Yanina de Rivo",
+  "Yanina de Ruvo",
   "Saul Orlando Sanches",
-  "Juan Jose Baglieto",
-  "Facundo Luba",
-  "Fabian Egüez",
-  "Joel Korolnic",
+  "Juan Jose Baglietto",
+  "Facundo Luna",
+  "",
+  "",
   ""
 ];

@@ -7,7 +7,7 @@ window.LPI_TEAM_PLAYERS["heaven"] = [
   "Diego Davoli",
   "Juan Manuel Damiano",
   "Gonzalo Liria",
-  "Facundo Leira2",
+  "Facundo Leira",
   "Ezequiel Basilio",
   "Walter Vicare",
   "Maximiliano Lopez",

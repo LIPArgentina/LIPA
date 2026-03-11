@@ -3,12 +3,10 @@ window.LPI_TEAM_PLAYERS["academiadepoolargentina"] = [
   "Matias Escobar",
   "Jorge Oscar Gonzalez",
   "Jorge Martin Gonzalez",
-  "Jorge Oscar Gonzalez",
   "Ramon Quiroz",
   "Mariano Walter Milanoff",
   "Ramon Isnardes",
   "Pablo Arias",
-  "Matias Escobar",
   "Fernando Dabrenche",
   "Jorge Junco",
   "Hugo Reyes",
@@ -19,5 +17,7 @@ window.LPI_TEAM_PLAYERS["academiadepoolargentina"] = [
   "Fernando Ruiz",
   "Facundo Luna",
   "Gabriel Zambianchi",
-  "Cristian Geordovich"
+  "Cristian Geordovich",
+  "Fernando Gonzalez",
+  "Fabian Ezguez"
 ];

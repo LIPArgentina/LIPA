@@ -16,7 +16,7 @@ window.LPI_TEAM_PLAYERS["eltrebolmoreno"] = [
   "Mauricio Lozano",
   "David Mitrovich",
   "Claudia Muñoz",
-  "Leonardo Voibo",
+  "Leonardo Voiro",
   "Gabriel Wilson",
   "",
   ""
