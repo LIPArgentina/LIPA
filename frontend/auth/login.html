@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ingreso | Liga Independiente de Pool</title>
+
+  <link rel="icon" href="../logo_liga.png" />
+  <link rel="stylesheet" href="./login.css" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<main class="auth-shell">
+
+  <section class="auth-card">
+
+    <div class="auth-brand">
+      <img src="../logo_liga.png" alt="Liga Independiente de Pool" class="auth-logo" />
+      <h1>Ingreso</h1>
+      <p>Elegí el tipo de acceso</p>
+    </div>
+
+    <!-- SELECCIÓN CATEGORÍA -->
+
+    <div class="category-grid" id="categoryGrid">
+
+      <button
+        type="button"
+        class="category-btn"
+        data-category="primera"
+      >
+        Primera
+      </button>
+
+      <button
+        type="button"
+        class="category-btn"
+        data-category="segunda"
+      >
+        Segunda
+      </button>
+
+      <button
+        type="button"
+        class="category-btn"
+        data-category="tercera"
+      >
+        Tercera
+      </button>
+
+      <button
+        type="button"
+        class="category-btn category-btn--admin"
+        data-category="admin"
+      >
+        Admin
+      </button>
+
+    </div>
+
+
+    <!-- LOGIN EQUIPO -->
+
+    <form
+      id="teamForm"
+      class="auth-form hidden"
+      autocomplete="on"
+    >
+
+      <div class="form-head">
+        <button
+          type="button"
+          class="back-btn"
+          id="backFromTeam"
+        >
+          ← Volver
+        </button>
+
+        <h2 id="teamFormTitle">Ingreso</h2>
+      </div>
+
+
+      <label
+        class="field-label"
+        for="userSelect"
+      >
+        Seleccioná usuario
+      </label>
+
+      <select
+        id="userSelect"
+        name="username"
+        class="field-control"
+        autocomplete="username"
+      >
+      </select>
+
+
+      <label
+        class="field-label"
+        for="passwordInput"
+      >
+        Contraseña
+      </label>
+
+      <input
+        id="passwordInput"
+        name="password"
+        type="password"
+        class="field-control"
+        autocomplete="current-password"
+      />
+
+
+      <label class="check-row">
+        <input
+          id="togglePass"
+          type="checkbox"
+        />
+        <span>Mostrar contraseña</span>
+      </label>
+
+
+      <p
+        id="teamError"
+        class="error hidden"
+      >
+        Usuario o contraseña incorrecta
+      </p>
+
+
+      <div class="form-actions">
+        <button
+          type="submit"
+          class="btn-primary"
+        >
+          Ingresar
+        </button>
+      </div>
+
+    </form>
+
+
+    <!-- LOGIN ADMIN -->
+
+    <form
+      id="adminForm"
+      class="auth-form hidden"
+      autocomplete="on"
+    >
+
+      <div class="form-head">
+
+        <button
+          type="button"
+          class="back-btn"
+          id="backFromAdmin"
+        >
+          ← Volver
+        </button>
+
+        <h2>Ingreso Admin</h2>
+
+      </div>
+
+
+      <label
+        class="field-label"
+        for="adminPass"
+      >
+        Contraseña
+      </label>
+
+      <input
+        id="adminPass"
+        name="password"
+        type="password"
+        class="field-control"
+        autocomplete="current-password"
+      />
+
+
+      <label class="check-row">
+        <input
+          id="toggleAdminPass"
+          type="checkbox"
+        />
+        <span>Mostrar contraseña</span>
+      </label>
+
+
+      <p
+        id="adminError"
+        class="error hidden"
+      >
+        Contraseña incorrecta
+      </p>
+
+
+      <div class="form-actions">
+        <button
+          type="submit"
+          class="btn-primary"
+        >
+          Ingresar
+        </button>
+      </div>
+
+    </form>
+
+  </section>
+
+</main>
+
+<script src="../config.js"></script>
+<script type="module" src="./login.js"></script>
+
+</body>
+</html>

@@ -22,13 +22,6 @@
 
       <div id="sessionBox">
         <button id="btnIngresar" class="btn btn-primary">Ingresar</button>
-
-        <div id="ingresarMenu" class="dropdown hidden">
-          <button class="dropdown__item" data-action="admin">Admin</button>
-          <button class="dropdown__item" data-action="primera">Primera</button>
-          <button class="dropdown__item" data-action="segunda">Segunda</button>
-          <button class="dropdown__item" data-action="tercera">Tercera</button>
-        </div>
       </div>
     </div>
   </header>
@@ -41,7 +34,7 @@
     <h1 class="title">LIGA INDEPENDIENTE DE POOL</h1>
 
     <div class="well">
-     <p id="bannerMessage">Bienvenidos a la Liga de Pool Independiente</p>
+      <p id="bannerMessage">Bienvenidos a la Liga de Pool Independiente</p>
     </div>
 
     <div id="bannerDots" class="banner-dots"></div>
@@ -59,61 +52,6 @@
       <button id="btnLogout" class="btn btn-ghost">Cerrar sesión</button>
     </div>
   </div>
-
-  <dialog id="loginModal" class="modal">
-    <form method="dialog" class="modal__panel" id="loginForm" autocomplete="off">
-      <div class="modal__header">
-        <h3 id="loginTitle">Ingreso</h3>
-      </div>
-
-      <div class="modal__body">
-        <label class="field__label">Seleccioná usuario</label>
-        <select id="userSelect" class="field__control"></select>
-
-        <label class="field__label">Contraseña</label>
-        <div class="field__password">
-          <input id="passwordInput" type="password" class="field__control" />
-          <label class="check">
-            <input id="togglePass" type="checkbox" />
-            <span>mostrar</span>
-          </label>
-        </div>
-
-        <p id="loginError" class="error hidden">Usuario o contraseña incorrecta</p>
-      </div>
-
-      <div class="modal__footer">
-        <button id="cancelLogin" class="btn btn-ghost" value="cancel" formmethod="dialog">Cancelar</button>
-        <button id="submitLogin" class="btn btn-primary" value="confirm">Ingresar</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="adminModal" class="modal">
-    <form method="dialog" class="modal__panel" id="adminForm" autocomplete="off">
-      <div class="modal__header">
-        <h3>Ingreso: Admin</h3>
-      </div>
-
-      <div class="modal__body">
-        <label class="field__label">Contraseña</label>
-        <div class="field__password">
-          <input id="adminPass" type="password" class="field__control" />
-          <label class="check">
-            <input id="toggleAdminPass" type="checkbox" />
-            <span>mostrar</span>
-          </label>
-        </div>
-        <p id="adminError" class="error hidden">Contraseña incorrecta</p>
-      </div>
-
-      <div class="modal__footer">
-        <button id="cancelAdmin" class="btn btn-ghost" value="cancel" formmethod="dialog">Cancelar</button>
-        <button id="submitAdmin" class="btn btn-primary" value="confirm">Ingresar</button>
-      </div>
-    </form>
-  </dialog>
-
 
   <dialog id="bannerModal" class="modal">
     <form method="dialog" class="modal__panel" id="bannerForm" autocomplete="off">
@@ -158,11 +96,9 @@
       </div>
     </form>
   </dialog>
-
-  <!-- JS principal de la app -->
+  
+  <script src="./config.js"></script>
   <script type="module" src="./app.js" defer></script>
-
-  <!-- Lógica específica de index (antes inline) -->
   <script type="module" src="./index.js" defer></script>
 </body>
 </html>

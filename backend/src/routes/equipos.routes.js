@@ -85,6 +85,41 @@ module.exports = function createEquiposRouter(deps) {
       return res.status(500).json({ ok: false, error: 'Error interno' });
     }
   });
+      // ====== API: Obtener jugadores de un equipo ======
+router.get('/team/players', async (req, res) => {
+  try {
+    const slug = String(req.query.team || req.query.slug || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
 
+    if (!slug) {
+      return res.status(400).json({ ok: false, error: 'Falta slug del equipo' });
+    }
+
+    const jsonPath = path.join(FRONTEND_EQUIPOS, `${slug}.players.json`);
+
+    if (!fs.existsSync(jsonPath)) {
+      return res.json({
+        ok: true,
+        slug,
+        teamName: null,
+        players: []
+      });
+    }
+
+    const data = JSON.parse(await fs.promises.readFile(jsonPath, 'utf8'));
+
+    return res.json({
+      ok: true,
+      slug,
+      teamName: slug,
+      players: data.players || []
+    });
+
+  } catch (err) {
+    console.error('Error cargando jugadores', err);
+    return res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
   return router;
 };

@@ -1,3 +1,44 @@
+alert("PLANTILLA JS CARGADO");
+console.log("PLANTILLA JS CARGADO");
+
+function LPI_apiBase() {
+  return (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+}
+
+function LPI_apiUrl(path) {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${LPI_apiBase()}${cleanPath}`;
+}
+
+function LPI_apiFetch(path, options = {}) {
+  return fetch(LPI_apiUrl(path), {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...(options.headers || {})
+    }
+  });
+}
+
+function LPI_apiBase(){
+  return (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+}
+
+function LPI_apiUrl(path){
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${LPI_apiBase()}${cleanPath}`;
+}
+
+function LPI_apiFetch(path, options = {}){
+  return fetch(LPI_apiUrl(path), {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...(options.headers || {})
+    }
+  });
+}
+
 // === LPI Auth helper ===
   function LPI_getAuthHeaders(){
     const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
@@ -27,13 +68,14 @@
   }
 
   var slug = computeSlug();
-if (!slug){ console.warn('No se pudo determinar el slug del equipo'); return; }
+  if (!slug){ console.warn('No se pudo determinar el slug del equipo'); return; }
 
-fetch(APP_CONFIG.API_BASE_URL + '/api/team/players?team=' + slug, {
-    method: 'GET',
-    cache: 'no-store',
-    credentials: 'same-origin'
-  })
+const slug = LPI_getSlugFromQuery();
+
+LPI_apiFetch(`/api/team/players?team=${encodeURIComponent(slug)}`, {
+  method: 'GET',
+  cache: 'no-store'
+})
     .then(function(r){
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -501,11 +543,11 @@ trash.addEventListener('drop', e => {
       return;
     }
     var slug = getTeamSlug();
-    fetch('/api/team/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: slug, oldPassword: oldPass, newPassword: newPass })
-    })
+    LPI_apiFetch('/api/team/change-password', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ slug: slug, oldPassword: oldPass, newPassword: newPass })
+})
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json().catch(function(){return {};}); })
     .then(function(){
       err.style.display = 'none';
@@ -619,7 +661,7 @@ async function savePlanilla(){
     };
 
     try {
-      const r = await fetch('/api/save-planilla', {
+      const r = await LPI_apiFetch('/api/save-planilla', {
         method: 'POST',
         headers: LPI_getAuthHeaders(),
         body: JSON.stringify({ planilla: payloadObj })
@@ -1062,11 +1104,11 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   async function tryAutoload(){
     try {
-      const r = await fetch('/api/team/planilla', {
-        method: 'GET',
-        cache: 'no-store',
-        headers: LPI_getAuthHeaders()
-      });
+      const r = await LPI_apiFetch('/api/team/planilla', {
+  method: 'GET',
+  cache: 'no-store',
+  headers: LPI_getAuthHeaders()
+});
       if (!r.ok) return;
       const j = await r.json().catch(() => ({}));
       const p = j && j.planilla;
@@ -1119,7 +1161,7 @@ document.addEventListener('DOMContentLoaded', function(){
     try{
       const team = deriveTeam() || '*';
       const qs = new URLSearchParams({ team, fechaKey });
-      const r = await fetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
+      const r = await LPI_apiFetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
       const j = await r.json();
       setEnabled(!!(j && j.enabled));
     }catch(_){
@@ -1135,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   try{
-    const es = new EventSource('/api/cruces/stream');
+    const es = new EventSource(LPI_apiUrl('/api/cruces/stream'));
     es.onmessage = (ev)=>{
       try{
         const data = JSON.parse(ev.data||'{}');

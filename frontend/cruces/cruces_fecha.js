@@ -49,7 +49,7 @@
   async function loadAllFixtures() {
     const isFile = location.protocol === 'file:';
     const localWinBase = 'file:///C:/Users/javie/Desktop/LIGA/frontend/fixture/';
-    const httpBase = 'http://localhost:3000/fixture/';
+    const httpBase = APP_CONFIG.API_BASE_URL + '/fixture/';
     const relBase = '/frontend/fixture/';
     const names = ['fixture.ida.tercera.js', 'fixture.vuelta.tercera.js'];
 
