@@ -22,7 +22,7 @@ app.get("/test-db", async (req, res) => {
   }
 });
 
-app.get("/init-reset-password-fields", async (req, res) => {
+app.get("/api/init-reset-password-fields", async (req, res) => {
   try {
 
     await pool.query(`
