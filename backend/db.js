@@ -1,19 +1,14 @@
 const { Pool } = require("pg");
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("Falta DATABASE_URL en el .env");
+  throw new Error("Falta DATABASE_URL");
 }
 
-const rawUrl = process.env.DATABASE_URL;
-const dbUrl = rawUrl.includes("sslmode=")
-  ? rawUrl
-  : `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}sslmode=require`;
-
 const pool = new Pool({
-  connectionString: dbUrl,
+  connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false,
-  },
+    rejectUnauthorized: false
+  }
 });
 
 module.exports = pool;
