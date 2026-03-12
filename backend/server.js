@@ -5,9 +5,9 @@ const app = require("./src/app");
 
 const PORT = process.env.PORT || 3000;
 
-// -----------------------------
-// Crear columnas reset password
-// -----------------------------
+// -------------------------------------
+// Verificar/crear columnas reset password
+// -------------------------------------
 (async () => {
   try {
     await pool.query(`
@@ -21,7 +21,9 @@ const PORT = process.env.PORT || 3000;
   }
 })();
 
-// endpoint de prueba de la base
+// -------------------------
+// Endpoint de prueba DB
+// -------------------------
 app.get("/test-db", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -34,6 +36,57 @@ app.get("/test-db", async (req, res) => {
     res.status(500).json({
       ok: false,
       error: "DB error"
+    });
+  }
+});
+
+// --------------------------------------
+// Endpoint: resetear contraseña de un equipo
+// --------------------------------------
+app.post("/api/admin/reset-team-password/:id", async (req, res) => {
+  const teamId = req.params.id;
+
+  if (!teamId) {
+    return res.status(400).json({
+      ok: false,
+      error: "Se requiere el ID del equipo"
+    });
+  }
+
+  // Generar contraseña provisoria aleatoria
+  const generatePassword = (length = 6) => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const newPassword = generatePassword();
+
+  try {
+    // Actualizar la tabla equipos
+    await pool.query(
+      `UPDATE equipos
+       SET password = $1,
+           must_change_password = true,
+           password_updated_at = NOW()
+       WHERE id = $2`,
+      [newPassword, teamId]
+    );
+
+    res.json({
+      ok: true,
+      message: "Contraseña resetada correctamente",
+      newPassword
+    });
+
+  } catch (err) {
+    console.error("Error reset password:", err);
+    res.status(500).json({
+      ok: false,
+      error: "Error al resetear la contraseña"
     });
   }
 });
