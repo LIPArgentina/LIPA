@@ -5,6 +5,22 @@ const app = require("./src/app");
 
 const PORT = process.env.PORT || 3000;
 
+// -----------------------------
+// Crear columnas reset password
+// -----------------------------
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE equipos
+      ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS password_updated_at TIMESTAMP;
+    `);
+    console.log("Campos de reset de contraseña verificados");
+  } catch (err) {
+    console.error("Error creando campos de reset:", err);
+  }
+})();
+
 // endpoint de prueba de la base
 app.get("/test-db", async (req, res) => {
   try {
@@ -18,29 +34,6 @@ app.get("/test-db", async (req, res) => {
     res.status(500).json({
       ok: false,
       error: "DB error"
-    });
-  }
-});
-
-app.get("/api/init-reset-password-fields", async (req, res) => {
-  try {
-
-    await pool.query(`
-      ALTER TABLE equipos
-      ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS password_updated_at TIMESTAMP;
-    `);
-
-    res.json({
-      ok: true,
-      message: "Campos de reset de contraseña agregados"
-    });
-
-  } catch (err) {
-    console.error("Error agregando campos:", err);
-    res.status(500).json({
-      ok: false,
-      error: "No se pudieron agregar los campos"
     });
   }
 });
