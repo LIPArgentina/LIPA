@@ -66,10 +66,10 @@ app.post("/api/admin/reset-team-password/:id", async (req, res) => {
   const newPassword = generatePassword();
 
   try {
-    // Actualizar la tabla equipos
+    // Actualizar la tabla equipos usando la columna correcta
     await pool.query(
       `UPDATE equipos
-       SET password = $1,
+       SET password_hash = $1,
            must_change_password = true,
            password_updated_at = NOW()
        WHERE id = $2`,
