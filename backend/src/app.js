@@ -1,3 +1,4 @@
+const pool = require("../db");
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -109,6 +110,84 @@ app.use(express.static(FRONTEND_DIR));
 app.use('/frontend', express.static(FRONTEND_DIR));
 app.use('/templates', express.static(FRONTEND_TEMPLATES));
 app.use('/fecha', express.static(FRONTEND_FECHA));
+
+/* =========================================================
+   TEST DB
+========================================================= */
+
+app.get("/test-db", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.json({
+      ok: true,
+      now: result.rows[0].now
+    });
+  } catch (err) {
+    console.error("Error DB:", err);
+    res.status(500).json({
+      ok: false,
+      error: "DB error"
+    });
+  }
+});
+
+/* =========================================================
+   INIT DB (TEMPORAL)
+========================================================= */
+
+app.get("/init-db", async (req, res) => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS equipos (
+        id SERIAL PRIMARY KEY,
+        slug TEXT UNIQUE NOT NULL,
+        nombre TEXT NOT NULL,
+        password_hash TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS jugadores (
+        id SERIAL PRIMARY KEY,
+        equipo_id INTEGER REFERENCES equipos(id) ON DELETE CASCADE,
+        nombre TEXT NOT NULL,
+        dorsal TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS planillas (
+        id SERIAL PRIMARY KEY,
+        equipo_id INTEGER REFERENCES equipos(id) ON DELETE CASCADE,
+        datos JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    res.json({
+      ok: true,
+      message: "Base de datos inicializada correctamente"
+    });
+  } catch (err) {
+    console.error("Error init-db:", err);
+    res.status(500).json({
+      ok: false,
+      error: err.message
+    });
+  }
+});
 
 /* =========================================================
    FALLBACK
