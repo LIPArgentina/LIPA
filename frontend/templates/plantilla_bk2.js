@@ -4,19 +4,6 @@
     return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
   }
 
-function LPI_getApiBase(){
-  try{
-    return (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL ? String(window.APP_CONFIG.API_BASE_URL) : '').replace(/\/$/, '');
-  }catch(_){
-    return '';
-  }
-}
-function LPI_apiUrl(path){
-  const base = LPI_getApiBase();
-  const p = String(path || '');
-  return base + (p.startsWith('/') ? p : '/' + p);
-}
-
 (function(){
   function localSlugify(s){
     return String(s||'').toLowerCase().normalize('NFD')
@@ -514,7 +501,7 @@ trash.addEventListener('drop', e => {
       return;
     }
     var slug = getTeamSlug();
-    fetch(LPI_apiUrl('/api/team/change-password'), {
+    fetch('/api/team/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug: slug, oldPassword: oldPass, newPassword: newPass })
@@ -632,15 +619,14 @@ async function savePlanilla(){
     };
 
     try {
-      const r = await fetch(LPI_apiUrl('/api/save-planilla'), {
+      const r = await fetch('/api/save-planilla', {
         method: 'POST',
         headers: LPI_getAuthHeaders(),
         body: JSON.stringify({ planilla: payloadObj })
       });
       if (!r.ok) {
         const t = await r.text().catch(()=> '');
-        const shortMsg = t && t.startsWith('<!DOCTYPE html') ? ('HTTP ' + r.status + ' (respuesta HTML inesperada)') : (t || ('HTTP ' + r.status));
-        if (typeof showAlert === 'function') showAlert('No se pudo guardar la planilla: ' + shortMsg);
+        if (typeof showAlert === 'function') showAlert('No se pudo guardar la planilla: ' + (t || ('HTTP ' + r.status)));
         return { ok:false };
       }
       const json = await r.json().catch(() => ({}));
@@ -1076,7 +1062,7 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   async function tryAutoload(){
     try {
-      const r = await fetch(LPI_apiUrl('/api/team/planilla'), {
+      const r = await fetch('/api/team/planilla', {
         method: 'GET',
         cache: 'no-store',
         headers: LPI_getAuthHeaders()
@@ -1133,7 +1119,7 @@ document.addEventListener('DOMContentLoaded', function(){
     try{
       const team = deriveTeam() || '*';
       const qs = new URLSearchParams({ team, fechaKey });
-      const r = await fetch(LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(), { cache:'no-store' });
+      const r = await fetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
       const j = await r.json();
       setEnabled(!!(j && j.enabled));
     }catch(_){
@@ -1149,7 +1135,7 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   try{
-    const es = new EventSource(LPI_apiUrl('/api/cruces/stream'));
+    const es = new EventSource('/api/cruces/stream');
     es.onmessage = (ev)=>{
       try{
         const data = JSON.parse(ev.data||'{}');
