@@ -61,14 +61,12 @@ async function getMatchAndSubmissions(client, fechaISO, localSlug, visitanteSlug
         ls.validated AS local_validated,
         ls.validated_at AS local_validated_at,
         ls.locked_until AS local_locked_until,
-        ls.updated_at AS local_updated_at,
         vs.id AS visitante_submission_id,
         vs.status_json AS visitante_status_json,
         vs.validacion_json AS visitante_validacion_json,
         vs.validated AS visitante_validated,
         vs.validated_at AS visitante_validated_at,
-        vs.locked_until AS visitante_locked_until,
-        vs.updated_at AS visitante_updated_at
+        vs.locked_until AS visitante_locked_until
       FROM cruces_matches m
       LEFT JOIN cruces_match_submissions ls
         ON ls.match_id = m.id AND ls.equipo_slug = m.local_slug
@@ -85,15 +83,8 @@ async function getMatchAndSubmissions(client, fechaISO, localSlug, visitanteSlug
 }
 
 function buildResponseFromRow(row) {
-  const localStatus = row?.local_status_json || null;
-  const visitanteStatus = row?.visitante_status_json || null;
-
-  const localUpdatedAt = row?.local_updated_at ? new Date(row.local_updated_at).getTime() : 0;
-  const visitanteUpdatedAt = row?.visitante_updated_at ? new Date(row.visitante_updated_at).getTime() : 0;
-
-  const snapshot = localUpdatedAt >= visitanteUpdatedAt
-    ? (localStatus || visitanteStatus || {})
-    : (visitanteStatus || localStatus || {});
+  const localStatus = row?.local_status_json || {};
+  const visitanteStatus = row?.visitante_status_json || {};
 
   return {
     ok: true,
@@ -102,10 +93,10 @@ function buildResponseFromRow(row) {
       validated: !!row.validated_final,
       localSlug: row.local_slug,
       visitanteSlug: row.visitante_slug,
-      localPlanilla: snapshot.localPlanilla || null,
-      visitantePlanilla: snapshot.visitantePlanilla || null,
-      local: snapshot.local || null,
-      visitante: snapshot.visitante || null,
+      localPlanilla: localStatus.localPlanilla || null,
+      visitantePlanilla: visitanteStatus.visitantePlanilla || null,
+      local: localStatus.local || null,
+      visitante: visitanteStatus.visitante || null,
       localValidated: !!row.local_validated,
       visitanteValidated: !!row.visitante_validated,
       localLockedUntil: row.local_locked_until || null,

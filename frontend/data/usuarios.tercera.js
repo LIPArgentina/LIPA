@@ -24,14 +24,6 @@ window.LPI_USERS = [
     "slug": "dogosbillards"
   },
   {
-    "username": "EL TREBOL",
-    "role": "team",
-    "captain": "",
-    "email": "",
-    "phone": "",
-    "slug": "eltrebol"
-  },
-  {
     "username": "LOS PATOS DEL TREBOL",
     "role": "team",
     "captain": "",
@@ -104,12 +96,12 @@ window.LPI_USERS = [
     "slug": "chuavechito"
   },
   {
-    "username": "HEAVEN",
+    "username": "BAIRES",
     "role": "team",
     "captain": "",
     "email": "",
     "phone": "",
-    "slug": "heaven"
+    "slug": "baires"
   },
   {
     "username": "WHY NOT",
@@ -126,5 +118,13 @@ window.LPI_USERS = [
     "email": "",
     "phone": "",
     "slug": "anexo"
+  },
+  {
+    "username": "EL TREBOL",
+    "role": "team",
+    "captain": "",
+    "email": "",
+    "phone": "",
+    "slug": "eltrebol"
   }
 ];

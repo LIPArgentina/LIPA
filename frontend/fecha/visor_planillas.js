@@ -50,18 +50,55 @@
     target.appendChild(wrap);
   }
 
-  // En el esquema nuevo la API ya devuelve la planilla lista para renderizar.
-  // El indicador sigue existiendo por compatibilidad visual, pero queda "verde"
-  // cuando la API responde correctamente.
-  function markFreshness(card){
+  function formatDateTime(value){
     try{
-      updateGlobalJsIndicator(true);
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return 'fecha inválida';
+      return d.toLocaleString('es-AR', {
+        year:'numeric',
+        month:'2-digit',
+        day:'2-digit',
+        hour:'2-digit',
+        minute:'2-digit'
+      });
+    }catch(_){
+      return String(value || '');
+    }
+  }
+
+  function isSameLocalDay(value){
+    try{
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return false;
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear()
+        && d.getMonth() === now.getMonth()
+        && d.getDate() === now.getDate();
+    }catch(_){
+      return false;
+    }
+  }
+
+  function markFreshness(card, updatedAt){
+    try{
+      const isToday = !!updatedAt && isSameLocalDay(updatedAt);
+      updateGlobalJsIndicator(isToday);
+
       let wrap = card.querySelector('.title-indicator');
       if(!wrap){ wrap = document.createElement('div'); wrap.className='title-indicator'; card.appendChild(wrap); }
+
       let dot = wrap.querySelector('.fresh-indicator');
       if(!dot){ dot = document.createElement('div'); dot.className='fresh-indicator'; wrap.appendChild(dot); }
-      dot.className = 'fresh-indicator fresh-ok';
-      dot.title = 'Planilla cargada desde API privada';
+
+      dot.className = 'fresh-indicator ' + (isToday ? 'fresh-ok' : 'fresh-stale');
+
+      if (updatedAt) {
+        dot.title = isToday
+          ? ('Planilla cargada hoy: ' + formatDateTime(updatedAt))
+          : ('Planilla cargada el: ' + formatDateTime(updatedAt));
+      } else {
+        dot.title = 'Planilla sin fecha de actualización';
+      }
     }catch(e){}
   }
 
@@ -90,6 +127,7 @@
       for(const item of files){
         const team = item.team || 'equipo';
         const plan = item.planilla || item.plan || {};
+        const updatedAt = item.updatedAt || null;
 
         const card = document.createElement('article');
         card.className = 'card';
@@ -100,9 +138,10 @@
 
         if(plan && (plan.individuales || plan.pareja1 || plan.pareja2 || plan.suplentes)){
           renderBoard(plan, card);
-          markFreshness(card);
+          markFreshness(card, updatedAt);
         }else{
           renderBoard({ individuales:[], pareja1:[], pareja2:[], suplentes:[] }, card);
+          markFreshness(card, updatedAt);
           const small = document.createElement('div');
           small.style.cssText = 'opacity:.8;text-align:center;margin-top:6px;font-size:12px;';
           small.textContent = 'Formato inválido';
@@ -124,8 +163,6 @@
   document.addEventListener('DOMContentLoaded', init);
 })();
 
-
-// Ordenar tarjetas por equipo
 window._sortBoards = function(mode){
   const cont = document.getElementById('boards');
   if(!cont) return;
@@ -139,7 +176,6 @@ window._sortBoards = function(mode){
   cards.forEach(c=>cont.appendChild(c));
 };
 
-
 // === Indicador global de actualidad ===
 let GLOBAL_JS_ALL_TODAY = true;
 let GLOBAL_JS_CHECKS = 0;
@@ -152,12 +188,9 @@ function updateGlobalJsIndicator(isToday){
   dot.classList.remove('fresh-ok','fresh-stale');
   dot.classList.add(GLOBAL_JS_ALL_TODAY ? 'fresh-ok' : 'fresh-stale');
   dot.title = GLOBAL_JS_ALL_TODAY
-    ? 'Todas las planillas visibles se cargaron desde API privada'
-    : 'Hay planillas con problema de carga';
+    ? 'Todas las planillas visibles son del día'
+    : 'Hay planillas con fecha anterior';
 }
-
-
-
 
 (function(){
   if (window.__CRUCES_ADMIN_WIRED__) return;

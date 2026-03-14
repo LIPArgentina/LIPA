@@ -1,5 +1,5 @@
 window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
-window.LPI_TEAM_PLAYERS["heaven"] = [
+window.LPI_TEAM_PLAYERS["baires"] = [
   "Alberto Lauretta",
   "Hector Ricardo Santillan",
   "Gonzalo Bernad",

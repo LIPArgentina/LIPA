@@ -105,7 +105,14 @@ function renderRows(users){
       <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
       <td><input class="input captain" type="text" value="${(by.cap.get(name)||'').replace(/"/g,'&quot;')}" aria-label="Capitán fila ${i+1}"></td>
       <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
-      <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>`;
+      <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
+      <td><button class="btn-del-team" type="button">Eliminar</button></td>`;
+    const del = tr.querySelector('.btn-del-team');
+    del?.addEventListener('click', () => {
+      const teamValue = tr.querySelector('.team')?.value?.trim() || `fila ${i+1}`;
+      if(!confirm(`¿Eliminar el equipo "${teamValue}" de la tabla?`)) return;
+      tr.remove();
+    });
     tbody.appendChild(tr);
   }
 }
@@ -186,12 +193,7 @@ function fillTeamSelect(){
 }
 function getSelectedTeamSlug(){ return $('#teamSelect')?.value || ''; }
 function refreshDraftButtons(){
-  const teamSlug = getSelectedTeamSlug();
-  const has = teamSlug ? hasDraft(_activeDiv, teamSlug) : false;
-  const btnLoad = $('#btnLoadDraft');
-  const btnDiscard = $('#btnDiscardDraft');
-  if (btnLoad) btnLoad.disabled = !has;
-  if (btnDiscard) btnDiscard.disabled = !has;
+  return;
 }
 function toggleImportBox(force){
   const box = $('#importBox');
@@ -215,6 +217,30 @@ function importPlayersFromTextarea(){
   refreshDraftButtons();
   toggleImportBox(false);
   toast(`Se importaron ${items.length} jugador(es)`);
+}
+function exportRoster(){
+  const teamSlug = getSelectedTeamSlug();
+  const teamName = (teamsInDiv.find(t => t.slug === teamSlug)?.name) || teamSlug || 'equipo';
+  const players = getCurrentValues().filter(Boolean);
+
+  if (!players.length){
+    toast('No hay jugadores para exportar');
+    return;
+  }
+
+  const lines = players.map((name, idx) => `${idx + 1}. ${name}`);
+  const content = lines.join('\n');
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${teamSlug || 'equipo'}.players.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  toast(`Lista exportada: ${teamName}`);
 }
 function loadDraftIntoForm(){
   const teamSlug = getSelectedTeamSlug();
@@ -358,8 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());
   $('#btnApplyImport')?.addEventListener('click', importPlayersFromTextarea);
   $('#btnCancelImport')?.addEventListener('click', () => toggleImportBox(false));
-  $('#btnLoadDraft')?.addEventListener('click', loadDraftIntoForm);
-  $('#btnDiscardDraft')?.addEventListener('click', discardDraftForCurrentTeam);
+  $('#btnExportRoster')?.addEventListener('click', exportRoster);
 
   buildPlayersUI(Array(SLOTS).fill(''));
   refreshDraftButtons();

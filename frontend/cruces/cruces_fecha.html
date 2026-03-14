@@ -33,13 +33,13 @@
         <section id="planilla-root-right" aria-label="Planilla visitante"></section>
       </div>
 
-      <!-- 1 BOTÓN CENTRADO (DENTRO DE <main>) -->
+      <!-- BOTÓN CENTRADO -->
       <div class="validate-cta" id="validateCta" style="display:none;">
         <button class="btn-validate" id="btnValidarGlobal">VALIDAR PLANILLA</button>
       </div>
     </main>
 
-    <!-- CARD TEMPLATE (CON BOTÓN OCULTO PARA LAYOUT) -->
+    <!-- CARD TEMPLATE -->
     <template id="card-template">
       <div class="wrap">
         <div class="card">
@@ -52,7 +52,7 @@
             <div class="totals-chip">
               <span class="label">TRIÁNGULOS TOTALES</span>
               <div class="total-box">
-                <input class="total-input" value="0" readonly aria-label="Total de triángulos" />
+                <input class="total-input" value="0" readonly />
               </div>
             </div>
           </div>
@@ -64,14 +64,16 @@
             </div>
           </div>
 
-          <!-- BOTÓN OCULTO (mantiene el layout del .row) -->
-          <button class="btn-validate" style="display:none;">VALIDAR PLANILLA</button>
         </div>
       </div>
     </template>
 
   </div>
 
+  <!-- CONFIG GLOBAL (IMPORTANTE) -->
+  <script src="../config.js"></script>
+
+  <!-- SCRIPT DE CRUCES -->
   <script src="./cruces_fecha.js" defer></script>
 
 </body>

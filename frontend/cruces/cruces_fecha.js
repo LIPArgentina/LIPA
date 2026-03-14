@@ -269,7 +269,7 @@ function pickBestByClosestDate(matches) {
     wrap.className = 'pts-edit';
     const sel = document.createElement('select');
     sel.className = 'pts-select';
-    for (let v = 0; v <= 5; v++) {
+    for (let v = 0; v <= 6; v++) {
       const opt = document.createElement('option');
       opt.value = String(v);
       opt.textContent = String(v);
@@ -280,9 +280,10 @@ function pickBestByClosestDate(matches) {
     return wrap;
   }
 
-  function makeRow(num, text, side, includePoints = false) {
+  function makeRow(num, text, side, includePoints = false, sectionKey = '') {
     const row = document.createElement('div');
     row.className = 'row';
+    if (sectionKey) row.dataset.section = sectionKey;
 
     const badge = document.createElement('div');
     badge.className = 'badge';
@@ -291,6 +292,8 @@ function pickBestByClosestDate(matches) {
     const slot = document.createElement('div');
     const isEmpty = !text || !String(text).trim();
     slot.className = 'slot' + (isEmpty ? ' is-empty' : '');
+    if (sectionKey) slot.dataset.section = sectionKey;
+    slot.dataset.side = side;
     if (!isEmpty) {
       slot.setAttribute('data-full', String(text).trim());
       slot.textContent = String(text).trim();
@@ -344,13 +347,14 @@ function pickBestByClosestDate(matches) {
 
       const items = data[sec];
 
+      const side = rootId.includes('left') ? 'left' : 'right';
       if (sec.includes('PAREJA') && items.length === 2) {
-        div.appendChild(makeRow(1, items[0], rootId.includes('left') ? 'left' : 'right', true));
-        div.appendChild(makeRow(2, items[1], rootId.includes('left') ? 'left' : 'right', false));
+        div.appendChild(makeRow(1, items[0], side, true, sec));
+        div.appendChild(makeRow(2, items[1], side, false, sec));
       } else {
         const includePts = sec === 'INDIVIDUALES';
         items.forEach((p, i) => {
-          div.appendChild(makeRow(i + 1, p, rootId.includes('left') ? 'left' : 'right', includePts));
+          div.appendChild(makeRow(i + 1, p, side, includePts, sec));
         });
       }
 
@@ -365,14 +369,24 @@ function pickBestByClosestDate(matches) {
     const root = document.getElementById(rootId);
     if (!root) return;
 
-    let totalTri = 0;
+    let totalEquipo = 0;
     let totalPts = 0;
 
-    root.querySelectorAll('.pts-select').forEach(sel => {
+    root.querySelectorAll('.row').forEach(row => {
+      const sel = row.querySelector('.pts-select');
+      if (!sel) return;
+
       const val = parseInt(sel.value, 10);
-      if (!isNaN(val)) {
-        totalPts += val;
-        if (val === 5) totalTri++;
+      if (isNaN(val)) return;
+
+      totalPts += val;
+
+      const section = String(row.dataset.section || '').toUpperCase();
+
+      if (section === 'INDIVIDUALES') {
+        if (val === 5 || val === 6) totalEquipo++;
+      } else if (section === 'PAREJA 1' || section === 'PAREJA 2') {
+        if (val === 4 || val === 5 || val === 6) totalEquipo++;
       }
     });
 
@@ -380,7 +394,163 @@ function pickBestByClosestDate(matches) {
     if (totalInput) totalInput.value = totalPts;
 
     const winsBox = root.querySelector('.wins-box');
-    if (winsBox) winsBox.textContent = totalTri;
+    if (winsBox) winsBox.textContent = totalEquipo;
+  }
+
+
+  // ---------------- CAMBIOS CON SUPLENTES ----------------
+  function ensureSwapStyles(){
+    if (document.getElementById('swap-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'swap-styles';
+    style.textContent = `
+      .slot.slot-selected-sub{
+        background:#9bf59b !important;
+        box-shadow:0 0 0 2px #31c45b inset;
+        color:#092b09 !important;
+      }
+      .slot.slot-sub-in{
+        background:#c8ffb8 !important;
+        box-shadow:0 0 0 2px #55c44d inset;
+        color:#16320f !important;
+      }
+      .slot.slot-sub-out{
+        background:#ffb6b6 !important;
+        box-shadow:0 0 0 2px #d94b4b inset;
+        color:#4a1010 !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function setSlotValue(slot, value){
+    const txt = String(value || '').trim();
+    if (txt) {
+      slot.textContent = txt;
+      slot.setAttribute('data-full', txt);
+      slot.classList.remove('is-empty');
+    } else {
+      slot.textContent = '';
+      slot.removeAttribute('data-full');
+      slot.classList.add('is-empty');
+    }
+  }
+
+  function getSlotValue(slot){
+    return (slot.getAttribute('data-full') || slot.textContent || '').trim();
+  }
+
+  function lockValidatedMatchUI(){
+    document.querySelectorAll('#planilla-root-left .pts-select, #planilla-root-right .pts-select').forEach(el => {
+      el.disabled = true;
+    });
+
+    document.querySelectorAll('#planilla-root-left .slot, #planilla-root-right .slot').forEach(slot => {
+      slot.style.pointerEvents = 'none';
+      slot.style.cursor = 'default';
+      slot.classList.remove('slot-selected-sub', 'slot-sub-in', 'slot-sub-out');
+    });
+
+    const btn = document.getElementById('btnValidarGlobal');
+    if (btn){
+      btn.textContent = 'VALIDADO';
+      btn.classList.add('success');
+      btn.disabled = true;
+    }
+  }
+
+  function clearSwapMarks(root){
+    root.querySelectorAll('.slot').forEach(s => {
+      s.classList.remove('slot-selected-sub', 'slot-sub-in', 'slot-sub-out');
+    });
+  }
+
+  function setupSuplentesSwap(rootId){
+    ensureSwapStyles();
+    const root = document.getElementById(rootId);
+    if (!root) return;
+
+    let selectedBenchSlot = null;
+
+    const getSectionName = (slot) => {
+      const sec = slot.closest('.section');
+      return (sec?.querySelector('h2')?.textContent || '').toUpperCase();
+    };
+
+    const isBenchSlot = (slot) => getSectionName(slot).includes('SUPLENTES');
+    const isSwappableField = (slot) => {
+      const name = getSectionName(slot);
+      return name.includes('INDIVIDUALES') || name.includes('PAREJA 1') || name.includes('PAREJA 2');
+    };
+
+    root.querySelectorAll('.slot').forEach(slot => {
+      if (slot.dataset.swapWired === '1') return;
+      slot.dataset.swapWired = '1';
+      slot.style.cursor = 'pointer';
+
+      slot.addEventListener('click', () => {
+        const slotValue = getSlotValue(slot);
+        if (!slotValue) return;
+
+        if (isBenchSlot(slot)) {
+          root.querySelectorAll('.slot.slot-selected-sub').forEach(s => s.classList.remove('slot-selected-sub'));
+          slot.classList.remove('slot-sub-in', 'slot-sub-out');
+          slot.classList.add('slot-selected-sub');
+          selectedBenchSlot = slot;
+          root.dispatchEvent(new Event('cruces:changed'));
+          return;
+        }
+
+        if (!selectedBenchSlot) return;
+        if (!isSwappableField(slot)) return;
+        if (selectedBenchSlot === slot) return;
+
+        const currentFieldPlayer = getSlotValue(slot);
+        const selectedSub = getSlotValue(selectedBenchSlot);
+        if (!currentFieldPlayer || !selectedSub) return;
+
+        root.querySelectorAll('.slot.slot-sub-in, .slot.slot-sub-out').forEach(s => {
+          s.classList.remove('slot-sub-in', 'slot-sub-out');
+        });
+
+        setSlotValue(slot, selectedSub);
+        setSlotValue(selectedBenchSlot, currentFieldPlayer);
+
+        slot.classList.remove('slot-selected-sub');
+        slot.classList.add('slot-sub-in');
+
+        selectedBenchSlot.classList.remove('slot-selected-sub');
+        selectedBenchSlot.classList.add('slot-sub-out');
+        selectedBenchSlot.classList.add('slot-selected-sub');
+
+        root.dispatchEvent(new Event('cruces:changed'));
+      });
+    });
+  }
+
+  function applyCollectedPlanilla(rootId, plan) {
+    const root = document.getElementById(rootId);
+    if (!root || !plan) return;
+
+    const map = {
+      'CAPITÁN': Array.isArray(plan.capitan) ? plan.capitan : [],
+      'INDIVIDUALES': Array.isArray(plan.individuales) ? plan.individuales : [],
+      'PAREJA 1': Array.isArray(plan.pareja1) ? plan.pareja1 : [],
+      'PAREJA 2': Array.isArray(plan.pareja2) ? plan.pareja2 : [],
+      'SUPLENTES': Array.isArray(plan.suplentes) ? plan.suplentes : [],
+    };
+
+    root.querySelectorAll('.section').forEach(sec => {
+      const title = (sec.querySelector('h2')?.textContent || '').toUpperCase();
+      const values = map[title];
+      if (!values) return;
+      const slots = sec.querySelectorAll('.slot');
+      slots.forEach((slot, idx) => {
+        setSlotValue(slot, values[idx] || '');
+      });
+    });
+
+    clearSwapMarks(root);
   }
 
   // ---------------- VALIDACIÓN ----------------
@@ -453,7 +623,7 @@ function sliceToStatus(values) {
   return { jugadores, parejas: { pareja1, pareja2 } };
 }
 
-function buildMatchStatus() {
+function buildMatchStatus(validated = false) {
   const leftVals  = readAllSelects('planilla-root-left');
   const rightVals = readAllSelects('planilla-root-right');
   const leftT  = computeTotalsFrom('planilla-root-left');
@@ -462,18 +632,36 @@ function buildMatchStatus() {
   const visitanteData = sliceToStatus(rightVals);
   return {
     fechaISO: todayISO_AR,
+    validated: !!validated,
+    localSlug,
+    visitanteSlug,
+    localPlanilla: collectPlanilla('planilla-root-left'),
+    visitantePlanilla: collectPlanilla('planilla-root-right'),
     local:     { ...localData,     triangulosTotales: leftT.triangulos,  puntosTotales: leftT.puntosTotales },
-    visitante:{ ...visitanteData, triangulosTotales: rightT.triangulos, puntosTotales: rightT.puntosTotales }
+    visitante: { ...visitanteData, triangulosTotales: rightT.triangulos, puntosTotales: rightT.puntosTotales }
   };
 }
 
-async function saveMatchStatus() {
-  const status = buildMatchStatus();
-  const body = { localSlug, visitanteSlug, fechaISO: todayISO_AR, status };
+async function saveMatchStatus(validated = false) {
+  const status = buildMatchStatus(validated);
+  const body = {
+    localSlug,
+    visitanteSlug,
+    fechaISO: todayISO_AR,
+    equipoSlug: mySlug,
+    status,
+    validar: !!validated
+  };
   const res = await fetch('/api/guardar-status-match', {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
   });
-  return res.ok;
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.error || 'No se pudo guardar el status del cruce');
+  }
+  return data;
 }
 
 // AUTOSAVE
@@ -492,29 +680,56 @@ function autosaveApplyIfAny() {
 }
 function autosaveClear(){ try{ localStorage.removeItem(AUTOSAVE_KEY);}catch{} }
 let autosaveTimer=null;
-function scheduleAutosave(){ clearTimeout(autosaveTimer); autosaveTimer=setTimeout(autosaveSave,400); }
+let serverSaveTimer=null;
+function scheduleAutosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(autosaveSave, 300);
+
+  clearTimeout(serverSaveTimer);
+  serverSaveTimer = setTimeout(async () => {
+    try { await saveMatchStatus(false); } catch(e) { console.warn('autosave cruces', e); }
+  }, 600);
+}
 function autosaveAttachListeners(){
   ['planilla-root-left','planilla-root-right'].forEach(id=>{
     const root = document.getElementById(id);
     root.addEventListener('change', ev => {
       if (ev.target && ev.target.classList && ev.target.classList.contains('pts-select')) scheduleAutosave();
     });
+    root.addEventListener('cruces:changed', scheduleAutosave);
   });
 }
 
-// STATUS autocarga si existe
+// STATUS autocarga: primero borrador propio, si no existe compartido final
 async function tryApplyStatusIfExists(){
-  const src = `../cruces/status/${localSlug}.vs.${visitanteSlug}.js`;
   try {
-    const data = await loadGlobalScript(src,'LPI_STATUS');
-    if (!data || data.fechaISO !== todayISO_AR) return false;
-    const L = [...(data.local.jugadores||[]), data.local.parejas?.pareja1?.j1 ?? 0, data.local.parejas?.pareja1?.j2 ?? 0, data.local.parejas?.pareja2?.j1 ?? 0, data.local.parejas?.pareja2?.j2 ?? 0];
-    const R = [...(data.visitante.jugadores||[]), data.visitante.parejas?.pareja1?.j1 ?? 0, data.visitante.parejas?.pareja1?.j2 ?? 0, data.visitante.parejas?.pareja2?.j1 ?? 0, data.visitante.parejas?.pareja2?.j2 ?? 0];
-    writeAllSelects('planilla-root-left',L);
-    writeAllSelects('planilla-root-right',R);
-    document.querySelectorAll('#planilla-root-left .pts-select, #planilla-root-right .pts-select').forEach(el=>el.disabled=true);
-    const btn = document.getElementById('btnValidarGlobal');
-    if (btn){ btn.textContent='VALIDADO'; btn.classList.add('success'); btn.disabled=true; }
+    const qs = new URLSearchParams({
+      localSlug,
+      visitanteSlug,
+      fechaISO: todayISO_AR,
+      equipoSlug: mySlug
+    });
+    const res = await fetch('/api/status-match?' + qs.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result?.ok || !result?.data) return false;
+
+    const data = result.data;
+    if (data.localPlanilla) applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
+    if (data.visitantePlanilla) applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
+
+    const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
+    const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
+    writeAllSelects('planilla-root-left', L);
+    writeAllSelects('planilla-root-right', R);
+    updateScoresFor('planilla-root-left');
+    updateScoresFor('planilla-root-right');
+
+    if (data.validated === true) {
+      lockValidatedMatchUI();
+    }
     return true;
   } catch { return false; }
 }
@@ -602,11 +817,18 @@ btn.onclick = async () => {
       return;
     }
 
+    const statusResult = await saveMatchStatus(true);
+
+    if (statusResult?.tipo !== 'validado') {
+      setBtnState('pending', statusResult?.mensaje || 'PENDIENTE: falta coincidencia final con tu rival');
+      return;
+    }
+
     const lockBody = { slug: mySlug, fechaISO: todayISO_AR, lockUntil: new Date(Date.now()+24*60*60*1000).toISOString() };
     await fetch('/api/validar-lock', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(lockBody) }).catch(()=>{});
 
-    await saveMatchStatus();
     autosaveClear();
+    lockValidatedMatchUI();
 
     setBtnState('success','VALIDACIÓN EXITOSA');
     showToast('Validación exitosa','success');
@@ -684,13 +906,68 @@ btn.onclick = async () => {
   }
 
   function syncHeaderHeights() {
-    const left = document.querySelector('#planilla-root-left .title');
-    const right = document.querySelector('#planilla-root-right .title');
-    if (left && right) {
-      const h = Math.max(left.offsetHeight, right.offsetHeight);
-      left.style.minHeight = right.style.minHeight = `${h}px`;
+    const leftTitle = document.querySelector('#planilla-root-left .title');
+    const rightTitle = document.querySelector('#planilla-root-right .title');
+    const leftMeta = document.querySelector('#planilla-root-left .meta');
+    const rightMeta = document.querySelector('#planilla-root-right .meta');
+
+    if (!leftTitle || !rightTitle || !leftMeta || !rightMeta) return;
+
+    leftTitle.style.minHeight = '';
+    rightTitle.style.minHeight = '';
+    leftMeta.style.minHeight = '';
+    rightMeta.style.minHeight = '';
+
+    const maxTitle = Math.max(leftTitle.offsetHeight, rightTitle.offsetHeight);
+    const maxMeta = Math.max(leftMeta.offsetHeight, rightMeta.offsetHeight);
+
+    leftTitle.style.minHeight = maxTitle + 'px';
+    rightTitle.style.minHeight = maxTitle + 'px';
+    leftMeta.style.minHeight = maxMeta + 'px';
+    rightMeta.style.minHeight = maxMeta + 'px';
+  }
+
+  function syncSectionStarts() {
+    const leftCard = document.querySelector('#planilla-root-left .card');
+    const rightCard = document.querySelector('#planilla-root-right .card');
+    const leftFirstSection = document.querySelector('#planilla-root-left .section');
+    const rightFirstSection = document.querySelector('#planilla-root-right .section');
+
+    if (!leftCard || !rightCard || !leftFirstSection || !rightFirstSection) return;
+
+    leftFirstSection.style.marginTop = '';
+    rightFirstSection.style.marginTop = '';
+
+    const leftTop = leftFirstSection.getBoundingClientRect().top - leftCard.getBoundingClientRect().top;
+    const rightTop = rightFirstSection.getBoundingClientRect().top - rightCard.getBoundingClientRect().top;
+
+    if (leftTop < rightTop) {
+      leftFirstSection.style.marginTop = (26 + (rightTop - leftTop)) + 'px';
+    } else if (rightTop < leftTop) {
+      rightFirstSection.style.marginTop = (26 + (leftTop - rightTop)) + 'px';
     }
   }
+
+  function syncRowHeights() {
+    const leftRows = document.querySelectorAll('#planilla-root-left .row');
+    const rightRows = document.querySelectorAll('#planilla-root-right .row');
+
+    const max = Math.max(leftRows.length, rightRows.length);
+
+    leftRows.forEach(r => { r.style.height = ''; });
+    rightRows.forEach(r => { r.style.height = ''; });
+
+    for (let i = 0; i < max; i++) {
+      const l = leftRows[i];
+      const r = rightRows[i];
+      if (!l || !r) continue;
+
+      const h = Math.max(l.offsetHeight, r.offsetHeight);
+      l.style.height = h + 'px';
+      r.style.height = h + 'px';
+    }
+  }
+
 
   // ---------------- BOOT ----------------
   async function bootCruces() {
@@ -734,11 +1011,16 @@ renderSide('planilla-root-right', visitantePlan, local.name,     match.date, vis
       updateScoresFor('planilla-root-left');
       updateScoresFor('planilla-root-right');
 
+      setupSuplentesSwap('planilla-root-left');
+      setupSuplentesSwap('planilla-root-right');
+
       setupValidationButtons(local, visitante, match.date);
 
       requestAnimationFrame(() => {
         syncSlotWidths();
         syncHeaderHeights();
+        syncSectionStarts();
+        syncRowHeights();
       });
     } catch (e) {
       console.error(e);
@@ -774,6 +1056,8 @@ window.addEventListener('resize', () => {
   resizeRaf = requestAnimationFrame(() => {
     syncSlotWidths();
     syncHeaderHeights();
+    syncSectionStarts();
+    syncRowHeights();
   });
 });
 })();

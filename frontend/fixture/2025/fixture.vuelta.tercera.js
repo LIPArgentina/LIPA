@@ -1,42 +1,50 @@
 window.LPI_FIXTURE = {
   "fechas": [
     {
-      "numero": 1,
+      "date": "2025-09-30",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
               "equipo": "EL TREBOL",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "local"
             },
             {
               "equipo": "LOS PATOS DEL TREBOL",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "visitante"
             },
             {
               "equipo": "DOGOS BILLARDS",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "BABYLON",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             },
             {
               "equipo": "TAKO'S",
-              "puntos": ""
+              "puntos": 8,
+              "categoria": "local"
             },
             {
               "equipo": "THE CUES",
-              "puntos": ""
+              "puntos": 1,
+              "categoria": "visitante"
             },
             {
               "equipo": "WO",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "local"
             },
             {
               "equipo": "EL TREBOL DE PACHECO",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "visitante"
             }
           ]
         },
@@ -45,77 +53,93 @@ window.LPI_FIXTURE = {
           "equipos": [
             {
               "equipo": "8910 BALL",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
-              "equipo": "BAIRES CLUB",
-              "puntos": ""
+              "equipo": "BAIRES",
+              "puntos": 4,
+              "categoria": "visitante"
             },
             {
               "equipo": "IMPERIO SUR",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "local"
             },
             {
               "equipo": "DUCK HUNTER",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "visitante"
             },
             {
               "equipo": "HOMERO",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "local"
             },
             {
               "equipo": "OLDIE'S",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "visitante"
             },
             {
               "equipo": "ACADEMIA DE POOL",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "local"
             },
             {
               "equipo": "CHUAVECHITO",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "visitante"
             }
           ]
         }
       ]
     },
     {
-      "numero": 2,
+      "date": "2025-10-07",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
               "equipo": "LOS PATOS DEL TREBOL",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "DOGOS BILLARDS",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             },
             {
               "equipo": "BABYLON",
-              "puntos": ""
+              "puntos": 1,
+              "categoria": "local"
             },
             {
               "equipo": "EL TREBOL",
-              "puntos": ""
+              "puntos": 8,
+              "categoria": "visitante"
             },
             {
               "equipo": "EL TREBOL DE PACHECO",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "TAKO'S",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "THE CUES",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "local"
             },
             {
               "equipo": "WO",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "visitante"
             }
           ]
         },
@@ -124,77 +148,93 @@ window.LPI_FIXTURE = {
           "equipos": [
             {
               "equipo": "BAIRES",
-              "puntos": ""
+              "puntos": 8,
+              "categoria": "local"
             },
             {
               "equipo": "IMPERIO SUR",
-              "puntos": ""
+              "puntos": 1,
+              "categoria": "visitante"
             },
             {
               "equipo": "DUCK HUNTER",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "8910 BALL",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "CHUAVECHITO",
-              "puntos": ""
+              "puntos": 8,
+              "categoria": "local"
             },
             {
               "equipo": "HOMERO",
-              "puntos": ""
+              "puntos": 1,
+              "categoria": "visitante"
             },
             {
               "equipo": "OLDIE'S",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "ACADEMIA DE POOL",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             }
           ]
         }
       ]
     },
     {
-      "numero": 3,
+      "date": "2025-10-14",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
               "equipo": "TAKO'S",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "local"
             },
             {
               "equipo": "LOS PATOS DEL TREBOL",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "visitante"
             },
             {
               "equipo": "EL TREBOL",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "EL TREBOL DE PACHECO",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "DOGOS BILLARDS",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "THE CUES",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "WO",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "local"
             },
             {
               "equipo": "BABYLON",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "visitante"
             }
           ]
         },
@@ -203,77 +243,93 @@ window.LPI_FIXTURE = {
           "equipos": [
             {
               "equipo": "HOMERO",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "BAIRES",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "8910 BALL",
-              "puntos": ""
+              "puntos": 7,
+              "categoria": "local"
             },
             {
               "equipo": "CHUAVECHITO",
-              "puntos": ""
+              "puntos": 2,
+              "categoria": "visitante"
             },
             {
               "equipo": "IMPERIO SUR",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "local"
             },
             {
               "equipo": "OLDIE'S",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "visitante"
             },
             {
               "equipo": "ACADEMIA DE POOL",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "DUCK HUNTER",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             }
           ]
         }
       ]
     },
     {
-      "numero": 4,
+      "date": "2025-10-21",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
               "equipo": "LOS PATOS DEL TREBOL",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "THE CUES",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "TAKO'S",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "EL TREBOL",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "EL TREBOL DE PACHECO",
-              "puntos": ""
+              "puntos": 7,
+              "categoria": "local"
             },
             {
               "equipo": "BABYLON",
-              "puntos": ""
+              "puntos": 2,
+              "categoria": "visitante"
             },
             {
               "equipo": "WO",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "local"
             },
             {
               "equipo": "DOGOS BILLARDS",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "visitante"
             }
           ]
         },
@@ -282,77 +338,93 @@ window.LPI_FIXTURE = {
           "equipos": [
             {
               "equipo": "BAIRES",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "OLDIE'S",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "HOMERO",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "local"
             },
             {
               "equipo": "8910 BALL",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "visitante"
             },
             {
               "equipo": "CHUAVECHITO",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "local"
             },
             {
               "equipo": "DUCK HUNTER",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "visitante"
             },
             {
               "equipo": "IMPERIO SUR",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "ACADEMIA DE POOL",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             }
           ]
         }
       ]
     },
     {
-      "numero": 5,
+      "date": "2025-10-28",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
               "equipo": "BABYLON",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "LOS PATOS DEL TREBOL",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "THE CUES",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "EL TREBOL DE PACHECO",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             },
             {
               "equipo": "DOGOS BILLARDS",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "TAKO'S",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "EL TREBOL",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "local"
             },
             {
               "equipo": "WO",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "visitante"
             }
           ]
         },
@@ -361,77 +433,93 @@ window.LPI_FIXTURE = {
           "equipos": [
             {
               "equipo": "DUCK HUNTER",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "BAIRES",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "OLDIE'S",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "CHUAVECHITO",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "HOMERO",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "local"
             },
             {
               "equipo": "IMPERIO SUR",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "visitante"
             },
             {
               "equipo": "8910 BALL",
-              "puntos": ""
+              "puntos": 2,
+              "categoria": "local"
             },
             {
               "equipo": "ACADEMIA DE POOL",
-              "puntos": ""
+              "puntos": 7,
+              "categoria": "visitante"
             }
           ]
         }
       ]
     },
     {
-      "numero": 6,
+      "date": "2025-11-04",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
               "equipo": "TAKO'S",
-              "puntos": ""
+              "puntos": 7,
+              "categoria": "local"
             },
             {
               "equipo": "BABYLON",
-              "puntos": ""
+              "puntos": 2,
+              "categoria": "visitante"
             },
             {
               "equipo": "EL TREBOL",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "THE CUES",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "EL TREBOL DE PACHECO",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "local"
             },
             {
               "equipo": "DOGOS BILLARDS",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "visitante"
             },
             {
               "equipo": "LOS PATOS DEL TREBOL",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "local"
             },
             {
               "equipo": "WO",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "visitante"
             }
           ]
         },
@@ -440,77 +528,93 @@ window.LPI_FIXTURE = {
           "equipos": [
             {
               "equipo": "HOMERO",
-              "puntos": ""
+              "puntos": 7,
+              "categoria": "local"
             },
             {
               "equipo": "DUCK HUNTER",
-              "puntos": ""
+              "puntos": 2,
+              "categoria": "visitante"
             },
             {
               "equipo": "8910 BALL",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "local"
             },
             {
               "equipo": "OLDIE'S",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "visitante"
             },
             {
               "equipo": "IMPERIO SUR",
-              "puntos": ""
+              "puntos": 1,
+              "categoria": "local"
             },
             {
               "equipo": "CHUAVECHITO",
-              "puntos": ""
+              "puntos": 8,
+              "categoria": "visitante"
             },
             {
               "equipo": "BAIRES",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "ACADEMIA DE POOL",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             }
           ]
         }
       ]
     },
     {
-      "numero": 7,
+      "date": "2025-12-02",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
               "equipo": "EL TREBOL DE PACHECO",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "LOS PATOS DEL TREBOL",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             },
             {
               "equipo": "EL TREBOL",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "DOGOS BILLARDS",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             },
             {
               "equipo": "THE CUES",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "BABYLON",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             },
             {
               "equipo": "WO",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "local"
             },
             {
               "equipo": "TAKO'S",
-              "puntos": ""
+              "puntos": 0,
+              "categoria": "visitante"
             }
           ]
         },
@@ -519,35 +623,43 @@ window.LPI_FIXTURE = {
           "equipos": [
             {
               "equipo": "CHUAVECHITO",
-              "puntos": ""
+              "puntos": 5,
+              "categoria": "local"
             },
             {
               "equipo": "BAIRES",
-              "puntos": ""
+              "puntos": 4,
+              "categoria": "visitante"
             },
             {
               "equipo": "IMPERIO SUR",
-              "puntos": ""
+              "puntos": 1,
+              "categoria": "local"
             },
             {
               "equipo": "8910 BALL",
-              "puntos": ""
+              "puntos": 8,
+              "categoria": "visitante"
             },
             {
               "equipo": "OLDIE'S",
-              "puntos": ""
+              "puntos": 8,
+              "categoria": "local"
             },
             {
               "equipo": "DUCK HUNTER",
-              "puntos": ""
+              "puntos": 1,
+              "categoria": "visitante"
             },
             {
               "equipo": "ACADEMIA DE POOL",
-              "puntos": ""
+              "puntos": 6,
+              "categoria": "local"
             },
             {
               "equipo": "HOMERO",
-              "puntos": ""
+              "puntos": 3,
+              "categoria": "visitante"
             }
           ]
         }

@@ -25,14 +25,6 @@
       "slug": "dogosbillards"
     },
     {
-      "username": "EL TREBOL",
-      "role": "team",
-      "captain": "",
-      "email": "",
-      "phone": "",
-      "slug": "eltrebol"
-    },
-    {
       "username": "LOS PATOS DEL TREBOL",
       "role": "team",
       "captain": "",
@@ -105,12 +97,12 @@
       "slug": "chuavechito"
     },
     {
-      "username": "HEAVEN",
+      "username": "BAIRES",
       "role": "team",
       "captain": "",
       "email": "",
       "phone": "",
-      "slug": "heaven"
+      "slug": "baires"
     },
     {
       "username": "WHY NOT",
@@ -127,6 +119,14 @@
       "email": "",
       "phone": "",
       "slug": "anexo"
+    },
+    {
+      "username": "EL TREBOL",
+      "role": "team",
+      "captain": "",
+      "email": "",
+      "phone": "",
+      "slug": "eltrebol"
     }
   ]
 }

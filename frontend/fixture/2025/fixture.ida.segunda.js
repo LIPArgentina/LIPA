@@ -7,7 +7,7 @@ window.LPI_FIXTURE = {
           "grupo": "A",
           "equipos": [
             {
-              "equipo": "PRIMERA",
+              "equipo": "SEGUNDA",
               "puntos": "4"
             },
             {
@@ -127,7 +127,7 @@ window.LPI_FIXTURE = {
               "puntos": "3"
             },
             {
-              "equipo": "HEAVEN",
+              "equipo": "BAIRES",
               "puntos": "6"
             },
             {
@@ -202,7 +202,7 @@ window.LPI_FIXTURE = {
           "grupo": "B",
           "equipos": [
             {
-              "equipo": "HEAVEN",
+              "equipo": "BAIRES",
               "puntos": "7"
             },
             {
@@ -285,7 +285,7 @@ window.LPI_FIXTURE = {
               "puntos": "5"
             },
             {
-              "equipo": "HEAVEN",
+              "equipo": "BAIRES",
               "puntos": "4"
             },
             {
@@ -360,7 +360,7 @@ window.LPI_FIXTURE = {
           "grupo": "B",
           "equipos": [
             {
-              "equipo": "HEAVEN",
+              "equipo": "BAIRES",
               "puntos": "5"
             },
             {
@@ -467,7 +467,7 @@ window.LPI_FIXTURE = {
               "puntos": "6"
             },
             {
-              "equipo": "HEAVEN",
+              "equipo": "BAIRES",
               "puntos": "3"
             }
           ]
@@ -518,7 +518,7 @@ window.LPI_FIXTURE = {
           "grupo": "B",
           "equipos": [
             {
-              "equipo": "HEAVEN",
+              "equipo": "BAIRES",
               "puntos": "4"
             },
             {

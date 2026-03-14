@@ -10,8 +10,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const createApiRouter = require('./routes');
-const { readJSON } = require('./utils/fileStorage');
-const adminPlanillasRouter = require('./routes/admin.planillas');
+const crucesDbRouter = require('./routes/cruces.routes.db');
 
 const app = express();
 
@@ -21,10 +20,12 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 /* =========================================================
-   CORS PARA FRONTEND SEPARADO
+   CORS PARA FRONTEND SEPARADO / LOCAL
 ========================================================= */
 
 const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3001',
   process.env.FRONTEND_URL,
@@ -34,7 +35,11 @@ app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
       return callback(new Error('Origen no permitido por CORS: ' + origin));
     },
     credentials: true,
@@ -47,9 +52,30 @@ app.use(
 
 app.use(helmet());
 
+const isLocalRequest = (req) => {
+  const ip = String(req.ip || '');
+  const host = String(req.hostname || '');
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    ip === '::1' ||
+    ip === '127.0.0.1' ||
+    ip === '::ffff:127.0.0.1'
+  );
+};
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  skip: (req) => {
+    if (isLocalRequest(req)) return true;
+
+    // Login de equipos y auth no se limitan para evitar bloquear pruebas locales
+    if (req.path.startsWith('/team/')) return true;
+    if (req.path.startsWith('/auth/')) return true;
+
+    return false;
+  },
 });
 
 app.use('/api', limiter);
@@ -87,6 +113,8 @@ const FRONTEND_FECHA = path.join(FRONTEND_DIR, 'fecha');
    API
 ========================================================= */
 
+app.use('/api/cruces', crucesDbRouter);
+
 app.use(
   '/api',
   createApiRouter({
@@ -99,8 +127,6 @@ app.use(
     FRONTEND_FECHA,
   })
 );
-
-app.use(adminPlanillasRouter);
 
 /* =========================================================
    FRONTEND ESTÁTICO (temporal, hasta separar del todo)
@@ -132,7 +158,7 @@ app.get("/test-db", async (req, res) => {
 });
 
 /* =========================================================
-   INIT DB (TEMPORAL)
+   INIT DB (TEMPORAL / LEGACY)
 ========================================================= */
 
 app.get("/init-db", async (req, res) => {

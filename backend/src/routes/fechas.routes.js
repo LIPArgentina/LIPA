@@ -1,14 +1,59 @@
-// backend/src/routes/fechas.routes.js
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { requireTeam } = require('../middleware/auth');
+const pool = require('../../db');
 
 module.exports = function createFechasRouter(deps) {
-  const { FRONTEND_DIR, FRONTEND_FECHA, DATA_DIR } = deps;
+  const { FRONTEND_DIR, FRONTEND_FECHA } = deps;
 
   const router = express.Router();
-  const PRIVATE_PLANILLAS_DIR = path.join(__dirname, '..', 'data', 'planillas');
+
+  async function resolveEquipoBySlug(rawSlug) {
+    const slug = String(rawSlug || '').trim().toLowerCase();
+    if (!slug) return null;
+
+    const result = await pool.query(
+      `
+        SELECT
+          e.id,
+          e.slug_uid,
+          e.slug_base,
+          e.display_name,
+          e.division
+        FROM equipos e
+        LEFT JOIN equipo_slug_aliases a
+          ON a.equipo_id = e.id
+        WHERE
+          e.slug_uid = $1
+          OR e.slug_base = $1
+          OR a.alias_slug = $1
+        ORDER BY
+          CASE
+            WHEN e.slug_uid = $1 THEN 1
+            WHEN e.slug_base = $1 THEN 2
+            ELSE 3
+          END,
+          CASE e.division
+            WHEN 'primera' THEN 1
+            WHEN 'segunda' THEN 2
+            WHEN 'tercera' THEN 3
+            ELSE 9
+          END
+      `,
+      [slug]
+    );
+
+    if (!result.rowCount) return null;
+
+    const exactUid = result.rows.filter(r => r.slug_uid === slug);
+    const exactBase = result.rows.filter(r => r.slug_base === slug);
+
+    if (exactUid.length === 1) return exactUid[0];
+    if (exactBase.length === 1) return exactBase[0];
+    if (result.rowCount === 1) return result.rows[0];
+    return result.rows[0];
+  }
 
   async function ensureDir(dir) {
     await fs.promises.mkdir(dir, { recursive: true });
@@ -34,7 +79,6 @@ module.exports = function createFechasRouter(deps) {
     try { return JSON.parse(m[1]); } catch (_) { return null; }
   }
 
-
   // ====== API: Validación (fecha/*.validacion.js) ======
   router.post('/validar', async (req, res) => {
     try {
@@ -47,7 +91,6 @@ module.exports = function createFechasRouter(deps) {
       const today = new Date().toISOString().split('T')[0];
       const validacionContent = { team, date: today, triangulos, puntosTotales };
 
-      // Verificar si ya existe hoy
       if (fs.existsSync(validacionPath)) {
         try {
           delete require.cache[require.resolve(validacionPath)];
@@ -56,10 +99,9 @@ module.exports = function createFechasRouter(deps) {
           if (existingData && existingData.date === today) {
             return res.status(409).json({ ok: false, error: 'Ya validado hoy' });
           }
-        } catch (e) { /* ignore */ }
+        } catch (e) {}
       }
 
-      // Verificar rival
       const rivalTeam = team === 'local' ? 'visitante' : 'local';
       const rivalValidacionPath = path.join(FRONTEND_FECHA, `${rivalTeam}.validacion.js`);
       if (fs.existsSync(rivalValidacionPath)) {
@@ -71,7 +113,7 @@ module.exports = function createFechasRouter(deps) {
               (rivalData.triangulos !== triangulos || rivalData.puntosTotales !== puntosTotales)) {
             return res.status(400).json({ ok: false, error: 'Los puntos no coinciden con el rival' });
           }
-        } catch (e) { /* ignore */ }
+        } catch (e) {}
       }
 
       const content = `window.LPI_VALIDACION = ${JSON.stringify(validacionContent, null, 2)};\n`;
@@ -108,7 +150,7 @@ module.exports = function createFechasRouter(deps) {
     }
   });
 
-  // ====== API: Guardar PLANILLA (privada, en JSON) ======
+  // ====== API: Guardar PLANILLA (PostgreSQL) ======
   router.post('/save-planilla', requireTeam, async (req, res) => {
     try {
       const { path: relPath, content, team } = req.body || {};
@@ -143,56 +185,99 @@ module.exports = function createFechasRouter(deps) {
       const finalPlan = normalizePlanillaPayload(plan, authSlug);
       finalPlan.team = authSlug;
 
-      await ensureDir(PRIVATE_PLANILLAS_DIR);
-
-      const filename = `${authSlug}.planilla.json`;
-      const absPath = path.join(PRIVATE_PLANILLAS_DIR, filename);
-      const dir = path.dirname(absPath);
-      await ensureDir(dir);
-
-      const bakPath = absPath + '.bak';
-      if (fs.existsSync(absPath)) {
-        try { await fs.promises.copyFile(absPath, bakPath); } catch (_) {}
+      const equipo = await resolveEquipoBySlug(authSlug);
+      if (!equipo) {
+        return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
       }
 
-      const tmpPath = absPath + '.tmp';
-      await fs.promises.writeFile(tmpPath, JSON.stringify(finalPlan, null, 2), 'utf8');
-      await fs.promises.rename(tmpPath, absPath);
+           const existingPlanilla = await pool.query(
+        `
+          SELECT id
+          FROM planillas
+          WHERE equipo_id = $1
+            AND estado = 'guardada'
+          ORDER BY updated_at DESC, id DESC
+          LIMIT 1
+        `,
+        [equipo.id]
+      );
 
-      // Intentar borrar la versión pública vieja para no exponer la formación
-      const legacyJsPath = path.join(FRONTEND_FECHA, `${authSlug}.planilla.js`);
-      const legacyBakPath = legacyJsPath + '.bak';
-      const legacyTmpPath = legacyJsPath + '.tmp';
-      for (const legacyPath of [legacyJsPath, legacyBakPath, legacyTmpPath]) {
-        try {
-          if (fs.existsSync(legacyPath)) await fs.promises.unlink(legacyPath);
-        } catch (_) {}
+      if (existingPlanilla.rowCount > 0) {
+        await pool.query(
+          `
+            UPDATE planillas
+            SET
+              fecha_clave = CURRENT_DATE,
+              datos = $2::jsonb,
+              source_file = $3,
+              updated_at = NOW()
+            WHERE id = $1
+          `,
+          [
+            existingPlanilla.rows[0].id,
+            JSON.stringify(finalPlan),
+            `${authSlug}.planilla.json`
+          ]
+        );
+      } else {
+        await pool.query(
+          `
+            INSERT INTO planillas (equipo_id, fecha_clave, estado, datos, source_file)
+            VALUES ($1, CURRENT_DATE, 'guardada', $2::jsonb, $3)
+          `,
+          [equipo.id, JSON.stringify(finalPlan), `${authSlug}.planilla.json`]
+        );
       }
 
-     return res.json({
-  ok: true,
-  message: 'Planilla guardada',
-  file: filename,
-});
+      try {
+        const legacyDir = path.join(__dirname, '..', 'data', 'planillas');
+        const legacyPath = path.join(legacyDir, `${authSlug}.planilla.json`);
+        const legacyBakPath = legacyPath + '.bak';
+        const legacyTmpPath = legacyPath + '.tmp';
+        for (const p of [legacyPath, legacyBakPath, legacyTmpPath]) {
+          if (fs.existsSync(p)) await fs.promises.unlink(p);
+        }
+      } catch (_) {}
+
+      return res.json({
+        ok: true,
+        message: 'Planilla guardada en PostgreSQL',
+        team: authSlug,
+        source: 'db'
+      });
     } catch (err) {
       console.error('Error al guardar planilla:', err);
       res.status(500).json({ ok: false, error: 'Error interno' });
     }
   });
 
-  // ====== API: Obtener PLANILLA del equipo autenticado ======
+  // ====== API: Obtener PLANILLA del equipo autenticado (PostgreSQL) ======
   router.get('/team/planilla', requireTeam, async (req, res) => {
     try {
       const authSlug = String((req.user && req.user.slug) || '').trim().toLowerCase();
       if (!authSlug) return res.status(401).json({ ok:false, error:'no autenticade' });
 
-      const absPath = path.join(PRIVATE_PLANILLAS_DIR, `${authSlug}.planilla.json`);
-      if (!fs.existsSync(absPath)) {
+      const equipo = await resolveEquipoBySlug(authSlug);
+      if (!equipo) {
+        return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
+      }
+
+      const result = await pool.query(
+        `
+          SELECT datos
+          FROM planillas
+          WHERE equipo_id = $1
+          ORDER BY updated_at DESC, id DESC
+          LIMIT 1
+        `,
+        [equipo.id]
+      );
+
+      if (!result.rowCount) {
         return res.status(404).json({ ok:false, error:'No existe planilla guardada' });
       }
 
-      const raw = await fs.promises.readFile(absPath, 'utf8');
-      const planilla = JSON.parse(raw);
+      const planilla = result.rows[0].datos || {};
 
       res.set('Cache-Control', 'no-store');
       return res.json({ ok:true, planilla });
@@ -202,26 +287,39 @@ module.exports = function createFechasRouter(deps) {
     }
   });
 
-// ====== API: Listar planillas existentes (privadas en JSON) ======
-router.get('/planillas', async (req, res) => {
-  try {
-    await ensureDir(PRIVATE_PLANILLAS_DIR);
-    const files = await fs.promises.readdir(PRIVATE_PLANILLAS_DIR);
+  // ====== API: Listar planillas existentes (PostgreSQL) ======
+  router.get('/planillas', async (req, res) => {
+    try {
+      const result = await pool.query(
+        `
+          SELECT
+            p.id,
+            p.updated_at,
+            e.slug_uid,
+            e.slug_base,
+            e.display_name,
+            e.division
+          FROM planillas p
+          JOIN equipos e ON e.id = p.equipo_id
+          ORDER BY e.display_name ASC, p.updated_at DESC
+        `
+      );
 
-    const planillas = files
-      .filter(f => f.endsWith('.planilla.json'))
-      .map(f => ({
-        file: f,
-        team: f.replace('.planilla.json', '')
+      const planillas = result.rows.map(row => ({
+        id: row.id,
+        team: row.slug_base,
+        slug_uid: row.slug_uid,
+        teamName: row.display_name,
+        division: row.division,
+        updatedAt: row.updated_at
       }));
 
-    return res.json(planillas);
-  } catch (err) {
-    console.error('Error al listar planillas:', err);
-    return res.status(500).json({ ok: false, error: 'Error interno al listar planillas' });
-  }
-});
-
+      return res.json(planillas);
+    } catch (err) {
+      console.error('Error al listar planillas:', err);
+      return res.status(500).json({ ok: false, error: 'Error interno al listar planillas' });
+    }
+  });
 
   return router;
 };
