@@ -261,7 +261,7 @@ function pickBestByClosestDate(matches) {
     try {
       const fechaKey = new Date().toISOString().slice(0,10);
       const qs = new URLSearchParams({ team: teamSlug, fechaKey });
-      const r = await fetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
+      const r = await fetch(`${API_BASE}/api/cruces/status?' + qs.toString(), { cache:'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       if (!j || !j.enabled) {
@@ -293,7 +293,7 @@ function pickBestByClosestDate(matches) {
     const map = new Map();
 
     try {
-      const r = await fetch('/api/admin/planillas', {
+      const r = await fetch(`${API_BASE}/api/admin/planillas', {
         cache: 'no-store',
         credentials: 'same-origin'
       });
@@ -337,7 +337,7 @@ function pickBestByClosestDate(matches) {
     }
 
     try {
-      const r = await fetch('/api/team/planilla?team=' + encodeURIComponent(team), {
+      const r = await fetch(`${API_BASE}/api/team/planilla?team=' + encodeURIComponent(team), {
         cache: 'no-store',
         credentials: 'same-origin'
       });
@@ -750,7 +750,7 @@ async function saveMatchStatus(validated = false) {
     status,
     validar: !!validated
   };
-  const res = await fetch('/api/cruces/match-status', {
+  const res = await fetch(`${API_BASE}/api/cruces/match-status', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)
@@ -807,7 +807,7 @@ async function tryApplyStatusIfExists(){
       fechaISO: todayISO_AR,
       equipoSlug: mySlug
     });
-    const res = await fetch('/api/cruces/match-status?' + qs.toString(), {
+    const res = await fetch(`${API_BASE}/api/cruces/match-status?' + qs.toString(), {
       cache: 'no-store',
       credentials: 'same-origin'
     });
@@ -896,7 +896,7 @@ btn.onclick = async () => {
     };
 
     const statusForValidate = buildMatchStatus(true);
-    const save = await fetch('/api/cruces/validate', {
+    const save = await fetch(`${API_BASE}/api/cruces/validate', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
