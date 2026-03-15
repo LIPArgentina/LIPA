@@ -62,47 +62,29 @@
   }
 
   var slug = computeSlug();
-  if (!slug){ console.warn('No se pudo determinar el slug del equipo'); return; }
+if (!slug){ console.warn('No se pudo determinar el slug del equipo'); return; }
 
-  function normalizePlayersPayload(data){
-    return Array.isArray(data && data.players) ? data.players : [];
-  }
-
-  function applyPlayersPayload(data){
-    window.LPI_PLAYERS = normalizePlayersPayload(data);
-    if (data && data.teamName) {
-      window.LPI_TEAM_NAME = window.LPI_TEAM_NAME || {};
-      window.LPI_TEAM_NAME[slug] = data.teamName;
-    }
-    window.__LPI_players_ready = true;
-    document.dispatchEvent(new Event('lpi:players-ready'));
-  }
-
-  function fetchJson(url){
-    return fetch(url, {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'include',
-      headers: LPI_getAuthHeaders()
-    }).then(function(r){
-      if (!r.ok) throw new Error('HTTP ' + r.status + ' @ ' + url);
+fetch(LPI_apiUrl('/api/team/players?team=' + slug), {
+    method: 'GET',
+    cache: 'no-store',
+    credentials: 'include',
+    headers: LPI_getAuthHeaders()
+  })
+    .then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
-    });
-  }
-
-  fetchJson(LPI_apiUrl('/api/team-assets?team=' + encodeURIComponent(slug)))
-    .catch(function(err){
-      console.warn('No se pudo cargar jugadores desde /api/team-assets, pruebo fallback:', err);
-      return fetchJson(LPI_apiUrl('/api/team/players?team=' + encodeURIComponent(slug)));
     })
     .then(function(data){
-      applyPlayersPayload(data);
+      window.LPI_PLAYERS = Array.isArray(data && data.players) ? data.players : [];
+      if (data && data.teamName) {
+        window.LPI_TEAM_NAME = window.LPI_TEAM_NAME || {};
+        window.LPI_TEAM_NAME[slug] = data.teamName;
+      }
+      window.__LPI_players_ready = true;
+      document.dispatchEvent(new Event('lpi:players-ready'));
     })
     .catch(function(err){
       console.error('No se pudo cargar jugadores por API:', err);
-      window.LPI_PLAYERS = [];
-      window.__LPI_players_ready = true;
-      document.dispatchEvent(new Event('lpi:players-ready'));
     });
 })();
 
