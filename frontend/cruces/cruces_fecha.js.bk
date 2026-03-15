@@ -415,18 +415,6 @@ function pickBestByClosestDate(matches) {
     return wrap;
   }
 
-  function writeAllSelects(rootId, values) {
-    const root = document.getElementById(rootId);
-    if (!root) return;
-    const selects = Array.from(root.querySelectorAll('.pts-select'));
-    selects.forEach((sel, i) => {
-      if (i < values.length) {
-        sel.value = String(values[i]);
-        sel.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    });
-  }
-
   function makeRow(num, text, side, includePoints = false, sectionKey = '') {
     const row = document.createElement('div');
     row.className = 'row';
@@ -743,6 +731,17 @@ function readAllSelects(rootId) {
     return Number.isFinite(n) ? n : 0;
   });
 }
+function writeAllSelects(rootId, values) {
+  const root = document.getElementById(rootId);
+  const selects = Array.from(root.querySelectorAll('.pts-select'));
+  selects.forEach((sel,i) => {
+    if (i < values.length) {
+      sel.value = String(values[i]);
+      sel.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  });
+}
+
 function computeTotalsFrom(rootId) {
   const root = document.getElementById(rootId);
   const winsEl = root.querySelector('[data-wins]');
