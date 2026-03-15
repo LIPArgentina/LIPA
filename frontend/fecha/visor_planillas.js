@@ -11,6 +11,8 @@
     }
   };
 
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
+
   function showAlert(msg){
     const a = $('#alert');
     if(!a){
@@ -332,7 +334,7 @@
 
       const [_, planillasResponse] = await Promise.all([
         loadCategoryMaps(),
-        fetch('/api/admin/planillas', { cache:'no-store' })
+        fetch(`${API_BASE}/api/admin/planillas`, { cache:'no-store' })
       ]);
 
       if(!planillasResponse.ok){
@@ -419,7 +421,7 @@ function updateGlobalJsIndicator(isToday){
 
   async function getStatus(){
     const qs = new URLSearchParams({ team: currentTeam(), fechaKey });
-    const r = await fetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
+    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), { cache:'no-store' });
     if(!r.ok) throw new Error('HTTP '+r.status);
     return await r.json();
   }
@@ -460,7 +462,7 @@ function updateGlobalJsIndicator(isToday){
         ? '/api/cruces/disable'
         : '/api/cruces/enable';
 
-      const r = await fetch(endpoint, {
+      const r = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ team: currentTeam(), fechaKey })
@@ -483,7 +485,7 @@ function updateGlobalJsIndicator(isToday){
   }
 
   try{
-    const es = new EventSource('/api/cruces/stream');
+    const es = new EventSource(`${API_BASE}/api/cruces/stream`);
     es.onmessage = ()=> refresh();
   }catch(_){}
 })();
