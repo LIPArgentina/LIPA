@@ -41,7 +41,7 @@
 
   async function loadAllFixtures() {
     const isFile = location.protocol === 'file:';
-    const apiBase = (window.APP_CONFIG?.API_BASE_URL || API_BASE || '').replace(/\/+$/, '');
+    const apiBase = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG?.API_BASE_URL) ? APP_CONFIG.API_BASE_URL : '';
     const localWinBase = 'file:///C:/Users/javie/Desktop/LIGA/frontend/fixture/';
     const httpBase = apiBase ? (apiBase.replace(/\/$/, '') + '/fixture/') : '/fixture/';
     const relBase = '../fixture/';
@@ -799,40 +799,6 @@ function autosaveAttachListeners(){
 }
 
 // STATUS autocarga: primero borrador propio, si no existe compartido final
-async function tryApplyStatusIfExists(){
-  try {
-    const qs = new URLSearchParams({
-      localSlug,
-      visitanteSlug,
-      fechaISO: todayISO_AR,
-      equipoSlug: mySlug
-    });
-    const res = await fetch(`${API_BASE}/api/cruces/match-status?` + qs.toString(), {
-      cache: 'no-store',
-      credentials: 'same-origin'
-    });
-    const result = await res.json().catch(() => null);
-    if (!res.ok || !result?.ok || !result?.data) return false;
-
-    const data = result.data;
-    if (data.localPlanilla) applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
-    if (data.visitantePlanilla) applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
-
-    const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
-    const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
-    writeAllSelects('planilla-root-left', L);
-    writeAllSelects('planilla-root-right', R);
-    updateScoresFor('planilla-root-left');
-    updateScoresFor('planilla-root-right');
-
-    if (data.validated === true) {
-      lockValidatedMatchUI();
-    }
-    return true;
-  } catch { return false; }
-}
-
-// STATUS: obtener parcial propio o validación final
 async function getSavedMatchStatus(){
   try {
     const qs = new URLSearchParams({
