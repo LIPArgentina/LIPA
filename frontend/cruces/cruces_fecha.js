@@ -44,6 +44,8 @@
     const localWinBase = 'file:///C:/Users/javie/Desktop/LIGA/frontend/fixture/';
     const httpBase = apiBase ? (apiBase.replace(/\/$/, '') + '/fixture/') : '/fixture/';
     const relBase = '../fixture/';
+    const relBase2 = './fixture/';
+    const legacyBase = '/frontend/fixture/';
     const names = [
       'fixture.ida.tercera.json',
       'fixture.vuelta.tercera.json',
@@ -51,17 +53,19 @@
       'fixture.vuelta.segunda.json'
     ];
 
-    // SOLO JSON del fixture actual. Desde cruces/cruces_fecha.html,
-    // la carpeta correcta es ../fixture/
     const sources = isFile
       ? [
           ...names.map(n => localWinBase + n),
+          ...names.map(n => httpBase + n),
           ...names.map(n => relBase + n),
-          ...names.map(n => httpBase + n)
+          ...names.map(n => relBase2 + n),
+          ...names.map(n => legacyBase + n)
         ]
       : [
+          ...names.map(n => httpBase + n),
           ...names.map(n => relBase + n),
-          ...names.map(n => httpBase + n)
+          ...names.map(n => relBase2 + n),
+          ...names.map(n => legacyBase + n)
         ];
 
     const results = await Promise.allSettled(sources.map(src => loadJson(src)));
@@ -71,7 +75,7 @@
         all.push({ src: sources[i], fechas: results[i].value.fechas });
       }
     }
-    if (!all.length) throw new Error('No se pudo cargar fixture JSON.');
+    if (!all.length) throw new Error('No se pudo cargar fixture.');
     return all;
   }
 
@@ -102,7 +106,13 @@
     }
   }
 
-  function findAllMatchesForTeam(fixtures, teamSlug) {
+  function findAllMatchesForTeam(fixtures, teamCandidates) {
+    const wanted = new Set(
+      (Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates])
+        .map(v => normPlanillaSlug(v))
+        .filter(Boolean)
+    );
+
     const matches = [];
     for (const fix of fixtures) {
       for (const fecha of fix.fechas) {
@@ -111,7 +121,7 @@
           for (const [loc, vis] of iteratePairs(equipos)) {
             const nLoc = normPlanillaSlug(loc);
             const nVis = normPlanillaSlug(vis);
-            if (nLoc === teamSlug || nVis === teamSlug) {
+            if (wanted.has(nLoc) || wanted.has(nVis)) {
               matches.push({ local: loc, visitante: vis, date: fecha.date, localSlug: nLoc, visitanteSlug: nVis });
             }
           }
@@ -159,38 +169,66 @@ function pickBestByClosestDate(matches) {
 }
 
 
-  function getStoredCrucesTeam() {
+  function getStoredCrucesCandidates() {
+    const out = [];
+    const push = (value) => {
+      const clean = normPlanillaSlug(value);
+      if (clean && !out.includes(clean)) out.push(clean);
+    };
+
     try {
       const qs = new URLSearchParams(location.search).get('team');
       if (qs) {
-        const clean = normPlanillaSlug(qs);
-        try { sessionStorage.setItem('lpi_cruces_team', clean); } catch(_){}
-        try { localStorage.setItem('lpi_cruces_team', clean); } catch(_){}
+        push(qs);
+        try { sessionStorage.setItem('lpi_cruces_team', normPlanillaSlug(qs)); } catch(_){}
+        try { localStorage.setItem('lpi_cruces_team', normPlanillaSlug(qs)); } catch(_){}
         try {
           const url = new URL(location.href);
           url.searchParams.delete('team');
           history.replaceState({}, '', url.pathname + url.search + url.hash);
         } catch(_){}
-        return clean;
       }
     } catch(_) {}
 
     try {
       const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
-      if (sess && sess.slug) return normPlanillaSlug(sess.slug);
+      if (sess) {
+        push(sess.slug);
+        push(sess.team);
+        push(sess.displayName);
+        push(sess.teamName);
+        push(sess.name);
+        push(sess.user);
+      }
     } catch(_) {}
 
     try {
       const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
-      if (sess2 && (sess2.slug || sess2.team)) return normPlanillaSlug(sess2.slug || sess2.team);
+      if (sess2) {
+        push(sess2.slug);
+        push(sess2.team);
+        push(sess2.displayName);
+        push(sess2.teamName);
+        push(sess2.name);
+        push(sess2.user);
+      }
     } catch(_) {}
 
     try {
-      const saved = sessionStorage.getItem('lpi_cruces_team') || localStorage.getItem('lpi_cruces_team') || '';
-      if (saved) return normPlanillaSlug(saved);
+      push(sessionStorage.getItem('lpi_cruces_team'));
+      push(localStorage.getItem('lpi_cruces_team'));
+      push(sessionStorage.getItem('teamSlug'));
+      push(localStorage.getItem('teamSlug'));
+      push(sessionStorage.getItem('team'));
+      push(localStorage.getItem('team'));
     } catch(_) {}
 
-    return '';
+    return out;
+  }
+
+  function getStoredCrucesTeam() {
+    const candidates = getStoredCrucesCandidates();
+    return candidates[0] || '';
   }
 
   async function checkCrucesEnabled(teamSlug) {
@@ -659,7 +697,7 @@ async function saveMatchStatus(validated = false) {
     status,
     validar: !!validated
   };
-  const res = await fetch('/api/guardar-status-match', {
+  const res = await fetch('/api/cruces/match-status', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)
@@ -716,7 +754,7 @@ async function tryApplyStatusIfExists(){
       fechaISO: todayISO_AR,
       equipoSlug: mySlug
     });
-    const res = await fetch('/api/status-match?' + qs.toString(), {
+    const res = await fetch('/api/cruces/match-status?' + qs.toString(), {
       cache: 'no-store',
       credentials: 'same-origin'
     });
@@ -779,10 +817,10 @@ btn.onclick = async () => {
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
-    const lockRes = await fetch(`/api/validar-lock?slug=${encodeURIComponent(mySlug)}&fechaISO=${encodeURIComponent(todayISO_AR)}`).catch(()=>null);
+    const lockRes = await fetch(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
-      if (lock?.locked) { setBtnState('success','VALIDADO'); return; }
+      if (lock?.locked || lock?.validatedFinal) { setBtnState('success','VALIDADO'); return; }
     }
 
     const left  = computeTotalsFrom('planilla-root-left');
@@ -804,35 +842,44 @@ btn.onclick = async () => {
       equipo2: { triangulos:right.triangulos, puntosTotales:right.puntosTotales }
     };
 
-    const save = await fetch('/api/validar-planilla', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ slug: mySlug, validacion: mine })
+    const statusForValidate = buildMatchStatus(true);
+    const save = await fetch('/api/cruces/validate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        fechaISO: todayISO_AR,
+        localSlug,
+        visitanteSlug,
+        equipoSlug: mySlug,
+        validacion: mine,
+        status: statusForValidate
+      })
     });
     const saveData = await save.json().catch(()=>null);
-    if (!save.ok || !saveData?.ok) { setBtnState('error','ERROR: No se pudo guardar'); return; }
+    if (!save.ok || !saveData) { setBtnState('error','ERROR: No se pudo guardar'); return; }
 
-    const rivalSrc = `../cruces/${rivalSlug}.validacion.js`;
-    const rivalVal = await loadGlobalScript(rivalSrc,'LPI_VALIDACION').catch(()=>null);
-    if (!rivalVal || rivalVal.fechaISO !== todayISO_AR) { setBtnState('pending','PENDIENTE: tu rival todavía no validó'); return; }
-    if (!sameTotalsStrict(mine, rivalVal)) {
-      setBtnState('error','Los datos no coinciden, verificar con su rival');
+    if (saveData?.tipo === 'pendiente') {
+      setBtnState('pending', saveData?.mensaje || 'PENDIENTE: tu rival todavía no validó');
+      return;
+    }
+
+    if (saveData?.tipo === 'mismatch' || saveData?.ok === false) {
+      setBtnState('error', saveData?.error || 'Los datos no coinciden, verificar con su rival');
       setTimeout(() => {
-        // volver al estado pendiente anterior
-        setBtnState('pending','PENDIENTE: tu rival todavía no validó');
         btn.disabled = false;
+        btn.classList.remove('success','error','pending','rival-pending','btn');
+        btn.classList.add('btn-validate');
+        btn.textContent = 'VALIDAR PLANILLA';
       }, 3000);
       return;
     }
 
-    const statusResult = await saveMatchStatus(true);
+    const statusResult = saveData;
 
-    if (statusResult?.tipo !== 'validado') {
+    if (statusResult?.tipo !== 'validado' && statusResult?.ok !== true) {
       setBtnState('pending', statusResult?.mensaje || 'PENDIENTE: falta coincidencia final con tu rival');
       return;
     }
-
-    const lockBody = { slug: mySlug, fechaISO: todayISO_AR, lockUntil: new Date(Date.now()+24*60*60*1000).toISOString() };
-    await fetch('/api/validar-lock', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(lockBody) }).catch(()=>{});
 
     autosaveClear();
     lockValidatedMatchUI();
@@ -984,15 +1031,18 @@ btn.onclick = async () => {
     document.getElementById('app-root').appendChild(loading);
 
     try {
-      const teamSlug = getStoredCrucesTeam();
+      const teamCandidates = getStoredCrucesCandidates();
+      const teamSlug = teamCandidates[0] || '';
       if (!teamSlug) throw new Error('Falta equipo');
 
       const [fixtureData] = await Promise.all([
         loadAllFixtures()
       ]);
 
-      const allMatches = findAllMatchesForTeam(fixtureData, teamSlug);
-      if (allMatches.length === 0) throw new Error('Partido no encontrado');
+      const allMatches = findAllMatchesForTeam(fixtureData, teamCandidates);
+      if (allMatches.length === 0) {
+        throw new Error('Partido no encontrado para: ' + teamCandidates.join(', '));
+      }
 
       const match = pickBestByClosestDate(allMatches);
       if (!match) throw new Error('No hay partido futuro');
