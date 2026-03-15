@@ -136,8 +136,8 @@ function openAdmin() {
   adminForm.classList.remove("hidden");
 }
 
-function establishSession({ role, displayName, slug, category }) {
-  const sess = { role, displayName, slug, category, ts: Date.now() };
+function establishSession({ role, displayName, slug, category, token }) {
+  const sess = { role, displayName, slug, category, token, ts: Date.now() };
   localStorage.setItem(sessionKey, JSON.stringify(sess));
 
   if (slug) localStorage.setItem("lpi.lastTeamSlug", slug);
@@ -216,13 +216,16 @@ async function submitTeamLogin(ev) {
       return;
     }
 
+    const data = await res.json().catch(() => ({}));
+
     teamError.classList.add("hidden");
 
     const sess = establishSession({
       role: selectedUser.role ?? "user",
       displayName: selectedUser.username,
       slug: selectedUser.slug,
-      category: currentCategory
+      category: currentCategory,
+      token: data.token || ""
     });
 
     finishLogin(sess);
