@@ -380,15 +380,6 @@ router.post('/validate', async (req, res) => {
     const mine = partials.find(r => r.equipo_slug === equipoSlug) || null;
     const rival = partials.find(r => r.equipo_slug === rivalSlug) || null;
 
-    if (!mine?.datos) {
-      await client.query('COMMIT');
-      return res.status(400).json({
-        ok: false,
-        tipo: 'sin-parcial',
-        error: 'Primero tenés que guardar tu carga parcial.'
-      });
-    }
-
     if (!rival?.datos) {
       await client.query('COMMIT');
       return res.json({
@@ -398,7 +389,7 @@ router.post('/validate', async (req, res) => {
       });
     }
 
-    const coincide = sameTotalsStrict(mine.datos, rival.datos);
+    const coincide = sameTotalsStrict(mine?.datos, rival?.datos);
     if (!coincide) {
       await client.query('COMMIT');
       return res.json({
@@ -414,7 +405,7 @@ router.post('/validate', async (req, res) => {
       fechaISO,
       localSlug,
       visitanteSlug,
-      datos: mine.datos,
+      datos: mine?.datos || rival?.datos,
       lockUntil
     });
 
