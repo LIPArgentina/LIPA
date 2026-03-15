@@ -112,10 +112,13 @@ const MAX_BANNERS = 5;
 
 
 function getApiBase() {
-  const fromWindow =
-    (typeof window !== "undefined" && (window.API_BASE_URL || window.API_BASE)) ||
+  const fromConfig =
+    (typeof window !== "undefined" &&
+      window.APP_CONFIG &&
+      window.APP_CONFIG.API_BASE_URL) ||
     "";
-  return String(fromWindow || "").replace(/\/$/, "");
+
+  return String(fromConfig || "").replace(/\/$/, "");
 }
 
 function apiUrl(path) {
