@@ -45,6 +45,10 @@ const FILES = {
 const EQUIPOS_DIR = 'equipos/';
 const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
+const API_BASE =
+  window.location.hostname === 'localhost'
+    ? 'http://localhost:3001'
+    : 'https://liga-backend-tt82.onrender.com';
 
 /* ====== Helpers ====== */
 const $ = (s) => document.querySelector(s);
@@ -131,7 +135,7 @@ function collectRows(){
 async function saveTeams(){
   const teams = collectRows();
   try{
-    const resp = await fetch('/api/save-teams', {
+    const resp = await fetch(`${API_BASE}/api/save-teams`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ division: _activeDiv, teams })
@@ -321,7 +325,7 @@ async function saveRoster(){
   const teamName = (teamsInDiv.find(t=>t.slug===teamSlug)?.name) || teamSlug;
   const players  = getCurrentValues().slice(0,SLOTS);
   try{
-    const resp = await fetch('/api/save-team-assets', {
+    const resp = await fetch(`${API_BASE}/api/save-team-assets`, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ slug: teamSlug, teamName, players })
@@ -449,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     var slug = getTeamSlug();
-    fetch('/api/admin/change-password', {
+    fetch(`${API_BASE}/api/admin/change-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug: slug, oldPassword: oldPass, newPassword: newPass })
