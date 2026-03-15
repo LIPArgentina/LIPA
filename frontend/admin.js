@@ -1,20 +1,19 @@
 (function(){
-      try{
-        const params = new URLSearchParams(location.search);
-        const isAdmin = params.get('admin') === '1' || params.get('mode') === 'admin';
-        const withMode = (url) => {
-          if(!isAdmin) return url;
-          const u = new URL(url, location.origin);
-          u.searchParams.set('admin','1');
-          return u.pathname + u.search;
-        };
-        const btnFixture = document.getElementById('btnFixture');
-        const btnFecha   = document.getElementById('btnFecha');
-        if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
-        if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
-      }catch(e){ console.warn('Nav admin patch:', e); }
-    })();
-  
+  try{
+    const params = new URLSearchParams(location.search);
+    const isAdmin = params.get('admin') === '1' || params.get('mode') === 'admin';
+    const withMode = (url) => {
+      if(!isAdmin) return url;
+      const u = new URL(url, location.origin);
+      u.searchParams.set('admin','1');
+      return u.pathname + u.search;
+    };
+    const btnFixture = document.getElementById('btnFixture');
+    const btnFecha   = document.getElementById('btnFecha');
+    if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
+    if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
+  }catch(e){ console.warn('Nav admin patch:', e); }
+})();
 
 
 /* ====== Header: mantener ?admin=1 en enlaces ====== */
@@ -42,7 +41,6 @@ const FILES = {
   segunda:  BASE + 'usuarios.segunda.js',
   tercera:  BASE + 'usuarios.tercera.js',
 };
-const EQUIPOS_DIR = 'equipos/';
 const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
 
@@ -264,18 +262,9 @@ async function discardDraftForCurrentTeam(){
   toast('Borrador descartado');
 }
 
-/* === Cargar jugadores desde /equipos/<slug>.players.js o .json === */
-function getPlayersFromGlobal(slug){
+/* === Cargar jugadores desde API === */
+async function loadPlayersForTeam(slug){
   try {
-    const m = window.LPI_TEAM_PLAYERS || {};
-    const arr = m[slug];
-    return Array.isArray(arr) ? arr.slice(0, SLOTS) : null;
-  } catch { return null; }
-}
-  async function loadPlayersForTeam(slug){
-
-  try {
-
     const r = await fetch(`/api/team-assets?team=${encodeURIComponent(slug)}`, {
       cache: 'no-store'
     });
@@ -289,39 +278,10 @@ function getPlayersFromGlobal(slug){
     if (Array.isArray(data.players)) {
       return data.players.slice(0, SLOTS);
     }
-
   } catch (e) {
     console.warn('loadPlayersForTeam', e);
   }
 
-  return Array(SLOTS).fill('');
-}
-  // 1) Intento JS
-  try {
-    if (window.LPI_TEAM_PLAYERS && window.LPI_TEAM_PLAYERS[slug]) {
-      delete window.LPI_TEAM_PLAYERS[slug];
-    }
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = `${EQUIPOS_DIR}${slug}.players.js?t=${Date.now()}`;
-      s.onload = () => res();
-      s.onerror = () => { s.remove(); rej(new Error('no-js')); };
-      document.head.appendChild(s);
-    });
-    const arr = getPlayersFromGlobal(slug);
-    if (arr) return arr;
-  } catch(e) { /* sigue */ }
-
-  // 2) Fallback JSON
-  try {
-    const r = await fetch(`${EQUIPOS_DIR}${slug}.players.json?t=${Date.now()}`, { cache: 'no-store' });
-    if (r.ok) {
-      const j = await r.json();
-      if (Array.isArray(j.players)) return j.players.slice(0, SLOTS);
-    }
-  } catch(e) { /* nada */ }
-
-  // 3) Nada
   return Array(SLOTS).fill('');
 }
 
@@ -351,8 +311,6 @@ async function saveRoster(){
     });
     const json = await resp.json().catch(()=> ({}));
     if(!resp.ok || !json.ok){ throw new Error(json?.error || 'Error al guardar'); }
-    window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
-    window.LPI_TEAM_PLAYERS[teamSlug] = players.slice(0,SLOTS);
     clearDraft(_activeDiv, teamSlug);
     refreshDraftButtons();
     toast('Guardado correctamente');
@@ -389,7 +347,6 @@ async function loadDivision(div){
   const users = Array.isArray(window.LPI_USERS) ? window.LPI_USERS : [];
   renderRows(users);
 
-  // preparar panel derecho
   teamsInDiv = users.filter(u => u && u.role==='team').map(u => ({ name: u.username, slug: (u.slug||slugify(u.username)) }));
   fillTeamSelect();
   const last = getLast();
@@ -510,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
     wireOpen();
     wireSubmit();
   }
-})();;
+})();
 
 // === Toggles "Mostrar" para contraseñas ===
 (function(){
@@ -531,7 +488,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       chk.addEventListener('change', update);
-      // Estado inicial
       update();
     });
   }
