@@ -1,4 +1,3 @@
-// cruces.routes.db.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
@@ -8,73 +7,139 @@ function normalizeSlug(value = '') {
 }
 
 function sortMatchSlugs(localSlug, visitanteSlug) {
-  const a = normalizeSlug(localSlug);
-  const b = normalizeSlug(visitanteSlug);
-  return { localSlug: a, visitanteSlug: b };
+  return {
+    localSlug: normalizeSlug(localSlug),
+    visitanteSlug: normalizeSlug(visitanteSlug),
+  };
 }
 
 function sameTotalsStrict(a, b) {
   return (
-    a?.equipo1?.triangulos === b?.equipo1?.triangulos &&
-    a?.equipo1?.puntosTotales === b?.equipo1?.puntosTotales &&
-    a?.equipo2?.triangulos === b?.equipo2?.triangulos &&
-    a?.equipo2?.puntosTotales === b?.equipo2?.puntosTotales
+    a?.local?.triangulosTotales === b?.local?.triangulosTotales &&
+    a?.local?.puntosTotales === b?.local?.puntosTotales &&
+    a?.visitante?.triangulosTotales === b?.visitante?.triangulosTotales &&
+    a?.visitante?.puntosTotales === b?.visitante?.puntosTotales
   );
 }
 
-async function getOrCreateMatch(client, fechaISO, localSlug, visitanteSlug) {
+function buildPartialResponse(row) {
+  return {
+    ok: true,
+    data: {
+      fechaISO: row.fecha_iso,
+      validated: !!row.validated,
+      localSlug: row.local_slug,
+      visitanteSlug: row.visitante_slug,
+      localPlanilla: row.datos?.localPlanilla || null,
+      visitantePlanilla: row.datos?.visitantePlanilla || null,
+      local: row.datos?.local || null,
+      visitante: row.datos?.visitante || null,
+      lockedUntil: row.locked_until || null,
+      updatedAt: row.updated_at || null,
+      equipoSlug: row.equipo_slug,
+    }
+  };
+}
+
+function buildFinalResponse(row) {
+  return {
+    ok: true,
+    data: {
+      fechaISO: row.fecha_iso,
+      validated: true,
+      localSlug: row.local_slug,
+      visitanteSlug: row.visitante_slug,
+      localPlanilla: row.datos?.localPlanilla || null,
+      visitantePlanilla: row.datos?.visitantePlanilla || null,
+      local: row.datos?.local || null,
+      visitante: row.datos?.visitante || null,
+      localValidated: true,
+      visitanteValidated: true,
+      localLockedUntil: row.locked_until || null,
+      visitanteLockedUntil: row.locked_until || null,
+      validatedAt: row.validated_at || null,
+    }
+  };
+}
+
+async function upsertPartial(client, { fechaISO, localSlug, visitanteSlug, equipoSlug, datos, validated = false, validatedAt = null, lockedUntil = null }) {
   const { rows } = await client.query(
     `
-      INSERT INTO cruces_matches (fecha_iso, local_slug, visitante_slug)
-      VALUES ($1::date, $2, $3)
-      ON CONFLICT (fecha_iso, local_slug, visitante_slug)
-      DO UPDATE SET updated_at = NOW()
+      INSERT INTO cruces_parciales (
+        fecha_iso,
+        local_slug,
+        visitante_slug,
+        equipo_slug,
+        datos,
+        validated,
+        validated_at,
+        locked_until,
+        updated_at
+      )
+      VALUES ($1::date, $2, $3, $4, $5::jsonb, $6, $7::timestamptz, $8::timestamptz, NOW())
+      ON CONFLICT (fecha_iso, local_slug, visitante_slug, equipo_slug)
+      DO UPDATE SET
+        datos = EXCLUDED.datos,
+        validated = EXCLUDED.validated,
+        validated_at = EXCLUDED.validated_at,
+        locked_until = EXCLUDED.locked_until,
+        updated_at = NOW()
       RETURNING *;
     `,
-    [fechaISO, localSlug, visitanteSlug]
+    [
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      equipoSlug,
+      JSON.stringify(datos),
+      !!validated,
+      validatedAt,
+      lockedUntil
+    ]
   );
   return rows[0];
 }
 
-async function getOrCreateSubmission(client, matchId, equipoSlug) {
+async function getPartial(client, { fechaISO, localSlug, visitanteSlug, equipoSlug }) {
   const { rows } = await client.query(
     `
-      INSERT INTO cruces_match_submissions (match_id, equipo_slug)
-      VALUES ($1, $2)
-      ON CONFLICT (match_id, equipo_slug)
-      DO UPDATE SET updated_at = NOW()
-      RETURNING *;
+      SELECT *
+      FROM cruces_parciales
+      WHERE fecha_iso = $1::date
+        AND local_slug = $2
+        AND visitante_slug = $3
+        AND equipo_slug = $4
+      LIMIT 1
     `,
-    [matchId, equipoSlug]
+    [fechaISO, localSlug, visitanteSlug, equipoSlug]
   );
-  return rows[0];
+  return rows[0] || null;
 }
 
-async function getMatchAndSubmissions(client, fechaISO, localSlug, visitanteSlug) {
+async function getBothPartials(client, { fechaISO, localSlug, visitanteSlug }) {
   const { rows } = await client.query(
     `
-      SELECT
-        m.*,
-        ls.id AS local_submission_id,
-        ls.status_json AS local_status_json,
-        ls.validacion_json AS local_validacion_json,
-        ls.validated AS local_validated,
-        ls.validated_at AS local_validated_at,
-        ls.locked_until AS local_locked_until,
-        vs.id AS visitante_submission_id,
-        vs.status_json AS visitante_status_json,
-        vs.validacion_json AS visitante_validacion_json,
-        vs.validated AS visitante_validated,
-        vs.validated_at AS visitante_validated_at,
-        vs.locked_until AS visitante_locked_until
-      FROM cruces_matches m
-      LEFT JOIN cruces_match_submissions ls
-        ON ls.match_id = m.id AND ls.equipo_slug = m.local_slug
-      LEFT JOIN cruces_match_submissions vs
-        ON vs.match_id = m.id AND vs.equipo_slug = m.visitante_slug
-      WHERE m.fecha_iso = $1::date
-        AND m.local_slug = $2
-        AND m.visitante_slug = $3
+      SELECT *
+      FROM cruces_parciales
+      WHERE fecha_iso = $1::date
+        AND local_slug = $2
+        AND visitante_slug = $3
+        AND equipo_slug IN ($4, $5)
+      ORDER BY equipo_slug
+    `,
+    [fechaISO, localSlug, visitanteSlug, localSlug, visitanteSlug]
+  );
+  return rows;
+}
+
+async function getFinalValidation(client, { fechaISO, localSlug, visitanteSlug }) {
+  const { rows } = await client.query(
+    `
+      SELECT *
+      FROM cruces_validaciones
+      WHERE fecha_iso = $1::date
+        AND local_slug = $2
+        AND visitante_slug = $3
       LIMIT 1
     `,
     [fechaISO, localSlug, visitanteSlug]
@@ -82,47 +147,55 @@ async function getMatchAndSubmissions(client, fechaISO, localSlug, visitanteSlug
   return rows[0] || null;
 }
 
-function buildResponseFromRow(row, viewerEquipoSlug = '') {
-  const localStatus = row?.local_status_json || {};
-  const visitanteStatus = row?.visitante_status_json || {};
-  const viewer = normalizeSlug(viewerEquipoSlug);
-  const validatedFinal = !!row?.validated_final;
+async function upsertFinalValidation(client, { fechaISO, localSlug, visitanteSlug, datos, lockUntil }) {
+  const { rows } = await client.query(
+    `
+      INSERT INTO cruces_validaciones (
+        fecha_iso,
+        local_slug,
+        visitante_slug,
+        datos,
+        local_equipo_slug,
+        visitante_equipo_slug,
+        validated_at,
+        locked_until
+      )
+      VALUES ($1::date, $2, $3, $4::jsonb, $5, $6, NOW(), $7::timestamptz)
+      ON CONFLICT (fecha_iso, local_slug, visitante_slug)
+      DO UPDATE SET
+        datos = EXCLUDED.datos,
+        validated_at = NOW(),
+        locked_until = EXCLUDED.locked_until
+      RETURNING *;
+    `,
+    [
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      JSON.stringify(datos),
+      localSlug,
+      visitanteSlug,
+      lockUntil
+    ]
+  );
+  return rows[0];
+}
 
-  const isLocalViewer = viewer && viewer === row?.local_slug;
-  const isVisitanteViewer = viewer && viewer === row?.visitante_slug;
-
-  const canSeeBoth = validatedFinal || !viewer || (!isLocalViewer && !isVisitanteViewer);
-
-  return {
-    ok: true,
-    data: {
-      fechaISO: row.fecha_iso,
-      validated: validatedFinal,
-      localSlug: row.local_slug,
-      visitanteSlug: row.visitante_slug,
-
-      localPlanilla: canSeeBoth
-        ? (localStatus.localPlanilla || null)
-        : (isLocalViewer ? (localStatus.localPlanilla || null) : null),
-
-      visitantePlanilla: canSeeBoth
-        ? (visitanteStatus.visitantePlanilla || null)
-        : (isVisitanteViewer ? (visitanteStatus.visitantePlanilla || null) : null),
-
-      local: canSeeBoth
-        ? (localStatus.local || null)
-        : (isLocalViewer ? (localStatus.local || null) : null),
-
-      visitante: canSeeBoth
-        ? (visitanteStatus.visitante || null)
-        : (isVisitanteViewer ? (visitanteStatus.visitante || null) : null),
-
-      localValidated: !!row.local_validated,
-      visitanteValidated: !!row.visitante_validated,
-      localLockedUntil: row.local_locked_until || null,
-      visitanteLockedUntil: row.visitante_locked_until || null
-    }
-  };
+async function lockBothPartials(client, { fechaISO, localSlug, visitanteSlug, lockUntil }) {
+  await client.query(
+    `
+      UPDATE cruces_parciales
+      SET
+        validated = TRUE,
+        validated_at = NOW(),
+        locked_until = $4::timestamptz,
+        updated_at = NOW()
+      WHERE fecha_iso = $1::date
+        AND local_slug = $2
+        AND visitante_slug = $3
+    `,
+    [fechaISO, localSlug, visitanteSlug, lockUntil]
+  );
 }
 
 router.post('/match-status', async (req, res) => {
@@ -149,29 +222,26 @@ router.post('/match-status', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const match = await getOrCreateMatch(client, fechaISO, localSlug, visitanteSlug);
-    await getOrCreateSubmission(client, match.id, equipoSlug);
+    const final = await getFinalValidation(client, { fechaISO, localSlug, visitanteSlug });
+    if (final) {
+      await client.query('COMMIT');
+      return res.json(buildFinalResponse(final));
+    }
 
-    await client.query(
-      `
-        UPDATE cruces_match_submissions
-        SET
-          status_json = $1::jsonb,
-          updated_at = NOW()
-        WHERE match_id = $2
-          AND equipo_slug = $3
-      `,
-      [JSON.stringify(status), match.id, equipoSlug]
-    );
-
-    const row = await getMatchAndSubmissions(client, fechaISO, localSlug, visitanteSlug);
+    const partial = await upsertPartial(client, {
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      equipoSlug,
+      datos: status
+    });
 
     await client.query('COMMIT');
-    return res.json(buildResponseFromRow(row, equipoSlug));
+    return res.json(buildPartialResponse(partial));
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('POST /cruces/match-status', error);
-    return res.status(500).json({ ok: false, error: 'No se pudo guardar el status del cruce.' });
+    return res.status(500).json({ ok: false, error: 'No se pudo guardar el parcial del cruce.' });
   } finally {
     client.release();
   }
@@ -182,19 +252,29 @@ router.get('/match-status', async (req, res) => {
   const equipoSlug = normalizeSlug(req.query.equipoSlug);
   const { localSlug, visitanteSlug } = sortMatchSlugs(req.query.localSlug, req.query.visitanteSlug);
 
-  if (!fechaISO || !localSlug || !visitanteSlug) {
+  if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug) {
     return res.status(400).json({ ok: false, error: 'Faltan parámetros.' });
   }
 
+  if (![localSlug, visitanteSlug].includes(equipoSlug)) {
+    return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
+  }
+
   try {
-    const row = await getMatchAndSubmissions(pool, fechaISO, localSlug, visitanteSlug);
-    if (!row) {
+    const final = await getFinalValidation(pool, { fechaISO, localSlug, visitanteSlug });
+    if (final) {
+      return res.json(buildFinalResponse(final));
+    }
+
+    const partial = await getPartial(pool, { fechaISO, localSlug, visitanteSlug, equipoSlug });
+    if (!partial) {
       return res.json({ ok: true, data: null });
     }
-    return res.json(buildResponseFromRow(row, equipoSlug));
+
+    return res.json(buildPartialResponse(partial));
   } catch (error) {
     console.error('GET /cruces/match-status', error);
-    return res.status(500).json({ ok: false, error: 'No se pudo leer el status del cruce.' });
+    return res.status(500).json({ ok: false, error: 'No se pudo leer el parcial del cruce.' });
   }
 });
 
@@ -204,15 +284,13 @@ router.post('/validate', async (req, res) => {
     localSlug: rawLocalSlug,
     visitanteSlug: rawVisitanteSlug,
     equipoSlug: rawEquipoSlug,
-    validacion,
-    status
   } = req.body || {};
 
   const { localSlug, visitanteSlug } = sortMatchSlugs(rawLocalSlug, rawVisitanteSlug);
   const equipoSlug = normalizeSlug(rawEquipoSlug);
   const rivalSlug = equipoSlug === localSlug ? visitanteSlug : localSlug;
 
-  if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug || !validacion) {
+  if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug) {
     return res.status(400).json({ ok: false, error: 'Faltan datos obligatorios.' });
   }
 
@@ -224,48 +302,39 @@ router.post('/validate', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const match = await getOrCreateMatch(client, fechaISO, localSlug, visitanteSlug);
-    await getOrCreateSubmission(client, match.id, equipoSlug);
-    await getOrCreateSubmission(client, match.id, rivalSlug);
+    const existingFinal = await getFinalValidation(client, { fechaISO, localSlug, visitanteSlug });
+    if (existingFinal) {
+      await client.query('COMMIT');
+      return res.json({
+        ok: true,
+        tipo: 'validado',
+        mensaje: 'Validación exitosa'
+      });
+    }
 
-    await client.query(
-      `
-        UPDATE cruces_match_submissions
-        SET
-          status_json = COALESCE($1::jsonb, status_json),
-          validacion_json = $2::jsonb,
-          validated = TRUE,
-          validated_at = NOW(),
-          updated_at = NOW()
-        WHERE match_id = $3
-          AND equipo_slug = $4
-      `,
-      [status ? JSON.stringify(status) : null, JSON.stringify(validacion), match.id, equipoSlug]
-    );
+    const partials = await getBothPartials(client, { fechaISO, localSlug, visitanteSlug });
+    const mine = partials.find(r => r.equipo_slug === equipoSlug) || null;
+    const rival = partials.find(r => r.equipo_slug === rivalSlug) || null;
 
-    const { rows: submissions } = await client.query(
-      `
-        SELECT equipo_slug, validacion_json, validated
-        FROM cruces_match_submissions
-        WHERE match_id = $1
-          AND equipo_slug IN ($2, $3)
-      `,
-      [match.id, localSlug, visitanteSlug]
-    );
+    if (!mine?.datos) {
+      await client.query('COMMIT');
+      return res.status(400).json({
+        ok: false,
+        tipo: 'sin-parcial',
+        error: 'Primero tenés que guardar tu carga parcial.'
+      });
+    }
 
-    const mine = submissions.find(x => x.equipo_slug === equipoSlug) || null;
-    const rival = submissions.find(x => x.equipo_slug === rivalSlug) || null;
-
-    if (!rival?.validated || !rival?.validacion_json) {
+    if (!rival?.datos) {
       await client.query('COMMIT');
       return res.json({
         ok: true,
         tipo: 'pendiente',
-        mensaje: 'PENDIENTE: tu rival todavía no validó'
+        mensaje: 'PENDIENTE: tu rival todavía no cargó su parcial'
       });
     }
 
-    const coincide = sameTotalsStrict(mine.validacion_json, rival.validacion_json);
+    const coincide = sameTotalsStrict(mine.datos, rival.datos);
     if (!coincide) {
       await client.query('COMMIT');
       return res.json({
@@ -277,27 +346,20 @@ router.post('/validate', async (req, res) => {
 
     const lockUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    await client.query(
-      `
-        UPDATE cruces_matches
-        SET
-          validated_final = TRUE,
-          updated_at = NOW()
-        WHERE id = $1
-      `,
-      [match.id]
-    );
+    await upsertFinalValidation(client, {
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      datos: mine.datos,
+      lockUntil
+    });
 
-    await client.query(
-      `
-        UPDATE cruces_match_submissions
-        SET
-          locked_until = $1::timestamptz,
-          updated_at = NOW()
-        WHERE match_id = $2
-      `,
-      [lockUntil, match.id]
-    );
+    await lockBothPartials(client, {
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      lockUntil
+    });
 
     await client.query('COMMIT');
     return res.json({
@@ -324,26 +386,79 @@ router.get('/lock-status', async (req, res) => {
   }
 
   try {
-    const row = await getMatchAndSubmissions(pool, fechaISO, localSlug, visitanteSlug);
-    if (!row) return res.json({ ok: true, locked: false });
+    const final = await getFinalValidation(pool, { fechaISO, localSlug, visitanteSlug });
+    if (final) {
+      const locked = !!(final.locked_until && new Date(final.locked_until) > new Date());
+      return res.json({
+        ok: true,
+        locked,
+        lockedUntil: final.locked_until || null,
+        validatedFinal: true
+      });
+    }
 
-    const lockedUntil =
-      equipoSlug === localSlug ? row.local_locked_until :
-      equipoSlug === visitanteSlug ? row.visitante_locked_until :
-      null;
-
-    const locked = !!(lockedUntil && new Date(lockedUntil) > new Date());
+    const partial = await getPartial(pool, { fechaISO, localSlug, visitanteSlug, equipoSlug });
+    const locked = !!(partial?.locked_until && new Date(partial?.locked_until) > new Date());
 
     return res.json({
       ok: true,
       locked,
-      lockedUntil: lockedUntil || null,
-      validatedFinal: !!row.validated_final
+      lockedUntil: partial?.locked_until || null,
+      validatedFinal: false
     });
   } catch (error) {
     console.error('GET /cruces/lock-status', error);
     return res.status(500).json({ ok: false, error: 'No se pudo leer el lock.' });
   }
+});
+
+// ===== ADMIN CRUCES (compatibilidad con frontend) =====
+let crucesEnabledUntil = null;
+
+router.get('/status', (req, res) => {
+  const now = Date.now();
+  const enabled = crucesEnabledUntil && crucesEnabledUntil > now;
+
+  res.json({
+    enabled,
+    remainingMs: enabled ? crucesEnabledUntil - now : 0
+  });
+});
+
+router.post('/enable', (req, res) => {
+  const now = Date.now();
+  crucesEnabledUntil = now + (48 * 60 * 60 * 1000);
+
+  res.json({
+    ok: true,
+    enabled: true,
+    remainingMs: crucesEnabledUntil - now
+  });
+});
+
+router.post('/disable', (req, res) => {
+  crucesEnabledUntil = null;
+  res.json({
+    ok: true,
+    enabled: false,
+    remainingMs: 0
+  });
+});
+
+router.get('/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const send = () => {
+    res.write(`data: ping\n\n`);
+  };
+
+  const timer = setInterval(send, 10000);
+
+  req.on('close', () => {
+    clearInterval(timer);
+  });
 });
 
 module.exports = router;
