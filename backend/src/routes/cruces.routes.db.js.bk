@@ -13,14 +13,6 @@ function sortMatchSlugs(localSlug, visitanteSlug) {
   };
 }
 
-function buildScopeSlug(localSlug, visitanteSlug) {
-  return `${localSlug}__${visitanteSlug}`;
-}
-
-function buildFechaClave(fechaISO, localSlug, visitanteSlug) {
-  return `${fechaISO}__${localSlug}__${visitanteSlug}`;
-}
-
 function sameTotalsStrict(a, b) {
   return (
     a?.local?.triangulosTotales === b?.local?.triangulosTotales &&
@@ -50,18 +42,17 @@ function buildPartialResponse(row) {
 }
 
 function buildFinalResponse(row) {
-  const payload = row.payload || {};
   return {
     ok: true,
     data: {
       fechaISO: row.fecha_iso,
       validated: true,
-      localSlug: row.local_equipo_slug,
-      visitanteSlug: row.visitante_equipo_slug,
-      localPlanilla: payload?.localPlanilla || null,
-      visitantePlanilla: payload?.visitantePlanilla || null,
-      local: payload?.local || null,
-      visitante: payload?.visitante || null,
+      localSlug: row.local_slug,
+      visitanteSlug: row.visitante_slug,
+      localPlanilla: row.datos?.localPlanilla || null,
+      visitantePlanilla: row.datos?.visitantePlanilla || null,
+      local: row.datos?.local || null,
+      visitante: row.datos?.visitante || null,
       localValidated: true,
       visitanteValidated: true,
       localLockedUntil: row.locked_until || null,
@@ -72,36 +63,7 @@ function buildFinalResponse(row) {
 }
 
 async function upsertPartial(client, { fechaISO, localSlug, visitanteSlug, equipoSlug, datos, validated = false, validatedAt = null, lockedUntil = null }) {
-  const updated = await client.query(
-    `
-      UPDATE cruces_parciales
-      SET
-        datos = $5::jsonb,
-        validated = $6,
-        validated_at = $7::timestamptz,
-        locked_until = $8::timestamptz,
-        updated_at = NOW()
-      WHERE fecha_iso = $1::date
-        AND local_slug = $2
-        AND visitante_slug = $3
-        AND equipo_slug = $4
-      RETURNING *;
-    `,
-    [
-      fechaISO,
-      localSlug,
-      visitanteSlug,
-      equipoSlug,
-      JSON.stringify(datos),
-      !!validated,
-      validatedAt,
-      lockedUntil
-    ]
-  );
-
-  if (updated.rows[0]) return updated.rows[0];
-
-  const inserted = await client.query(
+  const { rows } = await client.query(
     `
       INSERT INTO cruces_parciales (
         fecha_iso,
@@ -115,6 +77,13 @@ async function upsertPartial(client, { fechaISO, localSlug, visitanteSlug, equip
         updated_at
       )
       VALUES ($1::date, $2, $3, $4, $5::jsonb, $6, $7::timestamptz, $8::timestamptz, NOW())
+      ON CONFLICT (fecha_iso, local_slug, visitante_slug, equipo_slug)
+      DO UPDATE SET
+        datos = EXCLUDED.datos,
+        validated = EXCLUDED.validated,
+        validated_at = EXCLUDED.validated_at,
+        locked_until = EXCLUDED.locked_until,
+        updated_at = NOW()
       RETURNING *;
     `,
     [
@@ -128,8 +97,7 @@ async function upsertPartial(client, { fechaISO, localSlug, visitanteSlug, equip
       lockedUntil
     ]
   );
-
-  return inserted.rows[0];
+  return rows[0];
 }
 
 async function getPartial(client, { fechaISO, localSlug, visitanteSlug, equipoSlug }) {
@@ -170,9 +138,8 @@ async function getFinalValidation(client, { fechaISO, localSlug, visitanteSlug }
       SELECT *
       FROM cruces_validaciones
       WHERE fecha_iso = $1::date
-        AND local_equipo_slug = $2
-        AND visitante_equipo_slug = $3
-      ORDER BY validated_at DESC NULLS LAST, id DESC
+        AND local_slug = $2
+        AND visitante_slug = $3
       LIMIT 1
     `,
     [fechaISO, localSlug, visitanteSlug]
@@ -181,68 +148,37 @@ async function getFinalValidation(client, { fechaISO, localSlug, visitanteSlug }
 }
 
 async function upsertFinalValidation(client, { fechaISO, localSlug, visitanteSlug, datos, lockUntil }) {
-  const fechaClave = buildFechaClave(fechaISO, localSlug, visitanteSlug);
-  const scopeSlug = buildScopeSlug(localSlug, visitanteSlug);
-
-  const updated = await client.query(
-    `
-      UPDATE cruces_validaciones
-      SET
-        payload = $4::jsonb,
-        validated_at = NOW(),
-        locked_until = $5::timestamptz,
-        updated_at = NOW(),
-        fecha_clave = $6,
-        scope_slug = $7
-      WHERE fecha_iso = $1::date
-        AND local_equipo_slug = $2
-        AND visitante_equipo_slug = $3
-      RETURNING *;
-    `,
-    [
-      fechaISO,
-      localSlug,
-      visitanteSlug,
-      JSON.stringify(datos),
-      lockUntil,
-      fechaClave,
-      scopeSlug
-    ]
-  );
-
-  if (updated.rows[0]) return updated.rows[0];
-
-  const inserted = await client.query(
+  const { rows } = await client.query(
     `
       INSERT INTO cruces_validaciones (
         fecha_iso,
-        payload,
+        local_slug,
+        visitante_slug,
+        datos,
         local_equipo_slug,
         visitante_equipo_slug,
         validated_at,
-        locked_until,
-        updated_at,
-        created_at,
-        fecha_clave,
-        scope_slug,
-        source_file
+        locked_until
       )
-      VALUES ($1::date, $2::jsonb, $3, $4, NOW(), $5::timestamptz, NOW(), NOW(), $6, $7, $8)
+      VALUES ($1::date, $2, $3, $4::jsonb, $5, $6, NOW(), $7::timestamptz)
+      ON CONFLICT (fecha_iso, local_slug, visitante_slug)
+      DO UPDATE SET
+        datos = EXCLUDED.datos,
+        validated_at = NOW(),
+        locked_until = EXCLUDED.locked_until
       RETURNING *;
     `,
     [
       fechaISO,
+      localSlug,
+      visitanteSlug,
       JSON.stringify(datos),
       localSlug,
       visitanteSlug,
-      lockUntil,
-      fechaClave,
-      scopeSlug,
-      'postgres'
+      lockUntil
     ]
   );
-
-  return inserted.rows[0];
+  return rows[0];
 }
 
 async function lockBothPartials(client, { fechaISO, localSlug, visitanteSlug, lockUntil }) {
