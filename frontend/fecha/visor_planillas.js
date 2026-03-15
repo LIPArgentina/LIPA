@@ -403,7 +403,7 @@ function updateGlobalJsIndicator(isToday){
       ? 'Todas las planillas visibles son del día'
       : 'Hay planillas visibles con fecha anterior');
 }
-
+    const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
 (function(){
   if (window.__CRUCES_ADMIN_WIRED__) return;
   window.__CRUCES_ADMIN_WIRED__ = true;
