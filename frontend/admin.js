@@ -272,7 +272,30 @@ function getPlayersFromGlobal(slug){
     return Array.isArray(arr) ? arr.slice(0, SLOTS) : null;
   } catch { return null; }
 }
-async function loadPlayersForTeam(slug){
+  async function loadPlayersForTeam(slug){
+
+  try {
+
+    const r = await fetch(`/api/team-assets?team=${encodeURIComponent(slug)}`, {
+      cache: 'no-store'
+    });
+
+    if (!r.ok) {
+      throw new Error('No se pudo cargar el plantel');
+    }
+
+    const data = await r.json();
+
+    if (Array.isArray(data.players)) {
+      return data.players.slice(0, SLOTS);
+    }
+
+  } catch (e) {
+    console.warn('loadPlayersForTeam', e);
+  }
+
+  return Array(SLOTS).fill('');
+}
   // 1) Intento JS
   try {
     if (window.LPI_TEAM_PLAYERS && window.LPI_TEAM_PLAYERS[slug]) {
