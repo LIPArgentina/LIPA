@@ -361,6 +361,43 @@ function pickBestByClosestDate(matches) {
     }
   }
 
+  function toDateARTop(d = new Date()) {
+    const z = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+    const pad = n => String(n).padStart(2, '0');
+    return `${z.getFullYear()}-${pad(z.getMonth()+1)}-${pad(z.getDate())}`;
+  }
+
+  function getLoggedCrucesSlug() {
+    const qs = new URLSearchParams(location.search).get('team');
+    if (qs) return String(qs).toLowerCase();
+    try {
+      const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+      const sess = raw ? JSON.parse(raw) : null;
+      if (sess?.slug) return String(sess.slug).toLowerCase();
+    } catch {}
+    return String(sessionStorage.getItem('teamSlug') || localStorage.getItem('teamSlug') || '').toLowerCase();
+  }
+
+  async function getSavedMatchStatusTop(localSlug, visitanteSlug, mySlug, todayISO_AR) {
+    try {
+      const qs = new URLSearchParams({
+        localSlug,
+        visitanteSlug,
+        fechaISO: todayISO_AR,
+        equipoSlug: mySlug
+      });
+      const res = await fetch(`${API_BASE}/api/cruces/match-status?` + qs.toString(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.ok || !result?.data) return null;
+      return result.data;
+    } catch {
+      return null;
+    }
+  }
+
   // ---------------- RENDER ----------------
   function createPtsSelect() {
     const wrap = document.createElement('div');
@@ -1091,7 +1128,7 @@ btn.onclick = async () => {
 
       const isLocal = normPlanillaSlug(local.name) === normPlanillaSlug(teamSlug);
 
-      const savedStatus = await getSavedMatchStatus();
+      const savedStatus = await getSavedMatchStatusTop(local.teamSlug, visitante.teamSlug, getLoggedCrucesSlug(), toDateARTop());
 
       let localPlan;
       let visitantePlan;
