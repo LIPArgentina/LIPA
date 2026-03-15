@@ -28,6 +28,8 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3001',
+  'https://lipa.ar',
+  'https://www.lipa.ar',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
