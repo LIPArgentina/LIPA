@@ -3,8 +3,8 @@ const createBannerRouter = require('./banner.routes');
 const createAdminRouter = require('./admin.routes');
 const createEquiposRouter = require('./equipos.routes');
 const createFechasRouter = require('./fechas.routes');
-// const createCrucesRouter = require('./cruces.routes');
-// const createTeamPlayersRouter = require('./teamPlayers.routes');
+const createCrucesRouter = require('./cruces.routes');
+const createTeamPlayersRouter = require('./teamPlayers.routes');
 const adminPlanillas = require('./admin.planillas');
 
 module.exports = function createApiRouter(deps) {
@@ -28,14 +28,14 @@ module.exports = function createApiRouter(deps) {
   router.use('/', createFechasRouter(deps));
 
   // Rutas de cruces
-  //  router.use('/', createCrucesRouter(deps));
+  router.use('/cruces', createCrucesRouter);
 
   // Health-check
   router.get('/health', (req, res) => {
     res.json({ ok: true, variant: 'noauth-fhard' });
   });
 
-  // router.use(createTeamPlayersRouter(deps));
+  router.use(createTeamPlayersRouter(deps));
 
   return router;
 };

@@ -315,3 +315,13 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
   margin-top:10px;
   flex-wrap:wrap;
 }
+/* Escala general del panel admin */
+.wrap{
+  zoom: 0.75;
+}
+
+@media (max-width: 768px){
+  .wrap{
+    zoom: 1;
+  }
+}

@@ -5,7 +5,7 @@
   --text: #e9e9e9;
   --muted: #9aa0a6;
   --radius: 18px;
-  --slot-base-w: 400px;
+  --slot-base-w: 180px;
 }
 
 * { box-sizing: border-box; }
@@ -24,8 +24,16 @@ body {
 }
 
 /* Contenedor principal sin escalado global */
-#pageScaleRoot { width: 100%; }
+#pageScaleRoot {
+  width: 100%;
+  zoom: 0.62;
+}
 
+@media (max-width: 600px) {
+  #pageScaleRoot {
+    zoom: 1;
+  }
+}
 /* === LAYOUT PRINCIPAL === */
 .wrap {
   width: min(calc(var(--slot-base-w) * var(--slot-scale, 1) + 36px + 12px + 36px + 12px + 44px), 100%);
@@ -144,7 +152,7 @@ body {
   width: calc(var(--slot-base-w) * var(--slot-scale, 1));
   background: #ffffff;
   color: #1b1b1b;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
 }
 
 #planilla-root-left .row .slot.is-empty,

@@ -6,7 +6,6 @@ window.LPI_TEAM_PLAYERS["chuavechito"] = [
   "Alexis Gonzalez",
   "Valentin Gonzalez",
   "Guillermo Gutierrez",
-  "Jonatan Maldonado",
   "Laila Beatriz Franco",
   "Adrian Ramos",
   "Castro Miguel",
@@ -18,6 +17,7 @@ window.LPI_TEAM_PLAYERS["chuavechito"] = [
   "Martin Musso",
   "Enzo Ruiz",
   "Cristian Gomez",
-  "Rodolfo Remeima",
+  "Rodolfo Pereira",
+  "",
   ""
 ];

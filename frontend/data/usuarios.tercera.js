@@ -72,12 +72,12 @@ window.LPI_USERS = [
     "slug": "prbar"
   },
   {
-    "username": "OLDIE'S",
+    "username": "OLDIES 3ra",
     "role": "team",
     "captain": "",
     "email": "",
     "phone": "",
-    "slug": "oldies"
+    "slug": "oldies3ra"
   },
   {
     "username": "ACADEMIA DE POOL",

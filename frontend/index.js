@@ -110,6 +110,33 @@ function setupAuthBridge() {
 
 const MAX_BANNERS = 5;
 
+
+function getApiBase() {
+  const fromWindow =
+    (typeof window !== "undefined" && (window.API_BASE_URL || window.API_BASE)) ||
+    "";
+  return String(fromWindow || "").replace(/\/$/, "");
+}
+
+function apiUrl(path) {
+  const cleanPath = String(path || "");
+  const base = getApiBase();
+  if (!base) return cleanPath;
+  return `${base}${cleanPath}`;
+}
+
+async function loadBannerForHome() {
+  try {
+    const res = await fetch(apiUrl("/api/get-banner"), { cache: "no-store" });
+    if (!res.ok) throw new Error("GET /api/get-banner failed");
+    const data = await res.json();
+    renderBanner(data);
+  } catch (err) {
+    console.error("Banner load error:", err);
+  }
+}
+
+
 const bannerState = {
   banners: [],
   currentIndex: 0,
@@ -304,7 +331,7 @@ function setupBannerAdmin() {
 
   async function loadBanner() {
     try {
-      const res = await fetch("/api/get-banner", { cache: "no-store" });
+      const res = await fetch(apiUrl("/api/get-banner"), { cache: "no-store" });
       if (!res.ok) throw new Error("GET /api/get-banner failed");
       const data = await res.json();
       const banners = normalizeBannersConfig(data);
@@ -356,7 +383,7 @@ function setupBannerAdmin() {
     }
 
     try {
-      const res = await fetch("/api/save-banner", {
+      const res = await fetch(apiUrl("/api/save-banner"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -419,12 +446,5 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureManageTeamButton();
   setupAuthBridge();
   setupBannerAdmin();
-});
-
-import { BANNER_CONFIG } from "./templates/banner.js";
-
-document.addEventListener("DOMContentLoaded", () => {
-  if (typeof BANNER_CONFIG !== "undefined") {
-    renderBanner(BANNER_CONFIG);
-  }
+  loadBannerForHome();
 });

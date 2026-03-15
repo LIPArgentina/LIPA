@@ -8,32 +8,32 @@
           "equipos": [
             {
               "equipo": "DUCK HUNTERS 2DA",
-              "puntos": 4,
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "ANEXO",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
               "equipo": "EL TREBOL MORENO",
-              "puntos": 6,
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 3,
+              "equipo": "TAKOS PRO",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
               "equipo": "MALENA",
-              "puntos": 3,
+              "puntos": 0,
               "categoria": "local"
             },
             {
               "equipo": "WO",
-              "puntos": 6,
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -42,33 +42,33 @@
           "grupo": "B",
           "equipos": [
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "TAKOS FUSION",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "SEGUNDO DEL TREBOL",
-              "puntos": 5,
+              "equipo": "SEGUNDA DEL TREBOL",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
               "equipo": "LOS PATOS DE LA LIGA",
-              "puntos": 8,
+              "puntos": 0,
               "categoria": "local"
             },
             {
               "equipo": "ACADEMIA DE POOL ARGENTINA",
-              "puntos": 1,
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "OLDIES",
+              "puntos": 0,
               "categoria": "local"
             },
             {
               "equipo": "VICTORIA",
-              "puntos": 5,
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -82,33 +82,33 @@
           "grupo": "A",
           "equipos": [
             {
-              "equipo": "WO",
-              "puntos": 2,
+              "equipo": "TAKOS PRO",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 7,
+              "equipo": "ANEXO",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
               "equipo": "WO",
-              "puntos": 5,
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "DUCK HUNTERS 2DA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 8,
+              "equipo": "MALENA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 1,
+              "equipo": "EL TREBOL MORENO",
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -117,33 +117,33 @@
           "grupo": "B",
           "equipos": [
             {
-              "equipo": "WO",
-              "puntos": 3,
+              "equipo": "ACADEMIA DE POOL ARGENTINA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 6,
+              "equipo": "TAKOS FUSION",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 6,
+              "equipo": "VICTORIA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 3,
+              "equipo": "LOS PATOS DE LA LIGA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 8,
+              "equipo": "SEGUNDA DEL TREBOL",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 1,
+              "equipo": "OLDIES",
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -157,33 +157,33 @@
           "grupo": "A",
           "equipos": [
             {
-              "equipo": "WO",
-              "puntos": 6,
+              "equipo": "ANEXO",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 3,
+              "equipo": "MALENA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "DUCK HUNTERS 2DA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "TAKOS PRO",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "EL TREBOL MORENO",
+              "puntos": 0,
               "categoria": "local"
             },
             {
               "equipo": "WO",
-              "puntos": 4,
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -192,33 +192,33 @@
           "grupo": "B",
           "equipos": [
             {
-              "equipo": "WO",
-              "puntos": 7,
+              "equipo": "ACADEMIA DE POOL ARGENTINA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 2,
+              "equipo": "VICTORIA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "LOS PATOS DE LA LIGA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "SEGUNDA DEL TREBOL",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 3,
+              "equipo": "TAKOS FUSION",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 6,
+              "equipo": "OLDIES",
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -226,39 +226,39 @@
       ]
     },
     {
-      "date": "",
+      "date": "2026-04-06",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
               "equipo": "WO",
-              "puntos": 2,
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 7,
+              "equipo": "ANEXO",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "EL TREBOL MORENO",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "DUCK HUNTERS 2DA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "MALENA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "TAKOS PRO",
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -267,33 +267,33 @@
           "grupo": "B",
           "equipos": [
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "SEGUNDA DEL TREBOL",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "ACADEMIA DE POOL ARGENTINA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "OLDIES",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "LOS PATOS DE LA LIGA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 3,
+              "equipo": "VICTORIA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 6,
+              "equipo": "TAKOS FUSION",
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -301,39 +301,39 @@
       ]
     },
     {
-      "date": "",
+      "date": "2026-04-13",
       "tablas": [
         {
           "grupo": "A",
           "equipos": [
             {
-              "equipo": "WO",
-              "puntos": 6,
+              "equipo": "ANEXO",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 3,
+              "equipo": "EL TREBOL MORENO",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 8,
+              "equipo": "DUCK HUNTERS 2DA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 1,
+              "equipo": "MALENA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 6,
+              "equipo": "TAKOS PRO",
+              "puntos": 0,
               "categoria": "local"
             },
             {
               "equipo": "WO",
-              "puntos": 3,
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]
@@ -342,183 +342,33 @@
           "grupo": "B",
           "equipos": [
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "ACADEMIA DE POOL ARGENTINA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "OLDIES",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
+              "equipo": "TAKOS FUSION",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "LOS PATOS DE LA LIGA",
+              "puntos": 0,
               "categoria": "visitante"
             },
             {
-              "equipo": "WO",
-              "puntos": 5,
+              "equipo": "VICTORIA",
+              "puntos": 0,
               "categoria": "local"
             },
             {
-              "equipo": "WO",
-              "puntos": 4,
-              "categoria": "visitante"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "date": "",
-      "tablas": [
-        {
-          "grupo": "A",
-          "equipos": [
-            {
-              "equipo": "WO",
-              "puntos": 2,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 7,
-              "categoria": "visitante"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 2,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 7,
-              "categoria": "visitante"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 2,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 7,
-              "categoria": "visitante"
-            }
-          ]
-        },
-        {
-          "grupo": "B",
-          "equipos": [
-            {
-              "equipo": "WO",
-              "puntos": 3,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 6,
-              "categoria": "visitante"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 2,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 7,
-              "categoria": "visitante"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 6,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 3,
-              "categoria": "visitante"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "date": "",
-      "tablas": [
-        {
-          "grupo": "A",
-          "equipos": [
-            {
-              "equipo": "WO",
-              "puntos": 4,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 5,
-              "categoria": "visitante"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 5,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 4,
-              "categoria": "visitante"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 5,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 4,
-              "categoria": "visitante"
-            }
-          ]
-        },
-        {
-          "grupo": "B",
-          "equipos": [
-            {
-              "equipo": "WO",
-              "puntos": 4,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 5,
-              "categoria": "visitante"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 6,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 3,
-              "categoria": "visitante"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 3,
-              "categoria": "local"
-            },
-            {
-              "equipo": "WO",
-              "puntos": 6,
+              "equipo": "SEGUNDA DEL TREBOL",
+              "puntos": 0,
               "categoria": "visitante"
             }
           ]

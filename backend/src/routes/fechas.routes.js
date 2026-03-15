@@ -287,6 +287,46 @@ module.exports = function createFechasRouter(deps) {
     }
   });
 
+
+  // ====== API: Obtener planilla de cualquier equipo (para cruces) ======
+  router.get('/planilla', async (req, res) => {
+    try {
+      const slug = String(req.query.team || '').trim().toLowerCase();
+      if (!slug) {
+        return res.status(400).json({ ok:false, error:'team requerido' });
+      }
+
+      const equipo = await resolveEquipoBySlug(slug);
+      if (!equipo) {
+        return res.status(404).json({ ok:false, error:'equipo_no_encontrado' });
+      }
+
+      const result = await pool.query(
+        `
+          SELECT datos
+          FROM planillas
+          WHERE equipo_id = $1
+          ORDER BY updated_at DESC, id DESC
+          LIMIT 1
+        `,
+        [equipo.id]
+      );
+
+      if (!result.rowCount) {
+        return res.json({ ok:true, planilla:{} });
+      }
+
+      return res.json({
+        ok:true,
+        planilla: result.rows[0].datos || {}
+      });
+
+    } catch (err) {
+      console.error('GET /planilla', err);
+      return res.status(500).json({ ok:false, error:'error interno' });
+    }
+  });
+
   // ====== API: Listar planillas existentes (PostgreSQL) ======
   router.get('/planillas', async (req, res) => {
     try {

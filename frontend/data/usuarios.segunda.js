@@ -48,11 +48,43 @@ window.LPI_USERS = [
     "slug": "duckhunters2da"
   },
   {
-    "username": "SEGUNDO DEL TREBOL",
+    "username": "SEGUNDA DEL TREBOL",
     "role": "team",
     "captain": "",
     "email": "",
     "phone": "",
-    "slug": "segundodeltrebol"
+    "slug": "segundadeltrebol"
+  },
+  {
+    "username": "TAKOS PRO",
+    "role": "team",
+    "captain": "",
+    "email": "",
+    "phone": "",
+    "slug": "takospro"
+  },
+  {
+    "username": "TAKOS FUSION",
+    "role": "team",
+    "captain": "",
+    "email": "",
+    "phone": "",
+    "slug": "takosfusion"
+  },
+  {
+    "username": "ANEXO 2da",
+    "role": "team",
+    "captain": "",
+    "email": "",
+    "phone": "",
+    "slug": "anexo2da"
+  },
+  {
+    "username": "OLDIES",
+    "role": "team",
+    "captain": "",
+    "email": "",
+    "phone": "",
+    "slug": "oldies"
   }
 ];

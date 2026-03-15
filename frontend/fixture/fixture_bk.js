@@ -1,11 +1,12 @@
 const CATEGORY_LAYOUTS = {
   primera: { groups: ['A', 'B'], matchesPerGroup: 3, minFechas: 3 },
-  segunda: { groups: ['A', 'B'], matchesPerGroup: 3, minFechas: 5 },
+  segunda: { groups: ['A', 'B'], matchesPerGroup: 3, minFechas: 6 },
   tercera: { groups: ['A', 'B', 'C', 'D'], matchesPerGroup: 2, minFechas: 3 }
 };
 
 const KIND_KEY = 'fixture_kind';
 const CAT_KEY  = 'fixture_cat';
+const SCRIPT_ID = 'fixture-data-script';
 let PERSIST_WARNED = false;
 
 function getStored(key, fallback){
@@ -30,21 +31,24 @@ function currentCategoryKind(){
   };
 }
 
-async function loadFixtureJSON(src){
-  try { delete window.LPI_FIXTURE; } catch(_) { window.LPI_FIXTURE = undefined; }
+function removeExistingScript(){
+  const old = document.getElementById(SCRIPT_ID);
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+}
 
-  const resp = await fetch(src, { cache: 'no-store' });
-  if (!resp.ok) {
-    throw new Error('No se pudo cargar: ' + src);
-  }
+function injectScript(src){
+  return new Promise((resolve, reject) => {
+    removeExistingScript();
+    try { delete window.LPI_FIXTURE; } catch(_) { window.LPI_FIXTURE = undefined; }
 
-  const data = await resp.json().catch(() => null);
-  if (!data || typeof data !== 'object') {
-    throw new Error('El JSON del fixture es inválido: ' + src);
-  }
-
-  window.LPI_FIXTURE = data;
-  return src;
+    const s = document.createElement('script');
+    s.id = SCRIPT_ID;
+    s.src = src;
+    s.async = false;
+    s.onload = () => resolve(src);
+    s.onerror = () => reject(new Error('No se pudo cargar: ' + src));
+    document.head.appendChild(s);
+  });
 }
 
 function markActiveKind(kind){
@@ -69,13 +73,13 @@ window.FixtureSwitcher = {
     const persist = opts.persist !== false;
 
     let file;
-    if (kind === 'ida') file = `fixture.ida.${category}.json`;
-    else if (kind === 'vuelta') file = `fixture.vuelta.${category}.json`;
-    else if (!/\.json($|\?)/i.test(kind)) file = String(kind).replace(/\.js($|\?)/i, '.json') + (String(kind).endsWith('.js') ? '' : '.json');
+    if (kind === 'ida') file = `fixture.ida.${category}.js`;
+    else if (kind === 'vuelta') file = `fixture.vuelta.${category}.js`;
+    else if (!/\.js($|\?)/i.test(kind)) file = String(kind) + '.js';
     else file = kind;
 
     const src = (base.endsWith('/') ? base : base + '/') + file;
-    await loadFixtureJSON(src);
+    await injectScript(src);
 
     markActiveKind(kind);
     markActiveCat(category);
@@ -447,26 +451,31 @@ function buildFixtureFromUI(){
   return { fechas };
 }
 
-async function saveFixtureJSONOnServer(){
+async function saveFixtureJSOnServer(){
   const { cat, kind } = currentCategoryKind();
   const filename = `fixture.${kind}.${cat}`;
+  const relPathJS = `fixture/${filename}.js`;
   const relPathJSON = `fixture/${filename}.json`;
   const data = buildFixtureFromUI();
 
   assignCategoriasAlternadas(data);
 
+  const js = 'window.LPI_FIXTURE = ' + JSON.stringify(data, null, 2) + '\n';
   const jsonStr = JSON.stringify(data, null, 2);
 
-  const resp = await fetch('/api/save-js', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: relPathJSON, content: jsonStr })
-  });
+  for (const payload of [
+    { path: relPathJS, content: js },
+    { path: relPathJSON, content: jsonStr }
+  ]){
+    const resp = await fetch('/api/save-js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const j = await resp.json().catch(() => ({ ok:false }));
+    if (!resp.ok || !j.ok) throw new Error(j.error || `Error guardando ${payload.path}`);
+  }
 
-  const j = await resp.json().catch(() => ({ ok:false }));
-  if (!resp.ok || !j.ok) throw new Error(j.error || `Error guardando ${relPathJSON}`);
-
-  window.LPI_FIXTURE = data;
   showToast('Guardado correctamente');
 }
 
@@ -476,7 +485,7 @@ async function saveFixtureJSONOnServer(){
   btn.addEventListener('click', async (ev) => {
     ev.preventDefault();
     try {
-      await saveFixtureJSONOnServer();
+      await saveFixtureJSOnServer();
     } catch(e){
       console.error(e);
       alert(e && e.message ? e.message : 'Error al guardar');

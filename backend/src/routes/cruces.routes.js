@@ -334,4 +334,55 @@ router.get('/lock-status', async (req, res) => {
   }
 });
 
+
+
+// ===== ADMIN CRUCES (compatibilidad con frontend) =====
+let crucesEnabledUntil = null;
+
+router.get('/status', (req, res) => {
+  const now = Date.now();
+  const enabled = crucesEnabledUntil && crucesEnabledUntil > now;
+
+  res.json({
+    enabled,
+    remainingMs: enabled ? crucesEnabledUntil - now : 0
+  });
+});
+
+router.post('/enable', (req, res) => {
+  const now = Date.now();
+  crucesEnabledUntil = now + (48 * 60 * 60 * 1000); // 48 horas
+
+  res.json({
+    ok: true,
+    enabled: true,
+    remainingMs: crucesEnabledUntil - now
+  });
+});
+
+router.post('/disable', (req, res) => {
+  crucesEnabledUntil = null;
+  res.json({
+    ok: true,
+    enabled: false,
+    remainingMs: 0
+  });
+});
+
+router.get('/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const send = () => {
+    res.write(`data: ping\n\n`);
+  };
+
+  const timer = setInterval(send, 10000);
+
+  req.on('close', () => {
+    clearInterval(timer);
+  });
+});
+
 module.exports = router;

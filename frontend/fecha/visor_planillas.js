@@ -1,5 +1,15 @@
+
 (function(){
   const $ = s => document.querySelector(s);
+
+  const state = {
+    allFiles: [],
+    activeCategory: null,
+    categories: {
+      tercera: new Set(),
+      segunda: new Set()
+    }
+  };
 
   function showAlert(msg){
     const a = $('#alert');
@@ -10,6 +20,16 @@
     a.textContent = msg;
     a.style.display = 'block';
     setTimeout(()=> a.style.display='none', 4000);
+  }
+
+  function normalizeTeamName(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
   }
 
   function slot(idx, name){
@@ -102,6 +122,204 @@
     }catch(e){}
   }
 
+  function extractTeamNamesFromData(data){
+    const teams = [];
+
+    function push(value){
+      const normalized = normalizeTeamName(value);
+      if(normalized) teams.push(normalized);
+    }
+
+    function walk(value){
+      if(!value) return;
+      if(typeof value === 'string'){
+        push(value);
+        return;
+      }
+      if(Array.isArray(value)){
+        value.forEach(walk);
+        return;
+      }
+      if(typeof value === 'object'){
+        if(typeof value.equipo === 'string') push(value.equipo);
+        if(typeof value.nombre === 'string') push(value.nombre);
+        if(typeof value.team === 'string') push(value.team);
+        Object.values(value).forEach(walk);
+      }
+    }
+
+    walk(data);
+    return [...new Set(teams)];
+  }
+
+  function parseJsLikeTeamFile(text){
+    try{
+      const teams = [];
+      const regex = /(?:equipo|nombre|team)\s*:\s*['"]([^'"]+)['"]/gi;
+      let match;
+      while((match = regex.exec(text))){
+        teams.push(normalizeTeamName(match[1]));
+      }
+      if(teams.length) return [...new Set(teams)];
+
+      const stringRegex = /['"]([^'"\n\r]{2,})['"]/g;
+      while((match = stringRegex.exec(text))){
+        const candidate = normalizeTeamName(match[1]);
+        if(candidate && /[A-Z]/.test(candidate) && !/^(USE STRICT|CONST|LET|VAR|EXPORT|DEFAULT)$/.test(candidate)){
+          teams.push(candidate);
+        }
+      }
+      return [...new Set(teams)];
+    }catch(_){
+      return [];
+    }
+  }
+
+  async function fetchTeamNames(paths){
+    for(const path of paths){
+      try{
+        const r = await fetch(path, { cache:'no-store' });
+        if(!r.ok) continue;
+        const contentType = (r.headers.get('content-type') || '').toLowerCase();
+        if(contentType.includes('application/json') || path.endsWith('.json')){
+          const data = await r.json();
+          const teams = extractTeamNamesFromData(data);
+          if(teams.length) return teams;
+        }else{
+          const text = await r.text();
+          const teams = parseJsLikeTeamFile(text);
+          if(teams.length) return teams;
+        }
+      }catch(_){ }
+    }
+    return [];
+  }
+
+  async function loadCategoryMaps(){
+    const tercera = await fetchTeamNames([
+      '../data/usuarios.tercera.json',
+      '/data/usuarios.tercera.json',
+      'data/usuarios.tercera.json',
+      '../data/usuarios.tercera.js',
+      '/data/usuarios.tercera.js',
+      'data/usuarios.tercera.js'
+    ]);
+
+    const segunda = await fetchTeamNames([
+      '../data/usuarios.segunda.json',
+      '/data/usuarios.segunda.json',
+      'data/usuarios.segunda.json',
+      '../data/usuarios.segunda.js',
+      '/data/usuarios.segunda.js',
+      'data/usuarios.segunda.js'
+    ]);
+
+    state.categories.tercera = new Set(tercera);
+    state.categories.segunda = new Set(segunda);
+  }
+
+  function resolveCategory(team){
+    const normalized = normalizeTeamName(team);
+    if(state.categories.tercera.has(normalized)) return 'tercera';
+    if(state.categories.segunda.has(normalized)) return 'segunda';
+    return 'sin-categoria';
+  }
+
+  function getVisibleFiles(){
+    if(!state.activeCategory) return state.allFiles.slice();
+    return state.allFiles.filter(item => item.__category === state.activeCategory);
+  }
+
+  function updateCategoryButtons(){
+    const buttons = document.querySelectorAll('[data-category-filter]');
+    buttons.forEach(btn => {
+      const isActive = btn.dataset.categoryFilter === state.activeCategory;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+
+    const badge = document.getElementById('categoryFilterStatus');
+    if(!badge) return;
+    if(!state.activeCategory){
+      badge.textContent = 'Mostrando todas las planillas';
+      return;
+    }
+    badge.textContent = 'Filtro activo: ' + state.activeCategory;
+  }
+
+  function renderBoards(){
+    const boards = document.getElementById('boards');
+    if(!boards) return;
+
+    boards.innerHTML = '';
+    resetGlobalJsIndicator();
+
+    const visibleFiles = getVisibleFiles();
+
+    if(!visibleFiles.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'No hay planillas para mostrar en esta categoría';
+      boards.appendChild(empty);
+      updateGlobalJsIndicator(true);
+      updateCategoryButtons();
+      return;
+    }
+
+    for(const item of visibleFiles){
+      const team = item.team || 'equipo';
+      const plan = item.planilla || item.plan || {};
+      const updatedAt = item.updatedAt || null;
+
+      const card = document.createElement('article');
+      card.className = 'card';
+      card.dataset.category = item.__category || 'sin-categoria';
+
+      const categoryPill = document.createElement('div');
+      categoryPill.className = 'category-pill';
+      categoryPill.textContent = item.__category === 'segunda'
+        ? 'SEGUNDA'
+        : (item.__category === 'tercera' ? 'TERCERA' : 'SIN CATEGORÍA');
+      card.appendChild(categoryPill);
+
+      const h2 = document.createElement('h2');
+      h2.textContent = String(team).toUpperCase();
+      card.appendChild(h2);
+
+      if(plan && (plan.individuales || plan.pareja1 || plan.pareja2 || plan.suplentes)){
+        renderBoard(plan, card);
+        markFreshness(card, updatedAt);
+      }else{
+        renderBoard({ individuales:[], pareja1:[], pareja2:[], suplentes:[] }, card);
+        markFreshness(card, updatedAt);
+        const small = document.createElement('div');
+        small.style.cssText = 'opacity:.8;text-align:center;margin-top:6px;font-size:12px;';
+        small.textContent = 'Formato inválido';
+        card.appendChild(small);
+      }
+
+      boards.appendChild(card);
+    }
+
+    if(typeof window._sortBoards === 'function'){
+      window._sortBoards('team-asc');
+    }
+
+    updateCategoryButtons();
+  }
+
+  function setupCategoryFilters(){
+    const buttons = document.querySelectorAll('[data-category-filter]');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', ()=>{
+        const category = btn.dataset.categoryFilter;
+        state.activeCategory = (state.activeCategory === category) ? null : category;
+        renderBoards();
+      });
+    });
+    updateCategoryButtons();
+  }
+
   async function init(){
     try{
       const boards = document.getElementById('boards');
@@ -110,50 +328,30 @@
         return;
       }
 
-      const r = await fetch('/api/admin/planillas', { cache:'no-store' });
-      if(!r.ok){
-        throw new Error('No se pudieron cargar las planillas del admin (HTTP ' + r.status + ')');
+      setupCategoryFilters();
+
+      const [_, planillasResponse] = await Promise.all([
+        loadCategoryMaps(),
+        fetch('/api/admin/planillas', { cache:'no-store' })
+      ]);
+
+      if(!planillasResponse.ok){
+        throw new Error('No se pudieron cargar las planillas del admin (HTTP ' + planillasResponse.status + ')');
       }
 
-      const files = await r.json();
+      const files = await planillasResponse.json();
 
       if(!Array.isArray(files) || !files.length){
         showAlert('No hay planillas para mostrar');
         return;
       }
 
-      boards.innerHTML = '';
+      state.allFiles = files.map(item => ({
+        ...item,
+        __category: resolveCategory(item.team)
+      }));
 
-      for(const item of files){
-        const team = item.team || 'equipo';
-        const plan = item.planilla || item.plan || {};
-        const updatedAt = item.updatedAt || null;
-
-        const card = document.createElement('article');
-        card.className = 'card';
-
-        const h2 = document.createElement('h2');
-        h2.textContent = String(team).toUpperCase();
-        card.appendChild(h2);
-
-        if(plan && (plan.individuales || plan.pareja1 || plan.pareja2 || plan.suplentes)){
-          renderBoard(plan, card);
-          markFreshness(card, updatedAt);
-        }else{
-          renderBoard({ individuales:[], pareja1:[], pareja2:[], suplentes:[] }, card);
-          markFreshness(card, updatedAt);
-          const small = document.createElement('div');
-          small.style.cssText = 'opacity:.8;text-align:center;margin-top:6px;font-size:12px;';
-          small.textContent = 'Formato inválido';
-          card.appendChild(small);
-        }
-
-        boards.appendChild(card);
-      }
-
-      if(typeof window._sortBoards === 'function'){
-        window._sortBoards('team-asc');
-      }
+      renderBoards();
     }catch(e){
       console.error(e);
       showAlert(e.message || String(e));
@@ -180,6 +378,16 @@ window._sortBoards = function(mode){
 let GLOBAL_JS_ALL_TODAY = true;
 let GLOBAL_JS_CHECKS = 0;
 
+function resetGlobalJsIndicator(){
+  GLOBAL_JS_ALL_TODAY = true;
+  GLOBAL_JS_CHECKS = 0;
+  const dot = document.getElementById('globalJsIndicator');
+  if (!dot) return;
+  dot.classList.remove('fresh-ok','fresh-stale');
+  dot.classList.add('fresh-stale');
+  dot.title = 'Comprobando fecha de planillas…';
+}
+
 function updateGlobalJsIndicator(isToday){
   GLOBAL_JS_CHECKS++;
   if (!isToday) GLOBAL_JS_ALL_TODAY = false;
@@ -187,9 +395,11 @@ function updateGlobalJsIndicator(isToday){
   if (!dot) return;
   dot.classList.remove('fresh-ok','fresh-stale');
   dot.classList.add(GLOBAL_JS_ALL_TODAY ? 'fresh-ok' : 'fresh-stale');
-  dot.title = GLOBAL_JS_ALL_TODAY
-    ? 'Todas las planillas visibles son del día'
-    : 'Hay planillas con fecha anterior';
+  dot.title = GLOBAL_JS_CHECKS === 0
+    ? 'Comprobando fecha de planillas…'
+    : (GLOBAL_JS_ALL_TODAY
+      ? 'Todas las planillas visibles son del día'
+      : 'Hay planillas visibles con fecha anterior');
 }
 
 (function(){
@@ -246,7 +456,11 @@ function updateGlobalJsIndicator(isToday){
     btn.disabled = true;
     btn.textContent = (btn.dataset.state === 'on') ? 'deshabilitando…' : 'habilitando…';
     try{
-      const r = await fetch('/api/cruces/enable', {
+      const endpoint = (btn.dataset.state === 'on')
+        ? '/api/cruces/disable'
+        : '/api/cruces/enable';
+
+      const r = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ team: currentTeam(), fechaKey })

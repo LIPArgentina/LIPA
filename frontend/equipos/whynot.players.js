@@ -3,7 +3,7 @@ window.LPI_TEAM_PLAYERS["whynot"] = [
   "Diego Sotelo",
   "Eduardo Mendez",
   "Hernan Krulikowski",
-  "Ariel Brunot",
+  "Ariel Brunet",
   "Ezequiel Salvatierra",
   "Ezequiel Squiera",
   "Matias Bogado",

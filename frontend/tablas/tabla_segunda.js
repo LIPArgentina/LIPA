@@ -22,7 +22,7 @@ window.addEventListener('load', () => {
   document.querySelectorAll('.board').forEach(b => ro.observe(b));
 });
 
-const GROUPS = ['A', 'B', 'C', 'D'];
+const GROUPS = ['A', 'B'];
 const cache = { ida: null, vuelta: null };
 let selectedKind = 'ida';
 
@@ -53,23 +53,14 @@ function formatDateDMY(val){
 
 async function fetchFixture(kind){
   const file = kind === 'vuelta'
-    ? '../fixture/fixture.vuelta.tercera.json'
-    : '../fixture/fixture.ida.tercera.json';
+    ? '../fixture/fixture.vuelta.segunda.json'
+    : '../fixture/fixture.ida.segunda.json';
 
   const res = await fetch(file, { cache: 'no-store' });
   if (!res.ok) throw new Error(`No se pudo cargar ${file}`);
   const data = await res.json();
   cache[kind] = data;
   return data;
-}
-
-function clearFixtureCards(){
-  document.querySelectorAll('section.card[data-group]').forEach(section => {
-    Array.from(section.children).forEach((child, idx) => {
-      if (idx === 0) return; // deja el h1
-      child.remove();
-    });
-  });
 }
 
 function ensureFechaBlock(section, fechaIndex, fechaText){
@@ -121,46 +112,32 @@ function renderRowsStatic(rowsCont, equipos){
   }
 }
 
-function buildFixtureCard(group, fechaIndex, fechaText, equipos){
-  const section = document.createElement('section');
-  section.className = 'card';
-  section.setAttribute('data-group', group);
-  section.setAttribute('aria-label', `Fixture ${fechaIndex}ª fecha - Grupo ${group}`);
+function buildFixtureCard(group, fechas){
+  const section = document.querySelector(`section.card[data-group="${group}"]`);
+  if (!section) return;
+  section.innerHTML = `<h1 class="h1">GRUPO ${group}</h1>`;
 
-  const h1 = document.createElement('h1');
-  h1.className = 'h1';
-  h1.textContent = `GRUPO ${group}`;
-  section.appendChild(h1);
-
-  const rowsCont = ensureFechaBlock(section, fechaIndex, fechaText);
-  renderRowsStatic(rowsCont, equipos);
-  return section;
+  fechas.forEach((fechaObj, idx) => {
+    const fechaIndex = idx + 1;
+    const fechaText = fechaObj?.date || fechaObj?.fecha || '';
+    const tabla = (fechaObj?.tablas || []).find(
+      t => String(t?.grupo || '').toUpperCase() === group
+    );
+    const rowsCont = ensureFechaBlock(section, fechaIndex, fechaText);
+    renderRowsStatic(rowsCont, tabla?.equipos || []);
+  });
 }
 
 function renderSelectedFixture(){
   const fx = cache[selectedKind];
-  const grid = document.querySelector('.grid');
-  if (!fx || !Array.isArray(fx.fechas) || !grid) return;
-
-  grid.innerHTML = '';
-
-  fx.fechas.forEach((fechaObj, idx) => {
-    const fechaIndex = idx + 1;
-    const fechaText = fechaObj?.date || fechaObj?.fecha || '';
-
-    GROUPS.forEach(group => {
-      const tabla = (fechaObj?.tablas || []).find(
-        t => String(t?.grupo || '').toUpperCase() === group
-      );
-      const card = buildFixtureCard(group, fechaIndex, fechaText, tabla?.equipos || []);
-      grid.appendChild(card);
-    });
-  });
+  if (!fx || !Array.isArray(fx.fechas)) return;
+  GROUPS.forEach(group => buildFixtureCard(group, fx.fechas));
 }
 
 function calcRows(feeds){
   const puntos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const ju = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const teamsSeen = Object.fromEntries(GROUPS.map(g => [g, new Map()]));
 
   (feeds || []).forEach(feed => {
     (feed?.fechas || []).forEach(fecha => {
@@ -178,6 +155,7 @@ function calcRows(feeds){
           if (!key || key.toUpperCase() === 'WO') return;
           if (!puntos[g][key]) puntos[g][key] = { equipo: it.equipo, pts: 0 };
           puntos[g][key].pts += it.puntos;
+          if (!teamsSeen[g].has(key)) teamsSeen[g].set(key, it.equipo);
         });
 
         for (let i = 0; i < equipos.length; i += 2){
@@ -200,44 +178,51 @@ function calcRows(feeds){
 
   const result = {};
   GROUPS.forEach(g => {
-    result[g] = Object.values(puntos[g])
-      .sort((a, b) => b.pts - a.pts || String(a.equipo).localeCompare(String(b.equipo)))
-      .slice(0, 4)
-      .map((r, i) => ({
-        pos: i + 1,
-        equipo: r.equipo,
-        ju: (ju[g][normalizeName(r.equipo)] || ''),
-        tr: '',
-        pts: r.pts
-      }));
+    result[g] = Array.from(teamsSeen[g].entries()).map(([key, display]) => ({
+      key,
+      equipo: puntos[g][key]?.equipo || display,
+      pts: puntos[g][key]?.pts || 0,
+      ju: ju[g][key] || ''
+    }))
+    .sort((a, b) => b.pts - a.pts || String(a.equipo).localeCompare(String(b.equipo)))
+    .map((r, i) => ({
+      pos: i + 1,
+      equipo: r.equipo,
+      ju: r.ju,
+      tr: '',
+      pts: r.pts
+    }));
   });
   return result;
 }
 
-function fillBoard(boardEl, data){
-  if (!boardEl) return;
-  const rows = boardEl.querySelectorAll('.row[role="row"]');
-  rows.forEach((row, i) => {
-    const d = data[i] || { pos:'', equipo:'', ju:'', tr:'', pts:'' };
-    const set = (name, value) => {
-      const el = row.querySelector(`[data-field="${name}"]`);
-      if (el) el.textContent = value ?? '';
-    };
-    set('pos', d.pos);
-    set('team', d.equipo);
-    set('ju', d.ju);
-    set('tr', d.tr);
-    set('pts', d.pts);
-  });
+function buildStandingRow(d, idx){
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.setAttribute('role', 'row');
+  const pillClass = idx < 2 ? 'yellow' : 'white';
+  row.innerHTML = `
+    <div class="square" data-field="pos">${d.pos ?? ''}</div>
+    <div class="pill ${pillClass}" data-field="team">${d.equipo ?? ''}</div>
+    <div class="square" data-field="ju">${d.ju ?? ''}</div>
+    <div class="square" data-field="tr">${d.tr ?? ''}</div>
+    <div class="square" data-field="pts">${d.pts ?? ''}</div>
+  `;
+  return row;
+}
+
+function fillBoard(group, data){
+  const holder = document.querySelector(`[data-group-rows="${group}"]`);
+  if (!holder) return;
+  holder.innerHTML = '';
+  (data || []).forEach((d, idx) => holder.appendChild(buildStandingRow(d, idx)));
 }
 
 function renderStandings(){
   const feeds = [cache.ida, cache.vuelta].filter(Boolean);
   if (!feeds.length) return;
   const result = calcRows(feeds);
-  GROUPS.forEach(g => {
-    fillBoard(document.querySelector(`[data-group-board="${g}"]`), result[g] || []);
-  });
+  GROUPS.forEach(g => fillBoard(g, result[g] || []));
   equalizeTableWidths();
 }
 
@@ -249,14 +234,14 @@ function setActive(kind){
 
 async function switchFixture(kind){
   selectedKind = kind;
-  try { localStorage.setItem('fixture_kind', kind); } catch(_) {}
+  try { localStorage.setItem('fixture_kind_segunda', kind); } catch(_) {}
   if (!cache[kind]) await fetchFixture(kind);
   renderSelectedFixture();
   setActive(kind);
 }
 
 async function init(){
-  try { selectedKind = localStorage.getItem('fixture_kind') || 'ida'; } catch(_) { selectedKind = 'ida'; }
+  try { selectedKind = localStorage.getItem('fixture_kind_segunda') || 'ida'; } catch(_) { selectedKind = 'ida'; }
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {
     btn.addEventListener('click', () => {
       const kind = btn.getAttribute('data-fixture') || 'ida';
@@ -274,7 +259,7 @@ async function init(){
     setActive(selectedKind);
   } catch (err) {
     console.error(err);
-    alert('No se pudieron cargar los fixtures de tercera en formato JSON.');
+    alert('No se pudieron cargar los fixtures de segunda en formato JSON.');
   }
 }
 

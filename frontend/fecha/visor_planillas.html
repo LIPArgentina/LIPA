@@ -133,6 +133,57 @@
   .center-action{top:60px}
 }
 @media print{ .center-action{ display:none !important; } }
+
+/* Filtros por categoría */
+.category-filter-bar{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:18px 0 14px;
+}
+.btn-filter{
+  min-width:140px;
+  text-align:center;
+}
+.btn-filter.active{
+  filter:brightness(1.08);
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.6),
+    0 0 0 2px rgba(255,217,102,.30),
+    0 3px 8px rgba(0,0,0,.35);
+}
+.category-filter-status{
+  font-size:12px;
+  color:var(--gold);
+  opacity:.95;
+}
+.empty-state{
+  grid-column:1 / -1;
+  border:1px dashed var(--line);
+  border-radius:14px;
+  padding:22px;
+  text-align:center;
+  color:var(--gold);
+  background:#0f0f11;
+  font-weight:700;
+}
+.category-pill{
+  display:inline-block;
+  margin:0 auto 6px;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,217,102,.35);
+  color:var(--gold);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  background:rgba(255,217,102,.08);
+}
+.card h2{ margin-top:2px; }
+
 </style>
 </head>
 <body>
@@ -156,6 +207,11 @@
 </header>
 <div class="container">
 <main>
+<section class="category-filter-bar" aria-label="Filtros de categoría">
+<button type="button" class="btn-gold btn-filter" data-category-filter="tercera" aria-pressed="false">tercera</button>
+<button type="button" class="btn-gold btn-filter" data-category-filter="segunda" aria-pressed="false">segunda</button>
+<span id="categoryFilterStatus" class="category-filter-status">Mostrando todas las planillas</span>
+</section>
 <section aria-label="Planillas por equipo" class="grid-boards" id="boards">
 <!-- Se generan por JS -->
 </section>
