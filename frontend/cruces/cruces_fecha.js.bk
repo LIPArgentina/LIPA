@@ -1,6 +1,7 @@
 /* cruces_fecha.js — FINAL: TRIÁNGULOS ARRIBA, PUNTOS ABAJO, PAREJAS 1 SELECT, RUTA ../fecha/ */
 (() => {
-  'use strict';  // ---------------- UTILS ----------------
+  'use strict';
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");  // ---------------- UTILS ----------------
   const dtf = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' });
 
   const normalize = (s = '', { stripHyphens = false } = {}) => {
@@ -40,7 +41,7 @@
 
   async function loadAllFixtures() {
     const isFile = location.protocol === 'file:';
-    const apiBase = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG?.API_BASE_URL) ? APP_CONFIG.API_BASE_URL : '';
+    const apiBase = (window.APP_CONFIG?.API_BASE_URL || API_BASE || '').replace(/\/+$/, '');
     const localWinBase = 'file:///C:/Users/javie/Desktop/LIGA/frontend/fixture/';
     const httpBase = apiBase ? (apiBase.replace(/\/$/, '') + '/fixture/') : '/fixture/';
     const relBase = '../fixture/';
@@ -261,7 +262,7 @@ function pickBestByClosestDate(matches) {
     try {
       const fechaKey = new Date().toISOString().slice(0,10);
       const qs = new URLSearchParams({ team: teamSlug, fechaKey });
-      const r = await fetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
+      const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), { cache:'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       if (!j || !j.enabled) {
@@ -293,7 +294,7 @@ function pickBestByClosestDate(matches) {
     const map = new Map();
 
     try {
-      const r = await fetch('/api/admin/planillas', {
+      const r = await fetch(`${API_BASE}/api/admin/planillas`, {
         cache: 'no-store',
         credentials: 'same-origin'
       });
@@ -337,9 +338,8 @@ function pickBestByClosestDate(matches) {
     }
 
     try {
-      const r = await fetch('/api/team/planilla?team=' + encodeURIComponent(team), {
-        cache: 'no-store',
-        credentials: 'same-origin'
+      const r = await fetch(`${API_BASE}/api/planilla?team=` + encodeURIComponent(team), {
+        cache: 'no-store'
       });
 
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -358,6 +358,43 @@ function pickBestByClosestDate(matches) {
     } catch (e) {
       console.warn('No se pudo cargar planilla desde backend para', team, e);
       return emptyPlanilla(team);
+    }
+  }
+
+  function toDateARTop(d = new Date()) {
+    const z = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+    const pad = n => String(n).padStart(2, '0');
+    return `${z.getFullYear()}-${pad(z.getMonth()+1)}-${pad(z.getDate())}`;
+  }
+
+  function getLoggedCrucesSlug() {
+    const qs = new URLSearchParams(location.search).get('team');
+    if (qs) return String(qs).toLowerCase();
+    try {
+      const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+      const sess = raw ? JSON.parse(raw) : null;
+      if (sess?.slug) return String(sess.slug).toLowerCase();
+    } catch {}
+    return String(sessionStorage.getItem('teamSlug') || localStorage.getItem('teamSlug') || '').toLowerCase();
+  }
+
+  async function getSavedMatchStatusTop(localSlug, visitanteSlug, mySlug, todayISO_AR) {
+    try {
+      const qs = new URLSearchParams({
+        localSlug,
+        visitanteSlug,
+        fechaISO: todayISO_AR,
+        equipoSlug: mySlug
+      });
+      const res = await fetch(`${API_BASE}/api/cruces/match-status?` + qs.toString(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.ok || !result?.data) return null;
+      return result.data;
+    } catch {
+      return null;
     }
   }
 
@@ -750,7 +787,7 @@ async function saveMatchStatus(validated = false) {
     status,
     validar: !!validated
   };
-  const res = await fetch('/api/cruces/match-status', {
+  const res = await fetch(`${API_BASE}/api/cruces/match-status`, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)
@@ -798,8 +835,8 @@ function autosaveAttachListeners(){
   });
 }
 
-// STATUS autocarga: primero borrador propio, si no existe compartido final
-async function tryApplyStatusIfExists(){
+// STATUS: obtener parcial propio o validación final
+async function getSavedMatchStatus(){
   try {
     const qs = new URLSearchParams({
       localSlug,
@@ -807,35 +844,21 @@ async function tryApplyStatusIfExists(){
       fechaISO: todayISO_AR,
       equipoSlug: mySlug
     });
-    const res = await fetch('/api/cruces/match-status?' + qs.toString(), {
+    const res = await fetch(`${API_BASE}/api/cruces/match-status?` + qs.toString(), {
       cache: 'no-store',
       credentials: 'same-origin'
     });
     const result = await res.json().catch(() => null);
-    if (!res.ok || !result?.ok || !result?.data) return false;
-
-    const data = result.data;
-    if (data.localPlanilla) applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
-    if (data.visitantePlanilla) applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
-
-    const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
-    const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
-    writeAllSelects('planilla-root-left', L);
-    writeAllSelects('planilla-root-right', R);
-    updateScoresFor('planilla-root-left');
-    updateScoresFor('planilla-root-right');
-
-    if (data.validated === true) {
-      lockValidatedMatchUI();
-    }
-    return true;
-  } catch { return false; }
+    if (!res.ok || !result?.ok || !result?.data) return null;
+    return result.data;
+  } catch {
+    return null;
+  }
 }
 
 // Inicializar
 autosaveApplyIfAny();
 autosaveAttachListeners();
-tryApplyStatusIfExists();
 btn.onclick = async () => {
   const btnVolver = document.getElementById('btnVolver');
   const volverClass = btnVolver ? btnVolver.className : 'btn';
@@ -870,7 +893,7 @@ btn.onclick = async () => {
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
-    const lockRes = await fetch(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`).catch(()=>null);
+    const lockRes = await fetch(`${API_BASE}/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
       if (lock?.locked || lock?.validatedFinal) { setBtnState('success','VALIDADO'); return; }
@@ -896,7 +919,7 @@ btn.onclick = async () => {
     };
 
     const statusForValidate = buildMatchStatus(true);
-    const save = await fetch('/api/cruces/validate', {
+    const save = await fetch(`${API_BASE}/api/cruces/validate`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -1105,11 +1128,21 @@ btn.onclick = async () => {
 
       const isLocal = normPlanillaSlug(local.name) === normPlanillaSlug(teamSlug);
 
-      const localPlan = await loadFirstExistingPlanilla(local.teamSlug);
-      const visitantePlan = await loadFirstExistingPlanilla(visitante.teamSlug);
+      const savedStatus = await getSavedMatchStatusTop(local.teamSlug, visitante.teamSlug, getLoggedCrucesSlug(), toDateARTop());
 
-renderSide('planilla-root-left',  localPlan,     visitante.name, match.date, local.name);
-renderSide('planilla-root-right', visitantePlan, local.name,     match.date, visitante.name);
+      let localPlan;
+      let visitantePlan;
+
+      if (savedStatus && (savedStatus.localPlanilla || savedStatus.visitantePlanilla)) {
+        localPlan = savedStatus.localPlanilla || emptyPlanilla(local.teamSlug);
+        visitantePlan = savedStatus.visitantePlanilla || emptyPlanilla(visitante.teamSlug);
+      } else {
+        localPlan = await loadFirstExistingPlanilla(local.teamSlug);
+        visitantePlan = await loadFirstExistingPlanilla(visitante.teamSlug);
+      }
+
+      renderSide('planilla-root-left',  localPlan,     visitante.name, match.date, local.name);
+      renderSide('planilla-root-right', visitantePlan, local.name,     match.date, visitante.name);
 
       ['planilla-root-left', 'planilla-root-right'].forEach(id => {
         const root = document.getElementById(id);
@@ -1120,6 +1153,19 @@ renderSide('planilla-root-right', visitantePlan, local.name,     match.date, vis
 
       updateScoresFor('planilla-root-left');
       updateScoresFor('planilla-root-right');
+
+      if (savedStatus) {
+        const L = [...(savedStatus.local?.jugadores||[]), savedStatus.local?.parejas?.pareja1?.j1 ?? 0, savedStatus.local?.parejas?.pareja1?.j2 ?? 0, savedStatus.local?.parejas?.pareja2?.j1 ?? 0, savedStatus.local?.parejas?.pareja2?.j2 ?? 0];
+        const R = [...(savedStatus.visitante?.jugadores||[]), savedStatus.visitante?.parejas?.pareja1?.j1 ?? 0, savedStatus.visitante?.parejas?.pareja1?.j2 ?? 0, savedStatus.visitante?.parejas?.pareja2?.j1 ?? 0, savedStatus.visitante?.parejas?.pareja2?.j2 ?? 0];
+        writeAllSelects('planilla-root-left', L);
+        writeAllSelects('planilla-root-right', R);
+        updateScoresFor('planilla-root-left');
+        updateScoresFor('planilla-root-right');
+
+        if (savedStatus.validated === true) {
+          lockValidatedMatchUI();
+        }
+      }
 
       setupSuplentesSwap('planilla-root-left');
       setupSuplentesSwap('planilla-root-right');
