@@ -348,7 +348,6 @@ router.post('/validate', async (req, res) => {
     localSlug: rawLocalSlug,
     visitanteSlug: rawVisitanteSlug,
     equipoSlug: rawEquipoSlug,
-    status
   } = req.body || {};
 
   const { localSlug, visitanteSlug } = sortMatchSlugs(rawLocalSlug, rawVisitanteSlug);
@@ -377,28 +376,9 @@ router.post('/validate', async (req, res) => {
       });
     }
 
-    if (status) {
-      await upsertPartial(client, {
-        fechaISO,
-        localSlug,
-        visitanteSlug,
-        equipoSlug,
-        datos: status
-      });
-    }
-
     const partials = await getBothPartials(client, { fechaISO, localSlug, visitanteSlug });
     const mine = partials.find(r => r.equipo_slug === equipoSlug) || null;
     const rival = partials.find(r => r.equipo_slug === rivalSlug) || null;
-
-    if (!mine?.datos) {
-      await client.query('COMMIT');
-      return res.json({
-        ok: true,
-        tipo: 'pendiente',
-        mensaje: 'Tu parcial todavía no está guardado. Se puede validar apenas se envíe la planilla actual.'
-      });
-    }
 
     if (!rival?.datos) {
       await client.query('COMMIT');
