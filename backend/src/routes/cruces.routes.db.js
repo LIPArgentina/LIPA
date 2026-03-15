@@ -82,21 +82,41 @@ async function getMatchAndSubmissions(client, fechaISO, localSlug, visitanteSlug
   return rows[0] || null;
 }
 
-function buildResponseFromRow(row) {
+function buildResponseFromRow(row, viewerEquipoSlug = '') {
   const localStatus = row?.local_status_json || {};
   const visitanteStatus = row?.visitante_status_json || {};
+  const viewer = normalizeSlug(viewerEquipoSlug);
+  const validatedFinal = !!row?.validated_final;
+
+  const isLocalViewer = viewer && viewer === row?.local_slug;
+  const isVisitanteViewer = viewer && viewer === row?.visitante_slug;
+
+  const canSeeBoth = validatedFinal || !viewer || (!isLocalViewer && !isVisitanteViewer);
 
   return {
     ok: true,
     data: {
       fechaISO: row.fecha_iso,
-      validated: !!row.validated_final,
+      validated: validatedFinal,
       localSlug: row.local_slug,
       visitanteSlug: row.visitante_slug,
-      localPlanilla: localStatus.localPlanilla || null,
-      visitantePlanilla: visitanteStatus.visitantePlanilla || null,
-      local: localStatus.local || null,
-      visitante: visitanteStatus.visitante || null,
+
+      localPlanilla: canSeeBoth
+        ? (localStatus.localPlanilla || null)
+        : (isLocalViewer ? (localStatus.localPlanilla || null) : null),
+
+      visitantePlanilla: canSeeBoth
+        ? (visitanteStatus.visitantePlanilla || null)
+        : (isVisitanteViewer ? (visitanteStatus.visitantePlanilla || null) : null),
+
+      local: canSeeBoth
+        ? (localStatus.local || null)
+        : (isLocalViewer ? (localStatus.local || null) : null),
+
+      visitante: canSeeBoth
+        ? (visitanteStatus.visitante || null)
+        : (isVisitanteViewer ? (visitanteStatus.visitante || null) : null),
+
       localValidated: !!row.local_validated,
       visitanteValidated: !!row.visitante_validated,
       localLockedUntil: row.local_locked_until || null,
@@ -147,7 +167,7 @@ router.post('/match-status', async (req, res) => {
     const row = await getMatchAndSubmissions(client, fechaISO, localSlug, visitanteSlug);
 
     await client.query('COMMIT');
-    return res.json(buildResponseFromRow(row));
+    return res.json(buildResponseFromRow(row, equipoSlug));
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('POST /cruces/match-status', error);
@@ -159,6 +179,7 @@ router.post('/match-status', async (req, res) => {
 
 router.get('/match-status', async (req, res) => {
   const fechaISO = req.query.fechaISO;
+  const equipoSlug = normalizeSlug(req.query.equipoSlug);
   const { localSlug, visitanteSlug } = sortMatchSlugs(req.query.localSlug, req.query.visitanteSlug);
 
   if (!fechaISO || !localSlug || !visitanteSlug) {
@@ -170,7 +191,7 @@ router.get('/match-status', async (req, res) => {
     if (!row) {
       return res.json({ ok: true, data: null });
     }
-    return res.json(buildResponseFromRow(row));
+    return res.json(buildResponseFromRow(row, equipoSlug));
   } catch (error) {
     console.error('GET /cruces/match-status', error);
     return res.status(500).json({ ok: false, error: 'No se pudo leer el status del cruce.' });
