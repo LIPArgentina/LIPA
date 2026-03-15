@@ -1,6 +1,7 @@
 /* cruces_fecha.js — FINAL: TRIÁNGULOS ARRIBA, PUNTOS ABAJO, PAREJAS 1 SELECT, RUTA ../fecha/ */
 (() => {
-  'use strict';  // ---------------- UTILS ----------------
+  'use strict';
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");  // ---------------- UTILS ----------------
   const dtf = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' });
 
   const normalize = (s = '', { stripHyphens = false } = {}) => {
@@ -261,7 +262,7 @@ function pickBestByClosestDate(matches) {
     try {
       const fechaKey = new Date().toISOString().slice(0,10);
       const qs = new URLSearchParams({ team: teamSlug, fechaKey });
-      const r = await fetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
+      const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), { cache:'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       if (!j || !j.enabled) {
@@ -274,11 +275,70 @@ function pickBestByClosestDate(matches) {
   }
 
   // ---------------- CARGAR PLANILLAS DESDE BACKEND (MISMO ORIGEN QUE VISOR) ----------------
+  let __PLANILLAS_CACHE = null;
+
+  function emptyPlanilla(team = '') {
+    return {
+      team,
+      capitan: ['', ''],
+      individuales: Array(7).fill(''),
+      pareja1: ['', ''],
+      pareja2: ['', ''],
+      suplentes: ['', '', '']
+    };
+  }
+
+  async function loadPlanillasIndex() {
+    if (__PLANILLAS_CACHE) return __PLANILLAS_CACHE;
+
+    const map = new Map();
+
+    try {
+      const r = await fetch(`${API_BASE}/api/admin/planillas`, {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+
+      const arr = await r.json();
+      if (Array.isArray(arr)) {
+        arr.forEach(item => {
+          const teamKey = normPlanillaSlug(item?.team || item?.slug || item?.equipo || '');
+          const plan = item?.planilla || item?.plan || item || {};
+          if (teamKey) {
+            map.set(teamKey, {
+              team: item?.team || teamKey,
+              capitan: Array.isArray(plan.capitan) ? plan.capitan : ['', ''],
+              individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(7).fill(''),
+              pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['', ''],
+              pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['', ''],
+              suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', '']
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('No se pudo cargar índice global de planillas', e);
+    }
+
+    __PLANILLAS_CACHE = map;
+    return map;
+  }
+
   async function loadFirstExistingPlanilla(slug) {
     const team = normPlanillaSlug(slug);
 
     try {
-      const r = await fetch('/api/cruces/planilla?team=' + encodeURIComponent(team), {
+      const planillas = await loadPlanillasIndex();
+      if (planillas && planillas.has(team)) {
+        return planillas.get(team);
+      }
+    } catch (e) {
+      console.warn('Índice de planillas no disponible para', team, e);
+    }
+
+    try {
+      const r = await fetch(`${API_BASE}/api/team/planilla?team=` + encodeURIComponent(team), {
         cache: 'no-store',
         credentials: 'same-origin'
       });
@@ -286,25 +346,19 @@ function pickBestByClosestDate(matches) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
 
       const data = await r.json();
+      const plan = data?.planilla || data || {};
 
       return {
-        team: data.team || team,
-        capitan: Array.isArray(data.capitan) ? data.capitan : [],
-        individuales: Array.isArray(data.individuales) ? data.individuales : Array(7).fill(''),
-        pareja1: Array.isArray(data.pareja1) ? data.pareja1 : [],
-        pareja2: Array.isArray(data.pareja2) ? data.pareja2 : [],
-        suplentes: Array.isArray(data.suplentes) ? data.suplentes : []
+        team: data?.team || plan?.team || team,
+        capitan: Array.isArray(plan.capitan) ? plan.capitan : ['', ''],
+        individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(7).fill(''),
+        pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['', ''],
+        pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['', ''],
+        suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', '']
       };
     } catch (e) {
       console.warn('No se pudo cargar planilla desde backend para', team, e);
-      return {
-        team,
-        capitan: [],
-        individuales: Array(7).fill(''),
-        pareja1: [],
-        pareja2: [],
-        suplentes: []
-      };
+      return emptyPlanilla(team);
     }
   }
 
@@ -697,7 +751,7 @@ async function saveMatchStatus(validated = false) {
     status,
     validar: !!validated
   };
-  const res = await fetch('/api/cruces/match-status', {
+  const res = await fetch(`${API_BASE}/api/cruces/match-status`, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)
@@ -754,7 +808,7 @@ async function tryApplyStatusIfExists(){
       fechaISO: todayISO_AR,
       equipoSlug: mySlug
     });
-    const res = await fetch('/api/cruces/match-status?' + qs.toString(), {
+    const res = await fetch(`${API_BASE}/api/cruces/match-status?` + qs.toString(), {
       cache: 'no-store',
       credentials: 'same-origin'
     });
@@ -817,7 +871,7 @@ btn.onclick = async () => {
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
-    const lockRes = await fetch(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`).catch(()=>null);
+    const lockRes = await fetch(`${API_BASE}/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
       if (lock?.locked || lock?.validatedFinal) { setBtnState('success','VALIDADO'); return; }
@@ -843,7 +897,7 @@ btn.onclick = async () => {
     };
 
     const statusForValidate = buildMatchStatus(true);
-    const save = await fetch('/api/cruces/validate', {
+    const save = await fetch(`${API_BASE}/api/cruces/validate`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
