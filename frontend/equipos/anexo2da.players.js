@@ -16,7 +16,7 @@ window.LPI_TEAM_PLAYERS["anexo2da"] = [
   "Gaston Fernandez",
   "Andres Carillo",
   "Israel Ramires",
-  "",
+  "Eduardo Lopez",
   "",
   "",
   ""

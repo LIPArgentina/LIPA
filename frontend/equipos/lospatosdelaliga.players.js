@@ -16,8 +16,8 @@ window.LPI_TEAM_PLAYERS["lospatosdelaliga"] = [
   "Ernando Ayarde",
   "Nestor Massielo",
   "Pablo Torres",
-  "Aubel Videla",
   "Nahuel Gonzales",
   "David Gimenez",
-  "Santiago Segovia"
+  "Santiago Segovia",
+  "Jose Varga"
 ];

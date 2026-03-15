@@ -1,16 +1,18 @@
+import { apiFetch } from "../api.js";
+
 // templates/banner.js
 // Banner público: lee /api/get-banner y actualiza el mensaje de la portada
 
 async function fetchBannerConfig() {
-  const res = await fetch('/api/get-banner', { cache: 'no-store' });
+  const res = await apiFetch("/api/get-banner", { cache: "no-store" });
   if (!res.ok) {
-    throw new Error('GET /api/get-banner failed');
+    throw new Error("GET /api/get-banner failed");
   }
   return res.json();
 }
 
 function applyBannerToDOM(data) {
-  const msgEl = document.getElementById('bannerMessage');
+  const msgEl = document.getElementById("bannerMessage");
   if (!msgEl) return;
 
   // Texto principal
@@ -40,7 +42,7 @@ async function loadAndRenderBanner() {
     const data = await fetchBannerConfig();
     applyBannerToDOM(data);
   } catch (err) {
-    console.error('No se pudo cargar el banner público', err);
+    console.error("No se pudo cargar el banner público", err);
     // Acá simplemente dejamos el texto por defecto del HTML
   }
 }
@@ -51,11 +53,11 @@ function setupPublicBanner() {
 
   // Escuchar el "bust" que se setea cuando guardás desde el popup de admin
   // (index.js hace: localStorage.setItem('lpi_banner_bust', String(Date.now()));
-  window.addEventListener('storage', (event) => {
-    if (event.key === 'lpi_banner_bust') {
+  window.addEventListener("storage", (event) => {
+    if (event.key === "lpi_banner_bust") {
       loadAndRenderBanner();
     }
   });
 }
 
-document.addEventListener('DOMContentLoaded', setupPublicBanner);
+document.addEventListener("DOMContentLoaded", setupPublicBanner);
