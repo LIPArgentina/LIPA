@@ -26,7 +26,7 @@ function buildPartialResponse(row) {
   return {
     ok: true,
     data: {
-      fechaISO: row.fecha_iso,
+      fechaISO: row.fecha,
       validated: !!row.validated,
       localSlug: row.local_slug,
       visitanteSlug: row.visitante_slug,
@@ -45,7 +45,7 @@ function buildFinalResponse(row) {
   return {
     ok: true,
     data: {
-      fechaISO: row.fecha_iso,
+      fechaISO: row.fecha,
       validated: true,
       localSlug: row.local_slug,
       visitanteSlug: row.visitante_slug,
@@ -66,7 +66,7 @@ async function upsertPartial(client, { fechaISO, localSlug, visitanteSlug, equip
   const { rows } = await client.query(
     `
       INSERT INTO cruces_parciales (
-        fecha_iso,
+        fecha,
         local_slug,
         visitante_slug,
         equipo_slug,
@@ -77,7 +77,7 @@ async function upsertPartial(client, { fechaISO, localSlug, visitanteSlug, equip
         updated_at
       )
       VALUES ($1::date, $2, $3, $4, $5::jsonb, $6, $7::timestamptz, $8::timestamptz, NOW())
-      ON CONFLICT (fecha_iso, local_slug, visitante_slug, equipo_slug)
+      ON CONFLICT (fecha, local_slug, visitante_slug, equipo_slug)
       DO UPDATE SET
         datos = EXCLUDED.datos,
         validated = EXCLUDED.validated,
@@ -105,7 +105,7 @@ async function getPartial(client, { fechaISO, localSlug, visitanteSlug, equipoSl
     `
       SELECT *
       FROM cruces_parciales
-      WHERE fecha_iso = $1::date
+      WHERE fecha = $1::date
         AND local_slug = $2
         AND visitante_slug = $3
         AND equipo_slug = $4
@@ -121,7 +121,7 @@ async function getBothPartials(client, { fechaISO, localSlug, visitanteSlug }) {
     `
       SELECT *
       FROM cruces_parciales
-      WHERE fecha_iso = $1::date
+      WHERE fecha = $1::date
         AND local_slug = $2
         AND visitante_slug = $3
         AND equipo_slug IN ($4, $5)
@@ -137,7 +137,7 @@ async function getFinalValidation(client, { fechaISO, localSlug, visitanteSlug }
     `
       SELECT *
       FROM cruces_validaciones
-      WHERE fecha_iso = $1::date
+      WHERE fecha = $1::date
         AND local_slug = $2
         AND visitante_slug = $3
       LIMIT 1
@@ -151,7 +151,7 @@ async function upsertFinalValidation(client, { fechaISO, localSlug, visitanteSlu
   const { rows } = await client.query(
     `
       INSERT INTO cruces_validaciones (
-        fecha_iso,
+        fecha,
         local_slug,
         visitante_slug,
         datos,
@@ -161,7 +161,7 @@ async function upsertFinalValidation(client, { fechaISO, localSlug, visitanteSlu
         locked_until
       )
       VALUES ($1::date, $2, $3, $4::jsonb, $5, $6, NOW(), $7::timestamptz)
-      ON CONFLICT (fecha_iso, local_slug, visitante_slug)
+      ON CONFLICT (fecha, local_slug, visitante_slug)
       DO UPDATE SET
         datos = EXCLUDED.datos,
         validated_at = NOW(),
@@ -190,7 +190,7 @@ async function lockBothPartials(client, { fechaISO, localSlug, visitanteSlug, lo
         validated_at = NOW(),
         locked_until = $4::timestamptz,
         updated_at = NOW()
-      WHERE fecha_iso = $1::date
+      WHERE fecha = $1::date
         AND local_slug = $2
         AND visitante_slug = $3
     `,
