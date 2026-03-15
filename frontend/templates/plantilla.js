@@ -1,7 +1,28 @@
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
   function LPI_getApiBase(){
@@ -46,7 +67,8 @@ if (!slug){ console.warn('No se pudo determinar el slug del equipo'); return; }
 fetch(LPI_apiUrl('/api/team/players?team=' + slug), {
     method: 'GET',
     cache: 'no-store',
-    credentials: 'include'
+    credentials: 'include',
+    headers: LPI_getAuthHeaders()
   })
     .then(function(r){
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -77,9 +99,30 @@ fetch(LPI_apiUrl('/api/team/players?team=' + slug), {
 })();
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
     function slugify(s){
@@ -109,9 +152,30 @@ fetch(LPI_apiUrl('/api/team/players?team=' + slug), {
     }
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 /* ========= AUTH persistente (con fallback para file://) ========= */
@@ -389,9 +453,30 @@ trash.addEventListener('drop', e => {
 });
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 // Carga de nombres hacia la columna "JUGADORES" (robusta, espera a que estén listos)
@@ -433,9 +518,30 @@ trash.addEventListener('drop', e => {
 })();
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 // ===== Botones "Volver" + "Cambiar contraseña" en header =====
@@ -543,9 +649,30 @@ trash.addEventListener('drop', e => {
 })();
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 (function(){
@@ -576,9 +703,30 @@ trash.addEventListener('drop', e => {
 })();
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 (function(){
@@ -661,9 +809,30 @@ async function savePlanilla(){
   }
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -672,9 +841,30 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 (function(){
@@ -716,9 +906,30 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 // DnD sin validación para CAPITÁN (no participa de las reglas)
@@ -750,9 +961,30 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 // === Shim unificado con Pointer Events (touch/pen) para Drag & Drop ===
@@ -857,9 +1089,30 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 // ===== Tap-to-place (fallback para touch) =====
@@ -1008,9 +1261,30 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 
 // === LPI Auth helper ===
-  function LPI_getAuthHeaders(){
-    const pass = (window.__lpi_getCaptainPass ? window.__lpi_getCaptainPass() : (sessionStorage.getItem('lpi_team_pass') || localStorage.getItem('lpi_team_pass') || '')).trim();
-    return { 'Authorization': 'Bearer ' + pass, 'Content-Type': 'application/json' };
+  function LPI_getAuthHeaders() {
+    let token = "";
+
+    try {
+      const sess = JSON.parse(localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session") || "null");
+      token = sess && (sess.token || sess.accessToken) ? (sess.token || sess.accessToken) : "";
+    } catch (_) {}
+
+    if (!token) {
+      try {
+        const sess2 = JSON.parse(localStorage.getItem("lpi_team_session") || sessionStorage.getItem("lpi_team_session") || "null");
+        token = sess2 && (sess2.token || sess2.accessToken) ? (sess2.token || sess2.accessToken) : "";
+      } catch (_) {}
+    }
+
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers["Authorization"] = "Bearer " + token;
+    }
+
+    return headers;
   }
 
 // Guarda el team para cruces y evita exponerlo en la URL pública
