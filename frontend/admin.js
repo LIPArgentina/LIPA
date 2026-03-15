@@ -15,7 +15,6 @@
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 
-
 /* ====== Header: mantener ?admin=1 en enlaces ====== */
 (function(){
   try{
@@ -43,6 +42,7 @@ const FILES = {
 };
 const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
+const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 
 /* ====== Helpers ====== */
 const $ = (s) => document.querySelector(s);
@@ -129,9 +129,10 @@ function collectRows(){
 async function saveTeams(){
   const teams = collectRows();
   try{
-    const resp = await fetch('/api/save-teams', {
+    const resp = await fetch(`${API_BASE}/api/save-teams`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ division: _activeDiv, teams })
     });
     const json = await resp.json().catch(()=>({}));
@@ -265,8 +266,9 @@ async function discardDraftForCurrentTeam(){
 /* === Cargar jugadores desde API === */
 async function loadPlayersForTeam(slug){
   try {
-    const r = await fetch(`/api/team-assets?team=${encodeURIComponent(slug)}`, {
-      cache: 'no-store'
+    const r = await fetch(`${API_BASE}/api/team-assets?team=${encodeURIComponent(slug)}`, {
+      cache: 'no-store',
+      credentials: 'include'
     });
 
     if (!r.ok) {
@@ -304,9 +306,10 @@ async function saveRoster(){
   const teamName = (teamsInDiv.find(t=>t.slug===teamSlug)?.name) || teamSlug;
   const players  = getCurrentValues().slice(0,SLOTS);
   try{
-    const resp = await fetch('/api/save-team-assets', {
+    const resp = await fetch(`${API_BASE}/api/save-team-assets`, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ slug: teamSlug, teamName, players })
     });
     const json = await resp.json().catch(()=> ({}));
@@ -429,9 +432,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     var slug = getTeamSlug();
-    fetch('/api/admin/change-password', {
+    fetch(`${API_BASE}/api/admin/change-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ slug: slug, oldPassword: oldPass, newPassword: newPass })
     })
     .then(function(r){
