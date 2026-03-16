@@ -69,10 +69,15 @@ window.FixtureSwitcher = {
     const persist = opts.persist !== false;
 
     let file;
-    if (kind === 'ida') file = `fixture.ida.${category}.json`;
-    else if (kind === 'vuelta') file = `fixture.vuelta.${category}.json`;
-    else if (!/\.json($|\?)/i.test(kind)) file = String(kind).replace(/\.js($|\?)/i, '.json') + (String(kind).endsWith('.js') ? '' : '.json');
-    else file = kind;
+    if (kind === 'ida') file = `fixture/fixture.ida.${category}.json`;
+    else if (kind === 'vuelta') file = `fixture/fixture.vuelta.${category}.json`;
+    else if (!/\.json($|\?)/i.test(kind)) {
+      const normalized = String(kind).replace(/\.js($|\?)/i, '.json');
+      file = normalized.startsWith('fixture/') ? normalized : `fixture/${normalized}`;
+      if (!String(file).endsWith('.json')) file += '.json';
+    } else {
+      file = String(kind).startsWith('fixture/') ? kind : `fixture/${kind}`;
+    }
 
     const src = (base.endsWith('/') ? base : base + '/') + file;
     await loadFixtureJSON(src);
@@ -463,8 +468,23 @@ async function saveFixtureJSONOnServer(){
     body: JSON.stringify({ path: relPathJSON, content: jsonStr })
   });
 
-  const j = await resp.json().catch(() => ({ ok:false }));
-  if (!resp.ok || !j.ok) throw new Error(j.error || `Error guardando ${relPathJSON}`);
+  let result = null;
+  let rawText = '';
+
+  try {
+    rawText = await resp.text();
+    result = rawText ? JSON.parse(rawText) : null;
+  } catch (_) {
+    result = null;
+  }
+
+  if (!resp.ok) {
+    throw new Error(
+      (result && result.error) ||
+      rawText ||
+      `Error guardando ${relPathJSON}`
+    );
+  }
 
   window.LPI_FIXTURE = data;
   showToast('Guardado correctamente');
