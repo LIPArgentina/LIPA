@@ -454,7 +454,7 @@ function buildFixtureFromUI(){
 async function saveFixtureJSONOnServer(){
   const { cat, kind } = currentCategoryKind();
   const filename = `fixture.${kind}.${cat}`;
-  const relPathJSON = `fixture/${filename}.json`;
+  const relPathJSON = `frontend/fixture/${filename}.json`;
   const data = buildFixtureFromUI();
 
   assignCategoriasAlternadas(data);
