@@ -408,84 +408,123 @@ function updateGlobalJsIndicator(isToday){
   if (window.__CRUCES_ADMIN_WIRED__) return;
   window.__CRUCES_ADMIN_WIRED__ = true;
 
-  const btn = document.getElementById('btnHabilitarCruces');
-  if(!btn) return;
-  if (btn.__wired) return; btn.__wired = true;
+  const CATEGORY_KEYS = {
+    tercera: '__categoria_tercera__',
+    segunda: '__categoria_segunda__'
+  };
 
-  let inflight = false;
-
-  function currentTeam(){
-    try{ return new URLSearchParams(location.search).get('team') || '*'; }catch(_){ return '*'; }
-  }
-  const fechaKey = new Date().toISOString().slice(0,10);
-
-  async function getStatus(){
-    const qs = new URLSearchParams({ team: currentTeam(), fechaKey });
-    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), { cache:'no-store' });
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    return await r.json();
+  function fechaKeyActual(){
+    return new Date().toISOString().slice(0,10);
   }
 
-  function setUI(enabled, remainingMs){
-    const label = document.getElementById('crucesStatusLabel');
+  function getButton(category){
+    return document.getElementById(category === 'tercera' ? 'btnHabilitarCrucesTercera' : 'btnHabilitarCrucesSegunda');
+  }
+
+  function getLabel(category){
+    return document.getElementById(category === 'tercera' ? 'crucesStatusLabelTercera' : 'crucesStatusLabelSegunda');
+  }
+
+  function setUI(category, enabled, remainingMs){
+    const btn = getButton(category);
+    const label = getLabel(category);
+    if(!btn) return;
+
     if (enabled){
-      btn.textContent = 'deshabilitar cruces';
+      btn.textContent = category === 'tercera' ? 'deshabilitar cruces tercera' : 'deshabilitar cruces segunda';
       btn.dataset.state = 'on';
       const hrs = Math.max(1, Math.floor((remainingMs||0)/3600000));
       btn.title = 'Habilitado. Expira en ~' + hrs + 'h';
-      if(label) label.textContent = 'los cruces están habilitados';
+      if(label) label.textContent = 'los cruces de ' + category + ' están habilitados';
     }else{
-      btn.textContent = 'habilitar cruces';
+      btn.textContent = category === 'tercera' ? 'habilitar cruces tercera' : 'habilitar cruces segunda';
       btn.dataset.state = 'off';
       btn.title = 'Al hacer clic se habilita por 48 horas';
-      if(label) label.textContent = 'los cruces están deshabilitados';
+      if(label) label.textContent = 'los cruces de ' + category + ' están deshabilitados';
     }
   }
 
-  async function refresh(){
+  async function getStatus(category){
+    const qs = new URLSearchParams({
+      team: CATEGORY_KEYS[category],
+      fechaKey: fechaKeyActual()
+    });
+    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), { cache:'no-store' });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  }
+
+  async function refreshCategory(category){
     try{
-      const j = await getStatus();
-      setUI(!!j.enabled, j.remainingMs);
+      const j = await getStatus(category);
+      setUI(category, !!j.enabled, j.remainingMs);
     }catch(_){
-      setUI(false, 0);
+      setUI(category, false, 0);
     }
   }
 
-  btn.addEventListener('click', async (ev)=>{
-    ev.preventDefault(); ev.stopPropagation();
-    if (inflight) return; inflight = true;
-    const old = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = (btn.dataset.state === 'on') ? 'deshabilitando…' : 'habilitando…';
-    try{
-      const endpoint = (btn.dataset.state === 'on')
-        ? '/api/cruces/disable'
-        : '/api/cruces/enable';
+  async function refreshAll(){
+    await Promise.all([
+      refreshCategory('tercera'),
+      refreshCategory('segunda')
+    ]);
+  }
 
-      const r = await fetch(`${API_BASE}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ team: currentTeam(), fechaKey })
-      });
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      await refresh();
-    }catch(e){
-      btn.textContent = old;
-      alert('No se pudo actualizar cruces: ' + (e && e.message || e));
-    }finally{
-      btn.disabled = false;
-      setTimeout(()=>{ inflight = false; }, 300);
-    }
-  }, { once:false, passive:false });
+  function wireButton(category){
+    const btn = getButton(category);
+    if(!btn || btn.__wired) return;
+    btn.__wired = true;
+
+    let inflight = false;
+
+    btn.addEventListener('click', async (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (inflight) return;
+      inflight = true;
+
+      const old = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = (btn.dataset.state === 'on')
+        ? ('deshabilitando ' + category + '…')
+        : ('habilitando ' + category + '…');
+
+      try{
+        const endpoint = (btn.dataset.state === 'on')
+          ? '/api/cruces/disable'
+          : '/api/cruces/enable';
+
+        const r = await fetch(`${API_BASE}${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({
+            team: CATEGORY_KEYS[category],
+            fechaKey: fechaKeyActual()
+          })
+        });
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        await refreshCategory(category);
+      }catch(e){
+        btn.textContent = old;
+        alert('No se pudo actualizar cruces de ' + category + ': ' + ((e && e.message) || e));
+      }finally{
+        btn.disabled = false;
+        setTimeout(()=>{ inflight = false; }, 300);
+      }
+    }, { once:false, passive:false });
+  }
+
+  wireButton('tercera');
+  wireButton('segunda');
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', refresh, { once:true });
+    document.addEventListener('DOMContentLoaded', refreshAll, { once:true });
   } else {
-    refresh();
+    refreshAll();
   }
 
   try{
     const es = new EventSource(`${API_BASE}/api/cruces/stream`);
-    es.onmessage = ()=> refresh();
+    es.onmessage = ()=> refreshAll();
   }catch(_){}
 })();

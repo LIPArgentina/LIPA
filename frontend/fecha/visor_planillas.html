@@ -126,7 +126,7 @@
 
 /* Botón centrado en el header */
 .center-action{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:1001;text-align:center}
-.center-action-inner{display:flex;align-items:center;gap:8px;justify-content:center}
+.center-action-inner{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap}
 .cruces-button-wrap{display:flex;flex-direction:column;align-items:center;text-align:center}
 .cruces-status-label{margin-top:4px;font-size:11px;color:var(--gold);text-align:center;display:block}
 @media (max-width:520px){
@@ -190,8 +190,12 @@
 <div id="alert" role="alert"></div>
 <header><div class="center-action"><div class="center-action-inner">
 <div class="cruces-button-wrap">
-<button type="button" class="btn-gold" id="btnHabilitarCruces">habilitar cruces</button>
-<div id="crucesStatusLabel" class="cruces-status-label">los cruces están deshabilitados</div>
+<button type="button" class="btn-gold" id="btnHabilitarCrucesTercera">habilitar cruces tercera</button>
+<div id="crucesStatusLabelTercera" class="cruces-status-label">los cruces de tercera están deshabilitados</div>
+</div>
+<div class="cruces-button-wrap">
+<button type="button" class="btn-gold" id="btnHabilitarCrucesSegunda">habilitar cruces segunda</button>
+<div id="crucesStatusLabelSegunda" class="cruces-status-label">los cruces de segunda están deshabilitados</div>
 </div>
 <div id="globalJsIndicator" class="fresh-indicator fresh-stale" title="Comprobando fecha de planillas…"></div>
 </div>

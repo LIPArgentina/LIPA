@@ -1393,13 +1393,29 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 })();
 
-// === Control remoto de "ver cruces" (habilitado por admin) ===
+// === Control remoto de "ver cruces" (habilitado por admin por categoría) ===
 (function(){
+  const CATEGORY_KEYS = {
+    tercera: '__categoria_tercera__',
+    segunda: '__categoria_segunda__'
+  };
+
   function slugify(s){
     return String(s||'').toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
       .replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-');
   }
+
+  function normalizeTeamName(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+  }
+
   function deriveTeam(){
     try {
       const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
@@ -1418,27 +1434,116 @@ document.addEventListener('DOMContentLoaded', function(){
     return '';
   }
 
+  async function fetchTeamNames(paths){
+    for (const path of paths){
+      try{
+        const r = await fetch(path, { cache:'no-store' });
+        if(!r.ok) continue;
+        const contentType = (r.headers.get('content-type') || '').toLowerCase();
+        if(contentType.includes('application/json') || path.endsWith('.json')){
+          const data = await r.json();
+          const names = [];
+          (function walk(value){
+            if(!value) return;
+            if(typeof value === 'string'){
+              const n = normalizeTeamName(value);
+              if(n) names.push(n);
+              return;
+            }
+            if(Array.isArray(value)){ value.forEach(walk); return; }
+            if(typeof value === 'object'){
+              if(typeof value.username === 'string') names.push(normalizeTeamName(value.username));
+              if(typeof value.equipo === 'string') names.push(normalizeTeamName(value.equipo));
+              if(typeof value.nombre === 'string') names.push(normalizeTeamName(value.nombre));
+              Object.values(value).forEach(walk);
+            }
+          })(data);
+          const uniq = [...new Set(names.filter(Boolean))];
+          if(uniq.length) return uniq;
+        }else{
+          const text = await r.text();
+          const names = [];
+          const regex = /(?:username|equipo|nombre|team)\s*:\s*['"]([^'"]+)['"]/gi;
+          let m;
+          while((m = regex.exec(text))){
+            names.push(normalizeTeamName(m[1]));
+          }
+          const uniq = [...new Set(names.filter(Boolean))];
+          if(uniq.length) return uniq;
+        }
+      }catch(_){}
+    }
+    return [];
+  }
+
+  async function resolveCategoryByTeam(teamSlug){
+    const normalizedSlug = normalizeTeamName(String(teamSlug || '').replace(/-/g, ' '));
+
+    const tercera = await fetchTeamNames([
+      '../data/usuarios.tercera.json',
+      '/data/usuarios.tercera.json',
+      '../data/usuarios.tercera.js',
+      '/data/usuarios.tercera.js'
+    ]);
+    if (tercera.includes(normalizedSlug)) return 'tercera';
+
+    const segunda = await fetchTeamNames([
+      '../data/usuarios.segunda.json',
+      '/data/usuarios.segunda.json',
+      '../data/usuarios.segunda.js',
+      '/data/usuarios.segunda.js'
+    ]);
+    if (segunda.includes(normalizedSlug)) return 'segunda';
+
+    return null;
+  }
+
   const fechaKey = new Date().toISOString().slice(0,10);
   const btn = document.getElementById('btnVerCruces');
-  function setEnabled(on){
+
+  function setEnabled(on, category){
     if(!btn) return;
     btn.classList.toggle('is-disabled', !on);
-    if(!on){ btn.setAttribute('aria-disabled','true'); btn.title='Esperando habilitación del admin…'; }
-    else{ btn.removeAttribute('aria-disabled'); btn.title=''; }
-  }
-  async function refresh(){
-    try{
-      const team = deriveTeam() || '*';
-      const qs = new URLSearchParams({ team, fechaKey });
-      const r = await fetch(LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(), { cache:'no-store', credentials:'include' });
-      const j = await r.json();
-      setEnabled(!!(j && j.enabled));
-    }catch(_){
-      setEnabled(false);
+    if(!on){
+      btn.setAttribute('aria-disabled','true');
+      btn.title = category
+        ? ('Esperando habilitación del admin para ' + category + '…')
+        : 'Esperando habilitación del admin…';
+    } else {
+      btn.removeAttribute('aria-disabled');
+      btn.title = category ? ('Cruces habilitados para ' + category) : '';
     }
   }
 
-  setEnabled(false);
+  if (btn && !btn.__crucesGuardWired){
+    btn.__crucesGuardWired = true;
+    btn.addEventListener('click', function(ev){
+      if (btn.getAttribute('aria-disabled') === 'true'){
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+    });
+  }
+
+  async function refresh(){
+    try{
+      const team = deriveTeam() || '';
+      const category = await resolveCategoryByTeam(team);
+      if (!category || !CATEGORY_KEYS[category]){
+        setEnabled(false, null);
+        return;
+      }
+
+      const qs = new URLSearchParams({ team: CATEGORY_KEYS[category], fechaKey });
+      const r = await fetch(LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(), { cache:'no-store', credentials:'include' });
+      const j = await r.json().catch(() => ({}));
+      setEnabled(!!(j && j.enabled), category);
+    }catch(_){
+      setEnabled(false, null);
+    }
+  }
+
+  setEnabled(false, null);
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', refresh, { once:true });
   } else {
@@ -1447,18 +1552,8 @@ document.addEventListener('DOMContentLoaded', function(){
 
   try{
     const es = new EventSource(LPI_apiUrl('/api/cruces/stream'), { withCredentials: true });
-    es.onmessage = (ev)=>{
-      try{
-        const data = JSON.parse(ev.data||'{}');
-        if (data && data.type === 'cruces'){
-          const team = deriveTeam() || '*';
-          if (!data.team || data.team === '*' || data.team === team){
-            if (!data.fechaKey || data.fechaKey === fechaKey){
-              refresh();
-            }
-          }
-        }
-      }catch(_){}
+    es.onmessage = ()=>{
+      refresh();
     };
   }catch(_){}
 
