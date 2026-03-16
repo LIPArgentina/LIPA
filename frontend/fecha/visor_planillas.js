@@ -450,16 +450,14 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
     if(!btn) return;
 
     btn.disabled = false;
+    btn.dataset.state = enabled ? 'on' : 'off';
+    btn.textContent = category === 'tercera' ? 'habilitar cruces tercera' : 'habilitar cruces segunda';
 
     if (enabled){
-      btn.textContent = category === 'tercera' ? 'deshabilitar cruces tercera' : 'deshabilitar cruces segunda';
-      btn.dataset.state = 'on';
       const hrs = Math.max(1, Math.floor((remainingMs||0)/3600000));
-      btn.title = 'Habilitado. Expira en ~' + hrs + 'h';
-      if(label) label.textContent = 'los cruces de ' + category + ' están habilitados';
+      btn.title = 'Ya habilitado. Vuelve a presionar para renovar 48 horas';
+      if(label) label.textContent = 'los cruces de ' + category + ' están habilitados (~' + hrs + 'h restantes)';
     }else{
-      btn.textContent = category === 'tercera' ? 'habilitar cruces tercera' : 'habilitar cruces segunda';
-      btn.dataset.state = 'off';
       btn.title = 'Al hacer clic se habilita por 48 horas';
       if(label) label.textContent = 'los cruces de ' + category + ' están deshabilitados';
     }
@@ -506,16 +504,10 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
 
       const old = btn.textContent;
       btn.disabled = true;
-      btn.textContent = (btn.dataset.state === 'on')
-        ? ('deshabilitando ' + category + '...')
-        : ('habilitando ' + category + '...');
+      btn.textContent = 'habilitando ' + category + '...';
 
       try{
-        const endpoint = (btn.dataset.state === 'on')
-          ? '/api/cruces/disable'
-          : '/api/cruces/enable';
-
-        const r = await fetch(`${API_BASE}${endpoint}`, {
+        const r = await fetch(`${API_BASE}/api/cruces/enable`, {
           method: 'POST',
           headers: { 'Content-Type':'application/json' },
           body: JSON.stringify({
@@ -527,7 +519,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
         await refreshCategory(category);
       }catch(e){
         btn.textContent = old;
-        alert('No se pudo actualizar cruces de ' + category + ': ' + ((e && e.message) || e));
+        alert('No se pudo habilitar cruces de ' + category + ': ' + ((e && e.message) || e));
       }finally{
         btn.disabled = false;
         setTimeout(()=>{ inflight = false; }, 300);
