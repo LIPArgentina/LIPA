@@ -403,7 +403,7 @@ function updateGlobalJsIndicator(isToday){
       ? 'Todas las planillas visibles son del día'
       : 'Hay planillas visibles con fecha anterior');
 }
-const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
+
 (function(){
   if (window.__CRUCES_ADMIN_WIRED__) return;
   window.__CRUCES_ADMIN_WIRED__ = true;
@@ -428,7 +428,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
   function setLoading(category){
     const btn = getButton(category);
     const label = getLabel(category);
-    if(!btn) return;
+    if (!btn) return;
 
     btn.disabled = true;
     btn.dataset.state = 'loading';
@@ -437,7 +437,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       : 'consultando segunda...';
     btn.title = 'Consultando estado actual...';
 
-    if(label){
+    if (label){
       label.textContent = category === 'tercera'
         ? 'consultando estado de cruces tercera...'
         : 'consultando estado de cruces segunda...';
@@ -447,21 +447,25 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
   function setUI(category, enabled, remainingMs){
     const btn = getButton(category);
     const label = getLabel(category);
-    if(!btn) return;
+    if (!btn) return;
 
     btn.disabled = false;
 
     if (enabled){
-      btn.textContent = category === 'tercera' ? 'deshabilitar cruces tercera' : 'deshabilitar cruces segunda';
+      btn.textContent = category === 'tercera'
+        ? 'deshabilitar cruces tercera'
+        : 'deshabilitar cruces segunda';
       btn.dataset.state = 'on';
-      const hrs = Math.max(1, Math.floor((remainingMs||0)/3600000));
+      const hrs = Math.max(1, Math.floor((remainingMs || 0) / 3600000));
       btn.title = 'Habilitado. Expira en ~' + hrs + 'h';
-      if(label) label.textContent = 'los cruces de ' + category + ' están habilitados';
-    }else{
-      btn.textContent = category === 'tercera' ? 'habilitar cruces tercera' : 'habilitar cruces segunda';
+      if (label) label.textContent = 'los cruces de ' + category + ' están habilitados';
+    } else {
+      btn.textContent = category === 'tercera'
+        ? 'habilitar cruces tercera'
+        : 'habilitar cruces segunda';
       btn.dataset.state = 'off';
       btn.title = 'Al hacer clic se habilita por 48 horas';
-      if(label) label.textContent = 'los cruces de ' + category + ' están deshabilitados';
+      if (label) label.textContent = 'los cruces de ' + category + ' están deshabilitados';
     }
   }
 
@@ -470,16 +474,19 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       team: CATEGORY_KEYS[category],
       fechaKey: fechaKeyActual()
     });
-    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), { cache:'no-store' });
-    if(!r.ok) throw new Error('HTTP ' + r.status);
+
+    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), {
+      cache: 'no-store'
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.json();
   }
 
   async function refreshCategory(category){
-    try{
+    try {
       const j = await getStatus(category);
       setUI(category, !!j.enabled, j.remainingMs);
-    }catch(_){
+    } catch (_) {
       setUI(category, false, 0);
     }
   }
@@ -493,46 +500,49 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
 
   function wireButton(category){
     const btn = getButton(category);
-    if(!btn || btn.__wired) return;
+    if (!btn || btn.__wired) return;
     btn.__wired = true;
 
     let inflight = false;
 
-    btn.addEventListener('click', async (ev)=>{
+    btn.addEventListener('click', async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       if (inflight || btn.dataset.state === 'loading') return;
       inflight = true;
 
       const old = btn.textContent;
+      const turningOff = btn.dataset.state === 'on';
+
       btn.disabled = true;
-      btn.textContent = (btn.dataset.state === 'on')
+      btn.textContent = turningOff
         ? ('deshabilitando ' + category + '...')
         : ('habilitando ' + category + '...');
 
-      try{
-        const endpoint = (btn.dataset.state === 'on')
+      try {
+        const endpoint = turningOff
           ? '/api/cruces/disable'
           : '/api/cruces/enable';
 
         const r = await fetch(`${API_BASE}${endpoint}`, {
           method: 'POST',
-          headers: { 'Content-Type':'application/json' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             team: CATEGORY_KEYS[category],
             fechaKey: fechaKeyActual()
           })
         });
-        if(!r.ok) throw new Error('HTTP ' + r.status);
+
+        if (!r.ok) throw new Error('HTTP ' + r.status);
         await refreshCategory(category);
-      }catch(e){
+      } catch (e) {
         btn.textContent = old;
         alert('No se pudo actualizar cruces de ' + category + ': ' + ((e && e.message) || e));
-      }finally{
+      } finally {
         btn.disabled = false;
-        setTimeout(()=>{ inflight = false; }, 300);
+        setTimeout(() => { inflight = false; }, 300);
       }
-    }, { once:false, passive:false });
+    }, { once: false, passive: false });
   }
 
   wireButton('tercera');
@@ -542,13 +552,15 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
   setLoading('segunda');
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', refreshAll, { once:true });
+    document.addEventListener('DOMContentLoaded', refreshAll, { once: true });
   } else {
     refreshAll();
   }
 
-  try{
+  try {
     const es = new EventSource(`${API_BASE}/api/cruces/stream`);
-    es.onmessage = ()=> refreshAll();
-  }catch(_){}
+    es.onmessage = () => refreshAll();
+  } catch (_) {}
+
+  setInterval(refreshAll, 15000);
 })();
