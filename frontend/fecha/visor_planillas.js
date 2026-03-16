@@ -403,7 +403,7 @@ function updateGlobalJsIndicator(isToday){
       ? 'Todas las planillas visibles son del día'
       : 'Hay planillas visibles con fecha anterior');
 }
-    const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
+const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
 (function(){
   if (window.__CRUCES_ADMIN_WIRED__) return;
   window.__CRUCES_ADMIN_WIRED__ = true;
@@ -425,10 +425,31 @@ function updateGlobalJsIndicator(isToday){
     return document.getElementById(category === 'tercera' ? 'crucesStatusLabelTercera' : 'crucesStatusLabelSegunda');
   }
 
+  function setLoading(category){
+    const btn = getButton(category);
+    const label = getLabel(category);
+    if(!btn) return;
+
+    btn.disabled = true;
+    btn.dataset.state = 'loading';
+    btn.textContent = category === 'tercera'
+      ? 'consultando tercera...'
+      : 'consultando segunda...';
+    btn.title = 'Consultando estado actual...';
+
+    if(label){
+      label.textContent = category === 'tercera'
+        ? 'consultando estado de cruces tercera...'
+        : 'consultando estado de cruces segunda...';
+    }
+  }
+
   function setUI(category, enabled, remainingMs){
     const btn = getButton(category);
     const label = getLabel(category);
     if(!btn) return;
+
+    btn.disabled = false;
 
     if (enabled){
       btn.textContent = category === 'tercera' ? 'deshabilitar cruces tercera' : 'deshabilitar cruces segunda';
@@ -480,14 +501,14 @@ function updateGlobalJsIndicator(isToday){
     btn.addEventListener('click', async (ev)=>{
       ev.preventDefault();
       ev.stopPropagation();
-      if (inflight) return;
+      if (inflight || btn.dataset.state === 'loading') return;
       inflight = true;
 
       const old = btn.textContent;
       btn.disabled = true;
       btn.textContent = (btn.dataset.state === 'on')
-        ? ('deshabilitando ' + category + '…')
-        : ('habilitando ' + category + '…');
+        ? ('deshabilitando ' + category + '...')
+        : ('habilitando ' + category + '...');
 
       try{
         const endpoint = (btn.dataset.state === 'on')
@@ -516,6 +537,9 @@ function updateGlobalJsIndicator(isToday){
 
   wireButton('tercera');
   wireButton('segunda');
+
+  setLoading('tercera');
+  setLoading('segunda');
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', refreshAll, { once:true });
