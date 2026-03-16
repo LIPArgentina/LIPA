@@ -1,3 +1,5 @@
+// base del backend
+const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
 
 (function(){
   const $ = s => document.querySelector(s);
