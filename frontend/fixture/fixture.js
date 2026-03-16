@@ -30,8 +30,22 @@ function currentCategoryKind(){
   };
 }
 
-async function loadFixtureJSON(src){
+async function loadFixtureJSON(src, meta = null){
   try { delete window.LPI_FIXTURE; } catch(_) { window.LPI_FIXTURE = undefined; }
+
+  if (meta?.kind && meta?.category) {
+    const apiResp = await fetch(`/api/fixture?kind=${encodeURIComponent(meta.kind)}&category=${encodeURIComponent(meta.category)}`, {
+      cache: 'no-store'
+    });
+
+    if (apiResp.ok) {
+      const apiData = await apiResp.json().catch(() => null);
+      if (apiData?.ok && apiData?.data && typeof apiData.data === 'object') {
+        window.LPI_FIXTURE = apiData.data;
+        return `/api/fixture?kind=${meta.kind}&category=${meta.category}`;
+      }
+    }
+  }
 
   const resp = await fetch(src, { cache: 'no-store' });
   if (!resp.ok) {
@@ -79,7 +93,7 @@ window.FixtureSwitcher = {
     }
 
     const src = (base.endsWith('/') ? base : base + '/') + file;
-    await loadFixtureJSON(src);
+    await loadFixtureJSON(src, { kind, category });
 
     markActiveKind(kind);
     markActiveCat(category);
@@ -453,36 +467,24 @@ function buildFixtureFromUI(){
 
 async function saveFixtureJSONOnServer(){
   const { cat, kind } = currentCategoryKind();
-  const filename = `fixture.${kind}.${cat}`;
-  const relPathJSON = `frontend/fixture/${filename}.json`;
   const data = buildFixtureFromUI();
 
   assignCategoriasAlternadas(data);
 
-  const jsonStr = JSON.stringify(data, null, 2);
-
-  const resp = await fetch('/api/save-js', {
+  const resp = await fetch('/api/fixture', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: relPathJSON, content: jsonStr })
+    body: JSON.stringify({
+      kind,
+      category: cat,
+      data
+    })
   });
 
-  let result = null;
-  let rawText = '';
+  const result = await resp.json().catch(() => null);
 
-  try {
-    rawText = await resp.text();
-    result = rawText ? JSON.parse(rawText) : null;
-  } catch (_) {
-    result = null;
-  }
-
-  if (!resp.ok) {
-    throw new Error(
-      (result && result.error) ||
-      rawText ||
-      `Error guardando ${relPathJSON}`
-    );
+  if (!resp.ok || !result?.ok) {
+    throw new Error(result?.error || 'Error al guardar fixture en DB');
   }
 
   window.LPI_FIXTURE = data;

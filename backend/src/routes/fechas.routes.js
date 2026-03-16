@@ -79,6 +79,15 @@ module.exports = function createFechasRouter(deps) {
     try { return JSON.parse(m[1]); } catch (_) { return null; }
   }
 
+  function isValidFixtureKind(kind) {
+    return ['ida', 'vuelta'].includes(String(kind || '').trim().toLowerCase());
+  }
+
+  function isValidFixtureCategory(category) {
+    return ['primera', 'segunda', 'tercera'].includes(String(category || '').trim().toLowerCase());
+  }
+
+
   // ====== API: Validación (fecha/*.validacion.js) ======
   router.post('/validar', async (req, res) => {
     try {
@@ -146,6 +155,99 @@ module.exports = function createFechasRouter(deps) {
       return res.json({ ok: true, message: 'Archivo guardado' });
     } catch (err) {
       console.error('Error al guardar archivo', err);
+      return res.status(500).json({ ok: false, error: 'Error interno' });
+    }
+  });
+
+
+  // ====== API: Leer/GUARDAR FIXTURE (PostgreSQL con fallback a archivo) ======
+  router.get('/fixture', async (req, res) => {
+    try {
+      const kind = String(req.query.kind || '').trim().toLowerCase();
+      const category = String(req.query.category || '').trim().toLowerCase();
+
+      if (!isValidFixtureKind(kind)) {
+        return res.status(400).json({ ok: false, error: 'kind inválido' });
+      }
+
+      if (!isValidFixtureCategory(category)) {
+        return res.status(400).json({ ok: false, error: 'category inválida' });
+      }
+
+      try {
+        const dbResult = await pool.query(
+          `
+            SELECT data
+            FROM fixtures
+            WHERE kind = $1 AND category = $2
+            LIMIT 1
+          `,
+          [kind, category]
+        );
+
+        if (dbResult.rowCount > 0) {
+          res.set('Cache-Control', 'no-store');
+          return res.json({ ok: true, source: 'db', data: dbResult.rows[0].data });
+        }
+      } catch (dbErr) {
+        console.error('GET /fixture db fallback', dbErr);
+      }
+
+      const relPath = path.join('fixture', `fixture.${kind}.${category}.json`);
+      const absPath = path.join(FRONTEND_DIR, relPath);
+
+      if (fs.existsSync(absPath)) {
+        const raw = await fs.promises.readFile(absPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        res.set('Cache-Control', 'no-store');
+        return res.json({ ok: true, source: 'file', data: parsed });
+      }
+
+      return res.status(404).json({ ok: false, error: 'fixture_no_encontrado' });
+    } catch (err) {
+      console.error('Error al leer fixture', err);
+      return res.status(500).json({ ok: false, error: 'Error interno' });
+    }
+  });
+
+  router.post('/fixture', async (req, res) => {
+    try {
+      const kind = String(req.body?.kind || '').trim().toLowerCase();
+      const category = String(req.body?.category || '').trim().toLowerCase();
+      const data = req.body?.data;
+
+      if (!isValidFixtureKind(kind)) {
+        return res.status(400).json({ ok: false, error: 'kind inválido' });
+      }
+
+      if (!isValidFixtureCategory(category)) {
+        return res.status(400).json({ ok: false, error: 'category inválida' });
+      }
+
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        return res.status(400).json({ ok: false, error: 'data inválida' });
+      }
+
+      const result = await pool.query(
+        `
+          INSERT INTO fixtures (kind, category, data, created_at, updated_at)
+          VALUES ($1, $2, $3::jsonb, NOW(), NOW())
+          ON CONFLICT (kind, category)
+          DO UPDATE SET
+            data = EXCLUDED.data,
+            updated_at = NOW()
+          RETURNING id, kind, category, updated_at
+        `,
+        [kind, category, JSON.stringify(data)]
+      );
+
+      return res.json({
+        ok: true,
+        message: 'Fixture guardado en PostgreSQL',
+        fixture: result.rows[0]
+      });
+    } catch (err) {
+      console.error('Error al guardar fixture en DB', err);
       return res.status(500).json({ ok: false, error: 'Error interno' });
     }
   });
