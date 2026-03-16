@@ -69,14 +69,13 @@ window.FixtureSwitcher = {
     const persist = opts.persist !== false;
 
     let file;
-    if (kind === 'ida') file = `fixture/fixture.ida.${category}.json`;
-    else if (kind === 'vuelta') file = `fixture/fixture.vuelta.${category}.json`;
+    if (kind === 'ida') file = `fixture.ida.${category}.json`;
+    else if (kind === 'vuelta') file = `fixture.vuelta.${category}.json`;
     else if (!/\.json($|\?)/i.test(kind)) {
-      const normalized = String(kind).replace(/\.js($|\?)/i, '.json');
-      file = normalized.startsWith('fixture/') ? normalized : `fixture/${normalized}`;
+      file = String(kind).replace(/\.js($|\?)/i, '.json');
       if (!String(file).endsWith('.json')) file += '.json';
     } else {
-      file = String(kind).startsWith('fixture/') ? kind : `fixture/${kind}`;
+      file = kind;
     }
 
     const src = (base.endsWith('/') ? base : base + '/') + file;
