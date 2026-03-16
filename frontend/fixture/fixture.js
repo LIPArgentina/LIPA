@@ -6,6 +6,7 @@ const CATEGORY_LAYOUTS = {
 
 const KIND_KEY = 'fixture_kind';
 const CAT_KEY  = 'fixture_cat';
+const API_BASE = 'https://liga-backend-tt82.onrender.com/api';
 let PERSIST_WARNED = false;
 
 function getStored(key, fallback){
@@ -34,7 +35,7 @@ async function loadFixtureJSON(src, meta = null){
   try { delete window.LPI_FIXTURE; } catch(_) { window.LPI_FIXTURE = undefined; }
 
   if (meta?.kind && meta?.category) {
-    const apiResp = await fetch(`/api/fixture?kind=${encodeURIComponent(meta.kind)}&category=${encodeURIComponent(meta.category)}`, {
+    const apiResp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(meta.kind)}&category=${encodeURIComponent(meta.category)}`, {
       cache: 'no-store'
     });
 
@@ -42,7 +43,7 @@ async function loadFixtureJSON(src, meta = null){
       const apiData = await apiResp.json().catch(() => null);
       if (apiData?.ok && apiData?.data && typeof apiData.data === 'object') {
         window.LPI_FIXTURE = apiData.data;
-        return `/api/fixture?kind=${meta.kind}&category=${meta.category}`;
+        return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}`;
       }
     }
   }
@@ -471,7 +472,7 @@ async function saveFixtureJSONOnServer(){
 
   assignCategoriasAlternadas(data);
 
-  const resp = await fetch('/api/fixture', {
+  const resp = await fetch(`${API_BASE}/fixture`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
