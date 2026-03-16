@@ -1416,59 +1416,6 @@ document.addEventListener('DOMContentLoaded', function(){
       .toUpperCase();
   }
 
-  function normalizeCategoryValue(value){
-    const v = String(value || '').trim().toLowerCase();
-    if (!v) return null;
-    if (v.includes('terc')) return 'tercera';
-    if (v.includes('seg')) return 'segunda';
-    if (v === '3' || v === 'c') return 'tercera';
-    if (v === '2' || v === 'b') return 'segunda';
-    return null;
-  }
-
-  function readLoggedSession(){
-    try {
-      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
-      if (sess) return sess;
-    } catch(_) {}
-    try {
-      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
-      if (sess2) return sess2;
-    } catch(_) {}
-    return null;
-  }
-
-  function resolveCategoryFromSession(){
-    const sess = readLoggedSession();
-    if (!sess || typeof sess !== 'object') return null;
-
-    const directKeys = [
-      'category', 'categoria', 'cat', 'division', 'división', 'leagueCategory',
-      'teamCategory', 'fixtureCategory', 'grupoCategoria'
-    ];
-
-    for (const key of directKeys){
-      const value = normalizeCategoryValue(sess[key]);
-      if (value) return value;
-    }
-
-    if (sess.team && typeof sess.team === 'object'){
-      for (const key of directKeys){
-        const value = normalizeCategoryValue(sess.team[key]);
-        if (value) return value;
-      }
-    }
-
-    if (sess.user && typeof sess.user === 'object'){
-      for (const key of directKeys){
-        const value = normalizeCategoryValue(sess.user[key]);
-        if (value) return value;
-      }
-    }
-
-    return null;
-  }
-
   function deriveTeam(){
     try {
       const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
@@ -1496,14 +1443,21 @@ document.addEventListener('DOMContentLoaded', function(){
         if(contentType.includes('application/json') || path.endsWith('.json')){
           const data = await r.json();
           const names = [];
-          const list = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
-          list.forEach(item => {
-            if (!item || typeof item !== 'object') return;
-            if (typeof item.username === 'string') names.push(normalizeTeamName(item.username));
-            if (typeof item.equipo === 'string') names.push(normalizeTeamName(item.equipo));
-            if (typeof item.nombre === 'string') names.push(normalizeTeamName(item.nombre));
-            if (typeof item.team === 'string') names.push(normalizeTeamName(item.team));
-          });
+          (function walk(value){
+            if(!value) return;
+            if(typeof value === 'string'){
+              const n = normalizeTeamName(value);
+              if(n) names.push(n);
+              return;
+            }
+            if(Array.isArray(value)){ value.forEach(walk); return; }
+            if(typeof value === 'object'){
+              if(typeof value.username === 'string') names.push(normalizeTeamName(value.username));
+              if(typeof value.equipo === 'string') names.push(normalizeTeamName(value.equipo));
+              if(typeof value.nombre === 'string') names.push(normalizeTeamName(value.nombre));
+              Object.values(value).forEach(walk);
+            }
+          })(data);
           const uniq = [...new Set(names.filter(Boolean))];
           if(uniq.length) return uniq;
         }else{
@@ -1523,9 +1477,6 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   async function resolveCategoryByTeam(teamSlug){
-    const fromSession = resolveCategoryFromSession();
-    if (fromSession) return fromSession;
-
     const normalizedSlug = normalizeTeamName(String(teamSlug || '').replace(/-/g, ' '));
 
     const tercera = await fetchTeamNames([
