@@ -51,13 +51,32 @@ function formatDateDMY(val){
   return s;
 }
 
+const API_BASE = 'https://liga-backend-tt82.onrender.com/api';
+
 async function fetchFixture(kind){
+  const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=tercera`;
+
+  try {
+    const apiRes = await fetch(apiUrl, { cache: 'no-store' });
+
+    if (apiRes.ok) {
+      const apiData = await apiRes.json().catch(() => null);
+
+      if (apiData?.ok && apiData?.data) {
+        console.log('✔ API TERCERA');
+        cache[kind] = apiData.data;
+        return apiData.data;
+      }
+    }
+  } catch (err) {
+    console.warn('fallback JSON', err);
+  }
+
   const file = kind === 'vuelta'
     ? '../fixture/fixture.vuelta.tercera.json'
     : '../fixture/fixture.ida.tercera.json';
 
   const res = await fetch(file, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`No se pudo cargar ${file}`);
   const data = await res.json();
   cache[kind] = data;
   return data;
