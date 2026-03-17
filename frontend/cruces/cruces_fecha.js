@@ -145,21 +145,40 @@ async function checkCrucesEnabled(teamSlug) {
     return false;
   };
 
-  if (!teamSlug) {
-    return block('Cruces no disponibles', 'No se pudo identificar el equipo.');
-  }
-
   try {
-    const accessKey = await resolveCrucesAccessKey(teamSlug);
+    // 🔥 prioridad absoluta a la URL
+    const qsUrl = new URLSearchParams(location.search);
+    const cat = String(qsUrl.get('cat') || '').trim().toLowerCase();
+
+    let accessKey = null;
+
+    if (cat === 'tercera') accessKey = CATEGORY_KEYS.tercera;
+    if (cat === 'segunda') accessKey = CATEGORY_KEYS.segunda;
+
+    // fallback solo si no vino en URL
     if (!accessKey) {
-      return block('Cruces no disponibles', 'No se pudo determinar la categoría.');
+      if (!teamSlug) {
+        return block('Cruces no disponibles', 'No se pudo identificar el equipo.');
+      }
+
+      accessKey = await resolveCrucesAccessKey(teamSlug);
+
+      if (!accessKey) {
+        return block('Cruces no disponibles', 'No se pudo determinar la categoría.');
+      }
     }
 
     const fechaKey = new Date().toISOString().slice(0,10);
-    const accessTeam = getCategoryKeyFromUrlOrFallback(accessKey);
-    const qs = new URLSearchParams({ team: accessTeam, fechaKey });
 
-    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString());
+    const qs = new URLSearchParams({
+      team: accessKey,
+      fechaKey
+    });
+
+    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), {
+      cache: 'no-store'
+    });
+
     const j = await r.json();
 
     if (!j.enabled) {
@@ -167,6 +186,7 @@ async function checkCrucesEnabled(teamSlug) {
     }
 
     return true;
+
   } catch (e) {
     return block('Error', 'No se pudo verificar.');
   }
