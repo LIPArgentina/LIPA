@@ -9,7 +9,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
-const createApiRouter = require('./routes');
+
+
+const createApiRouter = require('./routes/index');
 const crucesDbRouter = require('./routes/cruces.routes.db');
 
 const app = express();
@@ -114,6 +116,10 @@ const FRONTEND_FECHA = path.join(FRONTEND_DIR, 'fecha');
 /* =========================================================
    API
 ========================================================= */
+
+app.get('/api/health-direct', (req, res) => {
+  res.json({ ok: true, source: 'app.js-direct' });
+});
 
 app.use(
   '/api',
