@@ -1393,13 +1393,82 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 })();
 
-// === Control remoto de "ver cruces" (habilitado por admin) ===
+// === Control remoto de "ver cruces" (habilitado por admin por categoría) ===
 (function(){
+  const CATEGORY_KEYS = {
+    tercera: '__categoria_tercera__',
+    segunda: '__categoria_segunda__'
+  };
+
   function slugify(s){
     return String(s||'').toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
       .replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-');
   }
+
+  function normalizeTeamName(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+  }
+
+  function normalizeCategoryValue(value){
+    const v = String(value || '').trim().toLowerCase();
+    if (!v) return null;
+    if (v.includes('terc')) return 'tercera';
+    if (v.includes('seg')) return 'segunda';
+    if (v === '3' || v === 'c') return 'tercera';
+    if (v === '2' || v === 'b') return 'segunda';
+    return null;
+  }
+
+  function readLoggedSession(){
+    try {
+      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+      if (sess) return sess;
+    } catch(_) {}
+    try {
+      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+      if (sess2) return sess2;
+    } catch(_) {}
+    return null;
+  }
+
+  function resolveCategoryFromSession(){
+    const sess = readLoggedSession();
+    if (!sess || typeof sess !== 'object') return null;
+
+    const directKeys = [
+      'category', 'categoria', 'cat', 'division', 'división', 'leagueCategory',
+      'teamCategory', 'fixtureCategory', 'grupoCategoria'
+    ];
+
+    for (const key of directKeys){
+      const value = normalizeCategoryValue(sess[key]);
+      if (value) return value;
+    }
+
+    if (sess.team && typeof sess.team === 'object'){
+      for (const key of directKeys){
+        const value = normalizeCategoryValue(sess.team[key]);
+        if (value) return value;
+      }
+    }
+
+    if (sess.user && typeof sess.user === 'object'){
+      for (const key of directKeys){
+        const value = normalizeCategoryValue(sess.user[key]);
+        if (value) return value;
+      }
+    }
+
+    return null;
+  }
+
   function deriveTeam(){
     try {
       const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
@@ -1418,51 +1487,169 @@ document.addEventListener('DOMContentLoaded', function(){
     return '';
   }
 
+  async function fetchTeamNames(paths){
+    for (const path of paths){
+      try{
+        const r = await fetch(path, { cache:'no-store' });
+        if(!r.ok) continue;
+        const contentType = (r.headers.get('content-type') || '').toLowerCase();
+
+        if(contentType.includes('application/json') || path.endsWith('.json')){
+          const data = await r.json();
+          const names = [];
+          const list = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
+          list.forEach(item => {
+            if (!item || typeof item !== 'object') return;
+            if (typeof item.username === 'string') names.push(normalizeTeamName(item.username));
+            if (typeof item.equipo === 'string') names.push(normalizeTeamName(item.equipo));
+            if (typeof item.nombre === 'string') names.push(normalizeTeamName(item.nombre));
+            if (typeof item.team === 'string') names.push(normalizeTeamName(item.team));
+          });
+          const uniq = [...new Set(names.filter(Boolean))];
+          if(uniq.length) return uniq;
+        } else {
+          const text = await r.text();
+          const names = [];
+          const regex = /(?:username|equipo|nombre|team)\s*:\s*['"]([^'"]+)['"]/gi;
+          let m;
+          while((m = regex.exec(text))){
+            names.push(normalizeTeamName(m[1]));
+          }
+          const uniq = [...new Set(names.filter(Boolean))];
+          if(uniq.length) return uniq;
+        }
+      } catch(_) {}
+    }
+    return [];
+  }
+
+  async function resolveCategoryByTeam(teamSlug){
+    const fromSession = resolveCategoryFromSession();
+    if (fromSession) return fromSession;
+
+    const normalizedSlug = normalizeTeamName(String(teamSlug || '').replace(/-/g, ' '));
+
+    const tercera = await fetchTeamNames([
+      '../data/usuarios.tercera.json',
+      '/data/usuarios.tercera.json',
+      '../data/usuarios.tercera.js',
+      '/data/usuarios.tercera.js'
+    ]);
+    if (tercera.includes(normalizedSlug)) return 'tercera';
+
+    const segunda = await fetchTeamNames([
+      '../data/usuarios.segunda.json',
+      '/data/usuarios.segunda.json',
+      '../data/usuarios.segunda.js',
+      '/data/usuarios.segunda.js'
+    ]);
+    if (segunda.includes(normalizedSlug)) return 'segunda';
+
+    return null;
+  }
+
   const fechaKey = new Date().toISOString().slice(0,10);
   const btn = document.getElementById('btnVerCruces');
-  function setEnabled(on){
+
+  function setEnabled(on, category){
     if(!btn) return;
+
     btn.classList.toggle('is-disabled', !on);
-    if(!on){ btn.setAttribute('aria-disabled','true'); btn.title='Esperando habilitación del admin…'; }
-    else{ btn.removeAttribute('aria-disabled'); btn.title=''; }
-  }
-  async function refresh(){
-    try{
-      const team = deriveTeam() || '*';
-      const qs = new URLSearchParams({ team, fechaKey });
-      const r = await fetch(LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(), { cache:'no-store', credentials:'include' });
-      const j = await r.json();
-      setEnabled(!!(j && j.enabled));
-    }catch(_){
-      setEnabled(false);
+
+    if(!on){
+      btn.setAttribute('aria-disabled','true');
+      btn.title = category
+        ? ('Esperando habilitación del admin para ' + category + '…')
+        : 'Esperando habilitación del admin…';
+    } else {
+      btn.removeAttribute('aria-disabled');
+      btn.title = category ? ('Cruces habilitados para ' + category) : '';
     }
   }
 
-  setEnabled(false);
+  if (btn && !btn.__crucesGuardWired){
+    btn.__crucesGuardWired = true;
+    btn.addEventListener('click', function(ev){
+      if (btn.getAttribute('aria-disabled') === 'true'){
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+    });
+  }
+
+  let lastKey = '';
+  let refreshTimer = null;
+  let refreshInFlight = false;
+
+  async function checkCruces(){
+    if (refreshInFlight) return;
+    refreshInFlight = true;
+
+    try{
+      const team = deriveTeam() || '';
+      const category = await resolveCategoryByTeam(team);
+
+      if (!category || !CATEGORY_KEYS[category]){
+        setEnabled(false, null);
+        return;
+      }
+
+      const currentKey = `${CATEGORY_KEYS[category]}::${fechaKey}`;
+      if (currentKey === lastKey && btn && btn.dataset.crucesResolved === 'true') {
+        return;
+      }
+
+      const qs = new URLSearchParams({
+        team: CATEGORY_KEYS[category],
+        fechaKey
+      });
+
+      const r = await fetch(
+        LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(),
+        { cache:'no-store', credentials:'include' }
+      );
+
+      const j = await r.json().catch(() => ({}));
+      setEnabled(!!(j && j.enabled), category);
+
+      if (btn) {
+        btn.dataset.crucesResolved = 'true';
+      }
+
+      lastKey = currentKey;
+    } catch(_){
+      setEnabled(false, null);
+    } finally {
+      refreshInFlight = false;
+    }
+  }
+
+  function queueCheck(){
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      checkCruces();
+    }, 250);
+  }
+
+  setEnabled(false, null);
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', refresh, { once:true });
+    document.addEventListener('DOMContentLoaded', checkCruces, { once:true });
   } else {
-    refresh();
+    checkCruces();
   }
 
   try{
     const es = new EventSource(LPI_apiUrl('/api/cruces/stream'), { withCredentials: true });
-    es.onmessage = (ev)=>{
-      try{
-        const data = JSON.parse(ev.data||'{}');
-        if (data && data.type === 'cruces'){
-          const team = deriveTeam() || '*';
-          if (!data.team || data.team === '*' || data.team === team){
-            if (!data.fechaKey || data.fechaKey === fechaKey){
-              refresh();
-            }
-          }
-        }
-      }catch(_){}
+    es.onmessage = () => {
+      queueCheck();
     };
-  }catch(_){}
+  } catch(_){}
 
-  setInterval(refresh, 15000);
+  // fallback liviano por si el stream no conecta
+  setInterval(() => {
+    queueCheck();
+  }, 60000);
 })();
 
 
