@@ -84,14 +84,30 @@ module.exports = function createEquiposRouter(deps) {
 
       for (const team of processedTeams) {
         await client.query(
-          `INSERT INTO equipos (slug, nombre, division)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (slug)
-           DO UPDATE SET
-             nombre = EXCLUDED.nombre,
-             division = EXCLUDED.division`,
-          [team.slug, team.username, division]
-        );
+  `INSERT INTO equipos (slug_uid, slug_base, division, display_name, username, role, captain, phone, email)
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+   ON CONFLICT (slug_uid)
+   DO UPDATE SET
+     slug_base = EXCLUDED.slug_base,
+     division = EXCLUDED.division,
+     display_name = EXCLUDED.display_name,
+     username = EXCLUDED.username,
+     role = EXCLUDED.role,
+     captain = EXCLUDED.captain,
+     phone = EXCLUDED.phone,
+     email = EXCLUDED.email`,
+  [
+    team.slug,
+    team.slug,
+    division,
+    team.username,
+    team.username,
+    team.role || 'team',
+    team.captain || '',
+    team.phone || '',
+    team.email || ''
+  ]
+);
       }
 
       await client.query('COMMIT');
@@ -112,19 +128,25 @@ module.exports = function createEquiposRouter(deps) {
     try {
       const { division } = req.query;
 
-      const result = await pool.query(
-        `SELECT slug, nombre FROM equipos WHERE division = $1 ORDER BY nombre`,
-        [division]
-      );
+const result = await pool.query(
+  `SELECT slug_uid, username, role, captain, email, phone
+   FROM equipos
+   WHERE division = $1
+   ORDER BY username`,
+  [division]
+);
 
-      res.json({
-        ok: true,
-        teams: result.rows.map(r => ({
-          username: r.nombre,
-          slug: r.slug,
-          role: 'team'
-        }))
-      });
+res.json({
+  ok: true,
+  teams: result.rows.map(r => ({
+    username: r.username,
+    slug: r.slug_uid,
+    role: r.role || 'team',
+    captain: r.captain || '',
+    email: r.email || '',
+    phone: r.phone || ''
+  }))
+});
 
     } catch (err) {
       console.error(err);
