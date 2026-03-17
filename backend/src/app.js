@@ -115,8 +115,6 @@ const FRONTEND_FECHA = path.join(FRONTEND_DIR, 'fecha');
    API
 ========================================================= */
 
-app.use('/api/cruces', crucesDbRouter);
-
 app.use(
   '/api',
   createApiRouter({
@@ -129,6 +127,8 @@ app.use(
     FRONTEND_FECHA,
   })
 );
+
+app.use('/api/cruces', crucesDbRouter);
 
 /* =========================================================
    FRONTEND ESTÁTICO (temporal, hasta separar del todo)
