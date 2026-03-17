@@ -33,7 +33,7 @@ module.exports = function createApiRouter(deps) {
   router.use('/', createFechasRouter(deps));
 
   // Cruces
-  router.use('/cruces', createCrucesRouter(deps));
+  router.use('/cruces', createCrucesRouter);
 
   // Players
   router.use('/', createTeamPlayersRouter(deps));
