@@ -468,33 +468,88 @@ router.get('/lock-status', async (req, res) => {
 });
 
 // ===== ADMIN CRUCES (compatibilidad con frontend) =====
-let crucesEnabledUntil = null;
+const crucesEnabledUntilByKey = new Map();
+
+function normalizeCrucesAdminKey(team, fechaKey) {
+  const normalizedTeam = String(team || '').trim().toLowerCase();
+  const normalizedFecha = String(fechaKey || '').trim();
+  return `${normalizedTeam}::${normalizedFecha}`;
+}
+
+function getCrucesEntry(team, fechaKey) {
+  const now = Date.now();
+  const key = normalizeCrucesAdminKey(team, fechaKey);
+  const until = crucesEnabledUntilByKey.get(key) || null;
+
+  if (until && until <= now) {
+    crucesEnabledUntilByKey.delete(key);
+    return { key, enabled: false, remainingMs: 0, until: null };
+  }
+
+  return {
+    key,
+    enabled: !!(until && until > now),
+    remainingMs: until ? Math.max(0, until - now) : 0,
+    until
+  };
+}
 
 router.get('/status', (req, res) => {
-  const now = Date.now();
-  const enabled = crucesEnabledUntil && crucesEnabledUntil > now;
+  const team = req.query.team;
+  const fechaKey = req.query.fechaKey;
+
+  if (!team || !fechaKey) {
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  }
+
+  const state = getCrucesEntry(team, fechaKey);
 
   res.json({
-    enabled,
-    remainingMs: enabled ? crucesEnabledUntil - now : 0
+    ok: true,
+    team: String(team),
+    fechaKey: String(fechaKey),
+    enabled: state.enabled,
+    remainingMs: state.remainingMs
   });
 });
 
 router.post('/enable', (req, res) => {
+  const team = req.body?.team;
+  const fechaKey = req.body?.fechaKey;
+
+  if (!team || !fechaKey) {
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  }
+
   const now = Date.now();
-  crucesEnabledUntil = now + (48 * 60 * 60 * 1000);
+  const key = normalizeCrucesAdminKey(team, fechaKey);
+  const until = now + (48 * 60 * 60 * 1000);
+  crucesEnabledUntilByKey.set(key, until);
 
   res.json({
     ok: true,
+    team: String(team),
+    fechaKey: String(fechaKey),
     enabled: true,
-    remainingMs: crucesEnabledUntil - now
+    remainingMs: until - now
   });
 });
 
 router.post('/disable', (req, res) => {
-  crucesEnabledUntil = null;
+  const team = req.body?.team;
+  const fechaKey = req.body?.fechaKey;
+
+  if (!team || !fechaKey) {
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  }
+
+  const key = normalizeCrucesAdminKey(team, fechaKey);
+  crucesEnabledUntilByKey.delete(key);
+
   res.json({
     ok: true,
+    team: String(team),
+    fechaKey: String(fechaKey),
     enabled: false,
     remainingMs: 0
   });
