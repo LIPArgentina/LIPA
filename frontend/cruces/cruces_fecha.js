@@ -99,6 +99,10 @@ async function fetchCategoryTeamNames(paths){
   return [];
 }
 
+function matchTeam(list, target){
+  return list.some(name => name.includes(target) || target.includes(name));
+}
+
 async function resolveCrucesAccessKey(teamSlug){
   const normalizedSlug = normalizeCategoryTeamName(String(teamSlug || '').replace(/-/g, ' '));
 
@@ -106,13 +110,13 @@ async function resolveCrucesAccessKey(teamSlug){
     '../data/usuarios.tercera.json',
     '/data/usuarios.tercera.json'
   ]);
-  if (tercera.includes(normalizedSlug)) return CATEGORY_KEYS.tercera;
+  if (matchTeam(tercera, normalizedSlug)) return CATEGORY_KEYS.tercera;
 
   const segunda = await fetchCategoryTeamNames([
     '../data/usuarios.segunda.json',
     '/data/usuarios.segunda.json'
   ]);
-  if (segunda.includes(normalizedSlug)) return CATEGORY_KEYS.segunda;
+  if (matchTeam(segunda, normalizedSlug)) return CATEGORY_KEYS.segunda;
 
   return null;
 }
