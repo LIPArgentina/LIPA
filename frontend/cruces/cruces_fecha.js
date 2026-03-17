@@ -1,16 +1,5 @@
 const API_BASE = 'https://liga-backend-tt82.onrender.com/api';
 
-function slugify(value){
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-}
-
 function getCategoryFromURL(){
   const qs = new URLSearchParams(location.search);
   return String(qs.get('cat') || '').toLowerCase();
@@ -57,7 +46,18 @@ async function loadCruces(){
     const accessKey = getAccessKey();
     const fechaKey = new Date().toISOString().slice(0,10);
 
-    const r = await fetch(`${API_BASE}/cruces?team=${accessKey}&fechaKey=${fechaKey}`);
+    // 🔥 CAMBIO CLAVE: POST en vez de GET
+    const r = await fetch(`${API_BASE}/cruces`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        team: accessKey,
+        fechaKey
+      })
+    });
+
     const data = await r.json();
 
     app.innerHTML = `
