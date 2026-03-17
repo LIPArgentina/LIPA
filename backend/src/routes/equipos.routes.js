@@ -1,12 +1,11 @@
 const express = require('express');
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const fs = require('fs');
 const { readJSON, writeJSON } = require('../utils/fileStorage');
 const pool = require('../../db');
 
 module.exports = function createEquiposRouter(deps) {
-  const { DATA_DIR, FRONTEND_DATA } = deps;
+  const { DATA_DIR } = deps;
 
   const router = express.Router();
 
@@ -20,126 +19,163 @@ module.exports = function createEquiposRouter(deps) {
     }
   }
 
-  // ====== API: Guardar equipos ======
+  async function ensureEquiposTable() {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS equipos (
+        id SERIAL PRIMARY KEY,
+        slug TEXT UNIQUE NOT NULL,
+        nombre TEXT NOT NULL,
+        division TEXT NOT NULL,
+        role TEXT DEFAULT 'team',
+        captain TEXT DEFAULT '',
+        email TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+  }
+
+  function buildSlug(value = '') {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  // ====== GUARDAR EQUIPOS EN POSTGRES ======
   router.post('/save-teams', async (req, res) => {
+    const client = await pool.connect();
+
     try {
       const { division, teams } = req.body || {};
+
       if (!division || !Array.isArray(teams)) {
-        return res.status(400).json({ ok: false, error: 'Faltan campos (division, teams)' });
+        return res.status(400).json({ ok: false });
       }
 
-      if (!['primera', 'segunda', 'tercera'].includes(division)) {
-        return res.status(403).json({ ok: false, error: 'División no autorizada' });
-      }
+      await ensureEquiposTable();
 
       const processedTeams = await Promise.all(
         teams.map(async (team) => {
-          const slug = String(team.username || '')
-            .toLowerCase()
-            .normalize('NFD').replace(/[̀-ͯ]/g, '')
-            .replace(/[^a-z0-9]/g, '');
+          const username = String(team.username || '').trim();
+          const slug = buildSlug(username);
 
           await ensureTeam(slug);
-          return { ...team, slug };
+
+          return {
+            username,
+            slug,
+            role: 'team',
+            captain: '',
+            email: '',
+            phone: ''
+          };
         })
       );
 
-      const jsPath = path.join(FRONTEND_DATA, `usuarios.${division}.js`);
-      const jsContent = `window.LPI_USERS = ${JSON.stringify(processedTeams, null, 2)};\n`;
-      await fs.promises.writeFile(jsPath, jsContent, 'utf8');
+      await client.query('BEGIN');
 
-      const jsonPath = path.join(FRONTEND_DATA, `usuarios.${division}.json`);
-      await fs.promises.writeFile(jsonPath, JSON.stringify({ users: processedTeams }, null, 2), 'utf8');
+      await client.query(
+        `DELETE FROM equipos WHERE division = $1`,
+        [division]
+      );
 
-      return res.json({ ok: true, message: 'Equipos guardados' });
+      for (const team of processedTeams) {
+        await client.query(
+          `INSERT INTO equipos (slug, nombre, division)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (slug)
+           DO UPDATE SET
+             nombre = EXCLUDED.nombre,
+             division = EXCLUDED.division`,
+          [team.slug, team.username, division]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      res.json({ ok: true });
 
     } catch (err) {
-      console.error('save-teams', err);
-      return res.status(500).json({ ok: false, error: 'Error interno' });
+      await client.query('ROLLBACK');
+      console.error(err);
+      res.status(500).json({ ok: false });
+    } finally {
+      client.release();
     }
   });
 
-  // ====== API: Guardar plantel en PostgreSQL ======
+  // ====== LEER EQUIPOS DESDE POSTGRES ======
+  router.get('/teams', async (req, res) => {
+    try {
+      const { division } = req.query;
+
+      const result = await pool.query(
+        `SELECT slug, nombre FROM equipos WHERE division = $1 ORDER BY nombre`,
+        [division]
+      );
+
+      res.json({
+        ok: true,
+        teams: result.rows.map(r => ({
+          username: r.nombre,
+          slug: r.slug,
+          role: 'team'
+        }))
+      });
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ ok: false });
+    }
+  });
+
+  // ====== PLANTEL (esto ya lo tenías bien) ======
   router.post('/save-team-assets', async (req, res) => {
     try {
       const { slug, teamName, players } = req.body || {};
 
-      if (!slug || !teamName || !Array.isArray(players)) {
-        return res.status(400).json({
-          ok: false,
-          error: 'Faltan campos (slug, teamName, players)'
-        });
-      }
-
-      if (!/^[a-z0-9]+$/.test(slug)) {
-        return res.status(403).json({ ok: false, error: 'Slug inválido' });
-      }
-
-      await ensureTeam(slug);
-
       await pool.query(
-        `
-        INSERT INTO team_players (slug, team_name, players)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (slug)
-        DO UPDATE SET
-          team_name = EXCLUDED.team_name,
-          players = EXCLUDED.players
-        `,
+        `INSERT INTO team_players (slug, team_name, players)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (slug)
+         DO UPDATE SET
+           team_name = EXCLUDED.team_name,
+           players = EXCLUDED.players`,
         [slug, teamName, JSON.stringify(players)]
       );
 
-      return res.json({
-        ok: true,
-        message: 'Plantel guardado'
-      });
+      res.json({ ok: true });
 
     } catch (err) {
-      console.error('save-team-assets', err);
-      return res.status(500).json({
-        ok: false,
-        error: 'Error interno'
-      });
+      console.error(err);
+      res.status(500).json({ ok: false });
     }
   });
 
-  // ====== API: Leer plantel desde PostgreSQL ======
   router.get('/team-assets', async (req, res) => {
     try {
       const { team } = req.query;
-
-      if (!team) {
-        return res.status(400).json({
-          ok: false,
-          error: 'team requerido'
-        });
-      }
 
       const result = await pool.query(
         'SELECT players, team_name FROM team_players WHERE slug = $1',
         [team]
       );
 
-      if (result.rowCount === 0) {
-        return res.json({
-          ok: true,
-          players: [],
-          teamName: null
-        });
+      if (!result.rowCount) {
+        return res.json({ ok: true, players: [] });
       }
 
-      return res.json({
+      res.json({
         ok: true,
-        players: result.rows[0].players || [],
-        teamName: result.rows[0].team_name || null
+        players: result.rows[0].players
       });
 
     } catch (err) {
-      console.error('GET /team-assets', err);
-      return res.status(500).json({
-        ok: false,
-        error: 'Error interno'
-      });
+      console.error(err);
+      res.status(500).json({ ok: false });
     }
   });
 
