@@ -571,4 +571,29 @@ router.get('/stream', (req, res) => {
   });
 });
 
+
+// ===== GET CRUCES (faltaba este endpoint) =====
+router.get('/cruces', async (req, res) => {
+  const team = String(req.query.team || '').trim();
+  const fechaKey = String(req.query.fechaKey || '').trim();
+
+  if (!team || !fechaKey) {
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  }
+
+  try {
+    // TODO: reemplazar por lectura real desde PostgreSQL
+    // Por ahora devolvemos estructura válida para el frontend
+    return res.json({
+      ok: true,
+      team,
+      fechaKey,
+      cruces: []
+    });
+  } catch (e) {
+    console.error('GET /cruces', e);
+    return res.status(500).json({ ok: false, error: 'No se pudieron obtener los cruces.' });
+  }
+});
+
 module.exports = router;
