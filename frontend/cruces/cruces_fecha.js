@@ -58,6 +58,17 @@ function getStoredCrucesTeam() {
   return '';
 }
 
+
+
+function getCategoryKeyFromUrlOrFallback(teamSlug){
+  try {
+    const qs = new URLSearchParams(location.search);
+    const cat = String(qs.get('cat') || '').trim().toLowerCase();
+    if (cat === 'tercera') return CATEGORY_KEYS.tercera;
+    if (cat === 'segunda') return CATEGORY_KEYS.segunda;
+  } catch(_) {}
+  return teamSlug;
+}
 const CATEGORY_KEYS = {
   tercera: '__categoria_tercera__',
   segunda: '__categoria_segunda__'
@@ -99,31 +110,20 @@ async function fetchCategoryTeamNames(paths){
   return [];
 }
 
-function matchTeam(list, target){
-  return list.some(name => name.includes(target) || target.includes(name));
-}
-
 async function resolveCrucesAccessKey(teamSlug){
-  try {
-    const qs = new URLSearchParams(location.search);
-    const cat = String(qs.get('cat') || '').trim().toLowerCase();
-    if (cat === 'tercera') return CATEGORY_KEYS.tercera;
-    if (cat === 'segunda') return CATEGORY_KEYS.segunda;
-  } catch(_) {}
-
   const normalizedSlug = normalizeCategoryTeamName(String(teamSlug || '').replace(/-/g, ' '));
 
   const tercera = await fetchCategoryTeamNames([
     '../data/usuarios.tercera.json',
     '/data/usuarios.tercera.json'
   ]);
-  if (matchTeam(tercera, normalizedSlug)) return CATEGORY_KEYS.tercera;
+  if (tercera.includes(normalizedSlug)) return CATEGORY_KEYS.tercera;
 
   const segunda = await fetchCategoryTeamNames([
     '../data/usuarios.segunda.json',
     '/data/usuarios.segunda.json'
   ]);
-  if (matchTeam(segunda, normalizedSlug)) return CATEGORY_KEYS.segunda;
+  if (segunda.includes(normalizedSlug)) return CATEGORY_KEYS.segunda;
 
   return null;
 }
@@ -156,11 +156,10 @@ async function checkCrucesEnabled(teamSlug) {
     }
 
     const fechaKey = new Date().toISOString().slice(0,10);
-    const qs = new URLSearchParams({ team: accessKey, fechaKey });
+    const accessTeam = getCategoryKeyFromUrlOrFallback(accessKey);
+    const qs = new URLSearchParams({ team: accessTeam, fechaKey });
 
-    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString(), {
-  cache: 'no-store'
-});
+    const r = await fetch(`${API_BASE}/api/cruces/status?` + qs.toString());
     const j = await r.json();
 
     if (!j.enabled) {
