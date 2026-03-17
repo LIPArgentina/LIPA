@@ -104,6 +104,13 @@ function matchTeam(list, target){
 }
 
 async function resolveCrucesAccessKey(teamSlug){
+  try {
+    const qs = new URLSearchParams(location.search);
+    const cat = String(qs.get('cat') || '').trim().toLowerCase();
+    if (cat === 'tercera') return CATEGORY_KEYS.tercera;
+    if (cat === 'segunda') return CATEGORY_KEYS.segunda;
+  } catch(_) {}
+
   const normalizedSlug = normalizeCategoryTeamName(String(teamSlug || '').replace(/-/g, ' '));
 
   const tercera = await fetchCategoryTeamNames([

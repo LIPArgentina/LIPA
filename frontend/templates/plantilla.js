@@ -1305,27 +1305,127 @@ document.addEventListener('DOMContentLoaded', function(){
     return headers;
   }
 
-// Guarda el team para cruces y evita exponerlo en la URL pública
+// Guarda el team para cruces y pasa la categoría explícitamente
 (function(){
+  function readCrucesCategoryFromSession(){
+    try {
+      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+      const raw = sess?.category || sess?.categoria || sess?.division || sess?.teamCategory || sess?.user?.category || sess?.user?.categoria || sess?.user?.division;
+      const v = String(raw || '').trim().toLowerCase();
+      if (v.includes('terc')) return 'tercera';
+      if (v.includes('seg')) return 'segunda';
+    } catch(_) {}
+    try {
+      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+      const raw = sess2?.category || sess2?.categoria || sess2?.division || sess2?.teamCategory || sess2?.user?.category || sess2?.user?.categoria || sess2?.user?.division;
+      const v = String(raw || '').trim().toLowerCase();
+      if (v.includes('terc')) return 'tercera';
+      if (v.includes('seg')) return 'segunda';
+    } catch(_) {}
+    return null;
+  }
+
+  async function readCrucesCategoryFromUsers(teamSlug){
+    function normalizeTeamName(value){
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
+    }
+    async function fetchTeamNames(paths){
+      for (const path of paths){
+        try{
+          const r = await fetch(path, { cache:'no-store' });
+          if(!r.ok) continue;
+          const contentType = (r.headers.get('content-type') || '').toLowerCase();
+
+          if(contentType.includes('application/json') || path.endsWith('.json')){
+            const data = await r.json();
+            const list = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
+            const names = [];
+            list.forEach(item => {
+              if (!item || typeof item !== 'object') return;
+              ['username','equipo','nombre','team'].forEach(k=>{
+                if (typeof item[k] === 'string') names.push(normalizeTeamName(item[k]));
+              });
+            });
+            const uniq = [...new Set(names.filter(Boolean))];
+            if (uniq.length) return uniq;
+          } else {
+            const text = await r.text();
+            const names = [];
+            const regex = /(?:username|equipo|nombre|team)\s*:\s*['"]([^'"]+)['"]/gi;
+            let m;
+            while((m = regex.exec(text))){
+              names.push(normalizeTeamName(m[1]));
+            }
+            const uniq = [...new Set(names.filter(Boolean))];
+            if (uniq.length) return uniq;
+          }
+        } catch(_) {}
+      }
+      return [];
+    }
+
+    const normalizedSlug = normalizeTeamName(String(teamSlug || '').replace(/-/g, ' '));
+
+    const tercera = await fetchTeamNames([
+      '../data/usuarios.tercera.json',
+      '/data/usuarios.tercera.json',
+      '../data/usuarios.tercera.js',
+      '/data/usuarios.tercera.js'
+    ]);
+    if (tercera.some(name => name.includes(normalizedSlug) || normalizedSlug.includes(name))) return 'tercera';
+
+    const segunda = await fetchTeamNames([
+      '../data/usuarios.segunda.json',
+      '/data/usuarios.segunda.json',
+      '../data/usuarios.segunda.js',
+      '/data/usuarios.segunda.js'
+    ]);
+    if (segunda.some(name => name.includes(normalizedSlug) || normalizedSlug.includes(name))) return 'segunda';
+
+    return null;
+  }
+
   try{
     const params = new URLSearchParams(location.search);
     const teamFromUrl = params.get('team');
     const team = teamFromUrl || (typeof deriveTeam === 'function' ? deriveTeam() : '');
     if (team) {
-      localStorage.setItem('team', team);
-      sessionStorage.setItem('lpi_cruces_team', team);
-      localStorage.setItem('lpi_cruces_team', team);
+      try { sessionStorage.setItem('lpi_cruces_team', team); } catch(_){}
+      try { localStorage.setItem('lpi_cruces_team', team); } catch(_){}
+      try { sessionStorage.setItem('crucesTeam', team); } catch(_){}
+      try { localStorage.setItem('crucesTeam', team); } catch(_){}
     }
 
     const btn = document.querySelector('.btn-cruces');
     if (btn) {
       btn.setAttribute('href', '../cruces/cruces_fecha.html');
-      btn.addEventListener('click', function(){
+      btn.addEventListener('click', async function(ev){
+        ev.preventDefault();
+
         const currentTeam = (typeof deriveTeam === 'function' ? deriveTeam() : team || '');
         if (currentTeam) {
           try { sessionStorage.setItem('lpi_cruces_team', currentTeam); } catch(_){}
           try { localStorage.setItem('lpi_cruces_team', currentTeam); } catch(_){}
+          try { sessionStorage.setItem('crucesTeam', currentTeam); } catch(_){}
+          try { localStorage.setItem('crucesTeam', currentTeam); } catch(_){}
         }
+
+        let cat = readCrucesCategoryFromSession();
+        if (!cat) {
+          cat = await readCrucesCategoryFromUsers(currentTeam);
+        }
+
+        const url = cat
+          ? ('../cruces/cruces_fecha.html?cat=' + encodeURIComponent(cat))
+          : '../cruces/cruces_fecha.html';
+
+        location.href = url;
       });
     }
   }catch(e){ /* no-op */ }
