@@ -12,30 +12,31 @@ module.exports = function createApiRouter(deps) {
 
   const router = express.Router();
 
-  // Visor admin de planillas
-  router.use('/admin', adminPlanillas);
-
-  // Router de banner
-  router.use('/', createBannerRouter({ DATA_DIR }));
-
-  // Rutas de admin / auth / gestión de equipos
-  router.use('/', createAdminRouter(deps));
-
-  // Rutas específicas de equipos
-  router.use('/', createEquiposRouter(deps));
-
-  // Rutas de fechas / fixtures / planillas de fecha
-  router.use('/', createFechasRouter(deps));
-
-  // Rutas de cruces
-  router.use('/cruces', createCrucesRouter);
-
-  // Health-check
+  // Health-check primero
   router.get('/health', (req, res) => {
     res.json({ ok: true, variant: 'noauth-fhard' });
   });
 
-  router.use(createTeamPlayersRouter(deps));
+  // Equipos primero para que /teams y /save-teams no queden tapados
+  router.use('/', createEquiposRouter(deps));
+
+  // Visor admin de planillas
+  router.use('/admin', adminPlanillas);
+
+  // Admin / auth
+  router.use('/', createAdminRouter(deps));
+
+  // Banner
+  router.use('/', createBannerRouter({ DATA_DIR }));
+
+  // Fechas / fixtures / planillas
+  router.use('/', createFechasRouter(deps));
+
+  // Cruces
+  router.use('/cruces', createCrucesRouter(deps));
+
+  // Players
+  router.use('/', createTeamPlayersRouter(deps));
 
   return router;
 };
