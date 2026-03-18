@@ -31,35 +31,48 @@ function currentCategoryKind(){
   };
 }
 
+function normalizeTeamName(name){
+  const raw = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!raw) return '';
+  const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const aliases = {
+    'ANEXO 2DA': 'ANEXO 2DA',
+    'ANEXO 2DA.': 'ANEXO 2DA',
+    'ANEXO 2da': 'ANEXO 2DA'
+  };
+  return aliases[raw] || aliases[upper] || raw;
+}
+
+function ensureSelectOption(select, value){
+  const safe = normalizeTeamName(value);
+  if (!select || !safe) return;
+  const exists = Array.from(select.options).some(opt => String(opt.value) === safe);
+  if (!exists){
+    const opt = document.createElement('option');
+    opt.value = safe;
+    opt.textContent = safe;
+    select.appendChild(opt);
+  }
+}
+
 async function loadFixtureJSON(src, meta = null){
   try { delete window.LPI_FIXTURE; } catch(_) { window.LPI_FIXTURE = undefined; }
 
-  if (meta?.kind && meta?.category) {
-    const apiResp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(meta.kind)}&category=${encodeURIComponent(meta.category)}`, {
-      cache: 'no-store'
-    });
-
-    if (apiResp.ok) {
-      const apiData = await apiResp.json().catch(() => null);
-      if (apiData?.ok && apiData?.data && typeof apiData.data === 'object') {
-        window.LPI_FIXTURE = apiData.data;
-        return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}`;
-      }
-    }
+  if (!meta?.kind || !meta?.category) {
+    throw new Error('Falta metadata para cargar fixture desde la API');
   }
 
-  const resp = await fetch(src, { cache: 'no-store' });
-  if (!resp.ok) {
-    throw new Error('No se pudo cargar: ' + src);
+  const apiResp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(meta.kind)}&category=${encodeURIComponent(meta.category)}`, {
+    cache: 'no-store'
+  });
+
+  const apiData = await apiResp.json().catch(() => null);
+  if (!apiResp.ok || !apiData?.ok || !apiData?.data || typeof apiData.data !== 'object') {
+    throw new Error(apiData?.error || 'No se pudo cargar el fixture desde PostgreSQL');
   }
 
-  const data = await resp.json().catch(() => null);
-  if (!data || typeof data !== 'object') {
-    throw new Error('El JSON del fixture es inválido: ' + src);
-  }
-
-  window.LPI_FIXTURE = data;
-  return src;
+  window.LPI_FIXTURE = apiData.data;
+  return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}`;
 }
 
 function markActiveKind(kind){
@@ -291,8 +304,8 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
   for (let k = 0; k < total; k++){
     const iL = 2 * k;
     const iV = 2 * k + 1;
-    const L = list[iL] || { equipo:'WO', puntos:0 };
-    const V = list[iV] || { equipo:'WO', puntos:0 };
+    const L = list[iL] || { equipo:'', puntos:0 };
+    const V = list[iV] || { equipo:'', puntos:0 };
 
     const row = document.createElement('div');
     row.className = 'row';
@@ -325,7 +338,8 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
       o.textContent = n;
       selL.appendChild(o);
     });
-    selL.value = equiposCat.includes(L.equipo) ? L.equipo : 'WO';
+    ensureSelectOption(selL, L.equipo);
+    selL.value = normalizeTeamName(L.equipo) || 'WO';
 
     const vs = document.createElement('div');
     vs.className = 'vs';
@@ -344,7 +358,8 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
       o.textContent = n;
       selV.appendChild(o);
     });
-    selV.value = equiposCat.includes(V.equipo) ? V.equipo : 'WO';
+    ensureSelectOption(selV, V.equipo);
+    selV.value = normalizeTeamName(V.equipo) || 'WO';
 
     const puntV = document.createElement('select');
     puntV.className = 'score-badge';
@@ -453,8 +468,8 @@ function buildFixtureFromUI(){
         const selV  = row.querySelector('select.team-name[data-side="V"]');
         const puntL = row.querySelector('select.score-badge[data-side="L"]');
         const puntV = row.querySelector('select.score-badge[data-side="V"]');
-        equipos.push({ equipo: selL ? selL.value : 'WO', puntos: puntL ? Number(puntL.value || 0) : 0 });
-        equipos.push({ equipo: selV ? selV.value : 'WO', puntos: puntV ? Number(puntV.value || 0) : 0 });
+        equipos.push({ equipo: normalizeTeamName(selL ? selL.value : ''), puntos: puntL ? Number(puntL.value || 0) : 0 });
+        equipos.push({ equipo: normalizeTeamName(selV ? selV.value : ''), puntos: puntV ? Number(puntV.value || 0) : 0 });
       });
 
       entry.tablas.push({ grupo, equipos });

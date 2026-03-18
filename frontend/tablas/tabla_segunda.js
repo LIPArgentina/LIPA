@@ -27,7 +27,15 @@ const cache = { ida: null, vuelta: null };
 let selectedKind = 'ida';
 
 function normalizeName(s){
-  return (s || '').toString().trim().replace(/\s+/g, ' ');
+  const raw = (s || '').toString().trim().replace(/\s+/g, ' ');
+  if (!raw) return '';
+  const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const aliases = {
+    'ANEXO 2DA': 'ANEXO 2DA',
+    'ANEXO 2DA.': 'ANEXO 2DA',
+    'ANEXO 2da': 'ANEXO 2DA'
+  };
+  return aliases[raw] || aliases[upper] || upper;
 }
 
 function formatDateDMY(val){
@@ -55,31 +63,15 @@ const API_BASE = 'https://liga-backend-tt82.onrender.com/api';
 
 async function fetchFixture(kind){
   const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=segunda`;
+  const apiRes = await fetch(apiUrl, { cache: 'no-store' });
+  const apiData = await apiRes.json().catch(() => null);
 
-  try {
-    const apiRes = await fetch(apiUrl, { cache: 'no-store' });
-
-    if (apiRes.ok) {
-      const apiData = await apiRes.json().catch(() => null);
-
-      if (apiData?.ok && apiData?.data) {
-        console.log('✔ API SEGUNDA');
-        cache[kind] = apiData.data;
-        return apiData.data;
-      }
-    }
-  } catch (err) {
-    console.warn('fallback JSON', err);
+  if (!apiRes.ok || !apiData?.ok || !apiData?.data) {
+    throw new Error(apiData?.error || `No se pudo cargar fixture ${kind} desde PostgreSQL`);
   }
 
-  const file = kind === 'vuelta'
-    ? '../fixture/fixture.vuelta.segunda.json'
-    : '../fixture/fixture.ida.segunda.json';
-
-  const res = await fetch(file, { cache: 'no-store' });
-  const data = await res.json();
-  cache[kind] = data;
-  return data;
+  cache[kind] = apiData.data;
+  return apiData.data;
 }
 
 function ensureFechaBlock(section, fechaIndex, fechaText){
@@ -171,8 +163,8 @@ function calcRows(feeds){
 
         equipos.forEach(it => {
           const key = normalizeName(it.equipo);
-          if (!key || key.toUpperCase() === 'WO') return;
-          if (!puntos[g][key]) puntos[g][key] = { equipo: it.equipo, pts: 0 };
+          if (!key || key === 'WO') return;
+          if (!puntos[g][key]) puntos[g][key] = { equipo: key, pts: 0 };
           puntos[g][key].pts += it.puntos;
           if (!teamsSeen[g].has(key)) teamsSeen[g].set(key, it.equipo);
         });
@@ -185,7 +177,7 @@ function calcRows(feeds){
           const aK = normalizeName(A.equipo);
           const bK = normalizeName(B.equipo);
           if (!aK || !bK) continue;
-          if (aK.toUpperCase() === 'WO' || bK.toUpperCase() === 'WO') continue;
+          if (aK === 'WO' || bK === 'WO') continue;
           if (A.puntos === 0 && B.puntos === 0) continue;
 
           ju[g][aK] = (ju[g][aK] || 0) + 1;
