@@ -31,9 +31,12 @@ function normalizeName(s){
   if (!raw) return '';
   const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   const aliases = {
+    'ANEXO': 'ANEXO 2DA',
     'ANEXO 2DA': 'ANEXO 2DA',
     'ANEXO 2DA.': 'ANEXO 2DA',
-    'ANEXO 2da': 'ANEXO 2DA'
+    'ANEXO 2da': 'ANEXO 2DA',
+    'ANEXO 2DA ': 'ANEXO 2DA',
+    'ANEXO 2DA. ': 'ANEXO 2DA'
   };
   return aliases[raw] || aliases[upper] || upper;
 }
@@ -229,10 +232,10 @@ function fillBoard(group, data){
   (data || []).forEach((d, idx) => holder.appendChild(buildStandingRow(d, idx)));
 }
 
-function renderStandings(){
-  const feeds = [cache.ida, cache.vuelta].filter(Boolean);
-  if (!feeds.length) return;
-  const result = calcRows(feeds);
+function renderStandings(kind = selectedKind){
+  const feed = cache[kind];
+  if (!feed) return;
+  const result = calcRows([feed]);
   GROUPS.forEach(g => fillBoard(g, result[g] || []));
   equalizeTableWidths();
 }
@@ -248,6 +251,7 @@ async function switchFixture(kind){
   try { localStorage.setItem('fixture_kind_segunda', kind); } catch(_) {}
   if (!cache[kind]) await fetchFixture(kind);
   renderSelectedFixture();
+  renderStandings(kind);
   setActive(kind);
 }
 
@@ -265,7 +269,7 @@ async function init(){
 
   try {
     await Promise.all([fetchFixture('ida'), fetchFixture('vuelta')]);
-    renderStandings();
+    renderStandings(selectedKind);
     renderSelectedFixture();
     setActive(selectedKind);
   } catch (err) {
