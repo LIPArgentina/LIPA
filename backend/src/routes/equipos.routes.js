@@ -1,4 +1,3 @@
-// equipos.routes.js (FIX FINAL)
 const express = require('express');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -27,39 +26,47 @@ module.exports = function createEquiposRouter(deps) {
       .replace(/[^a-z0-9]/g, '');
   }
 
+  function normalizeDivision(value = '') {
+    return String(value || '').trim().toLowerCase();
+  }
+
   router.post('/save-teams', async (req, res) => {
     const client = await pool.connect();
 
     try {
       const { division, teams } = req.body || {};
-      if (!division || !Array.isArray(teams)) {
-        return res.status(400).json({ ok: false });
+      const normalizedDivision = normalizeDivision(division);
+
+      if (!normalizedDivision || !Array.isArray(teams)) {
+        return res.status(400).json({ ok: false, error: 'division o teams inválidos' });
       }
 
       const processed = teams.map(t => {
         const username = String(t.username || '').trim();
         if (!username) return null;
 
-        const slugBase = buildSlug(username);
-        const slugUid = `${slugBase}_${division}`;
+        const explicitSlug = String(t.slug || '').trim().toLowerCase();
+        const slugBase = buildSlug(explicitSlug || username);
+        const slugUid = explicitSlug || `${slugBase}_${normalizedDivision}`;
 
         return {
           slug_uid: slugUid,
           slug_base: slugBase,
-          division,
+          division: normalizedDivision,
           display_name: username,
           username,
-          role: 'team',
-          captain: t.captain || '',
-          phone: t.phone || '',
-          email: t.email || ''
+          role: String(t.role || 'team').trim() || 'team',
+          captain: String(t.captain || '').trim(),
+          phone: String(t.phone || '').trim(),
+          email: String(t.email || '').trim()
         };
       }).filter(Boolean);
 
       await client.query('BEGIN');
-      await client.query(`DELETE FROM equipos WHERE division = $1`, [division]);
 
       for (const t of processed) {
+        await ensureTeam(t.slug_uid);
+
         await client.query(
           `INSERT INTO equipos
            (slug_uid, slug_base, division, display_name, username, role, captain, phone, email)
@@ -88,8 +95,13 @@ module.exports = function createEquiposRouter(deps) {
         );
       }
 
+      // IMPORTANTE:
+      // No borramos equipos existentes de la división, para no cambiar sus IDs y
+      // romper relaciones con jugadores/planillas. La limpieza de equipos viejos
+      // conviene hacerla con una migración controlada.
+
       await client.query('COMMIT');
-      res.json({ ok: true });
+      res.json({ ok: true, saved: processed.length, preservedIds: true });
 
     } catch (err) {
       await client.query('ROLLBACK');
@@ -102,7 +114,7 @@ module.exports = function createEquiposRouter(deps) {
 
   router.get('/teams', async (req, res) => {
     try {
-      const { division } = req.query;
+      const division = normalizeDivision(req.query.division);
 
       const result = await pool.query(
         `SELECT slug_uid, username, role, captain, email, phone
