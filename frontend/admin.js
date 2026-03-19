@@ -63,38 +63,66 @@ function renderRows(users){
   if (!tbody) return;
   tbody.innerHTML = '';
   const teams = (users||[]).filter(u => u && u.role === 'team');
-  const by = {
-    cap:  new Map(teams.map(u => [u.username, u.captain || ''])),
-    mail: new Map(teams.map(u => [u.username, u.email   || ''])),
-    tel:  new Map(teams.map(u => [u.username, u.phone   || ''])),
-  };
-  const names = teams.map(u => u.username);
 
   for(let i=0;i<SLOTS;i++){
-    const name  = names[i] || '';
+    const team = teams[i] || null;
+    const name = team?.username || '';
+    const slug = team?.slug || (name ? slugify(name) : '');
+    const captain = team?.captain || '';
+    const email = team?.email || '';
+    const phone = normalizePhone(team?.phone || '');
+
     const tr = document.createElement('tr');
+    if (slug) tr.dataset.slug = slug;
+    if (name) tr.dataset.originalUsername = name;
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
-      <td><input class="input captain" type="text" value="${(by.cap.get(name)||'').replace(/"/g,'&quot;')}" aria-label="Capitán fila ${i+1}"></td>
-      <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
-      <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
+      <td><input class="input captain" type="text" value="${captain.replace(/"/g,'&quot;')}" aria-label="Capitán fila ${i+1}"></td>
+      <td><input class="input email" type="email" value="${email.replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
+      <td><input class="input phone" type="tel" value="${phone.replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
       <td><button class="btn-del-team" type="button">Eliminar</button></td>`;
     const del = tr.querySelector('.btn-del-team');
     del?.addEventListener('click', () => tr.remove());
     tbody.appendChild(tr);
   }
 }
+function buildUniqueTeamSlug(baseSlug, used){
+  const base = slugify(baseSlug) || 'equipo';
+  let candidate = base;
+  let n = 2;
+  while(used.has(candidate)){
+    candidate = `${base}${n++}`;
+  }
+  used.add(candidate);
+  return candidate;
+}
 function collectRows(){
   const rows = [];
+  const usedSlugs = new Set();
+
   $$('#tbodyTeams tr').forEach(tr => {
     const name    = tr.querySelector('.team')?.value.trim()     || '';
     const captain = tr.querySelector('.captain')?.value.trim()  || '';
     const email   = tr.querySelector('.email')?.value.trim()    || '';
     const phone   = tr.querySelector('.phone')?.value.trim()    || '';
     if(!name) return;
-    rows.push({ username:name, role:'team', captain, email, phone });
+
+    const existingSlug = slugify(tr.dataset.slug || '');
+    const slug = existingSlug ? buildUniqueTeamSlug(existingSlug, usedSlugs) : buildUniqueTeamSlug(name, usedSlugs);
+    tr.dataset.slug = slug;
+
+    rows.push({
+      username: name,
+      slug,
+      role: 'team',
+      captain,
+      email,
+      phone,
+      originalUsername: tr.dataset.originalUsername || undefined
+    });
   });
+
   return rows;
 }
 async function saveTeams(){
@@ -311,7 +339,7 @@ async function loadDivision(div, preferredSlug = null, keepSelection = false){
 
     teamsInDiv = teams.map(t => ({
       name: t.username,
-      slug: String(t.slug || slugify(t.username || '')).trim().toLowerCase()
+      slug: slugify(t.slug || t.username)
     }));
 
     const currentSlug = keepSelection ? (preferredSlug || getSelectedTeamSlug()) : preferredSlug;
