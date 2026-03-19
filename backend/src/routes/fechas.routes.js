@@ -87,6 +87,50 @@ module.exports = function createFechasRouter(deps) {
     return ['primera', 'segunda', 'tercera'].includes(String(category || '').trim().toLowerCase());
   }
 
+  function canonicalTeamName(value) {
+    const raw = String(value || '').trim().replace(/\s+/g, ' ');
+    if (!raw) return '';
+
+    const upper = raw
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toUpperCase();
+
+    const aliases = {
+      'ANEXO 2DA': 'ANEXO 2DA',
+      'ANEXO 2DA.': 'ANEXO 2DA',
+      'ANEXO 2DA ': 'ANEXO 2DA',
+      'ANEXO 2DA 2DA': 'ANEXO 2DA',
+      'ANEXO 2da': 'ANEXO 2DA',
+      'SEGUNDA DEL TREBOL': 'SEGUNDA DEL TREBOL'
+    };
+
+    return aliases[raw] || aliases[upper] || upper;
+  }
+
+  function normalizeFixtureData(data) {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.fechas)) return data;
+
+    return {
+      ...data,
+      fechas: data.fechas.map((fecha) => ({
+        ...fecha,
+        tablas: Array.isArray(fecha?.tablas)
+          ? fecha.tablas.map((tabla) => ({
+              ...tabla,
+              grupo: String(tabla?.grupo || '').trim().toUpperCase(),
+              equipos: Array.isArray(tabla?.equipos)
+                ? tabla.equipos.map((equipo) => ({
+                    ...equipo,
+                    equipo: canonicalTeamName(equipo?.equipo),
+                    puntos: parseInt(equipo?.puntos ?? 0, 10) || 0
+                  }))
+                : []
+            }))
+          : []
+      }))
+    };
+  }
 
   // ====== API: Validación (fecha/*.validacion.js) ======
   router.post('/validar', async (req, res) => {
@@ -174,36 +218,23 @@ module.exports = function createFechasRouter(deps) {
         return res.status(400).json({ ok: false, error: 'category inválida' });
       }
 
-      try {
-        const dbResult = await pool.query(
-          `
-            SELECT data
-            FROM fixtures
-            WHERE kind = $1 AND category = $2
-            LIMIT 1
-          `,
-          [kind, category]
-        );
+      const dbResult = await pool.query(
+        `
+          SELECT data
+          FROM fixtures
+          WHERE kind = $1 AND category = $2
+          LIMIT 1
+        `,
+        [kind, category]
+      );
 
-        if (dbResult.rowCount > 0) {
-          res.set('Cache-Control', 'no-store');
-          return res.json({ ok: true, source: 'db', data: dbResult.rows[0].data });
-        }
-      } catch (dbErr) {
-        console.error('GET /fixture db fallback', dbErr);
+      if (!dbResult.rowCount) {
+        return res.status(404).json({ ok: false, error: 'fixture_no_encontrado_en_db' });
       }
 
-      const relPath = path.join('fixture', `fixture.${kind}.${category}.json`);
-      const absPath = path.join(FRONTEND_DIR, relPath);
-
-      if (fs.existsSync(absPath)) {
-        const raw = await fs.promises.readFile(absPath, 'utf8');
-        const parsed = JSON.parse(raw);
-        res.set('Cache-Control', 'no-store');
-        return res.json({ ok: true, source: 'file', data: parsed });
-      }
-
-      return res.status(404).json({ ok: false, error: 'fixture_no_encontrado' });
+      const normalizedData = normalizeFixtureData(dbResult.rows[0].data);
+      res.set('Cache-Control', 'no-store');
+      return res.json({ ok: true, source: 'db', data: normalizedData });
     } catch (err) {
       console.error('Error al leer fixture', err);
       return res.status(500).json({ ok: false, error: 'Error interno' });
@@ -214,7 +245,7 @@ module.exports = function createFechasRouter(deps) {
     try {
       const kind = String(req.body?.kind || '').trim().toLowerCase();
       const category = String(req.body?.category || '').trim().toLowerCase();
-      const data = req.body?.data;
+      const data = normalizeFixtureData(req.body?.data);
 
       if (!isValidFixtureKind(kind)) {
         return res.status(400).json({ ok: false, error: 'kind inválido' });
@@ -356,10 +387,18 @@ module.exports = function createFechasRouter(deps) {
   // ====== API: Obtener PLANILLA del equipo autenticado (PostgreSQL) ======
   router.get('/team/planilla', requireTeam, async (req, res) => {
     try {
-      const authSlug = String((req.user && req.user.slug) || '').trim().toLowerCase();
-      if (!authSlug) return res.status(401).json({ ok:false, error:'no autenticade' });
 
-      const equipo = await resolveEquipoBySlug(authSlug);
+    let requested = String(req.query.team || '').trim().toLowerCase();
+
+if (!requested || requested.startsWith('__categoria_')) {
+  requested = String((req.user && req.user.slug) || '').trim().toLowerCase();
+}
+
+if (!requested) {
+  return res.status(401).json({ ok:false, error:'no autenticade' });
+}
+
+const equipo = await resolveEquipoBySlug(requested);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
       }
@@ -393,12 +432,14 @@ module.exports = function createFechasRouter(deps) {
   // ====== API: Obtener planilla de cualquier equipo (para cruces) ======
   router.get('/planilla', async (req, res) => {
     try {
-      const slug = String(req.query.team || '').trim().toLowerCase();
-      if (!slug) {
-        return res.status(400).json({ ok:false, error:'team requerido' });
-      }
 
-      const equipo = await resolveEquipoBySlug(slug);
+    let requested = String(req.query.team || '').trim().toLowerCase();
+
+if (!requested || requested.startsWith('__categoria_')) {
+  return res.status(400).json({ ok:false, error:'team inválido' });
+}
+
+const equipo = await resolveEquipoBySlug(requested);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado' });
       }
