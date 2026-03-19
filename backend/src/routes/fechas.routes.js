@@ -87,50 +87,6 @@ module.exports = function createFechasRouter(deps) {
     return ['primera', 'segunda', 'tercera'].includes(String(category || '').trim().toLowerCase());
   }
 
-  function canonicalTeamName(value) {
-    const raw = String(value || '').trim().replace(/\s+/g, ' ');
-    if (!raw) return '';
-
-    const upper = raw
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .toUpperCase();
-
-    const aliases = {
-      'ANEXO 2DA': 'ANEXO 2DA',
-      'ANEXO 2DA.': 'ANEXO 2DA',
-      'ANEXO 2DA ': 'ANEXO 2DA',
-      'ANEXO 2DA 2DA': 'ANEXO 2DA',
-      'ANEXO 2da': 'ANEXO 2DA',
-      'SEGUNDA DEL TREBOL': 'SEGUNDA DEL TREBOL'
-    };
-
-    return aliases[raw] || aliases[upper] || upper;
-  }
-
-  function normalizeFixtureData(data) {
-    if (!data || typeof data !== 'object' || !Array.isArray(data.fechas)) return data;
-
-    return {
-      ...data,
-      fechas: data.fechas.map((fecha) => ({
-        ...fecha,
-        tablas: Array.isArray(fecha?.tablas)
-          ? fecha.tablas.map((tabla) => ({
-              ...tabla,
-              grupo: String(tabla?.grupo || '').trim().toUpperCase(),
-              equipos: Array.isArray(tabla?.equipos)
-                ? tabla.equipos.map((equipo) => ({
-                    ...equipo,
-                    equipo: canonicalTeamName(equipo?.equipo),
-                    puntos: parseInt(equipo?.puntos ?? 0, 10) || 0
-                  }))
-                : []
-            }))
-          : []
-      }))
-    };
-  }
 
   // ====== API: Validación (fecha/*.validacion.js) ======
   router.post('/validar', async (req, res) => {
@@ -218,23 +174,36 @@ module.exports = function createFechasRouter(deps) {
         return res.status(400).json({ ok: false, error: 'category inválida' });
       }
 
-      const dbResult = await pool.query(
-        `
-          SELECT data
-          FROM fixtures
-          WHERE kind = $1 AND category = $2
-          LIMIT 1
-        `,
-        [kind, category]
-      );
+      try {
+        const dbResult = await pool.query(
+          `
+            SELECT data
+            FROM fixtures
+            WHERE kind = $1 AND category = $2
+            LIMIT 1
+          `,
+          [kind, category]
+        );
 
-      if (!dbResult.rowCount) {
-        return res.status(404).json({ ok: false, error: 'fixture_no_encontrado_en_db' });
+        if (dbResult.rowCount > 0) {
+          res.set('Cache-Control', 'no-store');
+          return res.json({ ok: true, source: 'db', data: dbResult.rows[0].data });
+        }
+      } catch (dbErr) {
+        console.error('GET /fixture db fallback', dbErr);
       }
 
-      const normalizedData = normalizeFixtureData(dbResult.rows[0].data);
-      res.set('Cache-Control', 'no-store');
-      return res.json({ ok: true, source: 'db', data: normalizedData });
+      const relPath = path.join('fixture', `fixture.${kind}.${category}.json`);
+      const absPath = path.join(FRONTEND_DIR, relPath);
+
+      if (fs.existsSync(absPath)) {
+        const raw = await fs.promises.readFile(absPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        res.set('Cache-Control', 'no-store');
+        return res.json({ ok: true, source: 'file', data: parsed });
+      }
+
+      return res.status(404).json({ ok: false, error: 'fixture_no_encontrado' });
     } catch (err) {
       console.error('Error al leer fixture', err);
       return res.status(500).json({ ok: false, error: 'Error interno' });
@@ -245,7 +214,7 @@ module.exports = function createFechasRouter(deps) {
     try {
       const kind = String(req.body?.kind || '').trim().toLowerCase();
       const category = String(req.body?.category || '').trim().toLowerCase();
-      const data = normalizeFixtureData(req.body?.data);
+      const data = req.body?.data;
 
       if (!isValidFixtureKind(kind)) {
         return res.status(400).json({ ok: false, error: 'kind inválido' });
@@ -289,7 +258,7 @@ module.exports = function createFechasRouter(deps) {
       const { path: relPath, content, team } = req.body || {};
       const authSlug = String((req.user && req.user.slug) || '').trim().toLowerCase();
 
-      let requested = String(
+      const targetSlug = String(
         (typeof team === 'string' && team) ||
         (typeof relPath === 'string'
           ? relPath.replace(/^fecha\//,'').replace(/\.planilla\.(js|json)$/,'')
@@ -297,12 +266,9 @@ module.exports = function createFechasRouter(deps) {
         authSlug
       ).trim().toLowerCase();
 
-      if (!requested || requested.startsWith('__categoria_')) {
-        requested = authSlug;
-      }
-
-      if (!requested) {
-        return res.status(401).json({ ok:false, error:'no autenticade' });
+      if (!authSlug) return res.status(401).json({ ok:false, error:'no autenticade' });
+      if (!targetSlug || targetSlug !== authSlug) {
+        return res.status(403).json({ ok:false, error:'No podés guardar la planilla de otro equipo' });
       }
 
       let plan = null;
@@ -318,10 +284,10 @@ module.exports = function createFechasRouter(deps) {
         return res.status(400).json({ ok:false, error:'Faltan campos (planilla/plan) o el content es inválido' });
       }
 
-      const finalPlan = normalizePlanillaPayload(plan, requested);
-      finalPlan.team = requested;
+      const finalPlan = normalizePlanillaPayload(plan, authSlug);
+      finalPlan.team = authSlug;
 
-      const equipo = await resolveEquipoBySlug(requested);
+      const equipo = await resolveEquipoBySlug(authSlug);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
       }
@@ -352,7 +318,7 @@ module.exports = function createFechasRouter(deps) {
           [
             existingPlanilla.rows[0].id,
             JSON.stringify(finalPlan),
-            `${requested}.planilla.json`
+            `${authSlug}.planilla.json`
           ]
         );
       } else {
@@ -361,13 +327,13 @@ module.exports = function createFechasRouter(deps) {
             INSERT INTO planillas (equipo_id, fecha_clave, estado, datos, source_file)
             VALUES ($1, CURRENT_DATE, 'guardada', $2::jsonb, $3)
           `,
-          [equipo.id, JSON.stringify(finalPlan), `${requested}.planilla.json`]
+          [equipo.id, JSON.stringify(finalPlan), `${authSlug}.planilla.json`]
         );
       }
 
       try {
         const legacyDir = path.join(__dirname, '..', 'data', 'planillas');
-        const legacyPath = path.join(legacyDir, `${requested}.planilla.json`);
+        const legacyPath = path.join(legacyDir, `${authSlug}.planilla.json`);
         const legacyBakPath = legacyPath + '.bak';
         const legacyTmpPath = legacyPath + '.tmp';
         for (const p of [legacyPath, legacyBakPath, legacyTmpPath]) {
@@ -378,7 +344,7 @@ module.exports = function createFechasRouter(deps) {
       return res.json({
         ok: true,
         message: 'Planilla guardada en PostgreSQL',
-        team: requested,
+        team: authSlug,
         source: 'db'
       });
     } catch (err) {
@@ -390,18 +356,10 @@ module.exports = function createFechasRouter(deps) {
   // ====== API: Obtener PLANILLA del equipo autenticado (PostgreSQL) ======
   router.get('/team/planilla', requireTeam, async (req, res) => {
     try {
+      const authSlug = String((req.user && req.user.slug) || '').trim().toLowerCase();
+      if (!authSlug) return res.status(401).json({ ok:false, error:'no autenticade' });
 
-    let requested = String(req.query.team || '').trim().toLowerCase();
-
-if (!requested || requested.startsWith('__categoria_')) {
-  requested = String((req.user && req.user.slug) || '').trim().toLowerCase();
-}
-
-if (!requested) {
-  return res.status(401).json({ ok:false, error:'no autenticade' });
-}
-
-const equipo = await resolveEquipoBySlug(requested);
+      const equipo = await resolveEquipoBySlug(authSlug);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
       }
@@ -435,14 +393,12 @@ const equipo = await resolveEquipoBySlug(requested);
   // ====== API: Obtener planilla de cualquier equipo (para cruces) ======
   router.get('/planilla', async (req, res) => {
     try {
+      const slug = String(req.query.team || '').trim().toLowerCase();
+      if (!slug) {
+        return res.status(400).json({ ok:false, error:'team requerido' });
+      }
 
-    let requested = String(req.query.team || '').trim().toLowerCase();
-
-if (!requested || requested.startsWith('__categoria_')) {
-  return res.status(400).json({ ok:false, error:'team inválido' });
-}
-
-const equipo = await resolveEquipoBySlug(requested);
+      const equipo = await resolveEquipoBySlug(slug);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado' });
       }
