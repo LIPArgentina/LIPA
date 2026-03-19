@@ -311,7 +311,7 @@ async function loadDivision(div, preferredSlug = null, keepSelection = false){
 
     teamsInDiv = teams.map(t => ({
       name: t.username,
-      slug: t.slug || slugify(t.username)
+      slug: String(t.slug || slugify(t.username || '')).trim().toLowerCase()
     }));
 
     const currentSlug = keepSelection ? (preferredSlug || getSelectedTeamSlug()) : preferredSlug;
