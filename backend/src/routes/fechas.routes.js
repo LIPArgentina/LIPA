@@ -289,7 +289,7 @@ module.exports = function createFechasRouter(deps) {
       const { path: relPath, content, team } = req.body || {};
       const authSlug = String((req.user && req.user.slug) || '').trim().toLowerCase();
 
-      const targetSlug = String(
+      let requested = String(
         (typeof team === 'string' && team) ||
         (typeof relPath === 'string'
           ? relPath.replace(/^fecha\//,'').replace(/\.planilla\.(js|json)$/,'')
@@ -297,9 +297,12 @@ module.exports = function createFechasRouter(deps) {
         authSlug
       ).trim().toLowerCase();
 
-      if (!authSlug) return res.status(401).json({ ok:false, error:'no autenticade' });
-      if (!targetSlug || targetSlug !== authSlug) {
-        return res.status(403).json({ ok:false, error:'No podés guardar la planilla de otro equipo' });
+      if (!requested || requested.startsWith('__categoria_')) {
+        requested = authSlug;
+      }
+
+      if (!requested) {
+        return res.status(401).json({ ok:false, error:'no autenticade' });
       }
 
       let plan = null;
@@ -315,10 +318,10 @@ module.exports = function createFechasRouter(deps) {
         return res.status(400).json({ ok:false, error:'Faltan campos (planilla/plan) o el content es inválido' });
       }
 
-      const finalPlan = normalizePlanillaPayload(plan, authSlug);
-      finalPlan.team = authSlug;
+      const finalPlan = normalizePlanillaPayload(plan, requested);
+      finalPlan.team = requested;
 
-      const equipo = await resolveEquipoBySlug(authSlug);
+      const equipo = await resolveEquipoBySlug(requested);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
       }
@@ -349,7 +352,7 @@ module.exports = function createFechasRouter(deps) {
           [
             existingPlanilla.rows[0].id,
             JSON.stringify(finalPlan),
-            `${authSlug}.planilla.json`
+            `${requested}.planilla.json`
           ]
         );
       } else {
@@ -358,13 +361,13 @@ module.exports = function createFechasRouter(deps) {
             INSERT INTO planillas (equipo_id, fecha_clave, estado, datos, source_file)
             VALUES ($1, CURRENT_DATE, 'guardada', $2::jsonb, $3)
           `,
-          [equipo.id, JSON.stringify(finalPlan), `${authSlug}.planilla.json`]
+          [equipo.id, JSON.stringify(finalPlan), `${requested}.planilla.json`]
         );
       }
 
       try {
         const legacyDir = path.join(__dirname, '..', 'data', 'planillas');
-        const legacyPath = path.join(legacyDir, `${authSlug}.planilla.json`);
+        const legacyPath = path.join(legacyDir, `${requested}.planilla.json`);
         const legacyBakPath = legacyPath + '.bak';
         const legacyTmpPath = legacyPath + '.tmp';
         for (const p of [legacyPath, legacyBakPath, legacyTmpPath]) {
@@ -375,7 +378,7 @@ module.exports = function createFechasRouter(deps) {
       return res.json({
         ok: true,
         message: 'Planilla guardada en PostgreSQL',
-        team: authSlug,
+        team: requested,
         source: 'db'
       });
     } catch (err) {
@@ -387,10 +390,18 @@ module.exports = function createFechasRouter(deps) {
   // ====== API: Obtener PLANILLA del equipo autenticado (PostgreSQL) ======
   router.get('/team/planilla', requireTeam, async (req, res) => {
     try {
-      const authSlug = String((req.user && req.user.slug) || '').trim().toLowerCase();
-      if (!authSlug) return res.status(401).json({ ok:false, error:'no autenticade' });
 
-      const equipo = await resolveEquipoBySlug(authSlug);
+    let requested = String(req.query.team || '').trim().toLowerCase();
+
+if (!requested || requested.startsWith('__categoria_')) {
+  requested = String((req.user && req.user.slug) || '').trim().toLowerCase();
+}
+
+if (!requested) {
+  return res.status(401).json({ ok:false, error:'no autenticade' });
+}
+
+const equipo = await resolveEquipoBySlug(requested);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
       }
@@ -424,12 +435,14 @@ module.exports = function createFechasRouter(deps) {
   // ====== API: Obtener planilla de cualquier equipo (para cruces) ======
   router.get('/planilla', async (req, res) => {
     try {
-      const slug = String(req.query.team || '').trim().toLowerCase();
-      if (!slug) {
-        return res.status(400).json({ ok:false, error:'team requerido' });
-      }
 
-      const equipo = await resolveEquipoBySlug(slug);
+    let requested = String(req.query.team || '').trim().toLowerCase();
+
+if (!requested || requested.startsWith('__categoria_')) {
+  return res.status(400).json({ ok:false, error:'team inválido' });
+}
+
+const equipo = await resolveEquipoBySlug(requested);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado' });
       }
