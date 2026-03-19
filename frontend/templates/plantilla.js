@@ -1358,67 +1358,12 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   async function readCrucesCategoryFromUsers(teamSlug){
-    function normalizeTeamName(value){
-      return String(value || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toUpperCase();
-    }
-    async function fetchTeamNames(paths){
-      for (const path of paths){
-        try{
-          const r = await fetch(path, { cache:'no-store' });
-          if(!r.ok) continue;
-          const contentType = (r.headers.get('content-type') || '').toLowerCase();
+    const fromSession = readCrucesCategoryFromSession();
+    if (fromSession) return fromSession;
 
-          if(contentType.includes('application/json') || path.endsWith('.json')){
-            const data = await r.json();
-            const list = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
-            const names = [];
-            list.forEach(item => {
-              if (!item || typeof item !== 'object') return;
-              ['username','equipo','nombre','team'].forEach(k=>{
-                if (typeof item[k] === 'string') names.push(normalizeTeamName(item[k]));
-              });
-            });
-            const uniq = [...new Set(names.filter(Boolean))];
-            if (uniq.length) return uniq;
-          } else {
-            const text = await r.text();
-            const names = [];
-            const regex = /(?:username|equipo|nombre|team)\s*:\s*['"]([^'"]+)['"]/gi;
-            let m;
-            while((m = regex.exec(text))){
-              names.push(normalizeTeamName(m[1]));
-            }
-            const uniq = [...new Set(names.filter(Boolean))];
-            if (uniq.length) return uniq;
-          }
-        } catch(_) {}
-      }
-      return [];
-    }
-
-    const normalizedSlug = normalizeTeamName(String(teamSlug || '').replace(/-/g, ' '));
-
-    const tercera = await fetchTeamNames([
-      '../data/usuarios.tercera.json',
-      '/data/usuarios.tercera.json',
-      '../data/usuarios.tercera.js',
-      '/data/usuarios.tercera.js'
-    ]);
-    if (tercera.some(name => name.includes(normalizedSlug) || normalizedSlug.includes(name))) return 'tercera';
-
-    const segunda = await fetchTeamNames([
-      '../data/usuarios.segunda.json',
-      '/data/usuarios.segunda.json',
-      '../data/usuarios.segunda.js',
-      '/data/usuarios.segunda.js'
-    ]);
-    if (segunda.some(name => name.includes(normalizedSlug) || normalizedSlug.includes(name))) return 'segunda';
+    const key = String(teamSlug || '').trim().toLowerCase();
+    if (key.endsWith('tercera')) return 'tercera';
+    if (key.endsWith('segunda')) return 'segunda';
 
     return null;
   }
@@ -1504,17 +1449,30 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   async function tryAutoload(){
     try {
-      const r = await fetch(LPI_apiUrl('/api/team/planilla'), {
-        credentials: 'include',
-        method: 'GET',
-        cache: 'no-store',
-        headers: LPI_getAuthHeaders()
-      });
-      if (!r.ok) return;
-      const j = await r.json().catch(() => ({}));
-      const p = j && j.planilla;
-      if (p && shouldLoad(p.createdAt)) {
-        applyPlanilla(p);
+      const team = (typeof deriveTeamKey === 'function')
+        ? deriveTeamKey()
+        : ((typeof deriveTeam === 'function') ? deriveTeam() : '');
+
+      const candidates = [];
+      if (team) {
+        candidates.push(LPI_apiUrl('/api/team/planilla?team=' + encodeURIComponent(team)));
+      }
+      candidates.push(LPI_apiUrl('/api/team/planilla'));
+
+      for (const url of candidates) {
+        const r = await fetch(url, {
+          credentials: 'include',
+          method: 'GET',
+          cache: 'no-store',
+          headers: LPI_getAuthHeaders()
+        });
+        if (!r.ok) continue;
+        const j = await r.json().catch(() => ({}));
+        const p = j && j.planilla;
+        if (p && shouldLoad(p.createdAt)) {
+          applyPlanilla(p);
+          return;
+        }
       }
     } catch(_) { }
   }
@@ -1619,63 +1577,13 @@ document.addEventListener('DOMContentLoaded', function(){
     return '';
   }
 
-  async function fetchTeamNames(paths){
-    for (const path of paths){
-      try{
-        const r = await fetch(path, { cache:'no-store' });
-        if(!r.ok) continue;
-        const contentType = (r.headers.get('content-type') || '').toLowerCase();
-
-        if(contentType.includes('application/json') || path.endsWith('.json')){
-          const data = await r.json();
-          const names = [];
-          const list = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
-          list.forEach(item => {
-            if (!item || typeof item !== 'object') return;
-            if (typeof item.username === 'string') names.push(normalizeTeamName(item.username));
-            if (typeof item.equipo === 'string') names.push(normalizeTeamName(item.equipo));
-            if (typeof item.nombre === 'string') names.push(normalizeTeamName(item.nombre));
-            if (typeof item.team === 'string') names.push(normalizeTeamName(item.team));
-          });
-          const uniq = [...new Set(names.filter(Boolean))];
-          if(uniq.length) return uniq;
-        } else {
-          const text = await r.text();
-          const names = [];
-          const regex = /(?:username|equipo|nombre|team)\s*:\s*['"]([^'"]+)['"]/gi;
-          let m;
-          while((m = regex.exec(text))){
-            names.push(normalizeTeamName(m[1]));
-          }
-          const uniq = [...new Set(names.filter(Boolean))];
-          if(uniq.length) return uniq;
-        }
-      } catch(_) {}
-    }
-    return [];
-  }
-
   async function resolveCategoryByTeam(teamSlug){
     const fromSession = resolveCategoryFromSession();
     if (fromSession) return fromSession;
 
-    const normalizedSlug = normalizeTeamName(String(teamSlug || '').replace(/-/g, ' '));
-
-    const tercera = await fetchTeamNames([
-      '../data/usuarios.tercera.json',
-      '/data/usuarios.tercera.json',
-      '../data/usuarios.tercera.js',
-      '/data/usuarios.tercera.js'
-    ]);
-    if (tercera.includes(normalizedSlug)) return 'tercera';
-
-    const segunda = await fetchTeamNames([
-      '../data/usuarios.segunda.json',
-      '/data/usuarios.segunda.json',
-      '../data/usuarios.segunda.js',
-      '/data/usuarios.segunda.js'
-    ]);
-    if (segunda.includes(normalizedSlug)) return 'segunda';
+    const key = String(teamSlug || '').trim().toLowerCase();
+    if (key.endsWith('tercera')) return 'tercera';
+    if (key.endsWith('segunda')) return 'segunda';
 
     return null;
   }
