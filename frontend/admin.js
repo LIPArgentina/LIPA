@@ -15,31 +15,7 @@
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 
-/* ====== Header: mantener ?admin=1 en enlaces ====== */
-(function(){
-  try{
-    const params = new URLSearchParams(location.search);
-    const isAdmin = params.get('admin') === '1' || params.get('mode') === 'admin';
-    const withMode = (url) => {
-      if(!isAdmin) return url;
-      const u = new URL(url, location.origin);
-      u.searchParams.set('admin','1');
-      return u.pathname + u.search;
-    };
-    const btnFixture = document.getElementById('btnFixture');
-    const btnFecha   = document.getElementById('btnFecha');
-    if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
-    if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
-  }catch(e){ console.warn('Nav admin patch:', e); }
-})();
-
 /* ====== Config compartida ====== */
-const BASE = 'data/';
-const FILES = {
-  primera:  BASE + 'usuarios.primera.js',
-  segunda:  BASE + 'usuarios.segunda.js',
-  tercera:  BASE + 'usuarios.tercera.js',
-};
 const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
 const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
@@ -75,9 +51,7 @@ function setDraft(div, team, arr){
 }
 function clearDraft(div, team){
   const s = readLS();
-  if (s.drafts) {
-    delete s.drafts[getDraftKey(div, team)];
-  }
+  if (s.drafts) delete s.drafts[getDraftKey(div, team)];
   writeLS(s);
 }
 function setLast(div,team){ const s=readLS(); s.division=div; s.team=team; writeLS(s); }
@@ -86,44 +60,69 @@ function getLast(){ const s=readLS(); return { division: s.division||'primera', 
 /* ====== Tabla izquierda (equipos de liga) ====== */
 function renderRows(users){
   const tbody = $('#tbodyTeams');
+  if (!tbody) return;
   tbody.innerHTML = '';
   const teams = (users||[]).filter(u => u && u.role === 'team');
-  const by = {
-    cap:  new Map(teams.map(u => [u.username, u.captain || ''])),
-    mail: new Map(teams.map(u => [u.username, u.email   || ''])),
-    tel:  new Map(teams.map(u => [u.username, u.phone   || ''])),
-  };
-  const names = teams.map(u => u.username);
 
-  for(let i=0;i<20;i++){
-    const name  = names[i] || '';
+  for(let i=0;i<SLOTS;i++){
+    const team = teams[i] || null;
+    const name = team?.username || '';
+    const slug = team?.slug || (name ? slugify(name) : '');
+    const captain = team?.captain || '';
+    const email = team?.email || '';
+    const phone = normalizePhone(team?.phone || '');
+
     const tr = document.createElement('tr');
+    if (slug) tr.dataset.slug = slug;
+    if (name) tr.dataset.originalUsername = name;
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
-      <td><input class="input captain" type="text" value="${(by.cap.get(name)||'').replace(/"/g,'&quot;')}" aria-label="Capitán fila ${i+1}"></td>
-      <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
-      <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
+      <td><input class="input captain" type="text" value="${captain.replace(/"/g,'&quot;')}" aria-label="Capitán fila ${i+1}"></td>
+      <td><input class="input email" type="email" value="${email.replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
+      <td><input class="input phone" type="tel" value="${phone.replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
       <td><button class="btn-del-team" type="button">Eliminar</button></td>`;
     const del = tr.querySelector('.btn-del-team');
-    del?.addEventListener('click', () => {
-      const teamValue = tr.querySelector('.team')?.value?.trim() || `fila ${i+1}`;
-      if(!confirm(`¿Eliminar el equipo "${teamValue}" de la tabla?`)) return;
-      tr.remove();
-    });
+    del?.addEventListener('click', () => tr.remove());
     tbody.appendChild(tr);
   }
 }
+function buildUniqueTeamSlug(baseSlug, used){
+  const base = slugify(baseSlug) || 'equipo';
+  let candidate = base;
+  let n = 2;
+  while(used.has(candidate)){
+    candidate = `${base}${n++}`;
+  }
+  used.add(candidate);
+  return candidate;
+}
 function collectRows(){
   const rows = [];
+  const usedSlugs = new Set();
+
   $$('#tbodyTeams tr').forEach(tr => {
     const name    = tr.querySelector('.team')?.value.trim()     || '';
     const captain = tr.querySelector('.captain')?.value.trim()  || '';
     const email   = tr.querySelector('.email')?.value.trim()    || '';
     const phone   = tr.querySelector('.phone')?.value.trim()    || '';
     if(!name) return;
-    rows.push({ username:name, role:'team', captain, email, phone });
+
+    const existingSlug = slugify(tr.dataset.slug || '');
+    const slug = existingSlug ? buildUniqueTeamSlug(existingSlug, usedSlugs) : buildUniqueTeamSlug(name, usedSlugs);
+    tr.dataset.slug = slug;
+
+    rows.push({
+      username: name,
+      slug,
+      role: 'team',
+      captain,
+      email,
+      phone,
+      originalUsername: tr.dataset.originalUsername || undefined
+    });
   });
+
   return rows;
 }
 async function saveTeams(){
@@ -137,6 +136,9 @@ async function saveTeams(){
     });
     const json = await resp.json().catch(()=>({}));
     if(!resp.ok || !json.ok){ throw new Error(json.error || ('HTTP '+resp.status)); }
+
+    // refrescar desde DB para que quede sincronizado
+    await loadDivision(_activeDiv, getSelectedTeamSlug(), true);
     toast('Guardado correctamente');
   }catch(e){
     console.warn('save-teams', e);
@@ -146,9 +148,12 @@ async function saveTeams(){
 
 /* ====== Panel derecho (plantel) ====== */
 let teamsInDiv = []; // [{ name, slug }]
+let _activeDiv = 'primera';
 
 function buildPlayersUI(values){
-  const cont = $('#players'); cont.innerHTML = '';
+  const cont = $('#players');
+  if (!cont) return;
+  cont.innerHTML = '';
   const arr = (values || []).slice(0,SLOTS);
   while(arr.length < SLOTS) arr.push('');
 
@@ -182,18 +187,21 @@ function setCurrentValues(arr){
 }
 function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
-function fillTeamSelect(){
-  const sel = $('#teamSelect'); sel.innerHTML = '';
+function fillTeamSelect(selectedSlug){
+  const sel = $('#teamSelect');
+  if (!sel) return;
+  sel.innerHTML = '';
   teamsInDiv.forEach(t => {
     const opt = document.createElement('option');
-    opt.value = t.slug; opt.textContent = t.name;
+    opt.value = t.slug;
+    opt.textContent = t.name;
+    if (selectedSlug && selectedSlug === t.slug) opt.selected = true;
     sel.appendChild(opt);
   });
+  if (!selectedSlug && sel.options.length) sel.selectedIndex = 0;
 }
 function getSelectedTeamSlug(){ return $('#teamSelect')?.value || ''; }
-function refreshDraftButtons(){
-  return;
-}
+function refreshDraftButtons(){ return; }
 function toggleImportBox(force){
   const box = $('#importBox');
   if (!box) return;
@@ -258,247 +266,131 @@ async function discardDraftForCurrentTeam(){
   const teamSlug = getSelectedTeamSlug();
   if (!teamSlug) return;
   clearDraft(_activeDiv, teamSlug);
+  setCurrentValues(Array(SLOTS).fill(''));
   refreshDraftButtons();
-  await changeTeam();
   toast('Borrador descartado');
 }
-
-/* === Cargar jugadores desde API === */
-async function loadPlayersForTeam(slug){
-  try {
-    const r = await fetch(`${API_BASE}/api/team-assets?team=${encodeURIComponent(slug)}`, {
-      cache: 'no-store',
-      credentials: 'include'
-    });
-
-    if (!r.ok) {
-      throw new Error('No se pudo cargar el plantel');
-    }
-
-    const data = await r.json();
-
-    if (Array.isArray(data.players)) {
-      return data.players.slice(0, SLOTS);
-    }
-  } catch (e) {
-    console.warn('loadPlayersForTeam', e);
-  }
-
-  return Array(SLOTS).fill('');
-}
-
-/* === Cambio de equipo (async) === */
-async function changeTeam(){
-  const teamSlug = $('#teamSelect').value;
-  let vals = await loadPlayersForTeam(teamSlug);
-  while (vals.length < SLOTS) vals.push('');
-  buildPlayersUI(vals);
-  refreshDraftButtons();
+function saveDraftNow(){
+  const teamSlug = getSelectedTeamSlug();
+  if (!teamSlug) return;
+  setDraft(_activeDiv, teamSlug, getCurrentValues());
   setLast(_activeDiv, teamSlug);
 }
-function saveDraftNow(){
-  const teamSlug = $('#teamSelect').value;
-  if(!teamSlug) return;
-  setDraft(_activeDiv, teamSlug, getCurrentValues());
+async function loadTeamAssets(teamSlug){
+  if (!teamSlug) {
+    setCurrentValues(Array(SLOTS).fill(''));
+    return;
+  }
+  try{
+    const resp = await fetch(`${API_BASE}/api/team-assets?team=${encodeURIComponent(teamSlug)}`, { credentials:'include' });
+    const json = await resp.json().catch(()=>({}));
+    if(resp.ok && json.ok && Array.isArray(json.players) && json.players.length){
+      const vals = json.players.slice(0,SLOTS);
+      while(vals.length < SLOTS) vals.push('');
+      setCurrentValues(vals);
+      return;
+    }
+  }catch(e){
+    console.warn('loadTeamAssets', e);
+  }
+  const draft = getDraft(_activeDiv, teamSlug);
+  while(draft.length < SLOTS) draft.push('');
+  setCurrentValues(draft);
 }
-async function saveRoster(){
-  const teamSlug = $('#teamSelect').value;
-  const teamName = (teamsInDiv.find(t=>t.slug===teamSlug)?.name) || teamSlug;
-  const players  = getCurrentValues().slice(0,SLOTS);
+async function saveTeamAssets(){
+  const teamSlug = getSelectedTeamSlug();
+  if (!teamSlug) return toast('Elegí un equipo');
+
+  const teamName = (teamsInDiv.find(t => t.slug === teamSlug)?.name) || teamSlug;
+  const players = getCurrentValues().filter(Boolean);
+
   try{
     const resp = await fetch(`${API_BASE}/api/save-team-assets`, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
-      credentials: 'include',
+      credentials:'include',
       body: JSON.stringify({ slug: teamSlug, teamName, players })
     });
-    const json = await resp.json().catch(()=> ({}));
-    if(!resp.ok || !json.ok){ throw new Error(json?.error || 'Error al guardar'); }
+    const json = await resp.json().catch(()=>({}));
+    if(!resp.ok || !json.ok) throw new Error(json.error || ('HTTP '+resp.status));
     clearDraft(_activeDiv, teamSlug);
-    refreshDraftButtons();
-    toast('Guardado correctamente');
+    toast('Plantel guardado');
   }catch(e){
-    console.warn(e); toast('Error al guardar');
+    console.warn('save-team-assets', e);
+    toast('No se pudo guardar el plantel');
   }
 }
 
-/* ====== Carga de división (compartida para ambos paneles) ====== */
-let _currentScript = null;
-let _activeDiv = 'primera';
-async function loadDivision(div){
+async function loadDivision(div, preferredSlug = null, keepSelection = false){
   _activeDiv = div;
-  $$('.sw').forEach(btn => {
-    const on = btn.dataset.div === div;
-    btn.classList.toggle('active', on);
-    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
+  setLast(div, preferredSlug || getSelectedTeamSlug() || null);
 
-  try { delete window.LPI_USERS; } catch {}
-  if(_currentScript){ _currentScript.remove(); _currentScript = null; }
+  try{
+    const resp = await fetch(`${API_BASE}/api/teams?division=${encodeURIComponent(div)}`, {
+      credentials: 'include'
+    });
+    const json = await resp.json().catch(()=>({}));
+    if(!resp.ok || !json.ok || !Array.isArray(json.teams)){
+      throw new Error(json.error || ('HTTP ' + resp.status));
+    }
 
-  const src = FILES[div];
-  if(!src){ renderRows([]); teamsInDiv=[]; fillTeamSelect(); buildPlayersUI([]); return; }
+    const teams = json.teams.filter(t => t && t.username);
+    renderRows(teams);
 
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src; s.async = false;
-    s.onload = () => { _currentScript = s; resolve(); };
-    s.onerror = () => { if(s && s.parentNode) s.parentNode.removeChild(s); reject(new Error('No se pudo cargar '+src)); };
-    document.head.appendChild(s);
-  }).catch(err => { console.warn(err); toast('No se pudo cargar '+src); });
+    teamsInDiv = teams.map(t => ({
+      name: t.username,
+      slug: slugify(t.slug || t.username)
+    }));
 
-  const users = Array.isArray(window.LPI_USERS) ? window.LPI_USERS : [];
-  renderRows(users);
+    const currentSlug = keepSelection ? (preferredSlug || getSelectedTeamSlug()) : preferredSlug;
+    const selectedSlug = teamsInDiv.some(t => t.slug === currentSlug)
+      ? currentSlug
+      : (teamsInDiv[0]?.slug || '');
 
-  teamsInDiv = users.filter(u => u && u.role==='team').map(u => ({ name: u.username, slug: (u.slug||slugify(u.username)) }));
-  fillTeamSelect();
-  const last = getLast();
-  const fallback = teamsInDiv[0]?.slug || '';
-  const wantSlug = (last.division===div && last.team) ? last.team : fallback;
-  if (wantSlug) { $('#teamSelect').value = wantSlug; changeTeam(); }
+    fillTeamSelect(selectedSlug);
+    await loadTeamAssets(selectedSlug);
+    refreshDraftButtons();
+  }catch(e){
+    console.warn('loadDivision', e);
+    renderRows([]);
+    teamsInDiv = [];
+    fillTeamSelect('');
+    buildPlayersUI(Array(SLOTS).fill(''));
+    toast('No se pudieron cargar los equipos');
+  }
 }
 
-/* ====== Init ====== */
-document.addEventListener('DOMContentLoaded', () => {
-  $$('.sw').forEach(btn => btn.addEventListener('click', () => loadDivision(btn.dataset.div)));
-  $('#btnSaveTeams').addEventListener('click', saveTeams);
-  $('#btnSaveRoster').addEventListener('click', saveRoster);
-  $('#teamSelect').addEventListener('change', changeTeam);
-  $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());
-  $('#btnApplyImport')?.addEventListener('click', importPlayersFromTextarea);
-  $('#btnCancelImport')?.addEventListener('click', () => toggleImportBox(false));
+function bindDivisionButtons(){
+  ['primera','segunda','tercera'].forEach(div => {
+    const btn = document.querySelector(`[data-division="${div}"]`) || document.getElementById(`btn-${div}`) || document.getElementById(div);
+    if(btn){
+      btn.addEventListener('click', () => loadDivision(div));
+    }
+  });
+}
+
+function bindEvents(){
+  $('#btnSaveTeams')?.addEventListener('click', saveTeams);
+  $('#btnSaveRoster')?.addEventListener('click', saveTeamAssets);
+  $('#teamSelect')?.addEventListener('change', async () => {
+    const slug = getSelectedTeamSlug();
+    setLast(_activeDiv, slug);
+    await loadTeamAssets(slug);
+    refreshDraftButtons();
+  });
+  $('#btnImportToggle')?.addEventListener('click', () => toggleImportBox());
+  $('#btnImportApply')?.addEventListener('click', importPlayersFromTextarea);
   $('#btnExportRoster')?.addEventListener('click', exportRoster);
+  $('#btnLoadDraft')?.addEventListener('click', loadDraftIntoForm);
+  $('#btnDiscardDraft')?.addEventListener('click', discardDraftForCurrentTeam);
+}
 
+async function init(){
   buildPlayersUI(Array(SLOTS).fill(''));
-  refreshDraftButtons();
+  bindDivisionButtons();
+  bindEvents();
   const last = getLast();
-  loadDivision(last.division || 'primera');
-});
+  await loadDivision(last.division || 'primera', last.team || null);
+}
 
-// === Cambio de contraseña (admin) ===
-(function(){
-  function getTeamSlug(){
-    try {
-      if (typeof deriveTeam === 'function') return deriveTeam();
-    } catch(_){}
-    try {
-      var file = (location.pathname.split('/').pop()||'').replace(/\.html$/i,'');
-      return file.toLowerCase();
-    } catch(_){
-      return 'equipo';
-    }
-  }
-
-  var passModal = null;
-
-  function ensureModal(){
-    if (!passModal) {
-      passModal = document.getElementById('passModal');
-    }
-    return passModal;
-  }
-
-  function openModal(ev){
-    if (ev && ev.preventDefault) ev.preventDefault();
-    var dlg = ensureModal();
-    if (!dlg || !dlg.showModal) return;
-    document.getElementById('oldPass').value = '';
-    document.getElementById('newPass').value = '';
-    document.getElementById('newPass2').value = '';
-    document.getElementById('passError').style.display = 'none';
-    document.getElementById('passSuccess').style.display = 'none';
-    dlg.showModal();
-  }
-
-  function wireOpen(){
-    ensureModal();
-    var btn = document.getElementById('btnChangePassword');
-    if (btn) btn.addEventListener('click', openModal);
-  }
-
-  function submitPass(ev){
-    if (ev && ev.preventDefault) ev.preventDefault();
-    var oldPass = document.getElementById('oldPass').value;
-    var newPass = document.getElementById('newPass').value;
-    var newPass2 = document.getElementById('newPass2').value;
-    var err = document.getElementById('passError');
-    var ok  = document.getElementById('passSuccess');
-
-    if(!oldPass || !newPass || newPass !== newPass2){
-      err.textContent = 'Revisá los campos';
-      err.style.display = 'block';
-      ok.style.display = 'none';
-      return;
-    }
-
-    var slug = getTeamSlug();
-    fetch(`${API_BASE}/api/admin/change-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ slug: slug, oldPassword: oldPass, newPassword: newPass })
-    })
-    .then(function(r){
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.json().catch(function(){return {};});
-    })
-    .then(function(){
-      err.style.display = 'none';
-      ok.style.display = 'block';
-      setTimeout(function(){
-        var dlg = ensureModal();
-        if (dlg && dlg.close) dlg.close();
-      }, 800);
-    })
-    .catch(function(){
-      err.textContent = 'No se pudo actualizar.';
-      err.style.display = 'block';
-      ok.style.display = 'none';
-    });
-  }
-
-  function wireSubmit(){
-    var btn = document.getElementById('submitPass');
-    if (btn) btn.addEventListener('click', submitPass);
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){
-      wireOpen();
-      wireSubmit();
-    });
-  } else {
-    wireOpen();
-    wireSubmit();
-  }
-})();
-
-// === Toggles "Mostrar" para contraseñas ===
-(function(){
-  function wirePasswordToggles(){
-    var toggles = document.querySelectorAll('input[data-toggle]');
-    toggles.forEach(function(chk){
-      var selector = chk.getAttribute('data-toggle');
-      if (!selector) return;
-      var target = document.querySelector(selector);
-      if (!target) return;
-
-      function update(){
-        try{
-          target.type = chk.checked ? 'text' : 'password';
-        }catch(e){
-          console.warn('No se pudo cambiar el tipo del campo de contraseña', e);
-        }
-      }
-
-      chk.addEventListener('change', update);
-      update();
-    });
-  }
-
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', wirePasswordToggles);
-  } else {
-    wirePasswordToggles();
-  }
-})();
+document.addEventListener('DOMContentLoaded', init);
