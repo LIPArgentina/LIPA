@@ -1,4 +1,4 @@
-// equipos.routes.js FIXED (ver chat)
+// equipos.routes.js (FIX FINAL)
 const express = require('express');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -19,23 +19,6 @@ module.exports = function createEquiposRouter(deps) {
     }
   }
 
-  async function ensureEquiposTable() {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS equipos (
-        id SERIAL PRIMARY KEY,
-        slug TEXT UNIQUE NOT NULL,
-        nombre TEXT NOT NULL,
-        division TEXT NOT NULL,
-        role TEXT DEFAULT 'team',
-        captain TEXT DEFAULT '',
-        email TEXT DEFAULT '',
-        phone TEXT DEFAULT '',
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-  }
-
   function buildSlug(value = '') {
     return String(value || '')
       .toLowerCase()
@@ -46,53 +29,61 @@ module.exports = function createEquiposRouter(deps) {
 
   router.post('/save-teams', async (req, res) => {
     const client = await pool.connect();
+
     try {
       const { division, teams } = req.body || {};
       if (!division || !Array.isArray(teams)) {
         return res.status(400).json({ ok: false });
       }
 
-      await ensureEquiposTable();
+      const processed = teams.map(t => {
+        const username = String(t.username || '').trim();
+        if (!username) return null;
 
-      const processedTeams = await Promise.all(
-        teams.map(async (team) => {
-          const username = String(team.username || '').trim();
-          const slug = buildSlug(username);
-          await ensureTeam(slug);
-          return {
-            username,
-            slug,
-            role: 'team',
-            captain: team.captain || '',
-            email: team.email || '',
-            phone: team.phone || ''
-          };
-        })
-      );
+        const slugBase = buildSlug(username);
+        const slugUid = `${slugBase}_${division}`;
+
+        return {
+          slug_uid: slugUid,
+          slug_base: slugBase,
+          division,
+          display_name: username,
+          username,
+          role: 'team',
+          captain: t.captain || '',
+          phone: t.phone || '',
+          email: t.email || ''
+        };
+      }).filter(Boolean);
 
       await client.query('BEGIN');
       await client.query(`DELETE FROM equipos WHERE division = $1`, [division]);
 
-      for (const team of processedTeams) {
+      for (const t of processed) {
         await client.query(
-          `INSERT INTO equipos (slug, nombre, division, role, captain, email, phone)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)
-           ON CONFLICT (slug)
+          `INSERT INTO equipos
+           (slug_uid, slug_base, division, display_name, username, role, captain, phone, email)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           ON CONFLICT (slug_uid)
            DO UPDATE SET
-             nombre = EXCLUDED.nombre,
+             slug_base = EXCLUDED.slug_base,
              division = EXCLUDED.division,
+             display_name = EXCLUDED.display_name,
+             username = EXCLUDED.username,
              role = EXCLUDED.role,
              captain = EXCLUDED.captain,
-             email = EXCLUDED.email,
-             phone = EXCLUDED.phone`,
+             phone = EXCLUDED.phone,
+             email = EXCLUDED.email`,
           [
-            team.slug,
-            team.username,
-            division,
-            team.role,
-            team.captain,
-            team.email,
-            team.phone
+            t.slug_uid,
+            t.slug_base,
+            t.division,
+            t.display_name,
+            t.username,
+            t.role,
+            t.captain,
+            t.phone,
+            t.email
           ]
         );
       }
@@ -103,7 +94,7 @@ module.exports = function createEquiposRouter(deps) {
     } catch (err) {
       await client.query('ROLLBACK');
       console.error(err);
-      res.status(500).json({ ok: false });
+      res.status(500).json({ ok: false, error: err.message });
     } finally {
       client.release();
     }
@@ -112,19 +103,20 @@ module.exports = function createEquiposRouter(deps) {
   router.get('/teams', async (req, res) => {
     try {
       const { division } = req.query;
+
       const result = await pool.query(
-        `SELECT slug, nombre, role, captain, email, phone
+        `SELECT slug_uid, username, role, captain, email, phone
          FROM equipos
          WHERE division = $1
-         ORDER BY nombre`,
+         ORDER BY username`,
         [division]
       );
 
       res.json({
         ok: true,
         teams: result.rows.map(r => ({
-          username: r.nombre,
-          slug: r.slug,
+          username: r.username,
+          slug: r.slug_uid,
           role: r.role || 'team',
           captain: r.captain || '',
           email: r.email || '',
@@ -134,7 +126,7 @@ module.exports = function createEquiposRouter(deps) {
 
     } catch (err) {
       console.error(err);
-      res.status(500).json({ ok: false });
+      res.status(500).json({ ok: false, error: err.message });
     }
   });
 
