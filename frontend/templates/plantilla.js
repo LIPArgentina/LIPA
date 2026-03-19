@@ -61,7 +61,7 @@
     return '';
   }
 
-  var slug = computeSlug();
+  var slug = (typeof deriveTeamKey === 'function' ? deriveTeamKey() : computeSlug());
   if (!slug){ console.warn('No se pudo determinar el slug del equipo'); return; }
 
   function normalizePlayersPayload(data){
@@ -167,6 +167,38 @@
       const file = (location.pathname.split('/').pop()||'').replace(/\.html$/i,'');
       if (file) return slugify(file);
       return '';
+    }
+
+    function deriveCategory(){
+      function normalizeCategory(raw){
+        const v = String(raw || '').trim().toLowerCase();
+        if (!v) return '';
+        if (v.includes('terc')) return 'tercera';
+        if (v.includes('seg')) return 'segunda';
+        if (v === '3' || v === 'c') return 'tercera';
+        if (v === '2' || v === 'b') return 'segunda';
+        return '';
+      }
+      try {
+        const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+        const val = normalizeCategory(sess && (sess.category || sess.categoria || sess.cat || sess.division || sess['división'] || sess.teamCategory || (sess.user && (sess.user.category || sess.user.categoria || sess.user.division))));
+        if (val) return val;
+      } catch(_) {}
+      try {
+        const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+        const val = normalizeCategory(sess2 && (sess2.category || sess2.categoria || sess2.cat || sess2.division || sess2['división'] || sess2.teamCategory || (sess2.user && (sess2.user.category || sess2.user.categoria || sess2.user.division))));
+        if (val) return val;
+      } catch(_) {}
+      return '';
+    }
+
+    function deriveTeamKey(){
+      const base = deriveTeam();
+      const cat = deriveCategory();
+      if (!base) return '';
+      if (!cat) return base;
+      if (base.endsWith(cat)) return base;
+      return base + cat;
     }
 
 // === LPI Auth helper ===
@@ -504,7 +536,7 @@ trash.addEventListener('drop', e => {
     if (Array.isArray(window.LPI_JUGADORES)) return window.LPI_JUGADORES;
     const map = window.LPI_TEAM_PLAYERS;
     if (map && typeof map === "object") {
-      const prefer = [ deriveTeam() ];
+      const prefer = [ (typeof deriveTeamKey === 'function' ? deriveTeamKey() : deriveTeam()), deriveTeam() ].filter(Boolean);
       for (const k of prefer) if (Array.isArray(map[k])) return map[k];
       const keys = Object.keys(map);
       for (const k of keys) if (Array.isArray(map[k])) return map[k];
@@ -787,7 +819,7 @@ async function savePlanilla(){
       return Array.from(document.querySelectorAll(sel)).map(x => (x.dataset.player || '').trim());
     };
     const pickFree = () => Array.from(document.querySelectorAll('.yellow-box-free')).map(x => (x.dataset.player || '').trim());
-    const team = (typeof deriveTeam === 'function') ? deriveTeam() : '';
+    const team = (typeof deriveTeamKey === 'function') ? deriveTeamKey() : ((typeof deriveTeam === 'function') ? deriveTeam() : '');
 
     const payloadObj = {
       team,
