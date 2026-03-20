@@ -34,12 +34,7 @@
 })();
 
 /* ====== Config compartida ====== */
-const BASE = 'data/';
-const FILES = {
-  primera:  BASE + 'usuarios.primera.js',
-  segunda:  BASE + 'usuarios.segunda.js',
-  tercera:  BASE + 'usuarios.tercera.js',
-};
+const DIVISIONES = ['primera', 'segunda', 'tercera'];
 const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
 const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
@@ -322,8 +317,44 @@ async function saveRoster(){
   }
 }
 
+/* === Cargar equipos desde API === */
+async function loadTeamsForDivision(div){
+  try {
+    const r = await fetch(`${API_BASE}/api/teams?division=${encodeURIComponent(div)}`, {
+      cache: 'no-store',
+      credentials: 'include'
+    });
+
+    if (!r.ok) {
+      throw new Error('No se pudieron cargar los equipos');
+    }
+
+    const data = await r.json();
+    const raw =
+      Array.isArray(data) ? data :
+      Array.isArray(data.teams) ? data.teams :
+      Array.isArray(data.users) ? data.users :
+      [];
+
+    return raw
+      .filter(u => u && (u.role === 'team' || u.username || u.name))
+      .map(u => ({
+        username: u.username || u.name || '',
+        role: 'team',
+        captain: u.captain || '',
+        email: u.email || '',
+        phone: u.phone || '',
+        slug: u.slug || slugify(u.username || u.name || '')
+      }))
+      .filter(u => u.username);
+  } catch (e) {
+    console.warn('loadTeamsForDivision', e);
+    toast('No se pudieron cargar los equipos');
+    return [];
+  }
+}
+
 /* ====== Carga de división (compartida para ambos paneles) ====== */
-let _currentScript = null;
 let _activeDiv = 'primera';
 async function loadDivision(div){
   _activeDiv = div;
@@ -333,29 +364,34 @@ async function loadDivision(div){
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
 
-  try { delete window.LPI_USERS; } catch {}
-  if(_currentScript){ _currentScript.remove(); _currentScript = null; }
+  if (!DIVISIONES.includes(div)) {
+    renderRows([]);
+    teamsInDiv = [];
+    fillTeamSelect();
+    buildPlayersUI([]);
+    return;
+  }
 
-  const src = FILES[div];
-  if(!src){ renderRows([]); teamsInDiv=[]; fillTeamSelect(); buildPlayersUI([]); return; }
-
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src; s.async = false;
-    s.onload = () => { _currentScript = s; resolve(); };
-    s.onerror = () => { if(s && s.parentNode) s.parentNode.removeChild(s); reject(new Error('No se pudo cargar '+src)); };
-    document.head.appendChild(s);
-  }).catch(err => { console.warn(err); toast('No se pudo cargar '+src); });
-
-  const users = Array.isArray(window.LPI_USERS) ? window.LPI_USERS : [];
+  const users = await loadTeamsForDivision(div);
   renderRows(users);
 
-  teamsInDiv = users.filter(u => u && u.role==='team').map(u => ({ name: u.username, slug: (u.slug||slugify(u.username)) }));
+  teamsInDiv = users.map(u => ({
+    name: u.username,
+    slug: u.slug || slugify(u.username)
+  }));
+
   fillTeamSelect();
+
   const last = getLast();
   const fallback = teamsInDiv[0]?.slug || '';
-  const wantSlug = (last.division===div && last.team) ? last.team : fallback;
-  if (wantSlug) { $('#teamSelect').value = wantSlug; changeTeam(); }
+  const wantSlug = (last.division === div && last.team) ? last.team : fallback;
+
+  if (wantSlug) {
+    $('#teamSelect').value = wantSlug;
+    await changeTeam();
+  } else {
+    buildPlayersUI(Array(SLOTS).fill(''));
+  }
 }
 
 /* ====== Init ====== */
