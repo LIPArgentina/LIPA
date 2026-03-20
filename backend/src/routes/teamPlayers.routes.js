@@ -5,52 +5,57 @@ const pool = require('../../db');
 module.exports = function createTeamPlayersRouter() {
   const router = express.Router();
 
-  async function resolveTeamBySlug(rawSlug) {
-    const slug = String(rawSlug || '').trim().toLowerCase();
-    if (!slug) return null;
+  async function resolveTeam(rawValue) {
+    const value = String(rawValue || '').trim();
+    const lower = value.toLowerCase();
+    if (!lower) return null;
 
-    const result = await pool.query(`
-      SELECT id, slug_uid, slug_base, display_name, division
-      FROM equipos
-      WHERE slug_uid = $1 OR slug_base = $1
+    const result = await pool.query(
+      `
+      SELECT DISTINCT e.id, e.slug_uid, e.slug_base, e.display_name, e.division
+      FROM equipos e
+      LEFT JOIN equipo_slug_aliases a
+        ON a.equipo_id = e.id
+      WHERE
+        LOWER(e.slug_uid) = $1
+        OR LOWER(e.slug_base) = $1
+        OR LOWER(e.display_name) = $1
+        OR LOWER(a.alias_slug) = $1
       LIMIT 1
-    `, [slug]);
+      `,
+      [lower]
+    );
 
-    if (result.rowCount === 0) return null;
-    return result.rows[0];
+    return result.rows[0] || null;
   }
 
   async function fetchPlayersFromDB(teamId) {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT nombre
       FROM jugadores
       WHERE equipo_id = $1
-      ORDER BY orden ASC
-    `, [teamId]);
+      ORDER BY orden ASC, id ASC
+      `,
+      [teamId]
+    );
 
     return result.rows.map(r => r.nombre);
   }
 
   function normalizePlayers(input) {
     if (!Array.isArray(input)) return [];
-    return input
-      .map(x => String(x || '').trim())
-      .filter(Boolean);
+    return input.map(x => String(x || '').trim()).filter(Boolean);
   }
 
   async function replacePlayers(teamId, players, client = pool) {
-    await client.query(
-      `DELETE FROM jugadores WHERE equipo_id = $1`,
-      [teamId]
-    );
+    await client.query(`DELETE FROM jugadores WHERE equipo_id = $1`, [teamId]);
 
     let orden = 1;
     for (const nombre of players) {
       await client.query(
-        `
-        INSERT INTO jugadores (equipo_id, nombre, orden)
-        VALUES ($1, $2, $3)
-        `,
+        `INSERT INTO jugadores (equipo_id, nombre, orden)
+         VALUES ($1, $2, $3)`,
         [teamId, nombre, orden]
       );
       orden++;
@@ -68,46 +73,37 @@ module.exports = function createTeamPlayersRouter() {
     };
   }
 
-  // GET /api/team-assets?team=slug_uid|slug_base
   router.get('/team-assets', async (req, res) => {
     try {
-      const raw = String(req.query.team || '').trim().toLowerCase();
-      if (!raw) {
-        return res.status(400).json({ ok: false, players: [], error: 'Falta team' });
-      }
+      const raw = String(req.query.team || '').trim();
+      if (!raw) return res.status(400).json({ ok: false, players: [] });
 
-      const team = await resolveTeamBySlug(raw);
-      if (!team) {
-        return res.status(404).json({ ok: false, players: [], error: 'Equipo no encontrado' });
-      }
+      const team = await resolveTeam(raw);
+      if (!team) return res.status(404).json({ ok: false, players: [] });
 
       const players = await fetchPlayersFromDB(team.id);
       return res.json(buildResponse(team, players));
-
     } catch (err) {
-      console.error('GET /team-assets', err);
-      return res.status(500).json({ ok: false, players: [], error: 'Error interno' });
+      console.error(err);
+      return res.status(500).json({ ok: false, error: err.message });
     }
   });
 
-  // POST /api/save-team-assets
-  // Compatibilidad con admin.html/admin.js
   router.post('/save-team-assets', async (req, res) => {
     const client = await pool.connect();
 
     try {
-      const rawTeam = String(
-        req.body?.team ||
-        req.body?.slug ||
-        req.body?.slug_uid ||
-        req.body?.teamName ||
-        ''
-      ).trim().toLowerCase();
+      const rawTeam =
+        req.body?.team ??
+        req.body?.slug ??
+        req.body?.slug_uid ??
+        req.body?.teamName ??
+        '';
 
       const players = normalizePlayers(
-        req.body?.players ||
-        req.body?.jugadores ||
-        req.body?.roster ||
+        req.body?.players ??
+        req.body?.jugadores ??
+        req.body?.roster ??
         []
       );
 
@@ -115,52 +111,37 @@ module.exports = function createTeamPlayersRouter() {
         return res.status(400).json({ ok: false, error: 'Falta team' });
       }
 
-      const team = await resolveTeamBySlug(rawTeam);
+      const team = await resolveTeam(rawTeam);
       if (!team) {
-        return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
+        return res.status(404).json({ ok: false, error: rawTeam });
       }
 
       await client.query('BEGIN');
       await replacePlayers(team.id, players, client);
       await client.query('COMMIT');
 
-      return res.json({
-        ok: true,
-        slug: team.slug_base,
-        slug_uid: team.slug_uid,
-        teamName: team.display_name,
-        division: team.division,
-        players
-      });
-
+      return res.json(buildResponse(team, players));
     } catch (err) {
       await client.query('ROLLBACK');
-      console.error('POST /save-team-assets', err);
-      return res.status(500).json({ ok: false, error: 'Error interno' });
+      console.error(err);
+      return res.status(500).json({ ok: false, error: err.message });
     } finally {
       client.release();
     }
   });
 
-  // GET /api/team/players (ruta autenticada existente)
   router.get('/team/players', requireTeam, async (req, res) => {
     try {
-      const slug = String(req.user?.slug || '').trim().toLowerCase();
-      if (!slug) {
-        return res.status(401).json({ ok: false, error: 'No autenticade' });
-      }
+      const slug = req.user.slug;
+      const team = await resolveTeam(slug);
 
-      const team = await resolveTeamBySlug(slug);
-      if (!team) {
-        return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
-      }
+      if (!team) return res.status(404).json({ ok: false });
 
       const players = await fetchPlayersFromDB(team.id);
       return res.json(buildResponse(team, players));
-
     } catch (err) {
-      console.error('GET /team/players', err);
-      return res.status(500).json({ ok: false, error: 'Error interno' });
+      console.error(err);
+      return res.status(500).json({ ok: false });
     }
   });
 
