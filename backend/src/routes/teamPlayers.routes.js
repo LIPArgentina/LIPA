@@ -1,13 +1,9 @@
 const express = require('express');
 const { requireTeam } = require('../middleware/auth');
 const pool = require('../../db');
-const fs = require('fs');
-const path = require('path');
 
 module.exports = function createTeamPlayersRouter() {
   const router = express.Router();
-
-  const EQUIPOS_DIR = path.join(__dirname, '../../../frontend/equipos');
 
   async function resolveTeamBySlug(rawSlug) {
     const slug = String(rawSlug || '').trim().toLowerCase();
@@ -35,49 +31,6 @@ module.exports = function createTeamPlayersRouter() {
     return result.rows.map(r => r.nombre);
   }
 
-  function tryReadJSON(filePath) {
-    try {
-      if (!fs.existsSync(filePath)) return null;
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      return Array.isArray(data) ? data : (data.players || []);
-    } catch {
-      return null;
-    }
-  }
-
-  function tryReadJS(filePath) {
-    try {
-      if (!fs.existsSync(filePath)) return null;
-      delete require.cache[require.resolve(filePath)];
-      const mod = require(filePath);
-      if (Array.isArray(mod)) return mod;
-      if (mod && Array.isArray(mod.players)) return mod.players;
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  function fetchPlayersFromFiles(team) {
-    const candidates = [
-      team.slug_base,
-      team.slug_uid
-    ];
-
-    for (const name of candidates) {
-      const jsonPath = path.join(EQUIPOS_DIR, `${name}.players.json`);
-      const jsPath = path.join(EQUIPOS_DIR, `${name}.players.js`);
-
-      let players = tryReadJSON(jsonPath);
-      if (players && players.length) return players;
-
-      players = tryReadJS(jsPath);
-      if (players && players.length) return players;
-    }
-
-    return [];
-  }
-
   function buildResponse(team, players) {
     return {
       ok: true,
@@ -101,11 +54,7 @@ module.exports = function createTeamPlayersRouter() {
         return res.status(404).json({ ok: false, players: [] });
       }
 
-      let players = await fetchPlayersFromDB(team.id);
-
-      if (!players.length) {
-        players = fetchPlayersFromFiles(team);
-      }
+      const players = await fetchPlayersFromDB(team.id);
 
       return res.json(buildResponse(team, players));
 
@@ -124,11 +73,7 @@ module.exports = function createTeamPlayersRouter() {
         return res.status(404).json({ ok: false });
       }
 
-      let players = await fetchPlayersFromDB(team.id);
-
-      if (!players.length) {
-        players = fetchPlayersFromFiles(team);
-      }
+      const players = await fetchPlayersFromDB(team.id);
 
       return res.json(buildResponse(team, players));
 
