@@ -43,30 +43,25 @@ function normalizeUsers(list) {
     .filter((u) => u.role !== "admin" && u.username.toLowerCase() !== "admin" && u.slug.toLowerCase() !== "admin");
 }
 
+const BACKEND_URL = "https://liga-backend-tt82.onrender.com";
+
 async function loadUsers(categoria) {
-  // 1) Fuente principal: API / DB
   try {
-    const resp = await fetch(`/api/teams?division=${encodeURIComponent(categoria)}`, {
+    const resp = await fetch(`${BACKEND_URL}/api/teams?division=${encodeURIComponent(categoria)}`, {
       cache: "no-store",
-      credentials: "include"
+      credentials: "omit"
     });
 
     if (resp.ok) {
       const data = await resp.json();
-      const raw =
-        Array.isArray(data) ? data :
-        Array.isArray(data.teams) ? data.teams :
-        Array.isArray(data.users) ? data.users :
-        [];
-
-      const normalized = normalizeUsers(raw);
-      if (normalized.length) return normalized;
+      if (Array.isArray(data)) return normalizeUsers(data);
+      if (Array.isArray(data?.teams)) return normalizeUsers(data.teams);
+      if (Array.isArray(data?.users)) return normalizeUsers(data.users);
     }
   } catch (e) {
     console.debug("No se pudo leer equipos desde API:", e?.message || e);
   }
 
-  // 2) Fallback legacy: archivos estáticos
   try {
     const resp = await fetch(`${DATA_PATH}/usuarios.${categoria}.json`, { cache: "no-store" });
     if (resp.ok) {
