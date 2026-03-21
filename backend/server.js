@@ -1,13 +1,11 @@
-require("dotenv").config();   // cargar variables primero
+require("dotenv").config();
 
+const bcrypt = require('bcryptjs');
 const pool = require("./db");
 const app = require("./src/app");
 
 const PORT = process.env.PORT || 3000;
 
-// -------------------------------------
-// Verificar/crear columnas reset password
-// -------------------------------------
 (async () => {
   try {
     await pool.query(`
@@ -21,39 +19,23 @@ const PORT = process.env.PORT || 3000;
   }
 })();
 
-// -------------------------
-// Endpoint de prueba DB
-// -------------------------
 app.get("/test-db", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
-    res.json({
-      ok: true,
-      now: result.rows[0].now
-    });
+    res.json({ ok: true, now: result.rows[0].now });
   } catch (err) {
     console.error("Error DB:", err);
-    res.status(500).json({
-      ok: false,
-      error: "DB error"
-    });
+    res.status(500).json({ ok: false, error: "DB error" });
   }
 });
 
-// --------------------------------------
-// Endpoint: resetear contraseña de un equipo
-// --------------------------------------
 app.post("/api/admin/reset-team-password/:id", async (req, res) => {
   const teamId = req.params.id;
 
   if (!teamId) {
-    return res.status(400).json({
-      ok: false,
-      error: "Se requiere el ID del equipo"
-    });
+    return res.status(400).json({ ok: false, error: "Se requiere el ID del equipo" });
   }
 
-  // Generar contraseña provisoria aleatoria
   const generatePassword = (length = 6) => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let password = "";
@@ -66,28 +48,31 @@ app.post("/api/admin/reset-team-password/:id", async (req, res) => {
   const newPassword = generatePassword();
 
   try {
-    // Actualizar la tabla equipos usando la columna correcta
-    await pool.query(
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const result = await pool.query(
       `UPDATE equipos
-       SET password_hash = $1,
-           must_change_password = true,
-           password_updated_at = NOW()
-       WHERE id = $2`,
-      [newPassword, teamId]
+          SET password_hash = $1,
+              must_change_password = true,
+              password_updated_at = NOW()
+        WHERE id = $2
+      RETURNING id`,
+      [hashedPassword, teamId]
     );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ ok: false, error: "Equipo no encontrado" });
+    }
 
     res.json({
       ok: true,
-      message: "Contraseña resetada correctamente",
+      message: "Contraseña reseteada correctamente",
       newPassword
     });
 
   } catch (err) {
     console.error("Error reset password:", err);
-    res.status(500).json({
-      ok: false,
-      error: "Error al resetear la contraseña"
-    });
+    res.status(500).json({ ok: false, error: "Error al resetear la contraseña" });
   }
 });
 
