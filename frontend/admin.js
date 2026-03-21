@@ -100,6 +100,62 @@ function copyToClipboard(text){
   }
 }
 
+const resetPassUI = {
+  modal: null,
+  teamName: null,
+  passValue: null,
+  hint: null,
+  copyBtn: null,
+  closeBtn: null,
+};
+
+function ensureResetPassUI(){
+  if (!resetPassUI.modal) {
+    resetPassUI.modal = $('#resetPassModal');
+    resetPassUI.teamName = $('#resetPassTeamName');
+    resetPassUI.passValue = $('#resetPassValue');
+    resetPassUI.hint = $('#resetPassHint');
+    resetPassUI.copyBtn = $('#btnCopyResetPass');
+    resetPassUI.closeBtn = $('#btnCloseResetPass');
+
+    resetPassUI.copyBtn?.addEventListener('click', async () => {
+      const value = resetPassUI.passValue?.value || '';
+      const copied = await copyToClipboard(value);
+      if (resetPassUI.hint) {
+        resetPassUI.hint.textContent = copied
+          ? 'Contraseña copiada al portapapeles.'
+          : 'No se pudo copiar automáticamente. Copiala manualmente.';
+        resetPassUI.hint.classList.toggle('is-copied', copied);
+      }
+    });
+
+    resetPassUI.closeBtn?.addEventListener('click', () => {
+      resetPassUI.modal?.close();
+    });
+  }
+  return resetPassUI;
+}
+
+function openResetPassModal(teamName, password, copied = false){
+  const ui = ensureResetPassUI();
+  if (!ui.modal || !ui.modal.showModal) return;
+
+  if (ui.teamName) ui.teamName.textContent = teamName || 'Equipo';
+  if (ui.passValue) ui.passValue.value = password || '';
+  if (ui.hint) {
+    ui.hint.textContent = copied
+      ? 'Contraseña copiada al portapapeles. Al ingresar, el equipo deberá cambiarla.'
+      : 'Copiala y enviásela al equipo. Al ingresar deberá cambiarla.';
+    ui.hint.classList.toggle('is-copied', copied);
+  }
+
+  ui.modal.showModal();
+  setTimeout(() => {
+    ui.passValue?.focus();
+    ui.passValue?.select();
+  }, 30);
+}
+
 /* ====== Tabla izquierda (equipos de liga) ====== */
 function renderRows(users){
   const tbody = $('#tbodyTeams');
@@ -167,14 +223,7 @@ function renderRows(users){
 
         const tempPassword = String(data.newPassword || '').trim();
         const copied = await copyToClipboard(tempPassword);
-
-        alert(
-          `Contraseña blanqueada para "${teamName}".\n\n` +
-          `Nueva contraseña temporal: ${tempPassword}\n\n` +
-          (copied ? 'La contraseña quedó copiada al portapapeles.' : 'Copiala y enviásela al equipo.') +
-          `\n\nAl ingresar, el equipo deberá cambiarla.`
-        );
-
+        openResetPassModal(teamName, tempPassword, copied);
         toast(`Contraseña blanqueada: ${teamName}`);
       } catch (err) {
         console.error('reset-team-password', err);
@@ -434,7 +483,7 @@ async function loadTeamsForDivision(div){
   }
 }
 
-/* ====== Carga de división (compartida para ambos paneles) ====== */
+/* ====== Carga de división ====== */
 let _activeDiv = 'primera';
 async function loadDivision(div){
   _activeDiv = div;
@@ -477,6 +526,7 @@ async function loadDivision(div){
 
 /* ====== Init ====== */
 document.addEventListener('DOMContentLoaded', () => {
+  ensureResetPassUI();
   $$('.sw').forEach(btn => btn.addEventListener('click', () => loadDivision(btn.dataset.div)));
   $('#btnSaveTeams').addEventListener('click', saveTeams);
   $('#btnSaveRoster').addEventListener('click', saveRoster);

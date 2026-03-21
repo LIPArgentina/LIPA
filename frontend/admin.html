@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Administración de equipos</title>
-  
+
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
@@ -19,13 +19,12 @@
       <a id="btnFixture" class="btn btn-gold" href="fixture/fixture.html" aria-label="Abrir fixture">FIXTURE</a>
       <a id="btnFecha" class="btn btn-gold" href="/fecha/visor_planillas.html" aria-label="Abrir planillas de fecha">PLANILLAS FECHA</a>
     </nav>
-  
+
 <div class="top-right-actions">
   <a id="btnChangePassword" class="btn" href="#" aria-label="Cambiar contraseña">CAMBIAR CONTRASEÑA</a>
   <a class="btn" href="index.html" aria-label="Volver a inicio">VOLVER</a>
 </div>
 </header>
-
 
   <div class="wrap">
     <div class="title-row" role="group" aria-label="Selector de división">
@@ -97,43 +96,60 @@
 
   <div class="toast" id="toast"></div>
 
-
-  
-
-
-
-
   <script src="config.js"></script>
-<script src="admin.js"></script>
-
+  <script src="admin.js"></script>
 
   <dialog class="modal" id="passModal">
-<form autocomplete="off" class="modal__panel" id="passForm" method="dialog" style="min-width:320px;">
-<div class="modal__header"><h3>Cambiar contraseña</h3></div>
-<div class="modal__body">
-<label class="field__label">Contraseña actual</label>
-<input class="field__control" id="oldPass" type="password"/>
-<label class="field__toggle" for="toggle_oldPass">
-<input data-toggle="#oldPass" id="toggle_oldPass" type="checkbox"/> Mostrar
+    <form autocomplete="off" class="modal__panel" id="passForm" method="dialog" style="min-width:320px;">
+      <div class="modal__header"><h3>Cambiar contraseña</h3></div>
+      <div class="modal__body">
+        <label class="field__label">Contraseña actual</label>
+        <input class="field__control" id="oldPass" type="password"/>
+        <label class="field__toggle" for="toggle_oldPass">
+          <input data-toggle="#oldPass" id="toggle_oldPass" type="checkbox"/> Mostrar
         </label>
-<label class="field__label">Nueva contraseña</label>
-<input class="field__control" id="newPass" type="password">
-<label class="field__toggle" for="toggle_newPass">
-<input data-toggle="#newPass" id="toggle_newPass" type="checkbox"/> Mostrar
+
+        <label class="field__label">Nueva contraseña</label>
+        <input class="field__control" id="newPass" type="password">
+        <label class="field__toggle" for="toggle_newPass">
+          <input data-toggle="#newPass" id="toggle_newPass" type="checkbox"/> Mostrar
         </label>
-<label class="field__label">Repetir nueva contraseña</label>
-<input class="field__control" id="newPass2" type="password">
-<label class="field__toggle" for="toggle_newPass2">
-<input data-toggle="#newPass2" id="toggle_newPass2" type="checkbox"/> Mostrar
+
+        <label class="field__label">Repetir nueva contraseña</label>
+        <input class="field__control" id="newPass2" type="password">
+        <label class="field__toggle" for="toggle_newPass2">
+          <input data-toggle="#newPass2" id="toggle_newPass2" type="checkbox"/> Mostrar
         </label>
-<p class="error" id="passError" style="display:none;color:#ff6b6b;margin-top:8px;">Revisá los campos</p>
-<p class="success" id="passSuccess" style="display:none;color:#4cd964;margin-top:8px;">¡Contraseña actualizada!</p>
-</input></input></div>
-<div class="modal__footer">
-<button class="btn btn-ghost" value="cancel">Cancelar</button>
-<button class="btn btn-primary" id="submitPass" value="confirm">Guardar</button>
-</div>
-</form>
-</dialog>
+
+        <p class="error" id="passError" style="display:none;color:#ff6b6b;margin-top:8px;">Revisá los campos</p>
+        <p class="success" id="passSuccess" style="display:none;color:#4cd964;margin-top:8px;">¡Contraseña actualizada!</p>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-ghost" value="cancel">Cancelar</button>
+        <button class="btn btn-primary" id="submitPass" value="confirm">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="resetPassModal">
+    <div class="modal__panel modal__panel--reset">
+      <div class="modal__header">
+        <h3>Contraseña blanqueada</h3>
+      </div>
+      <div class="modal__body">
+        <p class="reset-pass-text">
+          Nueva contraseña temporal para <strong id="resetPassTeamName">Equipo</strong>
+        </p>
+        <div class="reset-pass-box">
+          <input class="field__control reset-pass-input" id="resetPassValue" type="text" readonly />
+          <button class="btn btn-primary btn-copy-pass" id="btnCopyResetPass" type="button">Copiar</button>
+        </div>
+        <p class="hint reset-pass-hint" id="resetPassHint">Copiala y enviásela al equipo. Al ingresar deberá cambiarla.</p>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-ghost" id="btnCloseResetPass" type="button">Cerrar</button>
+      </div>
+    </div>
+  </dialog>
 </body>
 </html>
