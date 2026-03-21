@@ -193,12 +193,21 @@
     }
 
     function deriveTeamKey(){
+      try {
+        const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+        if (sess && sess.slug) return String(sess.slug).trim();
+      } catch(_) {}
+      try {
+        const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+        if (sess2 && (sess2.slug || sess2.team)) return String(sess2.slug || sess2.team).trim();
+      } catch(_) {}
+
       const base = deriveTeam();
       const cat = deriveCategory();
       if (!base) return '';
       if (!cat) return base;
-      if (base.endsWith(cat)) return base;
-      return base + cat;
+      if (base.endsWith('_' + cat) || base.endsWith(cat)) return base;
+      return base + '_' + cat;
     }
 
 // === LPI Auth helper ===
@@ -630,14 +639,14 @@ trash.addEventListener('drop', e => {
 (function(){
   function getTeamSlug(){
     try {
-      if (typeof deriveTeam === 'function') return deriveTeam();
+      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+      if (sess && sess.slug) return String(sess.slug).trim();
     } catch(_){}
     try {
-      var file = (location.pathname.split('/').pop()||'').replace(/\.html$/i,'');
-      return file.toLowerCase();
-    } catch(_){
-      return 'equipo';
-    }
+      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+      if (sess2 && (sess2.slug || sess2.team)) return String(sess2.slug || sess2.team).trim();
+    } catch(_){}
+    return '';
   }
   var passModal = document.getElementById('passModal');
   function openModal(){
