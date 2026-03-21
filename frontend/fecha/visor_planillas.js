@@ -223,9 +223,33 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
   }
 
   function resolveCategory(team){
-    const normalized = normalizeTeamName(team);
+    const raw = String(team || '').trim();
+    const normalized = normalizeTeamName(raw);
+    const compact = normalized
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+
+    // Prioridad 1: resolver por slug / team key guardado en DB
+    if (
+      /(?:^|[_\s-])tercera$/.test(raw.toLowerCase()) ||
+      compact.endsWith('tercera') ||
+      compact.endsWith('3ra') ||
+      compact.endsWith('3era')
+    ) return 'tercera';
+
+    if (
+      /(?:^|[_\s-])segunda$/.test(raw.toLowerCase()) ||
+      compact.endsWith('segunda') ||
+      compact.endsWith('2da') ||
+      compact.endsWith('2nda')
+    ) return 'segunda';
+
+    // Prioridad 2: fallback legacy por archivos de usuarios
     if(state.categories.tercera.has(normalized)) return 'tercera';
     if(state.categories.segunda.has(normalized)) return 'segunda';
+
     return 'sin-categoria';
   }
 
