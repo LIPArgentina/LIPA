@@ -49,3 +49,5 @@
 - Se restauró el **frontend original** en la raíz de `frontend/` (sin carpeta `legacy/`).
 - Se mantuvieron también archivos como `logo_liga.png` en la raíz para compatibilidad con rutas antiguas.
 - El backend está configurado para servir `frontend/` como estático.
+
+## test deploy
