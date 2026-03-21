@@ -109,7 +109,7 @@ module.exports = function createEquiposRouter() {
       const { division } = req.query;
 
       const result = await pool.query(
-        `SELECT slug_uid, username, role, captain, email, phone
+        `SELECT id, slug_uid, username, role, captain, email, phone
            FROM equipos
           WHERE division = $1
           ORDER BY username`,
@@ -119,6 +119,7 @@ module.exports = function createEquiposRouter() {
       res.json({
         ok: true,
         teams: result.rows.map(r => ({
+          id: r.id,
           username: r.username,
           slug: r.slug_uid,
           role: r.role || 'team',

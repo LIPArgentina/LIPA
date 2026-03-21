@@ -42,7 +42,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 /* ====== Helpers ====== */
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
-function toast(msg){ const t=$('#toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 1600); }
+function toast(msg){ const t=$('#toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 1800); }
 function normalizePhone(p){ return String(p||'').trim(); }
 function slugify(s){
   return String(s||'').toLowerCase()
@@ -78,6 +78,28 @@ function clearDraft(div, team){
 function setLast(div,team){ const s=readLS(); s.division=div; s.team=team; writeLS(s); }
 function getLast(){ const s=readLS(); return { division: s.division||'primera', team: s.team||null }; }
 
+function copyToClipboard(text){
+  const value = String(text || '');
+  if (!value) return Promise.resolve(false);
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(value).then(() => true).catch(() => false);
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = value;
+    ta.setAttribute('readonly', 'readonly');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return Promise.resolve(!!ok);
+  } catch {
+    return Promise.resolve(false);
+  }
+}
+
 /* ====== Tabla izquierda (equipos de liga) ====== */
 function renderRows(users){
   const tbody = $('#tbodyTeams');
@@ -87,25 +109,81 @@ function renderRows(users){
     cap:  new Map(teams.map(u => [u.username, u.captain || ''])),
     mail: new Map(teams.map(u => [u.username, u.email   || ''])),
     tel:  new Map(teams.map(u => [u.username, u.phone   || ''])),
+    id:   new Map(teams.map(u => [u.username, u.id || null])),
   };
   const names = teams.map(u => u.username);
 
   for(let i=0;i<20;i++){
     const name  = names[i] || '';
+    const teamId = by.id.get(name) || '';
+    const canReset = Boolean(teamId);
     const tr = document.createElement('tr');
+    if (teamId) tr.dataset.teamId = String(teamId);
+
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
       <td><input class="input captain" type="text" value="${(by.cap.get(name)||'').replace(/"/g,'&quot;')}" aria-label="Capitán fila ${i+1}"></td>
       <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
       <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
-      <td><button class="btn-del-team" type="button">Eliminar</button></td>`;
+      <td class="team-actions-cell">
+        <button class="btn-reset-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${name || ('fila ' + (i+1))}" ${canReset ? '' : 'disabled'}>🔑</button>
+        <button class="btn-del-team" type="button">Eliminar</button>
+      </td>`;
+
     const del = tr.querySelector('.btn-del-team');
     del?.addEventListener('click', () => {
       const teamValue = tr.querySelector('.team')?.value?.trim() || `fila ${i+1}`;
       if(!confirm(`¿Eliminar el equipo "${teamValue}" de la tabla?`)) return;
       tr.remove();
     });
+
+    const resetBtn = tr.querySelector('.btn-reset-pass');
+    resetBtn?.addEventListener('click', async () => {
+      const teamName = tr.querySelector('.team')?.value?.trim() || `fila ${i+1}`;
+      const rawId = tr.dataset.teamId;
+      const teamId = rawId ? Number(rawId) : NaN;
+
+      if (!Number.isFinite(teamId) || teamId <= 0) {
+        alert('Ese equipo todavía no tiene ID en la base. Guardalo primero y después vas a poder blanquearle la contraseña.');
+        return;
+      }
+
+      const ok = confirm(`¿Blanquear la contraseña de "${teamName}"?\n\nSe va a generar una contraseña temporal nueva y el equipo deberá cambiarla al ingresar.`);
+      if (!ok) return;
+
+      try {
+        resetBtn.disabled = true;
+
+        const resp = await fetch(`${API_BASE}/api/admin/reset-team-password/${encodeURIComponent(teamId)}`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+
+        const tempPassword = String(data.newPassword || '').trim();
+        const copied = await copyToClipboard(tempPassword);
+
+        alert(
+          `Contraseña blanqueada para "${teamName}".\n\n` +
+          `Nueva contraseña temporal: ${tempPassword}\n\n` +
+          (copied ? 'La contraseña quedó copiada al portapapeles.' : 'Copiala y enviásela al equipo.') +
+          `\n\nAl ingresar, el equipo deberá cambiarla.`
+        );
+
+        toast(`Contraseña blanqueada: ${teamName}`);
+      } catch (err) {
+        console.error('reset-team-password', err);
+        alert(err?.message || 'No se pudo blanquear la contraseña');
+      } finally {
+        resetBtn.disabled = false;
+      }
+    });
+
     tbody.appendChild(tr);
   }
 }
@@ -133,6 +211,7 @@ async function saveTeams(){
     const json = await resp.json().catch(()=>({}));
     if(!resp.ok || !json.ok){ throw new Error(json.error || ('HTTP '+resp.status)); }
     toast('Guardado correctamente');
+    await loadDivision(_activeDiv);
   }catch(e){
     console.warn('save-teams', e);
     toast('No se pudo guardar');
@@ -140,7 +219,7 @@ async function saveTeams(){
 }
 
 /* ====== Panel derecho (plantel) ====== */
-let teamsInDiv = []; // [{ name, slug }]
+let teamsInDiv = []; // [{ id, name, slug }]
 
 function buildPlayersUI(values){
   const cont = $('#players'); cont.innerHTML = '';
@@ -339,6 +418,7 @@ async function loadTeamsForDivision(div){
     return raw
       .filter(u => u && (u.role === 'team' || u.username || u.name))
       .map(u => ({
+        id: u.id || null,
         username: u.username || u.name || '',
         role: 'team',
         captain: u.captain || '',
@@ -376,6 +456,7 @@ async function loadDivision(div){
   renderRows(users);
 
   teamsInDiv = users.map(u => ({
+    id: u.id,
     name: u.username,
     slug: u.slug || slugify(u.username)
   }));
