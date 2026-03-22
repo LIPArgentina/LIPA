@@ -2,6 +2,71 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
 
+// ===== ADMIN CRUCES (sin fecha) =====
+const crucesEnabledByTeam = new Map();
+
+function normalizeCrucesAdminKey(team) {
+  return String(team || '').trim().toLowerCase();
+}
+
+function getCrucesEntry(team) {
+  const key = normalizeCrucesAdminKey(team);
+  const enabled = crucesEnabledByTeam.get(key);
+  return { enabled: enabled !== false };
+}
+
+router.get('/status', (req, res) => {
+  const { team } = req.query;
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+  }
+
+  const state = getCrucesEntry(team);
+  res.json({ ok: true, enabled: state.enabled });
+});
+
+router.post('/enable', (req, res) => {
+  const { team } = req.body || {};
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+  }
+
+  const key = normalizeCrucesAdminKey(team);
+  crucesEnabledByTeam.set(key, true);
+
+  res.json({ ok: true, enabled: true });
+});
+
+router.post('/disable', (req, res) => {
+  const { team } = req.body || {};
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+  }
+
+  const key = normalizeCrucesAdminKey(team);
+  crucesEnabledByTeam.set(key, false);
+
+  res.json({ ok: true, enabled: false });
+});
+
+router.get('/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const send = () => {
+    res.write(`data: ping\n\n`);
+  };
+
+  const timer = setInterval(send, 10000);
+
+  req.on('close', () => {
+    clearInterval(timer);
+  });
+});
+
+// ===== CRUCES DESDE DB =====
+
 function inferCategoryFromTeamMarker(team = '') {
   const value = String(team || '').trim().toLowerCase();
   if (value === '__categoria_segunda__') return 'segunda';
@@ -80,15 +145,33 @@ async function fetchCrucesFromDB(team) {
   };
 }
 
-router.post('/', async (req, res) => {
-  const team = String(req.body?.team || '').trim();
-  if (!team) return res.status(400).json({ error: 'team requerido' });
+router.get('/cruces', async (req, res) => {
+  const team = String(req.query.team || '').trim();
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+  }
 
   try {
     const result = await fetchCrucesFromDB(team);
-    res.json({ ok: true, ...result });
+    return res.json({ ok: true, team, ...result });
   } catch (e) {
-    res.status(500).json({ error: 'error cruces' });
+    console.error('GET /cruces', e);
+    return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
+  }
+});
+
+router.post('/', async (req, res) => {
+  const team = String(req.body?.team || '').trim();
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+  }
+
+  try {
+    const result = await fetchCrucesFromDB(team);
+    return res.json({ ok: true, team, ...result });
+  } catch (e) {
+    console.error('POST /cruces', e);
+    return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
   }
 });
 
