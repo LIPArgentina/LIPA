@@ -1,4 +1,4 @@
-const express = require('express');
+hacé const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
 
@@ -572,27 +572,126 @@ router.get('/stream', (req, res) => {
 });
 
 
-// ===== GET CRUCES (faltaba este endpoint) =====
+// ===== CRUCES (GET + POST desde DB) =====
+
+async function getFixturesColumns() {
+  const { rows } = await pool.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'fixtures'
+  `);
+  return rows.map(r => r.column_name);
+}
+
+function pickExistingColumn(columns, candidates) {
+  return candidates.find(name => columns.includes(name)) || null;
+}
+
+function inferCategoryFromFechaKey(fechaKey = '') {
+  const value = String(fechaKey || '').toLowerCase();
+  if (value.includes('tercera')) return 'tercera';
+  if (value.includes('segunda')) return 'segunda';
+  return null;
+}
+
+async function fetchCrucesFromDB(team, fechaKey) {
+  const columns = await getFixturesColumns();
+
+  const localCol = pickExistingColumn(columns, [
+    'local_slug', 'equipo_local_slug', 'home_slug', 'local'
+  ]);
+
+  const visitanteCol = pickExistingColumn(columns, [
+    'visitante_slug', 'equipo_visitante_slug', 'away_slug', 'visitante'
+  ]);
+
+  const fechaKeyCol = pickExistingColumn(columns, [
+    'fecha_key', 'fecha_clave', 'fecha'
+  ]);
+
+  const kindCol = pickExistingColumn(columns, ['kind']);
+  const categoryCol = pickExistingColumn(columns, ['category']);
+
+  if (!localCol || !visitanteCol) {
+    throw new Error('Columnas de local/visitante no encontradas');
+  }
+
+  const where = [];
+  const params = [];
+  let i = 1;
+
+  if (kindCol) {
+    where.push(`${kindCol} = $${i++}`);
+    params.push('ida');
+  }
+
+  const inferredCategory = inferCategoryFromFechaKey(fechaKey);
+  if (categoryCol && inferredCategory) {
+    where.push(`${categoryCol} = $${i++}`);
+    params.push(inferredCategory);
+  }
+
+  if (fechaKeyCol) {
+    where.push(`${fechaKeyCol} = $${i++}`);
+    params.push(fechaKey);
+  }
+
+  where.push(`(
+    LOWER(TRIM(CAST(${localCol} AS text))) = $${i}
+    OR LOWER(TRIM(CAST(${visitanteCol} AS text))) = $${i}
+  )`);
+  params.push(team);
+
+  const sql = `
+    SELECT
+      ${localCol} AS local,
+      ${visitanteCol} AS visitante
+    FROM fixtures
+    WHERE ${where.join(' AND ')}
+  `;
+
+  const { rows } = await pool.query(sql, params);
+
+  return rows.map(r => ({
+    local: r.local,
+    visitante: r.visitante
+  }));
+}
+
+// GET (compatibilidad)
 router.get('/cruces', async (req, res) => {
-  const team = String(req.query.team || '').trim();
+  const team = normalizeSlug(req.query.team);
   const fechaKey = String(req.query.fechaKey || '').trim();
 
   if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros.' });
   }
 
   try {
-    // TODO: reemplazar por lectura real desde PostgreSQL
-    // Por ahora devolvemos estructura válida para el frontend
-    return res.json({
-      ok: true,
-      team,
-      fechaKey,
-      cruces: []
-    });
+    const cruces = await fetchCrucesFromDB(team, fechaKey);
+    return res.json({ ok: true, team, fechaKey, cruces });
   } catch (e) {
     console.error('GET /cruces', e);
-    return res.status(500).json({ ok: false, error: 'No se pudieron obtener los cruces.' });
+    return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
+  }
+});
+
+// POST principal
+router.post('/', async (req, res) => {
+  const team = normalizeSlug(req.body?.team);
+  const fechaKey = String(req.body?.fechaKey || '').trim();
+
+  if (!team || !fechaKey) {
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros.' });
+  }
+
+  try {
+    const cruces = await fetchCrucesFromDB(team, fechaKey);
+    return res.json({ ok: true, team, fechaKey, cruces });
+  } catch (e) {
+    console.error('POST /cruces', e);
+    return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
   }
 });
 

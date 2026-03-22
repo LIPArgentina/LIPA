@@ -1,4 +1,4 @@
-// cruces.routes.js
+// cruces.routes.db.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
@@ -334,6 +334,8 @@ router.get('/lock-status', async (req, res) => {
   }
 });
 
+
+
 // ===== ADMIN CRUCES (compatibilidad con frontend) =====
 const crucesEnabledUntilByKey = new Map();
 
@@ -438,96 +440,5 @@ router.get('/stream', (req, res) => {
     clearInterval(timer);
   });
 });
-
-// ===== CRUCES DESDE FIXTURE (compatibilidad frontend) =====
-const CATEGORY_KEYS = {
-  '__categoria_tercera__': 'tercera',
-  '__categoria_segunda__': 'segunda',
-  '__categoria_primera__': 'primera'
-};
-
-function resolveCategoryFromAccessKey(team) {
-  const raw = String(team || '').trim().toLowerCase();
-  return CATEGORY_KEYS[raw] || null;
-}
-
-function normalizeFixtureTeamName(value) {
-  return String(value || '').trim();
-}
-
-function buildCrucesFromFixtureData(data, fechaKey) {
-  const fechas = Array.isArray(data?.fechas) ? data.fechas : [];
-  const target = fechas.find((f) => String(f?.date || '').slice(0, 10) === String(fechaKey || '').slice(0, 10));
-  if (!target) return [];
-
-  const cruces = [];
-  const tablas = Array.isArray(target?.tablas) ? target.tablas : [];
-
-  for (const tabla of tablas) {
-    const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
-    for (let i = 0; i < equipos.length; i += 2) {
-      const local = normalizeFixtureTeamName(equipos[i]?.equipo);
-      const visitante = normalizeFixtureTeamName(equipos[i + 1]?.equipo);
-      if (local && visitante) {
-        cruces.push({ local, visitante });
-      }
-    }
-  }
-
-  return cruces;
-}
-
-async function loadFixtureCrucesForCategory(category, fechaKey) {
-  const { rows } = await pool.query(
-    `
-      SELECT data
-      FROM fixtures
-      WHERE kind = $1 AND category = $2
-      LIMIT 1
-    `,
-    ['ida', category]
-  );
-
-  if (!rows.length) return [];
-  return buildCrucesFromFixtureData(rows[0].data, fechaKey);
-}
-
-async function handleCrucesList(req, res) {
-  const team = req.method === 'POST' ? req.body?.team : req.query.team;
-  const fechaKey = req.method === 'POST' ? req.body?.fechaKey : req.query.fechaKey;
-
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
-  }
-
-  const category = resolveCategoryFromAccessKey(team);
-  if (!category) {
-    return res.status(400).json({ ok: false, error: 'team inválido' });
-  }
-
-  try {
-    const cruces = await loadFixtureCrucesForCategory(category, fechaKey);
-    return res.json({
-      ok: true,
-      team: String(team),
-      fechaKey: String(fechaKey),
-      category,
-      cruces
-    });
-  } catch (e) {
-    console.error(`${req.method} /cruces`, e);
-    return res.status(500).json({ ok: false, error: 'No se pudieron obtener los cruces.' });
-  }
-}
-
-// Compatibilidad total:
-//   GET  /api/cruces
-//   POST /api/cruces
-//   GET  /api/cruces/cruces
-//   POST /api/cruces/cruces
-router.get('/', handleCrucesList);
-router.post('/', handleCrucesList);
-router.get('/cruces', handleCrucesList);
-router.post('/cruces', handleCrucesList);
 
 module.exports = router;
