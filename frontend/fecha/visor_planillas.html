@@ -114,6 +114,33 @@
     0 2px 6px rgba(0,0,0,.25);
 }
 
+/* Variante tipo toolbar como "DESCARGAR PDF" */
+.btn-gold-link{
+  min-width: 150px;
+  padding: 12px 24px;
+  border-radius: 16px;
+  background: #0b0b0b;
+  border: 1px solid #8e6a12;
+  color: #f6d766;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  box-shadow: none;
+  line-height: 1;
+  text-align: center;
+}
+.btn-gold-link:hover{
+  filter: brightness(1.08);
+  background: #121212;
+}
+.btn-gold-link:active{
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.cruces-button-wrap-link{
+  justify-content: center;
+}
+
 
 /* Indicador verde/rojo (a la derecha del título) */
 .card{ position: relative; }
@@ -196,6 +223,9 @@
 <div class="cruces-button-wrap">
 <button type="button" class="btn-gold" id="btnHabilitarCrucesSegunda">habilitar cruces segunda</button>
 <div id="crucesStatusLabelSegunda" class="cruces-status-label">los cruces de segunda están deshabilitados</div>
+</div>
+<div class="cruces-button-wrap cruces-button-wrap-link">
+<a href="https://lipa.ar/export/planillas_auto.html" class="btn-gold btn-gold-link">generar cruces</a>
 </div>
 <div id="globalJsIndicator" class="fresh-indicator fresh-stale" title="Comprobando fecha de planillas…"></div>
 </div>
