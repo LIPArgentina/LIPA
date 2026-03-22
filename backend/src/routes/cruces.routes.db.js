@@ -2,7 +2,57 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
 
-// ===== CRUCES (GET + POST desde DB JSONB) =====
+// ===== ADMIN CRUCES (restaurado) =====
+const crucesEnabledUntilByKey = new Map();
+
+function normalizeCrucesAdminKey(team, fechaKey) {
+  const normalizedTeam = String(team || '').trim().toLowerCase();
+  const normalizedFecha = String(fechaKey || '').trim();
+  return `${normalizedTeam}::${normalizedFecha}`;
+}
+
+function getCrucesEntry(team, fechaKey) {
+  const now = Date.now();
+  const key = normalizeCrucesAdminKey(team, fechaKey);
+  const until = crucesEnabledUntilByKey.get(key) || null;
+
+  if (until && until <= now) {
+    crucesEnabledUntilByKey.delete(key);
+    return { enabled: false };
+  }
+
+  return { enabled: !!(until && until > now) };
+}
+
+router.get('/status', (req, res) => {
+  const { team, fechaKey } = req.query;
+  if (!team || !fechaKey) return res.status(400).json({ ok: false });
+
+  const state = getCrucesEntry(team, fechaKey);
+  res.json({ ok: true, enabled: state.enabled });
+});
+
+router.post('/enable', (req, res) => {
+  const { team, fechaKey } = req.body || {};
+  if (!team || !fechaKey) return res.status(400).json({ ok: false });
+
+  const key = normalizeCrucesAdminKey(team, fechaKey);
+  crucesEnabledUntilByKey.set(key, Date.now() + (48 * 60 * 60 * 1000));
+
+  res.json({ ok: true, enabled: true });
+});
+
+router.post('/disable', (req, res) => {
+  const { team, fechaKey } = req.body || {};
+  if (!team || !fechaKey) return res.status(400).json({ ok: false });
+
+  const key = normalizeCrucesAdminKey(team, fechaKey);
+  crucesEnabledUntilByKey.delete(key);
+
+  res.json({ ok: true, enabled: false });
+});
+
+// ===== CRUCES DESDE DB =====
 
 function inferCategoryFromTeamMarker(team = '') {
   const value = String(team || '').trim().toLowerCase();
@@ -14,31 +64,21 @@ function inferCategoryFromTeamMarker(team = '') {
 function extractCrucesByFecha(data, fechaKey) {
   const fechas = Array.isArray(data?.fechas) ? data.fechas : [];
   const targetFecha = fechas.find(f => String(f?.date || '').slice(0, 10) === String(fechaKey).slice(0, 10));
-
   if (!targetFecha) return [];
 
   const tablas = Array.isArray(targetFecha?.tablas) ? targetFecha.tablas : [];
   const cruces = [];
 
   for (const tabla of tablas) {
-    const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+    const equipos = tabla?.equipos || [];
     if (equipos.length < 2) continue;
 
-    let local = equipos.find(e => String(e?.categoria || '').toLowerCase() === 'local');
-    let visitante = equipos.find(e => String(e?.categoria || '').toLowerCase() === 'visitante');
+    const local = equipos.find(e => e.categoria === 'local') || equipos[0];
+    const visitante = equipos.find(e => e.categoria === 'visitante') || equipos[1];
 
-    if (!local && equipos[0]) local = equipos[0];
-    if (!visitante && equipos[1]) visitante = equipos[1];
-
-    const localName = String(local?.equipo || '').trim();
-    const visitanteName = String(visitante?.equipo || '').trim();
-
-    if (!localName || !visitanteName) continue;
-
-    cruces.push({
-      local: localName,
-      visitante: visitanteName
-    });
+    if (local?.equipo && visitante?.equipo) {
+      cruces.push({ local: local.equipo, visitante: visitante.equipo });
+    }
   }
 
   return cruces;
@@ -46,61 +86,32 @@ function extractCrucesByFecha(data, fechaKey) {
 
 async function fetchCrucesFromDB(team, fechaKey) {
   const category = inferCategoryFromTeamMarker(team);
-
-  if (!category) {
-    throw new Error(`Team marker inválido: ${team}`);
-  }
+  if (!category) throw new Error('categoría inválida');
 
   const { rows } = await pool.query(
-    `
-      SELECT data
-      FROM fixtures
-      WHERE kind = $1
-        AND category = $2
-      ORDER BY id DESC
-      LIMIT 1
-    `,
-    ['ida', category]
+    `SELECT data FROM fixtures WHERE kind='ida' AND category=$1 ORDER BY id DESC LIMIT 1`,
+    [category]
   );
 
   if (!rows[0]) return [];
-
   return extractCrucesByFecha(rows[0].data, fechaKey);
 }
 
-// GET /api/cruces/cruces
 router.get('/cruces', async (req, res) => {
-  const team = String(req.query.team || '').trim();
-  const fechaKey = String(req.query.fechaKey || '').trim();
-
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
-  }
-
   try {
-    const cruces = await fetchCrucesFromDB(team, fechaKey);
-    return res.json({ ok: true, team, fechaKey, cruces });
+    const cruces = await fetchCrucesFromDB(req.query.team, req.query.fechaKey);
+    res.json({ ok: true, cruces });
   } catch (e) {
-    console.error('GET /cruces', e);
-    return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
+    res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
   }
 });
 
-// POST /api/cruces
 router.post('/', async (req, res) => {
-  const team = String(req.body?.team || '').trim();
-  const fechaKey = String(req.body?.fechaKey || '').trim();
-
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
-  }
-
   try {
-    const cruces = await fetchCrucesFromDB(team, fechaKey);
-    return res.json({ ok: true, team, fechaKey, cruces });
+    const cruces = await fetchCrucesFromDB(req.body.team, req.body.fechaKey);
+    res.json({ ok: true, cruces });
   } catch (e) {
-    console.error('POST /cruces', e);
-    return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
+    res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
   }
 });
 
