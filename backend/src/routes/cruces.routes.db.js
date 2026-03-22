@@ -2,58 +2,49 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
 
-// ===== ADMIN CRUCES (restaurado) =====
-const crucesEnabledUntilByKey = new Map();
+// ===== ADMIN CRUCES (sin fecha) =====
+const crucesEnabledByTeam = new Map();
 
-function normalizeCrucesAdminKey(team, fechaKey) {
-  const normalizedTeam = String(team || '').trim().toLowerCase();
-  const normalizedFecha = String(fechaKey || '').trim();
-  return `${normalizedTeam}::${normalizedFecha}`;
+function normalizeCrucesAdminKey(team) {
+  return String(team || '').trim().toLowerCase();
 }
 
-function getCrucesEntry(team, fechaKey) {
-  const now = Date.now();
-  const key = normalizeCrucesAdminKey(team, fechaKey);
-  const until = crucesEnabledUntilByKey.get(key) || null;
-
-  if (until && until <= now) {
-    crucesEnabledUntilByKey.delete(key);
-    return { enabled: false };
-  }
-
-  return { enabled: !!(until && until > now) };
+function getCrucesEntry(team) {
+  const key = normalizeCrucesAdminKey(team);
+  const enabled = crucesEnabledByTeam.get(key);
+  return { enabled: enabled !== false };
 }
 
 router.get('/status', (req, res) => {
-  const { team, fechaKey } = req.query;
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  const { team } = req.query;
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
 
-  const state = getCrucesEntry(team, fechaKey);
+  const state = getCrucesEntry(team);
   res.json({ ok: true, enabled: state.enabled });
 });
 
 router.post('/enable', (req, res) => {
-  const { team, fechaKey } = req.body || {};
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  const { team } = req.body || {};
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
 
-  const key = normalizeCrucesAdminKey(team, fechaKey);
-  crucesEnabledUntilByKey.set(key, Date.now() + (48 * 60 * 60 * 1000));
+  const key = normalizeCrucesAdminKey(team);
+  crucesEnabledByTeam.set(key, true);
 
   res.json({ ok: true, enabled: true });
 });
 
 router.post('/disable', (req, res) => {
-  const { team, fechaKey } = req.body || {};
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  const { team } = req.body || {};
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
 
-  const key = normalizeCrucesAdminKey(team, fechaKey);
-  crucesEnabledUntilByKey.delete(key);
+  const key = normalizeCrucesAdminKey(team);
+  crucesEnabledByTeam.set(key, false);
 
   res.json({ ok: true, enabled: false });
 });
@@ -165,10 +156,9 @@ async function fetchCrucesFromDB(team) {
 
 router.get('/cruces', async (req, res) => {
   const team = String(req.query.team || '').trim();
-  const fechaKey = String(req.query.fechaKey || '').trim();
 
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
 
   try {
@@ -176,7 +166,6 @@ router.get('/cruces', async (req, res) => {
     return res.json({
       ok: true,
       team,
-      fechaKey,
       fechaFixture: result.fechaFixture,
       cruces: result.cruces
     });
@@ -188,10 +177,9 @@ router.get('/cruces', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const team = String(req.body?.team || '').trim();
-  const fechaKey = String(req.body?.fechaKey || '').trim();
 
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
 
   try {
@@ -199,7 +187,6 @@ router.post('/', async (req, res) => {
     return res.json({
       ok: true,
       team,
-      fechaKey,
       fechaFixture: result.fechaFixture,
       cruces: result.cruces
     });

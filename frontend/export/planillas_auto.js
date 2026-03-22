@@ -100,24 +100,23 @@ async function fetchJson(url, options){
   return data;
 }
 
-function fechaKeyActual(){
-  return new Date().toISOString().slice(0, 10);
-}
-
 async function checkCrucesEnabled(category){
   const team = CATEGORY_KEYS[category];
   if (!team) return false;
-  const params = new URLSearchParams({ team, fechaKey: fechaKeyActual() });
+
+  const params = new URLSearchParams({ team });
   const data = await fetchJson(`${API_BASE}/api/cruces/status?` + params.toString(), { cache: 'no-store' });
+
   return !!data?.enabled;
 }
 
 async function loadCruces(category){
   const team = CATEGORY_KEYS[category];
+
   return await fetchJson(`${API_BASE}/api/cruces`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ team, fechaKey: fechaKeyActual() })
+    body: JSON.stringify({ team })
   });
 }
 
@@ -402,7 +401,7 @@ async function reload(){
     if (!enabled) {
       state.completeSheets = [];
       renderEmpty('Los cruces de ' + categoryLabel(category) + ' no están habilitados en este momento.');
-      setStatus('warn', 'Cruces no habilitados', 'No se encontró habilitación activa para hoy.');
+      setStatus('warn', 'Cruces no habilitados', 'No se encontró habilitación activa.');
       return;
     }
 
