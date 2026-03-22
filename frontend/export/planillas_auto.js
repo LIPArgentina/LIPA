@@ -4,6 +4,17 @@ const CATEGORY_KEYS = {
   segunda: '__categoria_segunda__'
 };
 
+const TEAM_ALIASES = {
+  DOGOSBILLARDS: ['DOGOS BILLARDS', 'DOGOSBILLARDS'],
+  PRBAR: ['PR BAR', 'PRBAR'],
+  DUCKHUNTER: ['DUCK HUNTER', 'DUCK HUNTERS', 'DUCKHUNTER', 'DUCKHUNTERS'],
+  CHUAVECHITO: ['CHUAVECHITO'],
+  IMPERIOSUR: ['IMPERIO SUR', 'IMPERIOSUR'],
+  BAIRES: ['BAIRES'],
+  LOSPATOSDELTREBOL: ['LOS PATOS DEL TREBOL', 'LOSPATOSDELTREBOL'],
+  ELTREBOLDEPACHECO: ['EL TREBOL DE PACHECO', 'ELTREBOLDEPACHECO']
+};
+
 const state = {
   category: 'tercera',
   allPlanillas: [],
@@ -63,6 +74,13 @@ function teamKeyVariants(value){
 
   const noDe = baseCompact.replace(/^DE/, '');
   if (noDe) variants.add(noDe);
+
+  for (const [canonical, aliases] of Object.entries(TEAM_ALIASES)) {
+    const aliasKeys = [canonical, ...aliases].map((v) => compactKey(v)).filter(Boolean);
+    if (aliasKeys.includes(compact) || aliasKeys.includes(baseCompact) || aliasKeys.includes(slugCompact)) {
+      aliasKeys.forEach((v) => variants.add(v));
+    }
+  }
 
   return [...variants].filter(Boolean);
 }
