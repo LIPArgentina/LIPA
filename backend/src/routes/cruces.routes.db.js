@@ -572,20 +572,14 @@ router.get('/stream', (req, res) => {
 });
 
 
-// ===== CRUCES (GET + POST desde DB) =====
+// ===== CRUCES (GET + POST desde DB JSONB) =====
 
-async function getFixturesColumns() {
-  const { rows } = await pool.query(`
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'fixtures'
-  `);
-  return rows.map(r => r.column_name);
-}
-
-function pickExistingColumn(columns, candidates) {
-  return candidates.find(name => columns.includes(name)) || null;
+function normalizeTeamKey(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
 }
 
 function inferCategoryFromFechaKey(fechaKey = '') {
@@ -595,100 +589,113 @@ function inferCategoryFromFechaKey(fechaKey = '') {
   return null;
 }
 
-async function fetchCrucesFromDB(team, fechaKey) {
-  const columns = await getFixturesColumns();
+function extractCrucesFromFixtureData(data, team) {
+  const teamKey = normalizeTeamKey(team);
+  const cruces = [];
 
-  const localCol = pickExistingColumn(columns, [
-    'local_slug', 'equipo_local_slug', 'home_slug', 'local'
-  ]);
+  const fechas = Array.isArray(data?.fechas) ? data.fechas : [];
 
-  const visitanteCol = pickExistingColumn(columns, [
-    'visitante_slug', 'equipo_visitante_slug', 'away_slug', 'visitante'
-  ]);
+  for (const fecha of fechas) {
+    const tablas = Array.isArray(fecha?.tablas) ? fecha.tablas : [];
 
-  const fechaKeyCol = pickExistingColumn(columns, [
-    'fecha_key', 'fecha_clave', 'fecha'
-  ]);
+    for (const tabla of tablas) {
+      const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+      if (equipos.length < 2) continue;
 
-  const kindCol = pickExistingColumn(columns, ['kind']);
-  const categoryCol = pickExistingColumn(columns, ['category']);
+      let local = equipos.find(eq => String(eq?.categoria || '').toLowerCase() === 'local');
+      let visitante = equipos.find(eq => String(eq?.categoria || '').toLowerCase() === 'visitante');
 
-  if (!localCol || !visitanteCol) {
-    throw new Error('Columnas de local/visitante no encontradas');
+      if (!local && equipos[0]) local = equipos[0];
+      if (!visitante && equipos[1]) visitante = equipos[1];
+
+      const localName = String(local?.equipo || '').trim();
+      const visitanteName = String(visitante?.equipo || '').trim();
+
+      if (!localName || !visitanteName) continue;
+
+      const localKey = normalizeTeamKey(localName);
+      const visitanteKey = normalizeTeamKey(visitanteName);
+
+      if (teamKey === localKey || teamKey === visitanteKey) {
+        cruces.push({
+          local: localName,
+          visitante: visitanteName
+        });
+      }
+    }
   }
 
-  const where = [];
-  const params = [];
-  let i = 1;
-
-  if (kindCol) {
-    where.push(`${kindCol} = $${i++}`);
-    params.push('ida');
-  }
-
-  const inferredCategory = inferCategoryFromFechaKey(fechaKey);
-  if (categoryCol && inferredCategory) {
-    where.push(`${categoryCol} = $${i++}`);
-    params.push(inferredCategory);
-  }
-
-  if (fechaKeyCol) {
-    where.push(`${fechaKeyCol} = $${i++}`);
-    params.push(fechaKey);
-  }
-
-  where.push(`(
-    LOWER(TRIM(CAST(${localCol} AS text))) = $${i}
-    OR LOWER(TRIM(CAST(${visitanteCol} AS text))) = $${i}
-  )`);
-  params.push(team);
-
-  const sql = `
-    SELECT
-      ${localCol} AS local,
-      ${visitanteCol} AS visitante
-    FROM fixtures
-    WHERE ${where.join(' AND ')}
-  `;
-
-  const { rows } = await pool.query(sql, params);
-
-  return rows.map(r => ({
-    local: r.local,
-    visitante: r.visitante
-  }));
+  return cruces;
 }
 
-// GET (compatibilidad)
+async function fetchCrucesFromDB(team, fechaKey) {
+  const category = inferCategoryFromFechaKey(fechaKey);
+
+  if (!category) {
+    throw new Error(`No se pudo inferir category desde fechaKey: ${fechaKey}`);
+  }
+
+  const { rows } = await pool.query(
+    `
+      SELECT data
+      FROM fixtures
+      WHERE kind = $1
+        AND category = $2
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    ['ida', category]
+  );
+
+  if (!rows[0]) {
+    return [];
+  }
+
+  return extractCrucesFromFixtureData(rows[0].data, team);
+}
+
+// GET /api/cruces/cruces (compatibilidad con frontend viejo)
 router.get('/cruces', async (req, res) => {
-  const team = normalizeSlug(req.query.team);
+  const team = String(req.query.team || '').trim();
   const fechaKey = String(req.query.fechaKey || '').trim();
 
   if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros.' });
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
   }
 
   try {
     const cruces = await fetchCrucesFromDB(team, fechaKey);
-    return res.json({ ok: true, team, fechaKey, cruces });
+
+    return res.json({
+      ok: true,
+      team,
+      fechaKey,
+      cruces
+    });
   } catch (e) {
     console.error('GET /cruces', e);
     return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
   }
 });
 
-// POST principal
+// POST /api/cruces
 router.post('/', async (req, res) => {
-  const team = normalizeSlug(req.body?.team);
+  const team = String(req.body?.team || '').trim();
   const fechaKey = String(req.body?.fechaKey || '').trim();
 
   if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros.' });
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
   }
 
   try {
     const cruces = await fetchCrucesFromDB(team, fechaKey);
-    return res.json({ ok: true, team, fechaKey, cruces });
+
+    return res.json({
+      ok: true,
+      team,
+      fechaKey,
+      cruces
+    });
   } catch (e) {
     console.error('POST /cruces', e);
     return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
