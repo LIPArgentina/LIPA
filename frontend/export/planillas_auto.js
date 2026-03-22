@@ -68,10 +68,7 @@ function teamKeyVariants(value){
 }
 
 function resolvePlanillaCategory(item){
-  const raw = String(item?.team || '').toLowerCase();
-  if (/(^|[_\s-])tercera$/.test(raw) || /3ra$|3era$/.test(raw)) return 'tercera';
-  if (/(^|[_\s-])segunda$/.test(raw) || /2da$|2nda$/.test(raw)) return 'segunda';
-  return 'sin-categoria';
+  return 'todas';
 }
 
 async function fetchJson(url, options){
@@ -182,13 +179,11 @@ function extractCruces(input){
 
 function buildPlanillaIndex(planillas, category){
   const index = new Map();
-  planillas
-    .filter((item) => item.__category === category)
-    .forEach((item) => {
-      teamKeyVariants(item.team).forEach((variant) => {
-        if (!index.has(variant)) index.set(variant, item);
-      });
+  planillas.forEach((item) => {
+    teamKeyVariants(item.team).forEach((variant) => {
+      if (!index.has(variant)) index.set(variant, item);
     });
+  });
   return index;
 }
 
