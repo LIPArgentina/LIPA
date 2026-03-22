@@ -8,7 +8,6 @@
     :root{
       --bg:#000;
       --panel:#0b0b0f;
-      --panel-2:#11131a;
       --text:#fff6c1;
       --muted:#b8ab61;
       --gold:#f3cf1a;
@@ -17,6 +16,16 @@
       --danger:#ff6b6b;
       --ok:#68d391;
       --shadow:0 10px 24px rgba(0,0,0,.34);
+
+      --page-w:210mm;
+      --page-h:297mm;
+      --page-w-px:793.701px;
+      --page-h-px:1122.52px;
+      --page-pad:10mm;
+      --sheet-zoom:0.62;
+      --sheet-gap:22px;
+      --grid-border:2px solid #000;
+      --logo-col:140px;
     }
 
     *{ box-sizing:border-box; }
@@ -100,94 +109,292 @@
     .status-text{ font-size:15px; color:#fff9cf; }
     .meta{ font-size:13px; color:var(--muted); }
 
-    .grid{
-      display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:18px;
+    .sheets-stack{
+      display:grid;
+      gap:var(--sheet-gap);
+      justify-items:center;
+      align-content:start;
     }
 
-    .sheet-card{
-      background:linear-gradient(180deg,var(--panel-2),#08090d);
-      border:1px solid rgba(243,207,26,.18);
-      border-radius:22px; overflow:hidden; box-shadow:var(--shadow);
-      min-width:0;
+    .sheet-shell{
+      width:calc(var(--page-w-px) * var(--sheet-zoom));
+      min-width:calc(var(--page-w-px) * var(--sheet-zoom));
     }
 
     .sheet-head{
-      padding:14px 16px; border-bottom:1px solid rgba(243,207,26,.14);
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-      background:rgba(243,207,26,.05);
+      margin-bottom:10px;
+      padding:12px 14px;
+      border-radius:18px;
+      background:linear-gradient(180deg,var(--panel),#070708);
+      border:1px solid rgba(243,207,26,.18);
+      box-shadow:var(--shadow);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
     }
 
     .sheet-title{
-      margin:0; font-size:20px; color:var(--gold-2); font-weight:900; text-transform:uppercase; line-height:1.1;
+      margin:0;
+      font-size:20px;
+      color:var(--gold-2);
+      font-weight:900;
+      text-transform:uppercase;
+      line-height:1.1;
     }
 
     .sheet-sub{
-      margin-top:4px; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.4px;
+      margin-top:4px;
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.4px;
     }
 
-    .sheet-body{ padding:14px; }
+    .sheet-viewport{
+      width:calc(var(--page-w-px) * var(--sheet-zoom));
+      height:calc(var(--page-h-px) * var(--sheet-zoom));
+      overflow:hidden;
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      background:#d9d9d9;
+    }
 
-    .compact-sheet{
-      background:#fff; color:#000; border-radius:14px; padding:12px; overflow:auto;
+    .sheet-page{
+      width:var(--page-w-px);
+      min-height:var(--page-h-px);
+      padding:var(--page-pad);
+      background:#fff;
+      color:#000;
+      transform:scale(var(--sheet-zoom));
+      transform-origin:top left;
+      border:1px solid #000;
+    }
+
+    .page-meta{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-size:12px;
+      color:#333;
+      margin-bottom:2mm;
     }
 
     .league-title{
-      text-align:center; font-size:16px; font-weight:900; text-transform:uppercase; margin:0 0 8px 0;
+      margin:0;
+      text-align:center;
+      font-size:24px;
+      font-weight:800;
+      letter-spacing:.5px;
+      text-transform:uppercase;
     }
 
-    .bar{ height:8px; background:#c9c9c9; margin-bottom:10px; }
+    .bar{
+      height:14px;
+      background:#b5b5b5;
+      margin:6px 0 14px;
+    }
 
-    table{ width:100%; border-collapse:collapse; table-layout:fixed; }
-    td, th{ border:2px solid #000; padding:4px 6px; font-size:11px; }
-    th{ font-weight:900; text-transform:uppercase; background:#fff; }
-    .center{ text-align:center; }
-    .bold{ font-weight:800; }
+    .header-grid{
+      display:grid;
+      grid-template-columns:1fr var(--logo-col) 1fr;
+      align-items:start;
+      column-gap:18px;
+      margin-top:2px;
+    }
 
-    .header-grid{ display:grid; grid-template-columns:1fr 70px 1fr; gap:8px; align-items:start; margin-bottom:10px; }
     .logo-box{
-      display:flex; align-items:center; justify-content:center; min-height:60px;
-      font-weight:900; font-size:12px; text-transform:uppercase; text-align:center;
+      display:grid;
+      place-items:center;
+      min-height:64px;
     }
-    .logo-box img{ max-width:100%; max-height:52px; object-fit:contain; display:block; }
 
-    .spacer{ height:10px; }
+    .logo-box img{
+      max-width:100%;
+      max-height:64px;
+      object-fit:contain;
+      display:block;
+    }
 
-    .sig-grid{ display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:22px; }
-    .sig{ text-align:center; }
-    .sig-line{ border-top:1px dotted #000; height:0; margin-bottom:8px; }
-    .sig-label{ font-size:11px; font-weight:900; text-transform:uppercase; }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      table-layout:fixed;
+      color:#000;
+    }
+
+    td, th{
+      border:var(--grid-border);
+      padding:0;
+      font-size:14px;
+      background:#fff;
+    }
+
+    .form td, .form th{ height:30px; }
+    .label-cell{
+      width:95px;
+      font-weight:800;
+      text-transform:uppercase;
+      text-align:center;
+      white-space:nowrap;
+      padding:4px 6px;
+    }
+
+    .section{ margin-top:14px; }
+
+    .ind-head th{
+      font-weight:800;
+      text-transform:uppercase;
+      text-align:center;
+      font-size:14px;
+      height:28px;
+      letter-spacing:.3px;
+    }
+
+    .ind-row td{ height:26px; }
+    .center-col{
+      vertical-align:middle;
+      font-weight:700;
+      text-align:center;
+      border-left:var(--grid-border);
+      border-right:var(--grid-border);
+    }
+
+    .doubles-section{
+      margin-top:12px;
+      position:relative;
+      padding-top:18px;
+    }
+
+    .doubles-label{
+      position:absolute;
+      top:-12px;
+      left:50%;
+      transform:translateX(-50%);
+      padding:3px 16px;
+      font-weight:800;
+      text-transform:uppercase;
+      background:#fff;
+    }
+
+    .doubles td{ height:28px; }
+    .vs-merged{
+      text-align:center;
+      font-weight:700;
+      vertical-align:middle;
+    }
+
+    .result-section{ margin-top:18px; }
+    .result th, .result td{ height:28px; }
+    .result th{
+      text-transform:uppercase;
+      font-weight:800;
+      text-align:center;
+      font-size:14px;
+    }
+    .tri-left, .tri-right{
+      font-weight:800;
+      text-transform:uppercase;
+      font-size:12px;
+    }
+    .tri-left{ text-align:right; padding-right:10px; }
+    .tri-right{ text-align:left; padding-left:10px; }
+    .tri-left::after{ content: ":"; margin-left:.2ch; }
+    .tri-right::before{ content: ":"; margin-right:.2ch; }
+
+    .subs{
+      margin-top:18px;
+    }
+
+    .subs-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      column-gap:40px;
+      align-items:start;
+    }
+
+    .subs-table th, .subs-table td{ height:26px; }
+    .subs-table th{
+      text-transform:uppercase;
+      font-weight:800;
+      text-align:center;
+      font-size:14px;
+    }
+
+    .signatures{
+      margin-top:70px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      column-gap:120px;
+      align-items:end;
+    }
+
+    .sig{
+      display:grid;
+      justify-items:center;
+      gap:12px;
+      padding-top:10px;
+    }
+
+    .sig-line{
+      width:85%;
+      border-top:1px dotted #000;
+      height:0;
+    }
+
+    .sig-label{
+      font-size:14px;
+      font-weight:800;
+      text-transform:uppercase;
+      color:#000;
+    }
 
     .empty{
       background:linear-gradient(180deg,var(--panel),#080808);
       border:1px dashed rgba(243,207,26,.25);
       border-radius:18px; padding:42px 22px; text-align:center; color:var(--muted);
       box-shadow:var(--shadow);
+      width:100%;
     }
 
     .hint{ font-size:13px; color:var(--muted); }
 
-    @media (max-width: 1380px){
-      .grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
-    }
-
     @media (max-width: 920px){
-      .grid{ grid-template-columns:1fr; }
       .brand h1{ font-size:28px; }
-      .header-grid{ grid-template-columns:1fr; }
       .brand img{ height:48px; }
       .topbar-inner{ justify-content:center; }
       .toolbar{ justify-content:center; }
+      :root{ --sheet-zoom:0.43; }
     }
 
     @media print{
+      @page{ size:A4 portrait; margin:10mm; }
+
       body{ background:#fff !important; color:#000 !important; }
-      .topbar, .status-card{ display:none !important; }
+      .topbar, .status-card, .sheet-head{ display:none !important; }
       .page{ max-width:none; padding:0; }
-      .grid{ display:block; }
-      .sheet-card{ break-inside:avoid; page-break-inside:avoid; border:none; box-shadow:none; margin:0 0 12mm 0; }
-      .sheet-head{ display:none; }
-      .sheet-body{ padding:0; }
-      .compact-sheet{ border-radius:0; padding:0; }
+      .sheets-stack{ display:block; }
+      .sheet-shell, .sheet-viewport{
+        width:auto !important;
+        height:auto !important;
+        min-width:0 !important;
+        overflow:visible !important;
+        box-shadow:none !important;
+        border-radius:0 !important;
+        background:transparent !important;
+      }
+      .sheet-page{
+        width:210mm !important;
+        min-height:297mm !important;
+        transform:none !important;
+        border:none !important;
+        box-shadow:none !important;
+        padding:0 !important;
+        margin:0 0 0 0 !important;
+        break-after:page;
+      }
+      .page-meta{ display:none !important; }
     }
   </style>
 </head>
@@ -221,10 +428,10 @@
           <div class="meta" id="statusMeta">Esperando datos del backend</div>
         </div>
       </div>
-      <div class="hint" id="statusHint">Se muestran solo los cruces que ya tienen ambas planillas cargadas.</div>
+      <div class="hint" id="statusHint">Las planillas se renderizan en A4 fijo y en pantalla se ajustan con zoom general.</div>
     </section>
 
-    <section class="grid" id="grid"></section>
+    <section class="sheets-stack" id="grid"></section>
   </main>
 
   <script src="./planillas_auto.js"></script>

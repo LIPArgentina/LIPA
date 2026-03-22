@@ -234,55 +234,60 @@ function escapeHtml(value){
     .replace(/'/g, '&#39;');
 }
 
-function createIndRows(local, visitante){
-  const l = safeArr(local?.individuales, 7);
-  const v = safeArr(visitante?.individuales, 7);
-  return l.map((name, idx) => `
-    <tr>
+function individualRows(local, visitante){
+  const left = safeArr(local?.individuales, 7);
+  const right = safeArr(visitante?.individuales, 7);
+
+  return left.map((name, idx) => {
+    if(idx === 0){
+      return `<tr class="ind-row">
+        <td>${escapeHtml(name)}</td>
+        <td></td>
+        <td class="center-col" rowspan="7">VS.</td>
+        <td></td>
+        <td>${escapeHtml(right[idx])}</td>
+      </tr>`;
+    }
+    return `<tr class="ind-row">
       <td>${escapeHtml(name)}</td>
-      <td class="center bold">${idx + 1}</td>
-      <td class="center bold">VS.</td>
-      <td class="center bold">${idx + 1}</td>
-      <td>${escapeHtml(v[idx])}</td>
-    </tr>
-  `).join('');
+      <td></td>
+      <td></td>
+      <td>${escapeHtml(right[idx])}</td>
+    </tr>`;
+  }).join('');
 }
 
-function createPairRows(pairA, pairB){
-  const a = safeArr(pairA, 2);
-  const b = safeArr(pairB, 2);
-  return `
-    <tr>
-      <td>${escapeHtml(a[0])}</td>
-      <td class="center bold" rowspan="2">VS.</td>
-      <td>${escapeHtml(b[0])}</td>
-    </tr>
-    <tr>
-      <td>${escapeHtml(a[1])}</td>
-      <td>${escapeHtml(b[1])}</td>
-    </tr>
-  `;
+function doublesRows(localPair, visitantePair){
+  const l = safeArr(localPair, 2);
+  const r = safeArr(visitantePair, 2);
+  return `<tr>
+    <td>${escapeHtml(l[0])}</td>
+    <td rowspan="2"></td>
+    <td class="vs-merged" rowspan="2">VS.</td>
+    <td rowspan="2"></td>
+    <td>${escapeHtml(r[0])}</td>
+  </tr>
+  <tr>
+    <td>${escapeHtml(l[1])}</td>
+    <td>${escapeHtml(r[1])}</td>
+  </tr>`;
 }
 
-function createSubsRows(local, visitante){
-  const l = safeArr(local?.suplentes, 2);
-  const v = safeArr(visitante?.suplentes, 2);
-  return `
-    <tr><td>${escapeHtml(l[0])}</td><td>${escapeHtml(v[0])}</td></tr>
-    <tr><td>${escapeHtml(l[1])}</td><td>${escapeHtml(v[1])}</td></tr>
-  `;
+function subsRows(items){
+  const rows = safeArr(items, 2);
+  return rows.map((v) => `<tr><td>${escapeHtml(v)}</td></tr>`).join('');
 }
 
-function renderSheet(item){
+function renderSheet(item, index){
   const localTeam = text(item.localTeamName);
   const visitanteTeam = text(item.visitanteTeamName);
   const localPlan = item.localPlan || {};
   const visitantePlan = item.visitantePlan || {};
-  const localCap = safeArr(localPlan.capitan, 2);
-  const visitCap = safeArr(visitantePlan.capitan, 2);
+  const localCap = safeArr(localPlan.capitan, 2).filter(Boolean).join(' / ');
+  const visitCap = safeArr(visitantePlan.capitan, 2).filter(Boolean).join(' / ');
 
   const article = document.createElement('article');
-  article.className = 'sheet-card';
+  article.className = 'sheet-shell';
   article.innerHTML = `
     <div class="sheet-head">
       <div>
@@ -290,75 +295,159 @@ function renderSheet(item){
         <div class="sheet-sub">${escapeHtml(categoryLabel(item.category))}</div>
       </div>
     </div>
-    <div class="sheet-body">
-      <div class="compact-sheet">
-        <div class="league-title">Liga de Pool Independiente</div>
+
+    <div class="sheet-viewport">
+      <section class="sheet-page">
+        <div class="page-meta">
+          <span>Categoría: ${escapeHtml(categoryLabel(item.category))}</span>
+          <span>Planilla ${index + 1}</span>
+        </div>
+
+        <h1 class="league-title">LIGA DE POOL INDEPENDIENTE</h1>
         <div class="bar"></div>
 
         <div class="header-grid">
-          <table aria-label="Datos sala local">
-            <tr><td class="bold center" style="width:74px;">SALA</td><td></td></tr>
-            <tr><td class="bold center">CAPITANÍA</td><td>${escapeHtml(localCap.filter(Boolean).join(' / '))}</td></tr>
-          </table>
-          <div class="logo-box">
-            <img src="../logo_liga.png" alt="Logo Liga" onerror="this.style.display='none'; this.parentNode.textContent='LIPA';" />
+          <div>
+            <table class="form" aria-label="Datos de sala local">
+              <tr>
+                <td class="label-cell">SALA</td>
+                <td>${escapeHtml(localTeam)}</td>
+              </tr>
+              <tr>
+                <td class="label-cell">CAPITANÍA</td>
+                <td>${escapeHtml(localCap)}</td>
+              </tr>
+            </table>
           </div>
-          <table aria-label="Datos sala visitante">
-            <tr><td></td><td class="bold center" style="width:74px;">SALA</td></tr>
-            <tr><td>${escapeHtml(visitCap.filter(Boolean).join(' / '))}</td><td class="bold center">CAPITANÍA</td></tr>
+
+          <div class="logo-box">
+            <img src="../logo_liga.png" alt="Logo Liga" onerror="this.style.display='none';" />
+          </div>
+
+          <div>
+            <table class="form" aria-label="Datos de sala visitante">
+              <tr>
+                <td>${escapeHtml(visitanteTeam)}</td>
+                <td class="label-cell">SALA</td>
+              </tr>
+              <tr>
+                <td>${escapeHtml(visitCap)}</td>
+                <td class="label-cell">CAPITANÍA</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="section">
+          <table class="ind-table" aria-label="Partidos individuales">
+            <colgroup>
+              <col style="width:32.5%">
+              <col style="width:5%">
+              <col style="width:25%">
+              <col style="width:5%">
+              <col style="width:32.5%">
+            </colgroup>
+            <thead class="ind-head">
+              <tr>
+                <th colspan="2">Nombre y apellido</th>
+                <th>Individuales</th>
+                <th colspan="2">Nombre y apellido</th>
+              </tr>
+            </thead>
+            <tbody>${individualRows(localPlan, visitantePlan)}</tbody>
           </table>
         </div>
 
-        <table aria-label="Equipos enfrentados" style="margin-bottom:10px;">
-          <tr>
-            <th>${escapeHtml(localTeam)}</th>
-            <th style="width:64px;">VS.</th>
-            <th>${escapeHtml(visitanteTeam)}</th>
-          </tr>
-        </table>
-
-        <table aria-label="Individuales">
-          <thead>
-            <tr>
-              <th colspan="2">Nombre y apellido</th>
-              <th style="width:52px;">Ind.</th>
-              <th style="width:52px;">Ind.</th>
-              <th>Nombre y apellido</th>
-            </tr>
-          </thead>
-          <tbody>${createIndRows(localPlan, visitantePlan)}</tbody>
-        </table>
-
-        <div class="spacer"></div>
-        <table aria-label="Pareja 1">
-          <thead><tr><th>Pareja 1</th><th style="width:64px;">VS.</th><th>Pareja 1</th></tr></thead>
-          <tbody>${createPairRows(localPlan.pareja1, visitantePlan.pareja1)}</tbody>
-        </table>
-
-        <div class="spacer"></div>
-        <table aria-label="Pareja 2">
-          <thead><tr><th>Pareja 2</th><th style="width:64px;">VS.</th><th>Pareja 2</th></tr></thead>
-          <tbody>${createPairRows(localPlan.pareja2, visitantePlan.pareja2)}</tbody>
-        </table>
-
-        <div class="spacer"></div>
-        <table aria-label="Suplentes">
-          <thead><tr><th>Suplentes</th><th>Suplentes</th></tr></thead>
-          <tbody>${createSubsRows(localPlan, visitantePlan)}</tbody>
-        </table>
-
-        <div class="sig-grid">
-          <div class="sig"><div class="sig-line"></div><div class="sig-label">Firma local</div></div>
-          <div class="sig"><div class="sig-line"></div><div class="sig-label">Firma visitante</div></div>
+        <div class="doubles-section">
+          <div class="doubles-label">Parejas 1</div>
+          <table class="doubles" aria-label="Partidos de parejas 1">
+            <colgroup>
+              <col style="width:32.5%">
+              <col style="width:5%">
+              <col style="width:25%">
+              <col style="width:5%">
+              <col style="width:32.5%">
+            </colgroup>
+            <tbody>${doublesRows(localPlan.pareja1, visitantePlan.pareja1)}</tbody>
+          </table>
         </div>
-      </div>
+
+        <div class="doubles-section">
+          <div class="doubles-label">Parejas 2</div>
+          <table class="doubles" aria-label="Partidos de parejas 2">
+            <colgroup>
+              <col style="width:32.5%">
+              <col style="width:5%">
+              <col style="width:25%">
+              <col style="width:5%">
+              <col style="width:32.5%">
+            </colgroup>
+            <tbody>${doublesRows(localPlan.pareja2, visitantePlan.pareja2)}</tbody>
+          </table>
+        </div>
+
+        <div class="result-section">
+          <table class="result" aria-label="Resultado final">
+            <colgroup>
+              <col style="width:42%">
+              <col style="width:8%">
+              <col style="width:8%">
+              <col style="width:42%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Sala</th>
+                <th colspan="2">Resultado Final</th>
+                <th>Sala</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td></td><td></td><td></td><td></td></tr>
+              <tr>
+                <td class="tri-left">Triángulos Totales</td>
+                <td></td>
+                <td></td>
+                <td class="tri-right">Triángulos Totales</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subs">
+          <div class="subs-grid">
+            <div>
+              <table class="subs-table" aria-label="Suplentes local">
+                <thead><tr><th>Suplentes</th></tr></thead>
+                <tbody>${subsRows(localPlan.suplentes)}</tbody>
+              </table>
+            </div>
+            <div>
+              <table class="subs-table" aria-label="Suplentes visitante">
+                <thead><tr><th>Suplentes</th></tr></thead>
+                <tbody>${subsRows(visitantePlan.suplentes)}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="signatures">
+          <div class="sig">
+            <div class="sig-line"></div>
+            <div class="sig-label">Firma local</div>
+          </div>
+          <div class="sig">
+            <div class="sig-line"></div>
+            <div class="sig-label">Firma visitante</div>
+          </div>
+        </div>
+      </section>
     </div>
   `;
   return article;
 }
 
 function renderEmpty(message){
-  grid.innerHTML = `<div class="empty" style="grid-column:1 / -1;">${escapeHtml(message)}</div>`;
+  grid.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
 }
 
 function buildCompleteSheets(cruces, planillas, category){
@@ -387,7 +476,7 @@ function renderSheets(sheets){
     renderEmpty('Todavía no hay cruces completos para mostrar en esta categoría.');
     return;
   }
-  sheets.forEach((item) => grid.appendChild(renderSheet(item)));
+  sheets.forEach((item, index) => grid.appendChild(renderSheet(item, index)));
 }
 
 async function reload(){
