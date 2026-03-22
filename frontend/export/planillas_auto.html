@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planillas automáticas | LIPA</title>
+  <style>
+    :root{
+      --bg:#000;
+      --panel:#0b0b0f;
+      --panel-2:#11131a;
+      --text:#fff6c1;
+      --muted:#b8ab61;
+      --gold:#f3cf1a;
+      --gold-2:#ffea6b;
+      --line:#4c3d00;
+      --danger:#ff6b6b;
+      --ok:#68d391;
+      --shadow:0 10px 24px rgba(0,0,0,.34);
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family:Arial, Helvetica, sans-serif; }
+    body{ min-height:100vh; }
+
+    .topbar{
+      position:sticky; top:0; z-index:20;
+      background:rgba(0,0,0,.95);
+      backdrop-filter: blur(6px);
+      border-bottom:1px solid rgba(243,207,26,.18);
+      padding:10px 20px;
+    }
+
+    .topbar-inner{
+      max-width:1700px; margin:0 auto;
+      display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    }
+
+    .brand{
+      display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    }
+
+    .brand img{ height:60px; width:auto; display:block; }
+
+    .brand h1{
+      margin:0; font-size:36px; line-height:1; color:var(--gold); letter-spacing:.5px; font-weight:900; text-transform:uppercase;
+    }
+
+    .toolbar{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;
+    }
+
+    .toolbar-main{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+
+    .segmented{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+
+    .btn{
+      appearance:none; border:1px solid rgba(243,207,26,.35); background:linear-gradient(180deg,#1a1a12,#090909);
+      color:var(--gold-2); font-weight:800; text-transform:uppercase; letter-spacing:.3px;
+      border-radius:14px; padding:11px 16px; cursor:pointer; transition:.18s ease;
+      box-shadow:var(--shadow); text-decoration:none;
+    }
+    .btn:hover{ transform:translateY(-1px); border-color:rgba(243,207,26,.55); }
+    .btn.active{ background:linear-gradient(180deg,#ffe24b,#f3c900); color:#111; border-color:#f4d84f; }
+    .btn.secondary{ color:#fff3ae; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; transform:none; }
+
+    .btn-gold{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:11px 18px; border-radius:14px;
+      background:linear-gradient(180deg,#ffd86a 0%, #e8b127 100%);
+      border:1px solid #8e6a12; color:#111; font-weight:900;
+      letter-spacing:.5px; text-transform:uppercase; text-decoration:none;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.35);
+      transition:filter .15s ease, transform .05s ease;
+    }
+    .btn-gold:hover{ filter:brightness(1.05); transform:translateY(-1px); }
+    .btn-gold:active{ transform:translateY(1px); }
+
+    .page{
+      max-width:1700px; margin:0 auto; padding:24px 20px 38px;
+    }
+
+    .status-card{
+      display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+      background:linear-gradient(180deg,var(--panel),#070708);
+      border:1px solid rgba(243,207,26,.18);
+      border-radius:20px; padding:16px 18px; box-shadow:var(--shadow); margin-bottom:22px;
+    }
+
+    .status-main{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .status-dot{ width:12px; height:12px; border-radius:999px; background:#666; box-shadow:0 0 0 4px rgba(255,255,255,.04); }
+    .status-dot.ok{ background:var(--ok); }
+    .status-dot.warn{ background:#f6c343; }
+    .status-dot.error{ background:var(--danger); }
+    .status-text{ font-size:15px; color:#fff9cf; }
+    .meta{ font-size:13px; color:var(--muted); }
+
+    .grid{
+      display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:18px;
+    }
+
+    .sheet-card{
+      background:linear-gradient(180deg,var(--panel-2),#08090d);
+      border:1px solid rgba(243,207,26,.18);
+      border-radius:22px; overflow:hidden; box-shadow:var(--shadow);
+      min-width:0;
+    }
+
+    .sheet-head{
+      padding:14px 16px; border-bottom:1px solid rgba(243,207,26,.14);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      background:rgba(243,207,26,.05);
+    }
+
+    .sheet-title{
+      margin:0; font-size:20px; color:var(--gold-2); font-weight:900; text-transform:uppercase; line-height:1.1;
+    }
+
+    .sheet-sub{
+      margin-top:4px; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.4px;
+    }
+
+    .sheet-body{ padding:14px; }
+
+    .compact-sheet{
+      background:#fff; color:#000; border-radius:14px; padding:12px; overflow:auto;
+    }
+
+    .league-title{
+      text-align:center; font-size:16px; font-weight:900; text-transform:uppercase; margin:0 0 8px 0;
+    }
+
+    .bar{ height:8px; background:#c9c9c9; margin-bottom:10px; }
+
+    table{ width:100%; border-collapse:collapse; table-layout:fixed; }
+    td, th{ border:2px solid #000; padding:4px 6px; font-size:11px; }
+    th{ font-weight:900; text-transform:uppercase; background:#fff; }
+    .center{ text-align:center; }
+    .bold{ font-weight:800; }
+
+    .header-grid{ display:grid; grid-template-columns:1fr 70px 1fr; gap:8px; align-items:start; margin-bottom:10px; }
+    .logo-box{
+      display:flex; align-items:center; justify-content:center; min-height:60px;
+      font-weight:900; font-size:12px; text-transform:uppercase; text-align:center;
+    }
+    .logo-box img{ max-width:100%; max-height:52px; object-fit:contain; display:block; }
+
+    .spacer{ height:10px; }
+
+    .sig-grid{ display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:22px; }
+    .sig{ text-align:center; }
+    .sig-line{ border-top:1px dotted #000; height:0; margin-bottom:8px; }
+    .sig-label{ font-size:11px; font-weight:900; text-transform:uppercase; }
+
+    .empty{
+      background:linear-gradient(180deg,var(--panel),#080808);
+      border:1px dashed rgba(243,207,26,.25);
+      border-radius:18px; padding:42px 22px; text-align:center; color:var(--muted);
+      box-shadow:var(--shadow);
+    }
+
+    .hint{ font-size:13px; color:var(--muted); }
+
+    @media (max-width: 1380px){
+      .grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 920px){
+      .grid{ grid-template-columns:1fr; }
+      .brand h1{ font-size:28px; }
+      .header-grid{ grid-template-columns:1fr; }
+      .brand img{ height:48px; }
+      .topbar-inner{ justify-content:center; }
+      .toolbar{ justify-content:center; }
+    }
+
+    @media print{
+      body{ background:#fff !important; color:#000 !important; }
+      .topbar, .status-card{ display:none !important; }
+      .page{ max-width:none; padding:0; }
+      .grid{ display:block; }
+      .sheet-card{ break-inside:avoid; page-break-inside:avoid; border:none; box-shadow:none; margin:0 0 12mm 0; }
+      .sheet-head{ display:none; }
+      .sheet-body{ padding:0; }
+      .compact-sheet{ border-radius:0; padding:0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <a href="../index.html" title="Inicio"><img src="../logo_liga.png" alt="LIPA" /></a>
+        <h1>Planillas automáticas</h1>
+      </div>
+      <div class="toolbar">
+        <div class="toolbar-main">
+          <div class="segmented" id="categoryButtons">
+            <button class="btn active" data-category="tercera" type="button">Tercera</button>
+            <button class="btn" data-category="segunda" type="button">Segunda</button>
+          </div>
+          <button class="btn secondary" id="btnRefresh" type="button">Actualizar</button>
+          <button class="btn" id="btnPdf" type="button">Descargar PDF</button>
+        </div>
+        <a class="btn-gold" href="../admin.html">Volver</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="status-card">
+      <div class="status-main">
+        <div class="status-dot" id="statusDot"></div>
+        <div>
+          <div class="status-text" id="statusText">Cargando planillas...</div>
+          <div class="meta" id="statusMeta">Esperando datos del backend</div>
+        </div>
+      </div>
+      <div class="hint" id="statusHint">Se muestran solo los cruces que ya tienen ambas planillas cargadas.</div>
+    </section>
+
+    <section class="grid" id="grid"></section>
+  </main>
+
+  <script src="./planillas_auto.js"></script>
+</body>
+</html>
