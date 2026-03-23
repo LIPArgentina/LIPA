@@ -91,24 +91,19 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
   }
 
   function isSameLocalDay(value){
-  try{
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return false;
+    try{
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return false;
 
-    const now = new Date();
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
-    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-
-    return target.getTime() === today.getTime() ||
-           target.getTime() === yesterday.getTime();
-  }catch(_){
-    return false;
-  }
-}catch(_){
+      return target.getTime() === today.getTime() ||
+        target.getTime() === yesterday.getTime();
+    }catch(_){
       return false;
     }
   }
