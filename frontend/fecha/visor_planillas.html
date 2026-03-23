@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Visor de Planillas (múltiple) | LPI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&amp;display=swap" rel="stylesheet"/>
+<style>
+
+  :root{
+    --bg:#0a0a0a; --ink:#fff; --line:#ffffff22;
+    --gold:#ffd966; --gold-ink:#1b1600;
+  }
+  *{ box-sizing:border-box }
+  html,body{ height:100% }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  a{ color:inherit; text-decoration:none }
+  .container{ max-width:1400px; margin:0 auto; padding:0 12px 18px; }
+
+  header.site-header{
+    position:sticky;
+    top:0;
+    z-index:1000;
+    background:#0a0a0a;
+    border-bottom:1px solid var(--line);
+    padding:6px 10px 10px;
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    grid-template-areas:
+      "brand actions right";
+    align-items:start;
+    column-gap:18px;
+  }
+  .brand-wrap{
+    grid-area:brand;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    min-width:0;
+    padding-top:2px;
+  }
+  .brand-wrap img{ height:54px; width:auto; display:block; flex:0 0 auto; }
+  .title{
+    margin:0;
+    font-weight:900;
+    letter-spacing:.04em;
+    font-size:clamp(18px,3.1vw,27px);
+    color:var(--gold);
+    line-height:1.05;
+    white-space:nowrap;
+  }
+
+  .top-actions{
+    grid-area:actions;
+    justify-self:center;
+    align-self:start;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:nowrap;
+    margin-top:0;
+    padding-top:2px;
+  }
+  .cruces-button-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    min-width:176px;
+  }
+  .cruces-button-wrap-link{
+    min-width:auto;
+    align-self:flex-start;
+    padding-top:2px;
+  }
+  .cruces-status-label{
+    margin-top:5px;
+    font-size:11px;
+    line-height:1.15;
+    color:var(--gold);
+    text-align:center;
+    display:block;
+    max-width:170px;
+  }
+
+  .top-right-actions{
+    grid-area:right;
+    display:flex;
+    gap:8px;
+    align-self:start;
+    justify-self:end;
+    padding-top:2px;
+  }
+
+  #alert{ position:fixed; left:50%; transform:translateX(-50%); top:80px; z-index:2000; display:none;
+    background:#ff2d2d; color:#fff; padding:10px 14px; border-radius:8px; border:2px solid #ffb3b3; box-shadow:0 8px 24px rgba(0,0,0,.45); font-weight:900; }
+
+  .grid-boards{ display:grid; gap:18px; grid-template-columns: repeat(4, 1fr); }
+  @media (max-width:1200px){ .grid-boards{ grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width:900px){ .grid-boards{ grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width:580px){ .grid-boards{ grid-template-columns: 1fr; } }
+
+  .card{ position: relative; border:1px solid var(--line); border-radius:14px; padding:6px; background:#0f0f11; box-shadow:0 10px 24px #0006; }
+  .card h2{ margin:2px 0 4px; font-size:16px; letter-spacing:.04em; color:var(--gold); text-align:center; }
+
+  .board{ zoom:0.72; transform-origin: top center; max-width:420px; margin:0; }
+  .groups{ display:grid; gap:14px; }
+  .group{ border:1px dashed #ffffff22; border-radius:12px; padding:10px; background:#101217; }
+  .group h3{ margin:0 0 8px; font-size:14px; letter-spacing:.10em; text-transform:uppercase; opacity:.9; }
+  .grid{ display:grid; gap:8px; grid-template-columns:1fr; }
+  .slot{
+    display:grid;
+    grid-template-columns:56px 1fr;
+    align-items:center;
+    gap:8px;
+    border:1px solid #ffffff22;
+    border-radius:10px;
+    padding:6px 10px;
+    background:#0f1116;
+  }
+  .nro{
+    width:34px; height:34px; display:grid; place-items:center; border-radius:9px;
+    background:var(--gold); color:var(--gold-ink); font-weight:900;
+    box-shadow:inset 0 -3px 0 #b28900;
+  }
+  .yellow-box{
+    min-height:34px; display:flex; align-items:center; padding:0 10px; border-radius:8px;
+    background:linear-gradient(180deg,#f9f1c4,#ffd966); color:#0b0900; font-weight:800;
+    box-shadow:inset 0 -3px 0 #b28900;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;
+  }
+
+  .actions{ margin-top:10px; display:flex; justify-content:center; }
+  .btn{ background:#0b1224; color:#e2e8f0; border:1px solid rgba(255,255,255,.15); padding:6px 10px; border-radius:8px; cursor:pointer; }
+  .btn:hover{ filter:brightness(1.1) }
+  .btn.small{font-size:12px}
+  @media print{ .actions{ display:none !important; } }
+
+  .container, .card, .board, .panel, .frame { height:auto !important; min-height:0 !important; }
+  #boards { align-items:flex-start !important; }
+
+  .btn-gold{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:46px;
+    padding:9px 16px;
+    border-radius:14px;
+    background:linear-gradient(180deg, #ffd86a 0%, #e8b127 100%);
+    border:1px solid #8e6a12;
+    color:#111;
+    font-weight:800;
+    font-size:.82rem;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+    text-decoration:none;
+    text-align:center;
+    line-height:1.18;
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.6),
+      0 3px 8px rgba(0,0,0,.35);
+    transition:filter .15s ease, transform .05s ease;
+  }
+  .btn-gold:hover{ filter:brightness(1.05); }
+  .btn-gold:active{
+    transform:translateY(1px);
+    box-shadow:
+      inset 0 1px 0 rgba(0,0,0,.15),
+      0 2px 6px rgba(0,0,0,.25);
+  }
+
+  .btn-gold-link{
+    min-width:142px;
+    padding:10px 18px;
+    min-height:42px;
+    border-radius:14px;
+    background:#0b0b0b;
+    border:1px solid #8e6a12;
+    color:#f6d766;
+    font-weight:900;
+    box-shadow:none;
+  }
+  .btn-gold-link:hover{ filter:brightness(1.08); background:#121212; }
+  .btn-gold-link:active{ transform:translateY(1px); box-shadow:none; }
+
+  .btn-gold.volver{
+    min-height:auto;
+    padding:6px 12px;
+    font-size:.76rem;
+    border-radius:12px;
+    min-width:auto;
+    white-space:nowrap;
+  }
+
+  .fresh-indicator{
+    width:20px; height:20px; border-radius:9999px; border:1px solid rgba(255,255,255,.25);
+    box-shadow:0 1px 2px rgba(0,0,0,.4); background:#a3a3a3;
+    align-self:flex-start;
+    margin-top:9px;
+    flex:0 0 auto;
+  }
+  .fresh-ok{ background:#22c55e !important; }
+  .fresh-stale{ background:#ef4444 !important; }
+
+  .category-filter-bar{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+    padding:18px 0 14px;
+  }
+  .btn-filter{ min-width:119px; text-align:center; }
+  .btn-filter.active{
+    filter:brightness(1.08);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.6),
+      0 0 0 2px rgba(255,217,102,.30),
+      0 3px 8px rgba(0,0,0,.35);
+  }
+  .category-filter-status{ font-size:12px; color:var(--gold); opacity:.95; }
+  .empty-state{
+    grid-column:1 / -1;
+    border:1px dashed var(--line);
+    border-radius:14px;
+    padding:22px;
+    text-align:center;
+    color:var(--gold);
+    background:#0f0f11;
+    font-weight:700;
+  }
+  .category-pill{
+    display:inline-block;
+    margin:0 auto 6px;
+    padding:4px 10px;
+    border-radius:999px;
+    border:1px solid rgba(255,217,102,.35);
+    color:var(--gold);
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    background:rgba(255,217,102,.08);
+  }
+
+  @media (max-width: 1240px){
+    header.site-header{
+      grid-template-columns:auto 1fr;
+      grid-template-areas:
+        "brand right"
+        "actions actions";
+      row-gap:8px;
+    }
+    .top-actions{ justify-self:center; flex-wrap:wrap; }
+  }
+
+  @media (max-width: 760px){
+    .container{ padding:0 10px 16px; }
+    header.site-header{
+      grid-template-columns:1fr;
+      grid-template-areas:
+        "brand"
+        "actions"
+        "right";
+      row-gap:10px;
+      padding:8px 10px 10px;
+    }
+    .brand-wrap{ justify-content:flex-start; }
+    .title{ white-space:normal; }
+    .top-actions{
+      justify-self:start;
+      width:100%;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .top-right-actions{ justify-self:end; }
+  }
+
+  @media (max-width: 520px){
+    .brand-wrap img{ height:42px; }
+    .title{ font-size:1.35rem; }
+    .top-actions{ gap:8px; }
+    .cruces-button-wrap{ min-width:150px; flex:1 1 150px; }
+    .cruces-button-wrap-link{ flex:1 1 100%; }
+    .btn-gold{ width:100%; font-size:.76rem; padding:8px 12px; min-height:42px; }
+    .btn-gold-link{ width:100%; }
+    .top-right-actions{ width:100%; justify-self:stretch; justify-content:flex-end; }
+  }
+
+  @media print{
+    .top-actions, .top-right-actions{ display:none !important; }
+  }
+
+</style>
+</head>
+<body>
+<div id="alert" role="alert"></div>
+<header class="site-header">
+  <div class="brand-wrap">
+    <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
+    <h1 class="title">VISOR DE PLANILLAS</h1>
+  </div>
+
+  <div class="top-actions">
+    <div class="cruces-button-wrap">
+      <button type="button" class="btn-gold" id="btnHabilitarCrucesTercera">habilitar cruces tercera</button>
+      <div id="crucesStatusLabelTercera" class="cruces-status-label">los cruces de tercera están deshabilitados</div>
+    </div>
+
+    <div class="cruces-button-wrap">
+      <button type="button" class="btn-gold" id="btnHabilitarCrucesSegunda">habilitar cruces segunda</button>
+      <div id="crucesStatusLabelSegunda" class="cruces-status-label">los cruces de segunda están deshabilitados</div>
+    </div>
+
+    <div class="cruces-button-wrap cruces-button-wrap-link">
+      <a href="https://lipa.ar/export/planillas_auto.html" class="btn-gold btn-gold-link">generar cruces</a>
+    </div>
+
+    <div id="globalJsIndicator" class="fresh-indicator fresh-stale" title="Comprobando fecha de planillas…"></div>
+  </div>
+
+  <div class="top-right-actions">
+    <a class="btn-gold volver" href="../admin.html">volver</a>
+  </div>
+</header>
+<div class="container">
+<main>
+<section class="category-filter-bar" aria-label="Filtros de categoría">
+<button type="button" class="btn-gold btn-filter" data-category-filter="tercera" aria-pressed="false">tercera</button>
+<button type="button" class="btn-gold btn-filter" data-category-filter="segunda" aria-pressed="false">segunda</button>
+<span id="categoryFilterStatus" class="category-filter-status">Mostrando todas las planillas</span>
+</section>
+<section aria-label="Planillas por equipo" class="grid-boards" id="boards">
+<!-- Se generan por JS -->
+</section>
+</main>
+</div>
+
+
+  <script src="visor_planillas.js"></script>
+</body>
+</html>
