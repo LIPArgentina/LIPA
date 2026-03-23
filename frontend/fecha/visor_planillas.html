@@ -18,8 +18,8 @@
   .container{ max-width:1400px; margin:0 auto; padding:   0px 0px 0px; }
 
   /* Header simple */
-  header{ position:sticky; top:0; z-index:1000; background:#0a0a0a; border-bottom:1px solid var(--line);  position:relative;}
-  .hwrap{ display:flex; align-items:center; gap:12px; padding:10px 0; }
+  header{ position:sticky; top:0; z-index:1000; background:#0a0a0a; border-bottom:1px solid var(--line); position:relative; padding:10px 0 16px; }
+  .hwrap{ display:flex; align-items:center; gap:12px; padding:0; min-height:60px; }
   header img{ height:60px; width:auto; display:block }
   .title{ margin:0; font-weight:900; letter-spacing:.06em; font-size:clamp(18px,3.8vw,26px); color:var(--gold); }
   .spacer{ flex:1 }
@@ -92,13 +92,14 @@
 /* Botón dorado estilo "FIXTURE" */
 .btn-gold{
   display:inline-block;
-  padding:8px 18px;
-  border-radius:14px;
+  padding:7px 15px;
+  border-radius:12px;
   background:linear-gradient(180deg, #ffd86a 0%, #e8b127 100%);
   border:1px solid #8e6a12;
   color:#111;
   font-weight:800;
-  letter-spacing:.5px;
+  font-size: .85rem;
+  letter-spacing:.04em;
   text-transform:uppercase;
   text-decoration:none;
   box-shadow:
@@ -116,9 +117,9 @@
 
 /* Variante tipo toolbar como "DESCARGAR PDF" */
 .btn-gold-link{
-  min-width: 150px;
-  padding: 12px 24px;
-  border-radius: 16px;
+  min-width: 128px;
+  padding: 10px 20px;
+  border-radius: 14px;
   background: #0b0b0b;
   border: 1px solid #8e6a12;
   color: #f6d766;
@@ -140,6 +141,11 @@
 .cruces-button-wrap-link{
   justify-content: center;
 }
+.btn-gold.volver{
+  padding:5px 10px;
+  font-size:.72rem;
+  min-width:auto;
+}
 
 
 /* Indicador verde/rojo (a la derecha del título) */
@@ -152,12 +158,20 @@
 
 
 /* Botón centrado en el header */
-.center-action{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:1001;text-align:center}
-.center-action-inner{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap}
-.cruces-button-wrap{display:flex;flex-direction:column;align-items:center;text-align:center}
-.cruces-status-label{margin-top:4px;font-size:11px;color:var(--gold);text-align:center;display:block}
+.center-action{position:static;transform:none;z-index:1001;text-align:center;margin:8px auto 0;padding:0 96px 0 0;}
+.center-action-inner{display:flex;align-items:flex-start;gap:8px;justify-content:center;flex-wrap:wrap}
+.cruces-button-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;max-width:190px}
+.cruces-status-label{margin-top:4px;font-size:10px;line-height:1.2;color:var(--gold);text-align:center;display:block}
+@media (max-width:760px){
+  header{ padding:10px 0 12px; }
+  .hwrap{ min-height:auto; }
+  .top-right-actions{ position:static; justify-content:center; margin-top:8px; }
+  .center-action{ padding:0; margin-top:10px; }
+  .center-action-inner{ gap:10px; }
+  .cruces-button-wrap{ max-width:none; }
+}
 @media (max-width:520px){
-  .center-action{top:60px}
+  .center-action-inner{ flex-direction:column; align-items:center; }
 }
 @media print{ .center-action{ display:none !important; } }
 
@@ -171,7 +185,7 @@
   padding:18px 0 14px;
 }
 .btn-filter{
-  min-width:140px;
+  min-width:119px;
   text-align:center;
 }
 .btn-filter.active{
@@ -234,13 +248,6 @@
 </div>
 <div id="globalJsIndicator" class="fresh-indicator fresh-stale" title="Comprobando fecha de planillas…"></div>
 </div>
-</div>
-<div class="top-right-actions">
-<a class="btn-gold volver" href="../admin.html">volver</a>
-</div>
-<a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
-<h1 class="title">VISOR DE PLANILLAS</h1>
-<div class="spacer"></div>
 </div>
 <div class="top-right-actions">
 <a class="btn-gold volver" href="../admin.html">volver</a>
