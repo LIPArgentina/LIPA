@@ -540,7 +540,8 @@ function wireCategoryButtons(){
 
 function wireToolbar(){
   $('#btnRefresh').addEventListener('click', reload);
-  $('#btnPdf').addEventListener('click', () => window.print());
+  $('#btnPdfZip').addEventListener('click', () => exportAllSheets('pdf'));
+  $('#btnJpgZip').addEventListener('click', () => exportAllSheets('jpg'));
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -548,3 +549,122 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireToolbar();
   await reload();
 });
+
+
+function slugify(value){
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+}
+
+function sheetFileName(item, ext){
+  const left = slugify(item.localTeamName || 'local');
+  const right = slugify(item.visitanteTeamName || 'visitante');
+  const cat = slugify(item.category || state.category || 'categoria');
+  return `planilla-${cat}-${left}-vs-${right}.${ext}`;
+}
+
+async function clonePageForCapture(pageEl){
+  const clone = pageEl.cloneNode(true);
+  clone.style.transform = 'none';
+  clone.style.transformOrigin = 'top left';
+  clone.style.width = '793.701px';
+  clone.style.minHeight = '1122.52px';
+  clone.style.position = 'fixed';
+  clone.style.left = '-10000px';
+  clone.style.top = '0';
+  clone.style.zIndex = '-1';
+  clone.style.margin = '0';
+  clone.style.background = '#fff';
+  clone.style.boxShadow = 'none';
+  clone.style.border = '1px solid #000';
+  document.body.appendChild(clone);
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  return clone;
+}
+
+async function renderSheetCanvas(sheetShell){
+  const pageEl = sheetShell.querySelector('.sheet-page');
+  if (!pageEl) throw new Error('No se encontró la planilla para exportar.');
+
+  const clone = await clonePageForCapture(pageEl);
+  try {
+    const canvas = await html2canvas(clone, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      width: 794,
+      height: 1123,
+      windowWidth: 794,
+      windowHeight: 1123
+    });
+    return canvas;
+  } finally {
+    clone.remove();
+  }
+}
+
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function exportSheetAsPdf(sheetShell, item){
+  const canvas = await renderSheetCanvas(sheetShell);
+  const imgData = canvas.toDataURL('image/png');
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true
+  });
+  pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+  pdf.save(sheetFileName(item, 'pdf'));
+}
+
+async function exportSheetAsJpg(sheetShell, item){
+  const canvas = await renderSheetCanvas(sheetShell);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.96));
+  if (!blob) throw new Error('No se pudo generar la imagen JPG.');
+  downloadBlob(blob, sheetFileName(item, 'jpg'));
+}
+
+async function exportAllSheets(kind){
+  const shells = Array.from(document.querySelectorAll('.sheet-shell'));
+  if (!shells.length || !state.completeSheets.length) {
+    setStatus('warn', 'No hay planillas para exportar', 'Primero cargá una categoría con cruces completos.');
+    return;
+  }
+
+  const label = kind === 'pdf' ? 'PDFs' : 'JPGs';
+  setStatus('warn', 'Preparando descargas...', `Generando ${state.completeSheets.length} archivo(s) ${label} individuales`);
+
+  try {
+    for (let i = 0; i < shells.length; i++) {
+      const shell = shells[i];
+      const item = state.completeSheets[i];
+      if (kind === 'pdf') {
+        await exportSheetAsPdf(shell, item);
+      } else {
+        await exportSheetAsJpg(shell, item);
+      }
+      await sleep(350);
+    }
+
+    setStatus('ok', `Descarga iniciada: ${label}`, `Se generaron ${shells.length} archivo(s) individuales.`);
+  } catch (error) {
+    console.error(error);
+    setStatus('error', 'No se pudieron exportar las planillas', error?.message || 'Error al generar los archivos.');
+  }
+}
