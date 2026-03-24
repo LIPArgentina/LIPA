@@ -7,47 +7,36 @@
     <link rel="stylesheet" href="./cruces_fecha.css" />
   </head>
   <body>
-
-  <!-- HEADER FUERA DEL #pageScaleRoot -->
   <div class="header-bg">
     <div class="container">
       <header class="lpi-top" role="banner">
-        <a href="../index.html" aria-label="Ir al inicio" class="logo-link" id="homeLink">
-          <img class="liga-logo" id="logoImg" src="../logo_liga.png" alt="Logo de la liga" width="60" height="60" />
+        <a href="../index.html" class="logo-link" id="homeLink">
+          <img class="liga-logo" id="logoImg" src="../logo_liga.png" width="60" height="60" />
         </a>
-        <h1 class="title" id="headerTitle">CRUCES</h1>
-        <nav class="actions" aria-label="Acciones de navegación">
-          <a class="btn" id="btnVolver" href="#" aria-label="Volver">VOLVER</a>
+        <h1 class="title">CRUCES</h1>
+        <nav class="actions">
+          <a class="btn" id="btnVolver" href="#">VOLVER</a>
         </nav>
       </header>
     </div>
   </div>
-
-  <!-- SOLO EL CONTENIDO ESCALADO -->
   <div id="pageScaleRoot">
-
     <main class="container content-under-header" id="app-root">
       <div id="appError" class="error" style="display:none;"></div>
       <div class="cruces-grid" id="crucesGrid">
-        <section id="planilla-root-left" aria-label="Planilla local"></section>
-        <section id="planilla-root-right" aria-label="Planilla visitante"></section>
+        <section id="planilla-root-left"></section>
+        <section id="planilla-root-right"></section>
       </div>
-
-      <!-- BOTÓN CENTRADO -->
       <div class="validate-cta" id="validateCta" style="display:none;">
         <button class="btn-validate" id="btnValidarGlobal">VALIDAR PLANILLA</button>
       </div>
     </main>
-
-    <!-- CARD TEMPLATE -->
     <template id="card-template">
       <div class="wrap">
         <div class="card">
           <h2 class="title"></h2>
           <div class="meta"></div>
-          <div class="hint" aria-live="polite"></div>
           <div class="sections"></div>
-
           <div class="totals-wrap">
             <div class="totals-chip">
               <span class="label">TRIÁNGULOS TOTALES</span>
@@ -56,25 +45,17 @@
               </div>
             </div>
           </div>
-
           <div class="wins-wrap">
             <div class="wins-chip">
               <span class="label">PUNTOS</span>
               <div class="wins-box" data-wins>0</div>
             </div>
           </div>
-
         </div>
       </div>
     </template>
-
   </div>
-
-  <!-- CONFIG GLOBAL (IMPORTANTE) -->
   <script src="../config.js"></script>
-
-  <!-- SCRIPT DE CRUCES -->
   <script src="./cruces_fecha.js" defer></script>
-
 </body>
 </html>
