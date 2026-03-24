@@ -15,17 +15,21 @@ const TEAM_ALIASES = {
   LOSPATOSDELTREBOL: ['LOS PATOS DEL TREBOL', 'LOSPATOSDELTREBOL'],
   ELTREBOLDEPACHECO: ['EL TREBOL DE PACHECO', 'ELTREBOLDEPACHECO'],
   ELTREBOLMORENO: ['EL TREBOL MORENO', 'ELTREBOLMORENO'],
+  ELTREBOL: ['EL TREBOL', 'ELTREBOL'],
   SEGUNDADELTREBOL: ['SEGUNDA DEL TREBOL', 'SEGUNDADELTREBOL'],
   ACADEMIADEPOOL: ['ACADEMIA DE POOL', 'ACADEMIA DE POOL ARGENTINA', 'ACADEMIADEPOOL', 'ACADEMIADEPOOLARGENTINA'],
   VICTORIA: ['VICTORIA'],
   TAKOSFUSION: ['TAKOS FUSION', 'TAKOSFUSION'],
   TAKOSPRO: ['TAKOS PRO', 'TAKOSPRO'],
+  TAKOS: ["TAKO'S", 'TAKOS'],
   WHYNOT: ['WHY NOT', 'WHYNOT'],
   THECUES: ['THE CUES', 'THECUES'],
   OLDIES3RA: ['OLDIES 3RA', 'OLDIES3RA'],
   OLDIES: ['OLDIES'],
   ANEXO2DA: ['ANEXO 2DA', 'ANEXO2DA'],
-  ANEXO: ['ANEXO']
+  ANEXO: ['ANEXO'],
+  _8910BALL: ['8910 BALL', '8910BALL'],
+  MALENA: ['MALENA']
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -35,7 +39,6 @@ const leftRoot = $('#planilla-root-left');
 const rightRoot = $('#planilla-root-right');
 const validateCta = $('#validateCta');
 const btnVolver = $('#btnVolver');
-const template = $('#card-template');
 
 function getCategoryFromURL(){
   const qs = new URLSearchParams(location.search);
@@ -94,15 +97,6 @@ function sameTeam(a, b){
 
 function text(value){
   return String(value || '').trim();
-}
-
-function safeArr(value, expected){
-  const arr = Array.isArray(value) ? value.map(text) : [];
-  if (typeof expected === 'number') {
-    while (arr.length < expected) arr.push('');
-    return arr.slice(0, expected);
-  }
-  return arr;
 }
 
 function escapeHtml(value){
@@ -277,58 +271,77 @@ function findPlanilla(index, teamName){
   return null;
 }
 
+function rowHtml(name, idx){
+  const value = text(name);
+  if (!value) {
+    return `<div class="row"><div class="badge">${idx + 1}</div><div class="slot is-empty">Sin cargar</div></div>`;
+  }
+  return `<div class="row"><div class="badge">${idx + 1}</div><div class="slot" data-full="${escapeHtml(value)}">${escapeHtml(value)}</div></div>`;
+}
+
 function sectionHtml(label, values){
-  const arr = Array.isArray(values) ? values : [values];
-  const textRows = arr.map((v) => text(v)).filter(Boolean);
+  const arr = Array.isArray(values) ? values.map(text) : [text(values)];
+  const filled = arr.filter(Boolean);
+  const rows = (filled.length ? arr : ['']).map((v, i) => rowHtml(v, i)).join('');
   return `
-    <section class="section-block">
-      <h3>${escapeHtml(label)}</h3>
-      <div class="section-lines">
-        ${textRows.length ? textRows.map((v) => `<div class="line">${escapeHtml(v)}</div>`).join('') : '<div class="line empty">Sin cargar</div>'}
-      </div>
-    </section>
+    <div class="section">
+      <h2>${escapeHtml(label)}</h2>
+      ${rows}
+    </div>
   `;
 }
 
-function buildSections(plan){
-  return [
-    sectionHtml('CAPITÁN', safeArr(plan?.capitan, 1)),
-    sectionHtml('INDIVIDUALES', safeArr(plan?.individuales, 7)),
-    sectionHtml('PAREJA 1', safeArr(plan?.pareja1, 2)),
-    sectionHtml('PAREJA 2', safeArr(plan?.pareja2, 2)),
-    sectionHtml('SUPLENTES', safeArr(plan?.suplentes, 2))
-  ].join('');
-}
-
-function renderSide(root, sideLabel, teamName, item, matchDate){
-  root.innerHTML = '';
-  const fragment = template.content.firstElementChild.cloneNode(true);
-  const card = fragment.querySelector('.card');
-  const title = fragment.querySelector('.title');
-  const meta = fragment.querySelector('.meta');
-  const hint = fragment.querySelector('.hint');
-  const sections = fragment.querySelector('.sections');
-  const totalInput = fragment.querySelector('.total-input');
-  const winsBox = fragment.querySelector('[data-wins]');
-
+function renderPlanilla(root, sideLabel, teamName, item, matchDate){
   const plan = item?.planilla || item?.plan || null;
 
-  title.textContent = String(teamName || '').toUpperCase();
-  meta.textContent = `${sideLabel} · ${matchDate || 'Sin fecha'}`;
-  hint.textContent = plan ? 'Planilla cargada desde DB.' : 'Planilla no encontrada para este equipo.';
-  sections.innerHTML = buildSections(plan || {});
-  if (totalInput) totalInput.value = '0';
-  if (winsBox) winsBox.textContent = '0';
+  if (!plan) {
+    root.innerHTML = `
+      <div class="wrap">
+        <div class="card">
+          <h2 class="title">${escapeHtml(String(teamName || '').toUpperCase())}</h2>
+          <div class="meta">${escapeHtml(sideLabel)} · ${escapeHtml(matchDate || 'Sin fecha')}</div>
+          <div class="hint">Planilla no encontrada</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
 
-  if (!plan) card.classList.add('is-missing');
-  root.appendChild(fragment);
+  root.innerHTML = `
+    <div class="wrap">
+      <div class="card">
+        <h2 class="title">${escapeHtml(String(teamName || '').toUpperCase())}</h2>
+        <div class="meta">${escapeHtml(sideLabel)} · ${escapeHtml(matchDate || 'Sin fecha')}</div>
+        <div class="hint">Planilla cargada desde DB.</div>
+
+        ${sectionHtml('CAPITÁN', Array.isArray(plan.capitan) ? plan.capitan.slice(0, 1) : [plan.capitan])}
+        ${sectionHtml('INDIVIDUALES', Array.isArray(plan.individuales) ? plan.individuales.slice(0, 7) : [])}
+        ${sectionHtml('PAREJA 1', Array.isArray(plan.pareja1) ? plan.pareja1.slice(0, 2) : [])}
+        ${sectionHtml('PAREJA 2', Array.isArray(plan.pareja2) ? plan.pareja2.slice(0, 2) : [])}
+        ${sectionHtml('SUPLENTES', Array.isArray(plan.suplentes) ? plan.suplentes.slice(0, 2) : [])}
+
+        <div class="totals-wrap">
+          <div class="totals-chip">
+            <span class="label">TRIÁNGULOS TOTALES</span>
+            <div class="total-box"><input value="0" readonly></div>
+          </div>
+        </div>
+
+        <div class="wins-wrap">
+          <div class="wins-chip">
+            <span class="label">PUNTOS</span>
+            <div class="wins-box">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderMessage(message){
   leftRoot.innerHTML = '';
   rightRoot.innerHTML = '';
   validateCta.style.display = 'none';
-  appRoot.insertAdjacentHTML('beforeend', '');
   errorBox.style.display = 'block';
   errorBox.innerHTML = `<h2 style="color:#ffe65a; margin:0;">${escapeHtml(message)}</h2>`;
 }
@@ -388,8 +401,8 @@ async function init(){
     const localItem = findPlanilla(index, cruce.local);
     const visitanteItem = findPlanilla(index, cruce.visitante);
 
-    renderSide(leftRoot, 'LOCAL', cruce.local, localItem, cruce.date);
-    renderSide(rightRoot, 'VISITANTE', cruce.visitante, visitanteItem, cruce.date);
+    renderPlanilla(leftRoot, 'LOCAL', cruce.local, localItem, cruce.date);
+    renderPlanilla(rightRoot, 'VISITANTE', cruce.visitante, visitanteItem, cruce.date);
   } catch (error) {
     console.error(error);
     renderMessage(error?.message || 'Error cargando cruces');
