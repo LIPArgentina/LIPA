@@ -1,494 +1,1061 @@
-const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-tt82.onrender.com').replace(/\/+$/, '') + '/api';
+/* cruces_fecha.js — FINAL: TRIÁNGULOS ARRIBA, PUNTOS ABAJO, PAREJAS 1 SELECT, RUTA ../fecha/ */
+(() => {
+  'use strict';  // ---------------- UTILS ----------------
+  const dtf = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' });
 
-const CATEGORY_KEYS = {
-  tercera: '__categoria_tercera__',
-  segunda: '__categoria_segunda__'
-};
+  const normalize = (s = '', { stripHyphens = false } = {}) => {
+    const map = {
+      'á':'a','é':'e','í':'i','ó':'o','ú':'u','ñ':'n','ü':'u',
+      'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U','Ñ':'N','Ü':'U'
+    };
+    let out = String(s).toLowerCase()
+      .replace(/[áéíóúñüÁÉÍÓÚÑÜ]/g, c => map[c])
+      .replace(/[''´`]/g, '')
+      .replace(/[^a-z0-9_-]/g, '');
+    out = out.replace(/\s+/g, '');
+    if (stripHyphens) out = out.replace(/-/g, '');
+    return out.replace(/-+/g, '-').replace(/^-|-$/g, '');
+  };
 
-const TEAM_ALIASES = {
-  DOGOSBILLARDS: ['DOGOS BILLARDS', 'DOGOSBILLARDS'],
-  PRBAR: ['PR BAR', 'PRBAR'],
-  DUCKHUNTER: ['DUCK HUNTER', 'DUCKHUNTER'],
-  CHUAVECHITO: ['CHUAVECHITO'],
-  IMPERIOSUR: ['IMPERIO SUR', 'IMPERIOSUR'],
-  BAIRES: ['BAIRES'],
-  LOSPATOSDELTREBOL: ['LOS PATOS DEL TREBOL', 'LOSPATOSDELTREBOL'],
-  ELTREBOLDEPACHECO: ['EL TREBOL DE PACHECO', 'ELTREBOLDEPACHECO'],
-  ELTREBOLMORENO: ['EL TREBOL MORENO', 'ELTREBOLMORENO'],
-  SEGUNDADELTREBOL: ['SEGUNDA DEL TREBOL', 'SEGUNDADELTREBOL'],
-  ACADEMIADEPOOL: ['ACADEMIA DE POOL', 'ACADEMIA DE POOL ARGENTINA', 'ACADEMIADEPOOL', 'ACADEMIADEPOOLARGENTINA'],
-  VICTORIA: ['VICTORIA'],
-  TAKOSFUSION: ['TAKOS FUSION', 'TAKOSFUSION'],
-  TAKOSPRO: ['TAKOS PRO', 'TAKOSPRO'],
-  WHYNOT: ['WHY NOT', 'WHYNOT'],
-  THECUES: ['THE CUES', 'THECUES'],
-  OLDIES3RA: ['OLDIES 3RA', 'OLDIES3RA'],
-  OLDIES: ['OLDIES'],
-  ANEXO2DA: ['ANEXO 2DA', 'ANEXO2DA'],
-  ANEXO: ['ANEXO']
-};
+  const normPlanillaSlug = (name) => normalize(name, { stripHyphens: true });
 
-const SCORE_SECTIONS = [
-  { key: 'capitan', label: 'CAPITÁN', count: 1, editable: true },
-  { key: 'individuales', label: 'INDIVIDUALES', count: 7, editable: true },
-  { key: 'pareja1', label: 'PAREJA 1', count: 2, editable: true },
-  { key: 'pareja2', label: 'PAREJA 2', count: 2, editable: true },
-  { key: 'suplentes', label: 'SUPLENTES', count: 2, editable: false }
-];
+  const parseISOAsLocal = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0);
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? new Date() : d;
+  };
 
-const $ = (sel) => document.querySelector(sel);
-const errorBox = $('#appError');
-const leftRoot = $('#planilla-root-left');
-const rightRoot = $('#planilla-root-right');
-const validateCta = $('#validateCta');
-const btnValidarGlobal = $('#btnValidarGlobal');
-const btnVolver = $('#btnVolver');
-const template = $('#card-template');
+  const formatDate = (iso) => {
+    try { return dtf.format(parseISOAsLocal(iso)); }
+    catch { return String(iso || ''); }
+  };
 
-let currentContext = null;
+  // ---------------- DATA LOADING ----------------
+  async function loadJson(src) {
+    const r = await fetch(src, { cache: 'no-store' });
+    if (!r.ok) throw new Error('No se pudo cargar ' + src + ' (' + r.status + ')');
+    return r.json();
+  }
 
-function getCategoryFromURL() {
-  const qs = new URLSearchParams(location.search);
-  const raw = String(qs.get('cat') || '').trim().toLowerCase();
-  if (raw.includes('terc')) return 'tercera';
-  if (raw.includes('seg')) return 'segunda';
-  return raw;
-}
+  async function loadAllFixtures() {
+    const isFile = location.protocol === 'file:';
+    const apiBase = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG?.API_BASE_URL) ? APP_CONFIG.API_BASE_URL : '';
+    const localWinBase = 'file:///C:/Users/javie/Desktop/LIGA/frontend/fixture/';
+    const httpBase = apiBase ? (apiBase.replace(/\/$/, '') + '/fixture/') : '/fixture/';
+    const relBase = '/frontend/fixture/';
+    const names = [
+      'fixture.ida.tercera.json',
+      'fixture.vuelta.tercera.json',
+      'fixture.ida.segunda.json',
+      'fixture.vuelta.segunda.json'
+    ];
 
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/&/g, ' Y ')
-    .replace(/[._-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase();
-}
+    const sources = isFile
+      ? [...names.map(n => localWinBase + n), ...names.map(n => httpBase + n), ...names.map(n => relBase + n)]
+      : [...names.map(n => httpBase + n), ...names.map(n => relBase + n)];
 
-function compactKey(value) {
-  return normalizeText(value).replace(/[^A-Z0-9]/g, '');
-}
+    const results = await Promise.allSettled(sources.map(src => loadJson(src)));
+    const all = [];
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'fulfilled' && results[i].value?.fechas) {
+        all.push({ src: sources[i], fechas: results[i].value.fechas });
+      }
+    }
+    if (!all.length) throw new Error('No se pudo cargar fixture.');
+    return all;
+  }
 
-function teamKeyVariants(value) {
-  const raw = String(value || '');
-  const normalized = normalizeText(raw);
-  const variants = new Set();
-  const compact = compactKey(raw);
-  if (compact) variants.add(compact);
-
-  const baseNormalized = normalized
-    .replace(/\b(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const baseCompact = baseNormalized.replace(/[^A-Z0-9]/g, '');
-  if (baseCompact) variants.add(baseCompact);
-
-  const slugCompact = compact.replace(/(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)$/g, '');
-  if (slugCompact) variants.add(slugCompact);
-
-  for (const [canonical, aliases] of Object.entries(TEAM_ALIASES)) {
-    const aliasKeys = [canonical, ...aliases].map((v) => compactKey(v)).filter(Boolean);
-    if (aliasKeys.includes(compact) || aliasKeys.includes(baseCompact) || aliasKeys.includes(slugCompact)) {
-      aliasKeys.forEach((v) => variants.add(v));
+  function* iteratePairs(equipos) {
+    for (let i = 0; i + 1 < equipos.length; i += 2) {
+      const a = equipos[i], b = equipos[i + 1];
+      const getName = (x) => (typeof x === 'string') ? x : String(x?.equipo || '').trim();
+      const catA = String(a?.categoria || '').toLowerCase();
+      const catB = String(b?.categoria || '').toLowerCase();
+      let left = a, right = b;
+      // Si vienen invertidos, los acomodamos por categoria
+      if (catA === 'visitante' && catB === 'local') {
+        left = b; right = a;
+      } else if (catA === 'local' && catB === 'visitante') {
+        left = a; right = b;
+      } else if (catA === 'local' && !catB) {
+        left = a; right = b;
+      } else if (!catA && catB === 'visitante') {
+        left = a; right = b;
+      } else if (catA === 'visitante' && !catB) {
+        // si solo A es visitante, lo pasamos a la derecha
+        left = b; right = a;
+      } else if (!catA && catB === 'local') {
+        // si solo B es local, lo pasamos a la izquierda
+        left = b; right = a;
+      }
+      yield [ getName(left), getName(right) ];
     }
   }
 
-  return [...variants].filter(Boolean);
+  function findAllMatchesForTeam(fixtures, teamSlug) {
+    const matches = [];
+    for (const fix of fixtures) {
+      for (const fecha of fix.fechas) {
+        for (const tabla of (fecha.tablas || [])) {
+          const equipos = (tabla.equipos || []);
+          for (const [loc, vis] of iteratePairs(equipos)) {
+            const nLoc = normPlanillaSlug(loc);
+            const nVis = normPlanillaSlug(vis);
+            if (nLoc === teamSlug || nVis === teamSlug) {
+              matches.push({ local: loc, visitante: vis, date: fecha.date, localSlug: nLoc, visitanteSlug: nVis });
+            }
+          }
+        }
+      }
+    }
+    return matches;
+  }
+
+function pickBestByClosestDate(matches) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Parseo local de 'YYYY-MM-DD' (evita corrimiento UTC)
+  const _parseISOAsLocal = (iso) => {
+    if (!iso) return new Date('Invalid');
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return new Date('Invalid');
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  };
+
+  // Fechas únicas del fixture (por día)
+  const dates = Array.from(new Set(matches.map(m => String(m.date).slice(0,10))));
+  if (dates.length === 0) return null;
+
+  // Candidatas: aquellas cuyo rango [D-5, D+1] contiene "today"
+  const candidates = [];
+  for (const key of dates) {
+    const d = _parseISOAsLocal(key);
+    const start = new Date(d.getTime() - 5*24*60*60*1000);
+    const end   = new Date(d.getTime() + 1*24*60*60*1000);
+    if (today >= start && today <= end) {
+      candidates.push({ key, diff: Math.abs(d - today) });
+    }
+  }
+  if (candidates.length === 0) return null;
+
+  // Elegimos la de menor |D - today| (si hubiera dos, quedará la más cercana)
+  candidates.sort((a,b) => a.diff - b.diff);
+  const bestKey = candidates[0].key;
+
+  // Devolvemos un match de ese día (el más temprano)
+  const dayMatches = matches.filter(m => String(m.date).startsWith(bestKey));
+  if (dayMatches.length === 0) return null;
+  return dayMatches.sort((a, b) => new Date(a.date) - new Date(b.date))[0];
 }
 
-function sameTeam(a, b) {
-  const setA = new Set(teamKeyVariants(a));
-  return teamKeyVariants(b).some((v) => setA.has(v));
-}
 
-function text(value) {
-  return String(value || '').trim();
-}
+  function getStoredCrucesTeam() {
+    try {
+      const qs = new URLSearchParams(location.search).get('team');
+      if (qs) {
+        const clean = normPlanillaSlug(qs);
+        try { sessionStorage.setItem('lpi_cruces_team', clean); } catch(_){}
+        try { localStorage.setItem('lpi_cruces_team', clean); } catch(_){}
+        try {
+          const url = new URL(location.href);
+          url.searchParams.delete('team');
+          history.replaceState({}, '', url.pathname + url.search + url.hash);
+        } catch(_){}
+        return clean;
+      }
+    } catch(_) {}
 
-function safeArr(value, expected) {
-  const arr = Array.isArray(value) ? value.map(text) : [];
-  while (arr.length < expected) arr.push('');
-  return arr.slice(0, expected);
-}
+    try {
+      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+      if (sess && sess.slug) return normPlanillaSlug(sess.slug);
+    } catch(_) {}
 
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+    try {
+      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+      if (sess2 && (sess2.slug || sess2.team)) return normPlanillaSlug(sess2.slug || sess2.team);
+    } catch(_) {}
 
-function localDateKey(date = new Date()) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+    try {
+      const saved = sessionStorage.getItem('lpi_cruces_team') || localStorage.getItem('lpi_cruces_team') || '';
+      if (saved) return normPlanillaSlug(saved);
+    } catch(_) {}
 
-function parseDateKey(value) {
-  const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-}
+    return '';
+  }
 
-function startOfToday() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
+  async function checkCrucesEnabled(teamSlug) {
+    const app = document.getElementById('app-root');
+    const grid = document.getElementById('crucesGrid');
+    const cta = document.getElementById('validateCta');
+    const err = document.getElementById('appError');
 
-function getLoggedTeam() {
-  const direct = sessionStorage.getItem('lpi_cruces_team') || localStorage.getItem('lpi_cruces_team') || localStorage.getItem('crucesTeam') || sessionStorage.getItem('crucesTeam');
-  if (direct) return String(direct).trim();
+    const block = (title, msg) => {
+      if (grid) grid.innerHTML = '';
+      if (cta) cta.style.display = 'none';
+      if (err) err.style.display = 'none';
+      if (app) {
+        app.innerHTML = `
+          <div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+            <div style="max-width:560px;margin:0 auto;text-align:center;background:#151617;border:1px solid #ffffff10;border-radius:18px;padding:28px 24px;box-shadow:0 10px 40px #00000040;">
+              <h2 style="margin:0 0 10px;color:#ffe65a;font-size:28px;font-weight:900;">${title}</h2>
+              <p style="margin:0;color:#e9e9e9;font-size:16px;line-height:1.5;">${msg}</p>
+            </div>
+          </div>
+        `;
+      }
+      return false;
+    };
+
+    if (!teamSlug) {
+      return block('Cruces no disponibles', 'No se pudo identificar el equipo para mostrar los cruces.');
+    }
+
+    try {
+      const fechaKey = new Date().toISOString().slice(0,10);
+      const qs = new URLSearchParams({ team: teamSlug, fechaKey });
+      const r = await fetch('/api/cruces/status?' + qs.toString(), { cache:'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (!j || !j.enabled) {
+        return block('Cruces no habilitados', 'El administrador todavía no habilitó los cruces para esta fecha.');
+      }
+      return true;
+    } catch (e) {
+      return block('No se pudo verificar el acceso', 'Probá nuevamente en unos minutos.');
+    }
+  }
+
+  // ---------------- CARGAR PLANILLAS DESDE BACKEND (MISMO ORIGEN QUE VISOR) ----------------
+  async function loadFirstExistingPlanilla(slug) {
+    const team = normPlanillaSlug(slug);
+
+    try {
+      const r = await fetch('/api/cruces/planilla?team=' + encodeURIComponent(team), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+
+      const data = await r.json();
+
+      return {
+        team: data.team || team,
+        capitan: Array.isArray(data.capitan) ? data.capitan : [],
+        individuales: Array.isArray(data.individuales) ? data.individuales : Array(7).fill(''),
+        pareja1: Array.isArray(data.pareja1) ? data.pareja1 : [],
+        pareja2: Array.isArray(data.pareja2) ? data.pareja2 : [],
+        suplentes: Array.isArray(data.suplentes) ? data.suplentes : []
+      };
+    } catch (e) {
+      console.warn('No se pudo cargar planilla desde backend para', team, e);
+      return {
+        team,
+        capitan: [],
+        individuales: Array(7).fill(''),
+        pareja1: [],
+        pareja2: [],
+        suplentes: []
+      };
+    }
+  }
+
+  // ---------------- RENDER ----------------
+  function createPtsSelect() {
+    const wrap = document.createElement('div');
+    wrap.className = 'pts-edit';
+    const sel = document.createElement('select');
+    sel.className = 'pts-select';
+    for (let v = 0; v <= 6; v++) {
+      const opt = document.createElement('option');
+      opt.value = String(v);
+      opt.textContent = String(v);
+      if (v === 0) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    wrap.appendChild(sel);
+    return wrap;
+  }
+
+  function makeRow(num, text, side, includePoints = false, sectionKey = '') {
+    const row = document.createElement('div');
+    row.className = 'row';
+    if (sectionKey) row.dataset.section = sectionKey;
+
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.textContent = String(num);
+
+    const slot = document.createElement('div');
+    const isEmpty = !text || !String(text).trim();
+    slot.className = 'slot' + (isEmpty ? ' is-empty' : '');
+    if (sectionKey) slot.dataset.section = sectionKey;
+    slot.dataset.side = side;
+    if (!isEmpty) {
+      slot.setAttribute('data-full', String(text).trim());
+      slot.textContent = String(text).trim();
+    }
+
+    let ptsElement = null;
+    if (includePoints) {
+      ptsElement = createPtsSelect();
+    } else {
+      ptsElement = document.createElement('div');
+      ptsElement.className = 'pts-edit';
+      ptsElement.style.visibility = 'hidden';
+    }
+
+    if (side === 'left') {
+      row.appendChild(badge);
+      row.appendChild(slot);
+      row.appendChild(ptsElement);
+    } else {
+      row.appendChild(ptsElement);
+      row.appendChild(slot);
+      row.appendChild(badge);
+    }
+
+    return row;
+  }
+
+  function renderSide(rootId, planilla, opponent, date, teamName) {
+    const root = document.getElementById(rootId);
+    if (!root) return;
+    root.innerHTML = '';
+
+    const card = document.querySelector('#card-template').content.cloneNode(true).querySelector('.card');
+    card.querySelector('.title').textContent = teamName.toUpperCase();
+    card.querySelector('.meta').textContent = `vs ${opponent} · ${formatDate(date)}`;
+
+    const secs = card.querySelector('.sections');
+    const data = {
+      'CAPITÁN': planilla.capitan || [],
+      'INDIVIDUALES': planilla.individuales || [],
+      'PAREJA 1': planilla.pareja1 || [],
+      'PAREJA 2': planilla.pareja2 || [],
+      'SUPLENTES': planilla.suplentes || []
+    };
+
+    const sections = ['CAPITÁN', 'INDIVIDUALES', 'PAREJA 1', 'PAREJA 2', 'SUPLENTES'];
+    sections.forEach(sec => {
+      const div = document.createElement('div');
+      div.className = 'section';
+      div.innerHTML = `<h2>${sec}</h2>`;
+
+      const items = data[sec];
+
+      const side = rootId.includes('left') ? 'left' : 'right';
+      if (sec.includes('PAREJA') && items.length === 2) {
+        div.appendChild(makeRow(1, items[0], side, true, sec));
+        div.appendChild(makeRow(2, items[1], side, false, sec));
+      } else {
+        const includePts = sec === 'INDIVIDUALES';
+        items.forEach((p, i) => {
+          div.appendChild(makeRow(i + 1, p, side, includePts, sec));
+        });
+      }
+
+      secs.appendChild(div);
+    });
+
+    root.appendChild(card);
+  }
+
+  // ---------------- SCORES: TRIÁNGULOS ARRIBA, PUNTOS ABAJO ----------------
+  function updateScoresFor(rootId) {
+    const root = document.getElementById(rootId);
+    if (!root) return;
+
+    let totalEquipo = 0;
+    let totalPts = 0;
+
+    root.querySelectorAll('.row').forEach(row => {
+      const sel = row.querySelector('.pts-select');
+      if (!sel) return;
+
+      const val = parseInt(sel.value, 10);
+      if (isNaN(val)) return;
+
+      totalPts += val;
+
+      const section = String(row.dataset.section || '').toUpperCase();
+
+      if (section === 'INDIVIDUALES') {
+        if (val === 5 || val === 6) totalEquipo++;
+      } else if (section === 'PAREJA 1' || section === 'PAREJA 2') {
+        if (val === 4 || val === 5 || val === 6) totalEquipo++;
+      }
+    });
+
+    const totalInput = root.querySelector('.total-input');
+    if (totalInput) totalInput.value = totalPts;
+
+    const winsBox = root.querySelector('.wins-box');
+    if (winsBox) winsBox.textContent = totalEquipo;
+  }
+
+
+  // ---------------- CAMBIOS CON SUPLENTES ----------------
+  function ensureSwapStyles(){
+    if (document.getElementById('swap-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'swap-styles';
+    style.textContent = `
+      .slot.slot-selected-sub{
+        background:#9bf59b !important;
+        box-shadow:0 0 0 2px #31c45b inset;
+        color:#092b09 !important;
+      }
+      .slot.slot-sub-in{
+        background:#c8ffb8 !important;
+        box-shadow:0 0 0 2px #55c44d inset;
+        color:#16320f !important;
+      }
+      .slot.slot-sub-out{
+        background:#ffb6b6 !important;
+        box-shadow:0 0 0 2px #d94b4b inset;
+        color:#4a1010 !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function setSlotValue(slot, value){
+    const txt = String(value || '').trim();
+    if (txt) {
+      slot.textContent = txt;
+      slot.setAttribute('data-full', txt);
+      slot.classList.remove('is-empty');
+    } else {
+      slot.textContent = '';
+      slot.removeAttribute('data-full');
+      slot.classList.add('is-empty');
+    }
+  }
+
+  function getSlotValue(slot){
+    return (slot.getAttribute('data-full') || slot.textContent || '').trim();
+  }
+
+  function lockValidatedMatchUI(){
+    document.querySelectorAll('#planilla-root-left .pts-select, #planilla-root-right .pts-select').forEach(el => {
+      el.disabled = true;
+    });
+
+    document.querySelectorAll('#planilla-root-left .slot, #planilla-root-right .slot').forEach(slot => {
+      slot.style.pointerEvents = 'none';
+      slot.style.cursor = 'default';
+      slot.classList.remove('slot-selected-sub', 'slot-sub-in', 'slot-sub-out');
+    });
+
+    const btn = document.getElementById('btnValidarGlobal');
+    if (btn){
+      btn.textContent = 'VALIDADO';
+      btn.classList.add('success');
+      btn.disabled = true;
+    }
+  }
+
+  function clearSwapMarks(root){
+    root.querySelectorAll('.slot').forEach(s => {
+      s.classList.remove('slot-selected-sub', 'slot-sub-in', 'slot-sub-out');
+    });
+  }
+
+  function setupSuplentesSwap(rootId){
+    ensureSwapStyles();
+    const root = document.getElementById(rootId);
+    if (!root) return;
+
+    let selectedBenchSlot = null;
+
+    const getSectionName = (slot) => {
+      const sec = slot.closest('.section');
+      return (sec?.querySelector('h2')?.textContent || '').toUpperCase();
+    };
+
+    const isBenchSlot = (slot) => getSectionName(slot).includes('SUPLENTES');
+    const isSwappableField = (slot) => {
+      const name = getSectionName(slot);
+      return name.includes('INDIVIDUALES') || name.includes('PAREJA 1') || name.includes('PAREJA 2');
+    };
+
+    root.querySelectorAll('.slot').forEach(slot => {
+      if (slot.dataset.swapWired === '1') return;
+      slot.dataset.swapWired = '1';
+      slot.style.cursor = 'pointer';
+
+      slot.addEventListener('click', () => {
+        const slotValue = getSlotValue(slot);
+        if (!slotValue) return;
+
+        if (isBenchSlot(slot)) {
+          root.querySelectorAll('.slot.slot-selected-sub').forEach(s => s.classList.remove('slot-selected-sub'));
+          slot.classList.remove('slot-sub-in', 'slot-sub-out');
+          slot.classList.add('slot-selected-sub');
+          selectedBenchSlot = slot;
+          root.dispatchEvent(new Event('cruces:changed'));
+          return;
+        }
+
+        if (!selectedBenchSlot) return;
+        if (!isSwappableField(slot)) return;
+        if (selectedBenchSlot === slot) return;
+
+        const currentFieldPlayer = getSlotValue(slot);
+        const selectedSub = getSlotValue(selectedBenchSlot);
+        if (!currentFieldPlayer || !selectedSub) return;
+
+        root.querySelectorAll('.slot.slot-sub-in, .slot.slot-sub-out').forEach(s => {
+          s.classList.remove('slot-sub-in', 'slot-sub-out');
+        });
+
+        setSlotValue(slot, selectedSub);
+        setSlotValue(selectedBenchSlot, currentFieldPlayer);
+
+        slot.classList.remove('slot-selected-sub');
+        slot.classList.add('slot-sub-in');
+
+        selectedBenchSlot.classList.remove('slot-selected-sub');
+        selectedBenchSlot.classList.add('slot-sub-out');
+        selectedBenchSlot.classList.add('slot-selected-sub');
+
+        root.dispatchEvent(new Event('cruces:changed'));
+      });
+    });
+  }
+
+  function applyCollectedPlanilla(rootId, plan) {
+    const root = document.getElementById(rootId);
+    if (!root || !plan) return;
+
+    const map = {
+      'CAPITÁN': Array.isArray(plan.capitan) ? plan.capitan : [],
+      'INDIVIDUALES': Array.isArray(plan.individuales) ? plan.individuales : [],
+      'PAREJA 1': Array.isArray(plan.pareja1) ? plan.pareja1 : [],
+      'PAREJA 2': Array.isArray(plan.pareja2) ? plan.pareja2 : [],
+      'SUPLENTES': Array.isArray(plan.suplentes) ? plan.suplentes : [],
+    };
+
+    root.querySelectorAll('.section').forEach(sec => {
+      const title = (sec.querySelector('h2')?.textContent || '').toUpperCase();
+      const values = map[title];
+      if (!values) return;
+      const slots = sec.querySelectorAll('.slot');
+      slots.forEach((slot, idx) => {
+        setSlotValue(slot, values[idx] || '');
+      });
+    });
+
+    clearSwapMarks(root);
+  }
+
+  // ---------------- VALIDACIÓN ----------------
+  function setupValidationButtons(local, visitante, matchDate) {
+    const cta = document.getElementById('validateCta');
+    const btn = document.getElementById('btnValidarGlobal');
+    if (!cta || !btn) return;
+
+    document.querySelectorAll('.btn-validate').forEach(b => {
+      if (b.id !== 'btnValidarGlobal') b.remove();
+    });
+
+    cta.style.display = 'flex';
+
+     
+// === AUTOSAVE + STATUS HELPERS ===
+const toDateAR = (d = new Date()) => {
+  const z = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+  const pad = n => String(n).padStart(2, '0');
+  return `${z.getFullYear()}-${pad(z.getMonth()+1)}-${pad(z.getDate())}`;
+};
+const todayISO_AR = toDateAR();
+
+const getLoggedSlug = () => {
+  const qs = new URLSearchParams(location.search).get('team');
+  if (qs) return String(qs).toLowerCase();
   try {
-    const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
-    if (sess?.slug) return String(sess.slug).trim();
-  } catch (_) {}
-  return '';
+    const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+    const sess = raw ? JSON.parse(raw) : null;
+    if (sess?.slug) return String(sess.slug).toLowerCase();
+  } catch {}
+  return String(sessionStorage.getItem('teamSlug') || localStorage.getItem('teamSlug') || '').toLowerCase();
+};
+const mySlug = getLoggedSlug();
+const localSlug = local.teamSlug;
+const visitanteSlug = visitante.teamSlug;
+const AUTOSAVE_KEY = `lpi.autosave.${mySlug}.${todayISO_AR}.${(mySlug===localSlug?visitanteSlug:localSlug)}`;
+
+function readAllSelects(rootId) {
+  const root = document.getElementById(rootId);
+  return Array.from(root.querySelectorAll('.pts-select')).map(sel => {
+    const n = parseInt(sel.value, 10);
+    return Number.isFinite(n) ? n : 0;
+  });
+}
+function writeAllSelects(rootId, values) {
+  const root = document.getElementById(rootId);
+  const selects = Array.from(root.querySelectorAll('.pts-select'));
+  selects.forEach((sel,i) => {
+    if (i < values.length) {
+      sel.value = String(values[i]);
+      sel.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  });
 }
 
-function getStoredFixtureKinds() {
-  const kinds = [];
-  const preferred = localStorage.getItem('fixture_kind') || sessionStorage.getItem('fixture_kind') || '';
-  if (preferred) kinds.push(preferred);
-  ['ida', 'vuelta'].forEach((k) => { if (!kinds.includes(k)) kinds.push(k); });
-  return kinds;
+function computeTotalsFrom(rootId) {
+  const root = document.getElementById(rootId);
+  const winsEl = root.querySelector('[data-wins]');
+  const triEl  = root.querySelector('.total-input');
+  const puntosTotales = parseInt((winsEl?.textContent || '0').trim(),10) || 0;
+  const triangulos     = parseInt((triEl?.value ?? triEl?.textContent ?? '0').toString().trim(),10) || 0;
+  return { triangulos, puntosTotales };
 }
 
-async function fetchJson(url, options) {
-  const response = await fetch(url, options);
-  let data = null;
-  try { data = await response.json(); } catch (_) {}
-  if (!response.ok) {
-    const message = data?.error || data?.message || `HTTP ${response.status}`;
-    throw new Error(message);
+function sliceToStatus(values) {
+  const jugadores = values.slice(0,7);
+  const pareja1 = { j1: values[7]  ?? 0, j2: values[8]  ?? 0 };
+  const pareja2 = { j1: values[9]  ?? 0, j2: values[10] ?? 0 };
+  return { jugadores, parejas: { pareja1, pareja2 } };
+}
+
+function buildMatchStatus(validated = false) {
+  const leftVals  = readAllSelects('planilla-root-left');
+  const rightVals = readAllSelects('planilla-root-right');
+  const leftT  = computeTotalsFrom('planilla-root-left');
+  const rightT = computeTotalsFrom('planilla-root-right');
+  const localData     = sliceToStatus(leftVals);
+  const visitanteData = sliceToStatus(rightVals);
+  return {
+    fechaISO: todayISO_AR,
+    validated: !!validated,
+    localSlug,
+    visitanteSlug,
+    localPlanilla: collectPlanilla('planilla-root-left'),
+    visitantePlanilla: collectPlanilla('planilla-root-right'),
+    local:     { ...localData,     triangulosTotales: leftT.triangulos,  puntosTotales: leftT.puntosTotales },
+    visitante: { ...visitanteData, triangulosTotales: rightT.triangulos, puntosTotales: rightT.puntosTotales }
+  };
+}
+
+async function saveMatchStatus(validated = false) {
+  const status = buildMatchStatus(validated);
+  const body = {
+    localSlug,
+    visitanteSlug,
+    fechaISO: todayISO_AR,
+    equipoSlug: mySlug,
+    status,
+    validar: !!validated
+  };
+  const res = await fetch('/api/guardar-status-match', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.error || 'No se pudo guardar el status del cruce');
   }
   return data;
 }
 
-async function checkCrucesEnabled(category) {
-  const team = CATEGORY_KEYS[category];
-  if (!team) return false;
-  const params = new URLSearchParams({ team, fechaKey: localDateKey() });
-  const data = await fetchJson(`${API_BASE}/cruces/status?${params.toString()}`, { cache: 'no-store' });
-  return !!data?.enabled;
-}
-
-async function loadPlanillas() {
-  const data = await fetchJson(`${API_BASE}/admin/planillas`, { cache: 'no-store' });
-  return Array.isArray(data) ? data : [];
-}
-
-async function loadFixture(category, kind) {
-  const params = new URLSearchParams({ kind, category });
-  const data = await fetchJson(`${API_BASE}/fixture?${params.toString()}`, { cache: 'no-store' });
-  if (!data?.ok || !data?.data) throw new Error(data?.error || 'Fixture inválido');
-  return data.data;
-}
-
-function extractMatchesFromFecha(fecha) {
-  const result = [];
-  if (!fecha || !Array.isArray(fecha.tablas)) return result;
-
-  fecha.tablas.forEach((tabla) => {
-    const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos.filter(Boolean) : [];
-    if (equipos.length < 2) return;
-
-    for (let i = 0; i < equipos.length; i += 2) {
-      const local = equipos[i];
-      const visitante = equipos[i + 1];
-      if (local?.equipo && visitante?.equipo) {
-        result.push({ local: local.equipo, visitante: visitante.equipo, grupo: tabla?.grupo || '' });
-      }
-    }
-  });
-  return result;
-}
-
-function findUpcomingCruceForTeam(fixture, teamName) {
-  const today = startOfToday();
-  const fechas = Array.isArray(fixture?.fechas) ? [...fixture.fechas] : [];
-  fechas.sort((a, b) => (parseDateKey(a?.date)?.getTime() || Number.MAX_SAFE_INTEGER) - (parseDateKey(b?.date)?.getTime() || Number.MAX_SAFE_INTEGER));
-
-  for (const fecha of fechas) {
-    const dt = parseDateKey(fecha?.date);
-    if (!dt || dt < today) continue;
-    const cruces = extractMatchesFromFecha(fecha);
-    const found = cruces.find((item) => sameTeam(item.local, teamName) || sameTeam(item.visitante, teamName));
-    if (found) return { ...found, date: fecha.date || '', fecha };
-  }
-  return null;
-}
-
-async function resolveCruce(teamName, category) {
-  let lastError = null;
-  for (const kind of getStoredFixtureKinds()) {
-    try {
-      const fixture = await loadFixture(category, kind);
-      const match = findUpcomingCruceForTeam(fixture, teamName);
-      if (match) return { ...match, kind };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  if (lastError) throw lastError;
-  return null;
-}
-
-function buildPlanillaIndex(planillas) {
-  const index = new Map();
-  planillas.forEach((item) => {
-    teamKeyVariants(item?.team).forEach((variant) => { if (!index.has(variant)) index.set(variant, item); });
-    teamKeyVariants(item?.planilla?.team).forEach((variant) => { if (!index.has(variant)) index.set(variant, item); });
-  });
-  return index;
-}
-
-function findPlanilla(index, teamName) {
-  for (const variant of teamKeyVariants(teamName)) {
-    if (index.has(variant)) return index.get(variant);
-  }
-  return null;
-}
-
-function getStorageKey() {
-  if (!currentContext) return 'cruces_fecha_scores';
-  const { category, date, local, visitante } = currentContext;
-  return `cruces_fecha_scores:${category}:${date}:${compactKey(local)}:${compactKey(visitante)}`;
-}
-
-function loadStoredScores() {
+// AUTOSAVE
+function autosaveSave() {
   try {
-    return JSON.parse(localStorage.getItem(getStorageKey()) || '{}') || {};
-  } catch (_) {
-    return {};
-  }
+    const payload = { fechaISO: todayISO_AR, left: readAllSelects('planilla-root-left'), right: readAllSelects('planilla-root-right') };
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+  } catch {}
 }
-
-function saveStoredScores() {
-  const data = {};
-  document.querySelectorAll('.pts-select').forEach((select) => {
-    data[select.dataset.scoreKey] = String(select.value || '0');
-  });
-  data.__validated = btnValidarGlobal?.dataset.state === 'success';
-  localStorage.setItem(getStorageKey(), JSON.stringify(data));
+function autosaveLoad() { try{ const raw=localStorage.getItem(AUTOSAVE_KEY); return raw?JSON.parse(raw):null; }catch{ return null; } }
+function autosaveApplyIfAny() {
+  const data = autosaveLoad();
+  if (!data || data.fechaISO !== todayISO_AR) return;
+  writeAllSelects('planilla-root-left', data.left||[]);
+  writeAllSelects('planilla-root-right', data.right||[]);
 }
+function autosaveClear(){ try{ localStorage.removeItem(AUTOSAVE_KEY);}catch{} }
+let autosaveTimer=null;
+let serverSaveTimer=null;
+function scheduleAutosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(autosaveSave, 300);
 
-function buildSelectOptions(selected) {
-  let html = '';
-  for (let i = 0; i <= 15; i += 1) {
-    html += `<option value="${i}" ${String(selected) === String(i) ? 'selected' : ''}>${i}</option>`;
-  }
-  return html;
+  clearTimeout(serverSaveTimer);
+  serverSaveTimer = setTimeout(async () => {
+    try { await saveMatchStatus(false); } catch(e) { console.warn('autosave cruces', e); }
+  }, 600);
 }
-
-function rowHtml({ side, name, idx, editable, scoreKey, scoreValue }) {
-  const slotClass = name ? 'slot' : 'slot is-empty';
-  const shown = name || 'Sin cargar';
-  const pts = editable
-    ? `<div class="pts-edit"><select class="pts-select" data-score-key="${escapeHtml(scoreKey)}" aria-label="Puntos ${escapeHtml(name || `fila ${idx}`)}">${buildSelectOptions(scoreValue)}</select></div>`
-    : '';
-  return `<div class="row" data-side="${escapeHtml(side)}">${pts}<div class="badge">${idx}</div><div class="${slotClass}" data-full="${escapeHtml(shown)}">${escapeHtml(shown)}</div></div>`;
-}
-
-function sectionHtml(side, spec, plan, stored) {
-  const values = safeArr(plan?.[spec.key], spec.count);
-  const rows = values.map((name, index) => {
-    const scoreKey = `${side}:${spec.key}:${index}`;
-    const scoreValue = stored[scoreKey] ?? '0';
-    return rowHtml({
-      side,
-      name,
-      idx: index + 1,
-      editable: spec.editable && !!name,
-      scoreKey,
-      scoreValue
+function autosaveAttachListeners(){
+  ['planilla-root-left','planilla-root-right'].forEach(id=>{
+    const root = document.getElementById(id);
+    root.addEventListener('change', ev => {
+      if (ev.target && ev.target.classList && ev.target.classList.contains('pts-select')) scheduleAutosave();
     });
-  }).join('');
-
-  return `<section class="section"><h2>${escapeHtml(spec.label)}</h2>${rows}</section>`;
-}
-
-function renderSide(root, sideLabel, teamName, item, matchDate, side, stored) {
-  root.innerHTML = '';
-  const fragment = template.content.firstElementChild.cloneNode(true);
-  const card = fragment.querySelector('.card');
-  const title = fragment.querySelector('.title');
-  const meta = fragment.querySelector('.meta');
-  const hint = fragment.querySelector('.hint');
-  const sections = fragment.querySelector('.sections');
-  const totalInput = fragment.querySelector('.total-input');
-  const winsBox = fragment.querySelector('[data-wins]');
-  const plan = item?.planilla || item?.plan || null;
-
-  title.textContent = String(teamName || '').toUpperCase();
-  meta.textContent = `${sideLabel} · ${matchDate || 'Sin fecha'}`;
-  hint.textContent = plan ? 'Planilla cargada desde DB.' : 'Planilla no encontrada para este equipo.';
-  sections.innerHTML = SCORE_SECTIONS.map((spec) => sectionHtml(side, spec, plan || {}, stored)).join('');
-  totalInput.value = '0';
-  winsBox.textContent = '0';
-  if (!plan) card.classList.add('is-missing');
-  root.appendChild(fragment);
-}
-
-function renderMessage(message) {
-  leftRoot.innerHTML = '';
-  rightRoot.innerHTML = '';
-  validateCta.style.display = 'none';
-  errorBox.style.display = 'block';
-  errorBox.innerHTML = `<h2 style="color:#ffe65a; margin:0;">${escapeHtml(message)}</h2>`;
-}
-
-function clearMessage() {
-  errorBox.style.display = 'none';
-  errorBox.textContent = '';
-}
-
-function ensureToast() {
-  let toast = document.getElementById('toast-cruces');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'toast-cruces';
-    toast.className = 'toast';
-    document.body.appendChild(toast);
-  }
-  return toast;
-}
-
-function showToast(message, kind = 'info') {
-  const toast = ensureToast();
-  toast.textContent = message;
-  toast.className = `toast toast-${kind} show`;
-  clearTimeout(showToast._timer);
-  showToast._timer = setTimeout(() => toast.classList.remove('show'), 2200);
-}
-
-function getSideTotal(side) {
-  return [...document.querySelectorAll(`.pts-select[data-score-key^="${side}:"]`)].reduce((acc, select) => acc + Number(select.value || 0), 0);
-}
-
-function updateWins(localTotal, visitanteTotal) {
-  let localWins = 0;
-  let visitanteWins = 0;
-  if (localTotal > visitanteTotal) {
-    localWins = 2;
-  } else if (visitanteTotal > localTotal) {
-    visitanteWins = 2;
-  } else if (localTotal !== 0 || visitanteTotal !== 0) {
-    localWins = 1;
-    visitanteWins = 1;
-  }
-  const leftWins = leftRoot.querySelector('[data-wins]');
-  const rightWins = rightRoot.querySelector('[data-wins]');
-  if (leftWins) leftWins.textContent = String(localWins);
-  if (rightWins) rightWins.textContent = String(visitanteWins);
-}
-
-function updateScoresUI() {
-  const localTotal = getSideTotal('local');
-  const visitanteTotal = getSideTotal('visitante');
-  const leftTotal = leftRoot.querySelector('.total-input');
-  const rightTotal = rightRoot.querySelector('.total-input');
-  if (leftTotal) leftTotal.value = String(localTotal);
-  if (rightTotal) rightTotal.value = String(visitanteTotal);
-  updateWins(localTotal, visitanteTotal);
-
-  if (btnValidarGlobal?.dataset.state !== 'success') {
-    btnValidarGlobal.classList.remove('error', 'success', 'rival-pending');
-    btnValidarGlobal.classList.add('pending');
-    btnValidarGlobal.textContent = 'VALIDAR PLANILLA';
-    btnValidarGlobal.dataset.state = 'pending';
-  }
-  saveStoredScores();
-}
-
-function bindScoreEvents() {
-  document.querySelectorAll('.pts-select').forEach((select) => {
-    select.addEventListener('change', updateScoresUI);
+    root.addEventListener('cruces:changed', scheduleAutosave);
   });
 }
 
-function applyStoredValidationState() {
-  const stored = loadStoredScores();
-  if (stored.__validated && btnValidarGlobal) {
-    btnValidarGlobal.classList.remove('pending', 'error');
-    btnValidarGlobal.classList.add('success');
-    btnValidarGlobal.textContent = 'PLANILLA VALIDADA';
-    btnValidarGlobal.dataset.state = 'success';
-  }
+// STATUS autocarga: primero borrador propio, si no existe compartido final
+async function tryApplyStatusIfExists(){
+  try {
+    const qs = new URLSearchParams({
+      localSlug,
+      visitanteSlug,
+      fechaISO: todayISO_AR,
+      equipoSlug: mySlug
+    });
+    const res = await fetch('/api/status-match?' + qs.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result?.ok || !result?.data) return false;
+
+    const data = result.data;
+    if (data.localPlanilla) applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
+    if (data.visitantePlanilla) applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
+
+    const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
+    const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
+    writeAllSelects('planilla-root-left', L);
+    writeAllSelects('planilla-root-right', R);
+    updateScoresFor('planilla-root-left');
+    updateScoresFor('planilla-root-right');
+
+    if (data.validated === true) {
+      lockValidatedMatchUI();
+    }
+    return true;
+  } catch { return false; }
 }
 
-function wireValidation() {
-  if (!btnValidarGlobal) return;
-  btnValidarGlobal.addEventListener('click', () => {
-    const hasPlanillas = leftRoot.querySelector('.card') && rightRoot.querySelector('.card');
-    if (!hasPlanillas) {
-      showToast('No hay planillas cargadas para validar', 'error');
+// Inicializar
+autosaveApplyIfAny();
+autosaveAttachListeners();
+tryApplyStatusIfExists();
+btn.onclick = async () => {
+  const btnVolver = document.getElementById('btnVolver');
+  const volverClass = btnVolver ? btnVolver.className : 'btn';
+
+  const setBtnState = (mode, text) => {
+    btn.disabled = (mode === 'success');
+    btn.classList.remove('success','error','pending','rival-pending','btn','btn-validate');
+    if (mode === 'pending') {
+      text && (btn.textContent = text);
+      volverClass.split(/\s+/).forEach(c => c && btn.classList.add(c));
+    } else {
+      btn.classList.add('btn-validate');
+      btn.classList.add(mode);
+      text && (btn.textContent = text);
+    }
+  };
+
+  const sameTotalsStrict = (a, b) => {
+    return (
+      a.equipo1.triangulos    === b.equipo1.triangulos   &&
+      a.equipo1.puntosTotales === b.equipo1.puntosTotales &&
+      a.equipo2.triangulos    === b.equipo2.triangulos   &&
+      a.equipo2.puntosTotales === b.equipo2.puntosTotales
+    );
+  };
+
+  try {
+    btn.disabled = true;
+    setBtnState('pending','VALIDANDO...');
+
+    const mySlug = getLoggedSlug();
+    if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
+    const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
+
+    const lockRes = await fetch(`/api/validar-lock?slug=${encodeURIComponent(mySlug)}&fechaISO=${encodeURIComponent(todayISO_AR)}`).catch(()=>null);
+    if (lockRes && lockRes.ok) {
+      const lock = await lockRes.json().catch(()=>null);
+      if (lock?.locked) { setBtnState('success','VALIDADO'); return; }
+    }
+
+    const left  = computeTotalsFrom('planilla-root-left');
+    const right = computeTotalsFrom('planilla-root-right');
+    if ((left.puntosTotales + right.puntosTotales) !== 9) {
+    setBtnState('error','ERROR: La suma de puntos debe ser 9');
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.classList.remove('success','error','pending','rival-pending','btn');
+      btn.classList.add('btn-validate');
+      btn.textContent = 'VALIDAR PLANILLA';
+    }, 3000);
+    return;
+    }
+
+    const mine = {
+      fechaISO: todayISO_AR,
+      equipo1: { triangulos:left.triangulos,  puntosTotales:left.puntosTotales },
+      equipo2: { triangulos:right.triangulos, puntosTotales:right.puntosTotales }
+    };
+
+    const save = await fetch('/api/validar-planilla', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ slug: mySlug, validacion: mine })
+    });
+    const saveData = await save.json().catch(()=>null);
+    if (!save.ok || !saveData?.ok) { setBtnState('error','ERROR: No se pudo guardar'); return; }
+
+    const rivalSrc = `../cruces/${rivalSlug}.validacion.js`;
+    const rivalVal = await loadGlobalScript(rivalSrc,'LPI_VALIDACION').catch(()=>null);
+    if (!rivalVal || rivalVal.fechaISO !== todayISO_AR) { setBtnState('pending','PENDIENTE: tu rival todavía no validó'); return; }
+    if (!sameTotalsStrict(mine, rivalVal)) {
+      setBtnState('error','Los datos no coinciden, verificar con su rival');
+      setTimeout(() => {
+        // volver al estado pendiente anterior
+        setBtnState('pending','PENDIENTE: tu rival todavía no validó');
+        btn.disabled = false;
+      }, 3000);
       return;
     }
-    btnValidarGlobal.classList.remove('pending', 'error');
-    btnValidarGlobal.classList.add('success');
-    btnValidarGlobal.textContent = 'PLANILLA VALIDADA';
-    btnValidarGlobal.dataset.state = 'success';
-    saveStoredScores();
-    showToast('Puntos guardados en esta sesión', 'success');
-  });
-}
 
-function wireBack() {
-  if (!btnVolver) return;
-  btnVolver.addEventListener('click', (ev) => {
-    ev.preventDefault();
-    if (document.referrer) {
-      history.back();
-    } else {
-      const cat = getCategoryFromURL();
-      location.href = `../templates/plantilla.html${cat ? `?cat=${encodeURIComponent(cat)}` : ''}`;
+    const statusResult = await saveMatchStatus(true);
+
+    if (statusResult?.tipo !== 'validado') {
+      setBtnState('pending', statusResult?.mensaje || 'PENDIENTE: falta coincidencia final con tu rival');
+      return;
     }
-  });
-}
 
-async function init() {
-  wireBack();
-  wireValidation();
-  clearMessage();
-  leftRoot.innerHTML = '';
-  rightRoot.innerHTML = '';
-  validateCta.style.display = 'none';
+    const lockBody = { slug: mySlug, fechaISO: todayISO_AR, lockUntil: new Date(Date.now()+24*60*60*1000).toISOString() };
+    await fetch('/api/validar-lock', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(lockBody) }).catch(()=>{});
 
-  try {
-    const category = getCategoryFromURL();
-    if (!CATEGORY_KEYS[category]) return renderMessage('Cruces no disponibles');
+    autosaveClear();
+    lockValidatedMatchUI();
 
-    const enabled = await checkCrucesEnabled(category);
-    if (!enabled) return renderMessage('Cruces no habilitados');
-
-    const loggedTeam = getLoggedTeam();
-    if (!loggedTeam) return renderMessage('No se pudo determinar el equipo logueado');
-
-    const cruce = await resolveCruce(loggedTeam, category);
-    if (!cruce) return renderMessage('No se encontró un cruce próximo para este equipo');
-
-    currentContext = { category, date: cruce.date, local: cruce.local, visitante: cruce.visitante };
-
-    const planillas = await loadPlanillas();
-    const index = buildPlanillaIndex(planillas);
-    const localItem = findPlanilla(index, cruce.local);
-    const visitanteItem = findPlanilla(index, cruce.visitante);
-    const stored = loadStoredScores();
-
-    renderSide(leftRoot, 'LOCAL', cruce.local, localItem, cruce.date, 'local', stored);
-    renderSide(rightRoot, 'VISITANTE', cruce.visitante, visitanteItem, cruce.date, 'visitante', stored);
-    validateCta.style.display = 'flex';
-    bindScoreEvents();
-    updateScoresUI();
-    applyStoredValidationState();
-  } catch (error) {
-    console.error(error);
-    renderMessage(error?.message || 'Error cargando cruces');
+    setBtnState('success','VALIDACIÓN EXITOSA');
+    showToast('Validación exitosa','success');
+    setTimeout(() => {
+      window.location.reload();
+    }, 3000);
+  } catch (e) {
+    console.error(e);
+    setBtnState('error', e?.message || 'Error inesperado');
+  } finally {
+    if (!btn.classList.contains('success')) btn.disabled = false;
   }
-}
+};;;
 
-document.addEventListener('DOMContentLoaded', init);
+  }
+
+  function collectPlanilla(rootId) {
+    const root = document.getElementById(rootId);
+    if (!root) return null;
+
+    const plan = {
+      capitan: [],
+      individuales: [],
+      pareja1: [],
+      pareja2: [],
+      suplentes: []
+    };
+
+    root.querySelectorAll('.section').forEach(sec => {
+      const title = sec.querySelector('h2')?.textContent.toUpperCase();
+      const target = title.includes('CAPITÁN') ? 'capitan' :
+                    title.includes('INDIVIDUALES') ? 'individuales' :
+                    title.includes('PAREJA 1') ? 'pareja1' :
+                    title.includes('PAREJA 2') ? 'pareja2' :
+                    title.includes('SUPLENTES') ? 'suplentes' : null;
+
+      if (!target) return;
+
+      sec.querySelectorAll('.slot').forEach(slot => {
+        const text = slot.getAttribute('data-full') || slot.textContent.trim();
+        if (text) plan[target].push(text);
+      });
+
+      if (target === 'individuales' || target === 'pareja1' || target === 'pareja2') {
+        const ptsSelects = sec.querySelectorAll('.pts-select');
+        if (!plan[target + 'Pts']) plan[target + 'Pts'] = [];
+        ptsSelects.forEach((sel, i) => {
+          plan[target + 'Pts'][i] = parseInt(sel.value, 10) || 0;
+        });
+      }
+    });
+
+    return plan;
+  }
+
+  function showToast(msg, type = 'info') {
+    let toast = document.querySelector('.toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.className = `toast toast-${type} show`;
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  // ---------------- SYNC ----------------
+  function syncSlotWidths() {
+    const slots = document.querySelectorAll('.slot:not(.is-empty)');
+    let max = 0;
+    slots.forEach(s => { if (s.scrollWidth > max) max = s.scrollWidth; });
+    const target = Math.min(Math.max(160, max + 34), 400);
+    document.documentElement.style.setProperty('--slot-base-w', target + 'px');
+  }
+
+  function syncHeaderHeights() {
+    const leftTitle = document.querySelector('#planilla-root-left .title');
+    const rightTitle = document.querySelector('#planilla-root-right .title');
+    const leftMeta = document.querySelector('#planilla-root-left .meta');
+    const rightMeta = document.querySelector('#planilla-root-right .meta');
+
+    if (!leftTitle || !rightTitle || !leftMeta || !rightMeta) return;
+
+    leftTitle.style.minHeight = '';
+    rightTitle.style.minHeight = '';
+    leftMeta.style.minHeight = '';
+    rightMeta.style.minHeight = '';
+
+    const maxTitle = Math.max(leftTitle.offsetHeight, rightTitle.offsetHeight);
+    const maxMeta = Math.max(leftMeta.offsetHeight, rightMeta.offsetHeight);
+
+    leftTitle.style.minHeight = maxTitle + 'px';
+    rightTitle.style.minHeight = maxTitle + 'px';
+    leftMeta.style.minHeight = maxMeta + 'px';
+    rightMeta.style.minHeight = maxMeta + 'px';
+  }
+
+  function syncSectionStarts() {
+    const leftCard = document.querySelector('#planilla-root-left .card');
+    const rightCard = document.querySelector('#planilla-root-right .card');
+    const leftFirstSection = document.querySelector('#planilla-root-left .section');
+    const rightFirstSection = document.querySelector('#planilla-root-right .section');
+
+    if (!leftCard || !rightCard || !leftFirstSection || !rightFirstSection) return;
+
+    leftFirstSection.style.marginTop = '';
+    rightFirstSection.style.marginTop = '';
+
+    const leftTop = leftFirstSection.getBoundingClientRect().top - leftCard.getBoundingClientRect().top;
+    const rightTop = rightFirstSection.getBoundingClientRect().top - rightCard.getBoundingClientRect().top;
+
+    if (leftTop < rightTop) {
+      leftFirstSection.style.marginTop = (26 + (rightTop - leftTop)) + 'px';
+    } else if (rightTop < leftTop) {
+      rightFirstSection.style.marginTop = (26 + (leftTop - rightTop)) + 'px';
+    }
+  }
+
+  function syncRowHeights() {
+    const leftRows = document.querySelectorAll('#planilla-root-left .row');
+    const rightRows = document.querySelectorAll('#planilla-root-right .row');
+
+    const max = Math.max(leftRows.length, rightRows.length);
+
+    leftRows.forEach(r => { r.style.height = ''; });
+    rightRows.forEach(r => { r.style.height = ''; });
+
+    for (let i = 0; i < max; i++) {
+      const l = leftRows[i];
+      const r = rightRows[i];
+      if (!l || !r) continue;
+
+      const h = Math.max(l.offsetHeight, r.offsetHeight);
+      l.style.height = h + 'px';
+      r.style.height = h + 'px';
+    }
+  }
+
+
+  // ---------------- BOOT ----------------
+  async function bootCruces() {
+    const loading = document.createElement('div');
+    loading.className = 'loading';
+    loading.textContent = 'Cargando...';
+    document.getElementById('app-root').appendChild(loading);
+
+    try {
+      const teamSlug = getStoredCrucesTeam();
+      if (!teamSlug) throw new Error('Falta equipo');
+
+      const [fixtureData] = await Promise.all([
+        loadAllFixtures()
+      ]);
+
+      const allMatches = findAllMatchesForTeam(fixtureData, teamSlug);
+      if (allMatches.length === 0) throw new Error('Partido no encontrado');
+
+      const match = pickBestByClosestDate(allMatches);
+      if (!match) throw new Error('No hay partido futuro');
+
+      const local = { name: match.local, teamSlug: match.localSlug };
+      const visitante = { name: match.visitante, teamSlug: match.visitanteSlug };
+
+      const isLocal = normPlanillaSlug(local.name) === normPlanillaSlug(teamSlug);
+
+      const localPlan = await loadFirstExistingPlanilla(local.teamSlug);
+      const visitantePlan = await loadFirstExistingPlanilla(visitante.teamSlug);
+
+renderSide('planilla-root-left',  localPlan,     visitante.name, match.date, local.name);
+renderSide('planilla-root-right', visitantePlan, local.name,     match.date, visitante.name);
+
+      ['planilla-root-left', 'planilla-root-right'].forEach(id => {
+        const root = document.getElementById(id);
+        root?.addEventListener('change', e => {
+          if (e.target?.classList?.contains('pts-select')) updateScoresFor(id);
+        });
+      });
+
+      updateScoresFor('planilla-root-left');
+      updateScoresFor('planilla-root-right');
+
+      setupSuplentesSwap('planilla-root-left');
+      setupSuplentesSwap('planilla-root-right');
+
+      setupValidationButtons(local, visitante, match.date);
+
+      requestAnimationFrame(() => {
+        syncSlotWidths();
+        syncHeaderHeights();
+        syncSectionStarts();
+        syncRowHeights();
+      });
+    } catch (e) {
+      console.error(e);
+      const err = document.getElementById('appError');
+      if (err) { err.style.display = 'block'; err.textContent = e.message || 'Error al cargar'; }
+    } finally {
+      loading.remove();
+    }
+  }
+
+  // ---------------- INIT ----------------
+window.addEventListener('load', async () => {
+  const teamSlug = getStoredCrucesTeam();
+  const allowed = await checkCrucesEnabled(teamSlug);
+
+  if (allowed) {
+    bootCruces().catch(console.error);
+  }
+
+  // === BOTÓN VOLVER ===
+  const volverBtn = document.getElementById('btnVolver');
+  if (volverBtn) {
+    volverBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.history.back();
+    });
+  }
+});
+
+let resizeRaf = 0;
+window.addEventListener('resize', () => {
+  cancelAnimationFrame(resizeRaf);
+  resizeRaf = requestAnimationFrame(() => {
+    syncSlotWidths();
+    syncHeaderHeights();
+    syncSectionStarts();
+    syncRowHeights();
+  });
+});
+})();
