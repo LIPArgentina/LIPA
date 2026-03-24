@@ -31,7 +31,7 @@
     catch { return String(iso || ''); }
   };
 
-  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-tt82.onrender.com').replace(/\/+$/, '');
   const CATEGORY_KEYS = {
     tercera: '__categoria_tercera__',
     segunda: '__categoria_segunda__'
@@ -393,7 +393,7 @@
     const map = new Map();
 
     try {
-      const r = await fetch('/api/admin/planillas', {
+      const r = await fetch(apiUrl('/api/admin/planillas'), {
         cache: 'no-store',
         credentials: 'same-origin'
       });
@@ -444,7 +444,7 @@
 
     for (const key of [team, ...variants]) {
       try {
-        const r = await fetch('/api/team/planilla?team=' + encodeURIComponent(key), {
+        const r = await fetch(apiUrl('/api/team/planilla?team=' + encodeURIComponent(key)), {
           cache: 'no-store',
           credentials: 'same-origin'
         });
@@ -860,7 +860,7 @@ async function saveMatchStatus(validated = false) {
     status,
     validar: !!validated
   };
-  const res = await fetch('/api/cruces/match-status', {
+  const res = await fetch(apiUrl('/api/cruces/match-status'), {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)
@@ -917,7 +917,7 @@ async function tryApplyStatusIfExists(){
       fechaISO: todayISO_AR,
       equipoSlug: mySlug
     });
-    const res = await fetch('/api/cruces/match-status?' + qs.toString(), {
+    const res = await fetch(apiUrl('/api/cruces/match-status?') + qs.toString(), {
       cache: 'no-store',
       credentials: 'same-origin'
     });
@@ -980,7 +980,7 @@ btn.onclick = async () => {
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
-    const lockRes = await fetch(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`).catch(()=>null);
+    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
       if (lock?.locked || lock?.validatedFinal) { setBtnState('success','VALIDADO'); return; }
@@ -1006,7 +1006,7 @@ btn.onclick = async () => {
     };
 
     const statusForValidate = buildMatchStatus(true);
-    const save = await fetch('/api/cruces/validate', {
+    const save = await fetch(apiUrl('/api/cruces/validate'), {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
