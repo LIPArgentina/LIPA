@@ -109,11 +109,15 @@ function renderRowsStatic(rowsCont, equipos){
   for (let k = 0; k < total; k++){
     const iL = 2 * k;
     const iV = 2 * k + 1;
-    const L = list[iL] || { equipo:'', puntos:'' };
-    const V = list[iV] || { equipo:'', puntos:'' };
+    const L = list[iL] || { equipo:'', puntos:'', puntosExtra:'' };
+    const V = list[iV] || { equipo:'', puntos:'', puntosExtra:'' };
 
     const row = document.createElement('div');
     row.className = 'row';
+
+    const extraL = document.createElement('div');
+    extraL.className = 'score-badge extra-badge';
+    extraL.textContent = L.puntosExtra ?? '';
 
     const puntL = document.createElement('div');
     puntL.className = 'score-badge';
@@ -135,7 +139,11 @@ function renderRowsStatic(rowsCont, equipos){
     puntV.className = 'score-badge';
     puntV.textContent = V.puntos ?? '';
 
-    row.append(puntL, selL, vs, selV, puntV);
+    const extraV = document.createElement('div');
+    extraV.className = 'score-badge extra-badge';
+    extraV.textContent = V.puntosExtra ?? '';
+
+    row.append(extraL, puntL, selL, vs, selV, puntV, extraV);
     rowsCont.append(row);
   }
 }
