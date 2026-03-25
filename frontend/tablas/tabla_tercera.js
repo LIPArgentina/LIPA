@@ -109,11 +109,15 @@ function renderRowsStatic(rowsCont, equipos){
   for (let k = 0; k < total; k++){
     const iL = 2 * k;
     const iV = 2 * k + 1;
-    const L = list[iL] || { equipo:'', puntos:'' };
-    const V = list[iV] || { equipo:'', puntos:'' };
+    const L = list[iL] || { equipo:'', puntos:'', puntosExtra:'' };
+    const V = list[iV] || { equipo:'', puntos:'', puntosExtra:'' };
 
     const row = document.createElement('div');
     row.className = 'row';
+
+    const extraL = document.createElement('div');
+    extraL.className = 'score-badge extra-badge';
+    extraL.textContent = L.puntosExtra ?? '';
 
     const puntL = document.createElement('div');
     puntL.className = 'score-badge';
@@ -135,7 +139,11 @@ function renderRowsStatic(rowsCont, equipos){
     puntV.className = 'score-badge';
     puntV.textContent = V.puntos ?? '';
 
-    row.append(puntL, selL, vs, selV, puntV);
+    const extraV = document.createElement('div');
+    extraV.className = 'score-badge extra-badge';
+    extraV.textContent = V.puntosExtra ?? '';
+
+    row.append(extraL, puntL, selL, vs, selV, puntV, extraV);
     rowsCont.append(row);
   }
 }
@@ -179,6 +187,7 @@ function renderSelectedFixture(){
 
 function calcRows(feeds){
   const puntos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const triangulos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const ju = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
 
   (feeds || []).forEach(feed => {
@@ -196,9 +205,11 @@ function calcRows(feeds){
         equipos.forEach(it => {
           const key = normalizeName(it.equipo);
           if (!key || key.toUpperCase() === 'WO') return;
-          if (!puntos[g][key]) puntos[g][key] = { equipo: it.equipo, pts: 0, tr: 0 };
+
+          if (!puntos[g][key]) puntos[g][key] = { equipo: it.equipo, pts: 0 };
           puntos[g][key].pts += it.puntos;
-          puntos[g][key].tr += it.puntosExtra;
+
+          triangulos[g][key] = (triangulos[g][key] || 0) + it.puntosExtra;
         });
 
         for (let i = 0; i < equipos.length; i += 2){
@@ -222,13 +233,17 @@ function calcRows(feeds){
   const result = {};
   GROUPS.forEach(g => {
     result[g] = Object.values(puntos[g])
-      .sort((a, b) => b.pts - a.pts || b.tr - a.tr || String(a.equipo).localeCompare(String(b.equipo)))
+      .sort((a, b) =>
+        (b.pts - a.pts) ||
+        ((triangulos[g][normalizeName(b.equipo)] || 0) - (triangulos[g][normalizeName(a.equipo)] || 0)) ||
+        String(a.equipo).localeCompare(String(b.equipo))
+      )
       .slice(0, 4)
       .map((r, i) => ({
         pos: i + 1,
         equipo: r.equipo,
         ju: (ju[g][normalizeName(r.equipo)] || ''),
-        tr: r.tr,
+        tr: (triangulos[g][normalizeName(r.equipo)] || 0),
         pts: r.pts
       }));
   });
