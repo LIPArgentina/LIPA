@@ -1,0 +1,23 @@
+window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
+window.LPI_TEAM_PLAYERS["imperiosur"] = [
+  "Patricia \"Pato\" Quintana",
+  "Gaston Eduardo Mussi",
+  "Julian Morales",
+  "Nicolas Sanchez",
+  "Matias Robledo",
+  "Javier Morales",
+  "Juan Sosa",
+  "Gerardo Gardino Larroza",
+  "Nicolas Sosa",
+  "Fernando Encalada",
+  "Pedro Gustavo Toconas",
+  "Nicolas Argimon",
+  "Andres Fernandez",
+  "Gabriel Ramon De Los Santos",
+  "Gabriel Markovich",
+  "",
+  "",
+  "",
+  "",
+  ""
+];

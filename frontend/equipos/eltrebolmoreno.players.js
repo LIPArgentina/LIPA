@@ -1,0 +1,23 @@
+window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
+window.LPI_TEAM_PLAYERS["eltrebolmoreno"] = [
+  "Alejandro David Mitrovich",
+  "Jorge Rodriguez",
+  "Miguel Galvez",
+  "Walter Ciarlito",
+  "Sergio Pereira",
+  "Roman Mir",
+  "Walter Linares",
+  "Carlos Mansilla",
+  "Charlie Muniz",
+  "Lucas Carosella",
+  "Jorge Rodriguez",
+  "Rodolfo Mario Cañete",
+  "Marcos Ovejero",
+  "Mauricio Lozano",
+  "David Mitrovich",
+  "Claudia Muñoz",
+  "Leonardo Voiro",
+  "Gabriel Wilson",
+  "",
+  ""
+];

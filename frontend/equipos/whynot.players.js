@@ -1,0 +1,23 @@
+window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
+window.LPI_TEAM_PLAYERS["whynot"] = [
+  "Diego Sotelo",
+  "Eduardo Mendez",
+  "Hernan Krulikowski",
+  "Ariel Brunet",
+  "Ezequiel Salvatierra",
+  "Ezequiel Squiera",
+  "Matias Bogado",
+  "Juan Pablo Araoz",
+  "Jim Enriquez",
+  "Clementino Gomez",
+  "Rafael Galeano",
+  "Marcelo Iñigo",
+  "Ringo Ojeda",
+  "Santiago Serrano",
+  "Adrian Aguilera",
+  "Matias Jardin",
+  "",
+  "",
+  "",
+  ""
+];

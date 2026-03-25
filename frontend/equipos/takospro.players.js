@@ -1,0 +1,23 @@
+window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
+window.LPI_TEAM_PLAYERS["takospro"] = [
+  "Favio Godoy",
+  "Nestor Gomez",
+  "Gabriel Castellon",
+  "Roque Baselli",
+  "Javier Jerez",
+  "Cesar Corvillon",
+  "Javier Nicida",
+  "Pablo Sconza",
+  "Carlos Dominguez",
+  "Braian Fursa",
+  "Claudio Vargas",
+  "Gustavo Zalazar",
+  "Jose Alarcon",
+  "Matias Detrueba",
+  "Dylan Sierra",
+  "Marcelo Sierra",
+  "Emanuel Dengler",
+  "Damian Benitez",
+  "Mauro Moyano",
+  ""
+];

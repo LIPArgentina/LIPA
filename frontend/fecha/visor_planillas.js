@@ -114,7 +114,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       updateGlobalJsIndicator(isToday);
 
       let wrap = card.querySelector('.title-indicator');
-      if(!wrap){ wrap = document.createElement('div'); wrap.className='title-indicator'; card.appendChild(wrap); }
+      if(!wrap){ wrap = document.createElement('div'); wrap.className='title-indicator'; card.insertBefore(wrap, card.querySelector('h2').nextSibling); }
 
       let dot = wrap.querySelector('.fresh-indicator');
       if(!dot){ dot = document.createElement('div'); dot.className='fresh-indicator'; wrap.appendChild(dot); }

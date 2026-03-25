@@ -1,0 +1,23 @@
+window.LPI_TEAM_PLAYERS = window.LPI_TEAM_PLAYERS || {};
+window.LPI_TEAM_PLAYERS["eltreboldepacheco"] = [
+  "Marcelo Sierra",
+  "Dylan Sierra",
+  "Jorge Rodríguez",
+  "Iván Simón Valdez",
+  "Micaela Paso",
+  "Dolores Anahí Torres",
+  "Federico Lammatteo",
+  "Fabián Alfredo Kalí",
+  "Carlos Valero",
+  "Jesús Rodolfo Orosco",
+  "Jesús Alberto Castro",
+  "Damián Benítez",
+  "Sergio Daniel Suárez",
+  "Carlos Daniel Martínez",
+  "Aldo Bianco",
+  "Luis Salinas",
+  "Leonardo Aníbal Izetta",
+  "David Joaquín Vouvilloud",
+  "",
+  ""
+];

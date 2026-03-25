@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>FIXTURE | Liga de Pool Independiente</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="fixture.css"/>
+</head>
+<body>
+<div class="container">
+<header>
+<a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
+<div class="header-center"><div class="title">FIXTURE</div><div aria-label="Categoría" class="cat-inline" role="tablist"><button aria-pressed="false" class="cat-btn" data-cat="primera" type="button" disabled>PRIMERA</button><button aria-pressed="false" class="cat-btn" data-cat="segunda" type="button">SEGUNDA</button><button aria-pressed="true" class="cat-btn active" data-cat="tercera" type="button">TERCERA</button></div></div>
+<nav class="actions">
+<a class="btn" href="../admin.html">VOLVER</a>
+</nav>
+</header>
+<div class="pill-wrap">
+<button class="pill-btn active" data-fixture="ida" type="button">Encuentros de ida</button>
+<button class="pill-btn" data-fixture="vuelta" type="button">Encuentros de vuelta</button>
+</div>
+
+<template id="tpl-group-card">
+  <section class="card" data-group="">
+    <h1 class="h1"></h1>
+  </section>
+</template>
+
+<template id="tpl-fecha">
+  <div class="fecha-header">
+    <div class="h2"></div>
+    <input type="date" class="fecha-input" aria-label="Fecha de calendario"/>
+  </div>
+  <div class="rule"></div>
+  <div class="rows" data-fecha=""></div>
+</template>
+
+<div class="grid" id="fixtureGrid"></div>
+</div>
+<footer>
+  <button id="saveFixture" class="save-btn">Guardar Fixture</button>
+</footer>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="fixture.js"></script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+  const primera=document.querySelector('.cat-btn[data-cat="primera"]');
+  if(primera){
+    primera.addEventListener("click",(e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    });
+  }
+});
+</script>
+
+</body>
+</html>
