@@ -325,6 +325,21 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
     }
     puntL.value = String(L.puntos ?? 0);
 
+    const extraL = document.createElement('select');
+    extraL.className = 'score-badge score-badge-white';
+    extraL.dataset.field = 'puntosExtra';
+    extraL.dataset.side = 'L';
+    extraL.dataset.fecha = fecha;
+    extraL.dataset.grupo = grupo;
+    extraL.dataset.index = k;
+    for (let n = 0; n <= 45; n++){
+      const o = document.createElement('option');
+      o.value = String(n);
+      o.textContent = String(n);
+      extraL.appendChild(o);
+    }
+    extraL.value = String(L.puntosExtra ?? 0);
+
     const selL = document.createElement('select');
     selL.className = 'team-name';
     selL.dataset.field = 'equipo';
@@ -376,10 +391,27 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
     }
     puntV.value = String(V.puntos ?? 0);
 
+    const extraV = document.createElement('select');
+    extraV.className = 'score-badge score-badge-white';
+    extraV.dataset.field = 'puntosExtra';
+    extraV.dataset.side = 'V';
+    extraV.dataset.fecha = fecha;
+    extraV.dataset.grupo = grupo;
+    extraV.dataset.index = k;
+    for (let n = 0; n <= 45; n++){
+      const o = document.createElement('option');
+      o.value = String(n);
+      o.textContent = String(n);
+      extraV.appendChild(o);
+    }
+    extraV.value = String(V.puntosExtra ?? 0);
+
     row.appendChild(puntL);
+    row.appendChild(extraL);
     row.appendChild(selL);
     row.appendChild(vs);
     row.appendChild(selV);
+    row.appendChild(extraV);
     row.appendChild(puntV);
     rowsCont.appendChild(row);
   }
@@ -466,10 +498,20 @@ function buildFixtureFromUI(){
       card.querySelectorAll('.row').forEach(row => {
         const selL  = row.querySelector('select.team-name[data-side="L"]');
         const selV  = row.querySelector('select.team-name[data-side="V"]');
-        const puntL = row.querySelector('select.score-badge[data-side="L"]');
-        const puntV = row.querySelector('select.score-badge[data-side="V"]');
-        equipos.push({ equipo: normalizeTeamName(selL ? selL.value : ''), puntos: puntL ? Number(puntL.value || 0) : 0 });
-        equipos.push({ equipo: normalizeTeamName(selV ? selV.value : ''), puntos: puntV ? Number(puntV.value || 0) : 0 });
+        const puntL = row.querySelector('select.score-badge[data-side="L"][data-field="puntos"]');
+        const puntV = row.querySelector('select.score-badge[data-side="V"][data-field="puntos"]');
+        const extraL = row.querySelector('select.score-badge-white[data-side="L"][data-field="puntosExtra"]');
+        const extraV = row.querySelector('select.score-badge-white[data-side="V"][data-field="puntosExtra"]');
+        equipos.push({
+          equipo: normalizeTeamName(selL ? selL.value : ''),
+          puntos: puntL ? Number(puntL.value || 0) : 0,
+          puntosExtra: extraL ? Number(extraL.value || 0) : 0
+        });
+        equipos.push({
+          equipo: normalizeTeamName(selV ? selV.value : ''),
+          puntos: puntV ? Number(puntV.value || 0) : 0,
+          puntosExtra: extraV ? Number(extraV.value || 0) : 0
+        });
       });
 
       entry.tablas.push({ grupo, equipos });
