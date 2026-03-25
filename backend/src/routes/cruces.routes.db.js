@@ -180,20 +180,42 @@ router.post('/', async (req, res) => {
 
 router.post('/match-status', async (req, res) => {
   try {
-    const { team, fechaKey, data } = req.body || {};
-    if (!team || !fechaKey || data === undefined) {
+    const {
+      localSlug,
+      visitanteSlug,
+      fechaISO,
+      equipoSlug,
+      status
+    } = req.body || {};
+
+    if (!localSlug || !visitanteSlug || !fechaISO || !equipoSlug) {
       return res.status(400).json({ ok: false, error: 'Faltan datos' });
     }
 
     const result = await pool.query(
       `
-      INSERT INTO cruces_match_status (team, fecha_key, status_json, updated_at)
-      VALUES ($1, $2, $3::jsonb, NOW())
-      ON CONFLICT (team, fecha_key)
-      DO UPDATE SET status_json = EXCLUDED.status_json, updated_at = NOW()
-      RETURNING team, fecha_key, updated_at
+      INSERT INTO cruces_match_status (
+        local_slug,
+        visitante_slug,
+        fecha_iso,
+        equipo_slug,
+        status_json,
+        updated_at
+      )
+      VALUES ($1, $2, $3::date, $4, $5::jsonb, NOW())
+      ON CONFLICT (local_slug, visitante_slug, fecha_iso, equipo_slug)
+      DO UPDATE SET
+        status_json = EXCLUDED.status_json,
+        updated_at = NOW()
+      RETURNING local_slug, visitante_slug, fecha_iso, equipo_slug, updated_at
       `,
-      [team, fechaKey, JSON.stringify(data)]
+      [
+        localSlug,
+        visitanteSlug,
+        fechaISO,
+        equipoSlug,
+        JSON.stringify(status || {})
+      ]
     );
 
     return res.json({ ok: true, saved: result.rows[0] });
@@ -205,21 +227,26 @@ router.post('/match-status', async (req, res) => {
 
 router.get('/match-status', async (req, res) => {
   try {
-    const team = String(req.query.team || '').trim();
-    const fechaKey = String(req.query.fechaKey || '').trim();
+    const localSlug = String(req.query.localSlug || '').trim();
+    const visitanteSlug = String(req.query.visitanteSlug || '').trim();
+    const fechaISO = String(req.query.fechaISO || '').trim();
+    const equipoSlug = String(req.query.equipoSlug || '').trim();
 
-    if (!team || !fechaKey) {
-      return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey' });
+    if (!localSlug || !visitanteSlug || !fechaISO || !equipoSlug) {
+      return res.status(400).json({ ok: false, error: 'Faltan parámetros' });
     }
 
     const result = await pool.query(
       `
-      SELECT team, fecha_key, status_json, updated_at
+      SELECT local_slug, visitante_slug, fecha_iso, equipo_slug, status_json, updated_at
       FROM cruces_match_status
-      WHERE team = $1 AND fecha_key = $2
+      WHERE local_slug = $1
+        AND visitante_slug = $2
+        AND fecha_iso = $3::date
+        AND equipo_slug = $4
       LIMIT 1
       `,
-      [team, fechaKey]
+      [localSlug, visitanteSlug, fechaISO, equipoSlug]
     );
 
     if (!result.rows.length) {
