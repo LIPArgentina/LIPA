@@ -573,36 +573,46 @@
   }
 
   // ---------------- SCORES: TRIÁNGULOS ARRIBA, PUNTOS ABAJO ----------------
-  function updateScoresFor(rootId) {
+  function getEncounterValues(rootId) {
     const root = document.getElementById(rootId);
-    if (!root) return;
-
-    let totalEquipo = 0;
-    let totalPts = 0;
-
-    root.querySelectorAll('.row').forEach(row => {
-      const sel = row.querySelector('.pts-select');
-      if (!sel) return;
-
-      const val = parseInt(sel.value, 10);
-      if (isNaN(val)) return;
-
-      totalPts += val;
-
-      const section = String(row.dataset.section || '').toUpperCase();
-
-      if (section === 'INDIVIDUALES') {
-        if (val === 5 || val === 6) totalEquipo++;
-      } else if (section === 'PAREJA 1' || section === 'PAREJA 2') {
-        if (val === 4 || val === 5 || val === 6) totalEquipo++;
-      }
+    if (!root) return [];
+    return Array.from(root.querySelectorAll('.pts-select')).map(sel => {
+      const n = parseInt(sel.value, 10);
+      return Number.isFinite(n) ? n : 0;
     });
+  }
 
-    const totalInput = root.querySelector('.total-input');
-    if (totalInput) totalInput.value = totalPts;
+  function computeEncounterWins(ownValues, rivalValues) {
+    let wins = 0;
+    const maxLen = Math.max(ownValues.length, rivalValues.length);
+    for (let i = 0; i < maxLen; i++) {
+      const own = Number.isFinite(ownValues[i]) ? ownValues[i] : 0;
+      const rival = Number.isFinite(rivalValues[i]) ? rivalValues[i] : 0;
+      if (own > rival) wins++;
+    }
+    return wins;
+  }
 
-    const winsBox = root.querySelector('.wins-box');
-    if (winsBox) winsBox.textContent = totalEquipo;
+  function updateScoresFor(_rootId) {
+    const leftValues = getEncounterValues('planilla-root-left');
+    const rightValues = getEncounterValues('planilla-root-right');
+
+    const applyTotals = (rootId, ownValues, rivalValues) => {
+      const root = document.getElementById(rootId);
+      if (!root) return;
+
+      const totalPts = ownValues.reduce((acc, val) => acc + (Number.isFinite(val) ? val : 0), 0);
+      const totalEquipo = computeEncounterWins(ownValues, rivalValues);
+
+      const totalInput = root.querySelector('.total-input');
+      if (totalInput) totalInput.value = totalPts;
+
+      const winsBox = root.querySelector('.wins-box');
+      if (winsBox) winsBox.textContent = totalEquipo;
+    };
+
+    applyTotals('planilla-root-left', leftValues, rightValues);
+    applyTotals('planilla-root-right', rightValues, leftValues);
   }
 
 
@@ -826,9 +836,16 @@ function computeTotalsFrom(rootId) {
 
 function sliceToStatus(values) {
   const jugadores = values.slice(0,7);
-  const pareja1 = { j1: values[7]  ?? 0, j2: values[8]  ?? 0 };
-  const pareja2 = { j1: values[9]  ?? 0, j2: values[10] ?? 0 };
+  const pareja1 = { j1: values[7] ?? 0, j2: 0 };
+  const pareja2 = { j1: values[8] ?? 0, j2: 0 };
   return { jugadores, parejas: { pareja1, pareja2 } };
+}
+
+function statusToSelectValues(statusSide, planSide) {
+  const individuales = Array.isArray(statusSide?.jugadores) ? statusSide.jugadores.slice(0, 7) : [];
+  const pareja1 = planSide?.pareja1Pts?.[0] ?? statusSide?.parejas?.pareja1?.j1 ?? statusSide?.parejas?.pareja1?.j2 ?? 0;
+  const pareja2 = planSide?.pareja2Pts?.[0] ?? statusSide?.parejas?.pareja2?.j1 ?? statusSide?.parejas?.pareja2?.j2 ?? 0;
+  return [...individuales, pareja1, pareja2];
 }
 
 function buildMatchStatus(validated = false) {
@@ -928,8 +945,8 @@ async function tryApplyStatusIfExists(){
     if (data.localPlanilla) applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
     if (data.visitantePlanilla) applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
 
-    const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
-    const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
+    const L = statusToSelectValues(data.local, data.localPlanilla);
+    const R = statusToSelectValues(data.visitante, data.visitantePlanilla);
     writeAllSelects('planilla-root-left', L);
     writeAllSelects('planilla-root-right', R);
     updateScoresFor('planilla-root-left');
