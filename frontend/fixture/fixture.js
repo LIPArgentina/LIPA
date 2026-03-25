@@ -332,7 +332,7 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
     extraL.dataset.fecha = fecha;
     extraL.dataset.grupo = grupo;
     extraL.dataset.index = k;
-    for (let n = 0; n <= 45; n++){
+    for (let n = 0; n <= 54; n++){
       const o = document.createElement('option');
       o.value = String(n);
       o.textContent = String(n);
@@ -398,7 +398,7 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
     extraV.dataset.fecha = fecha;
     extraV.dataset.grupo = grupo;
     extraV.dataset.index = k;
-    for (let n = 0; n <= 45; n++){
+    for (let n = 0; n <= 54; n++){
       const o = document.createElement('option');
       o.value = String(n);
       o.textContent = String(n);
