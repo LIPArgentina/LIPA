@@ -121,6 +121,8 @@ app.get('/api/health-direct', (req, res) => {
   res.json({ ok: true, source: 'app.js-direct' });
 });
 
+app.use('/api/cruces', crucesDbRouter);
+
 app.use(
   '/api',
   createApiRouter({
@@ -133,8 +135,6 @@ app.use(
     FRONTEND_FECHA,
   })
 );
-
-app.use('/api/cruces', crucesDbRouter);
 
 /* =========================================================
    FRONTEND ESTÁTICO (temporal, hasta separar del todo)
