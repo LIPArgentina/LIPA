@@ -132,75 +132,27 @@ module.exports = function createFechasRouter(deps) {
     };
   }
 
-  // ====== API: Validación (fecha/*.validacion.js) ======
-  router.post('/validar', async (req, res) => {
-    try {
-      const { team, triangulos, puntosTotales } = req.body || {};
-      if (!team || triangulos === undefined || puntosTotales === undefined) {
-        return res.status(400).json({ ok: false, error: 'Faltan campos' });
-      }
-
-      const validacionPath = path.join(FRONTEND_FECHA, `${team}.validacion.js`);
-      const today = new Date().toISOString().split('T')[0];
-      const validacionContent = { team, date: today, triangulos, puntosTotales };
-
-      if (fs.existsSync(validacionPath)) {
-        try {
-          delete require.cache[require.resolve(validacionPath)];
-          const existingModule = require(validacionPath);
-          const existingData = existingModule?.window?.LPI_VALIDACION;
-          if (existingData && existingData.date === today) {
-            return res.status(409).json({ ok: false, error: 'Ya validado hoy' });
-          }
-        } catch (e) {}
-      }
-
-      const rivalTeam = team === 'local' ? 'visitante' : 'local';
-      const rivalValidacionPath = path.join(FRONTEND_FECHA, `${rivalTeam}.validacion.js`);
-      if (fs.existsSync(rivalValidacionPath)) {
-        try {
-          delete require.cache[require.resolve(rivalValidacionPath)];
-          const rivalModule = require(rivalValidacionPath);
-          const rivalData = rivalModule?.window?.LPI_VALIDACION;
-          if (rivalData &&
-              (rivalData.triangulos !== triangulos || rivalData.puntosTotales !== puntosTotales)) {
-            return res.status(400).json({ ok: false, error: 'Los puntos no coinciden con el rival' });
-          }
-        } catch (e) {}
-      }
-
-      const content = `window.LPI_VALIDACION = ${JSON.stringify(validacionContent, null, 2)};\n`;
-      await fs.promises.writeFile(validacionPath, content, 'utf8');
-      return res.json({ ok: true, message: 'Validación guardada para hoy' });
-    } catch (err) {
-      console.error('Error al guardar la validación', err);
-      return res.status(500).json({ ok: false, error: 'Error interno' });
-    }
+  // ====== LEGACY DESCONTINUADO ======
+  // Estas rutas escribían archivos en disco y generaban una segunda fuente de verdad.
+  // A partir de ahora, cruces/validaciones deben persistirse en DB mediante:
+  //   POST /api/cruces/match-status
+  //   POST /api/cruces/validate
+  // El fixture debe guardarse con:
+  //   POST /fixture
+  router.post('/validar', async (_req, res) => {
+    return res.status(410).json({
+      ok: false,
+      error: 'Ruta legacy descontinuada',
+      migrateTo: '/api/cruces/validate'
+    });
   });
 
-  // ====== API: Guardar JS/JSON (fixture) ======
-  router.post('/save-js', async (req, res) => {
-    try {
-      const { path: relPath, content } = req.body || {};
-      if (!relPath || typeof content !== 'string') {
-        return res.status(400).json({ ok: false, error: 'Faltan campos o inválidos (path, content)' });
-      }
-
-      if (!/^fixture\/fixture[._](ida|vuelta)[._](primera|segunda|tercera)\.(js|json)$/.test(relPath)) {
-        return res.status(403).json({ ok: false, error: 'Path no autorizado' });
-      }
-
-      const absPath = path.join(FRONTEND_DIR, relPath);
-      const dir = path.dirname(absPath);
-
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-      await fs.promises.writeFile(absPath, content, 'utf8');
-      return res.json({ ok: true, message: 'Archivo guardado' });
-    } catch (err) {
-      console.error('Error al guardar archivo', err);
-      return res.status(500).json({ ok: false, error: 'Error interno' });
-    }
+  router.post('/save-js', async (_req, res) => {
+    return res.status(410).json({
+      ok: false,
+      error: 'Ruta legacy descontinuada',
+      migrateTo: '/fixture'
+    });
   });
 
 
