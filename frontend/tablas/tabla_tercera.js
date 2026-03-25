@@ -109,15 +109,11 @@ function renderRowsStatic(rowsCont, equipos){
   for (let k = 0; k < total; k++){
     const iL = 2 * k;
     const iV = 2 * k + 1;
-    const L = list[iL] || { equipo:'', puntos:'', puntosExtra:'' };
-    const V = list[iV] || { equipo:'', puntos:'', puntosExtra:'' };
+    const L = list[iL] || { equipo:'', puntos:'' };
+    const V = list[iV] || { equipo:'', puntos:'' };
 
     const row = document.createElement('div');
     row.className = 'row';
-
-    const extraL = document.createElement('div');
-    extraL.className = 'score-badge extra-badge';
-    extraL.textContent = L.puntosExtra ?? '';
 
     const puntL = document.createElement('div');
     puntL.className = 'score-badge';
@@ -139,11 +135,7 @@ function renderRowsStatic(rowsCont, equipos){
     puntV.className = 'score-badge';
     puntV.textContent = V.puntos ?? '';
 
-    const extraV = document.createElement('div');
-    extraV.className = 'score-badge extra-badge';
-    extraV.textContent = V.puntosExtra ?? '';
-
-    row.append(extraL, puntL, selL, vs, selV, puntV, extraV);
+    row.append(puntL, selL, vs, selV, puntV);
     rowsCont.append(row);
   }
 }
@@ -197,14 +189,16 @@ function calcRows(feeds){
 
         const equipos = (tabla?.equipos || []).map(e => ({
           equipo: e?.equipo || '',
-          puntos: parseInt(e?.puntos ?? 0, 10) || 0
+          puntos: parseInt(e?.puntos ?? 0, 10) || 0,
+          puntosExtra: parseInt(e?.puntosExtra ?? 0, 10) || 0
         }));
 
         equipos.forEach(it => {
           const key = normalizeName(it.equipo);
           if (!key || key.toUpperCase() === 'WO') return;
-          if (!puntos[g][key]) puntos[g][key] = { equipo: it.equipo, pts: 0 };
+          if (!puntos[g][key]) puntos[g][key] = { equipo: it.equipo, pts: 0, tr: 0 };
           puntos[g][key].pts += it.puntos;
+          puntos[g][key].tr += it.puntosExtra;
         });
 
         for (let i = 0; i < equipos.length; i += 2){
@@ -216,7 +210,7 @@ function calcRows(feeds){
           const bK = normalizeName(B.equipo);
           if (!aK || !bK) continue;
           if (aK.toUpperCase() === 'WO' || bK.toUpperCase() === 'WO') continue;
-          if (A.puntos === 0 && B.puntos === 0) continue;
+          if (A.puntos === 0 && B.puntos === 0 && A.puntosExtra === 0 && B.puntosExtra === 0) continue;
 
           ju[g][aK] = (ju[g][aK] || 0) + 1;
           ju[g][bK] = (ju[g][bK] || 0) + 1;
@@ -228,13 +222,13 @@ function calcRows(feeds){
   const result = {};
   GROUPS.forEach(g => {
     result[g] = Object.values(puntos[g])
-      .sort((a, b) => b.pts - a.pts || String(a.equipo).localeCompare(String(b.equipo)))
+      .sort((a, b) => b.pts - a.pts || b.tr - a.tr || String(a.equipo).localeCompare(String(b.equipo)))
       .slice(0, 4)
       .map((r, i) => ({
         pos: i + 1,
         equipo: r.equipo,
         ju: (ju[g][normalizeName(r.equipo)] || ''),
-        tr: '',
+        tr: r.tr,
         pts: r.pts
       }));
   });
