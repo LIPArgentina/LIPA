@@ -95,11 +95,15 @@ function renderRowsStatic(rowsCont, equipos){
   for (let k = 0; k < total; k++){
     const iL = 2 * k;
     const iV = 2 * k + 1;
-    const L = list[iL] || { equipo:'', puntos:'' };
-    const V = list[iV] || { equipo:'', puntos:'' };
+    const L = list[iL] || { equipo:'', puntos:'', puntosExtra:'' };
+    const V = list[iV] || { equipo:'', puntos:'', puntosExtra:'' };
 
     const row = document.createElement('div');
     row.className = 'row';
+
+    const triL = document.createElement('div');
+    triL.className = 'triangle-badge';
+    triL.textContent = L.puntosExtra ?? '';
 
     const puntL = document.createElement('div');
     puntL.className = 'score-badge';
@@ -121,7 +125,11 @@ function renderRowsStatic(rowsCont, equipos){
     puntV.className = 'score-badge';
     puntV.textContent = V.puntos ?? '';
 
-    row.append(puntL, selL, vs, selV, puntV);
+    const triV = document.createElement('div');
+    triV.className = 'triangle-badge';
+    triV.textContent = V.puntosExtra ?? '';
+
+    row.append(triL, puntL, selL, vs, selV, puntV, triV);
     rowsCont.append(row);
   }
 }
@@ -151,6 +159,7 @@ function renderSelectedFixture(){
 function calcRows(feeds){
   const puntos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const ju = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const tr = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const teamsSeen = Object.fromEntries(GROUPS.map(g => [g, new Map()]));
 
   (feeds || []).forEach(feed => {
@@ -161,7 +170,8 @@ function calcRows(feeds){
 
         const equipos = (tabla?.equipos || []).map(e => ({
           equipo: e?.equipo || '',
-          puntos: parseInt(e?.puntos ?? 0, 10) || 0
+          puntos: parseInt(e?.puntos ?? 0, 10) || 0,
+          puntosExtra: parseInt(e?.puntosExtra ?? 0, 10) || 0
         }));
 
         equipos.forEach(it => {
@@ -169,6 +179,7 @@ function calcRows(feeds){
           if (!key || key === 'WO') return;
           if (!puntos[g][key]) puntos[g][key] = { equipo: key, pts: 0 };
           puntos[g][key].pts += it.puntos;
+          tr[g][key] = (tr[g][key] || 0) + it.puntosExtra;
           if (!teamsSeen[g].has(key)) teamsSeen[g].set(key, it.equipo);
         });
 
@@ -196,14 +207,15 @@ function calcRows(feeds){
       key,
       equipo: puntos[g][key]?.equipo || display,
       pts: puntos[g][key]?.pts || 0,
-      ju: ju[g][key] || ''
+      ju: ju[g][key] || '',
+      tr: tr[g][key] || 0
     }))
-    .sort((a, b) => b.pts - a.pts || String(a.equipo).localeCompare(String(b.equipo)))
+    .sort((a, b) => b.pts - a.pts || b.tr - a.tr || String(a.equipo).localeCompare(String(b.equipo)))
     .map((r, i) => ({
       pos: i + 1,
       equipo: r.equipo,
       ju: r.ju,
-      tr: '',
+      tr: r.tr,
       pts: r.pts
     }));
   });
