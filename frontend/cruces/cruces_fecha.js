@@ -27,8 +27,16 @@
   };
 
   const formatDate = (iso) => {
-    try { return dtf.format(parseISOAsLocal(iso)); }
-    catch { return String(iso || ''); }
+    const raw = String(iso || '').trim();
+    if (!raw) return '';
+    try {
+      const d = parseISOAsLocal(raw);
+      if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+      if (d.getFullYear() < 2000) return '';
+      return dtf.format(d);
+    } catch {
+      return '';
+    }
   };
 
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-tt82.onrender.com').replace(/\/+$/, '');
@@ -94,7 +102,13 @@
     return [...variants].filter(Boolean);
   }
 
-  function apiUrl(path){
+  function withBust(params){
+  const qs = new URLSearchParams(params);
+  qs.set('_', String(Date.now()));
+  return qs;
+}
+
+function apiUrl(path){
     if (!API_BASE) return path;
     return API_BASE + path;
   }
@@ -536,7 +550,8 @@
 
     const card = document.querySelector('#card-template').content.cloneNode(true).querySelector('.card');
     card.querySelector('.title').textContent = teamName.toUpperCase();
-    card.querySelector('.meta').textContent = `vs ${opponent} · ${formatDate(date)}`;
+    const formattedDate = formatDate(date);
+    card.querySelector('.meta').textContent = formattedDate ? `vs ${opponent} · ${formattedDate}` : `vs ${opponent}`;
 
     const secs = card.querySelector('.sections');
     const data = {
@@ -761,6 +776,18 @@
     clearSwapMarks(root);
   }
 
+  function planillaTieneContenido(plan) {
+    if (!plan) return false;
+    const values = [
+      ...(Array.isArray(plan.capitan) ? plan.capitan : []),
+      ...(Array.isArray(plan.individuales) ? plan.individuales : []),
+      ...(Array.isArray(plan.pareja1) ? plan.pareja1 : []),
+      ...(Array.isArray(plan.pareja2) ? plan.pareja2 : []),
+      ...(Array.isArray(plan.suplentes) ? plan.suplentes : []),
+    ];
+    return values.some(v => String(v || '').trim() !== '');
+  }
+
   // ---------------- VALIDACIÓN ----------------
   function setupValidationButtons(local, visitante, matchDate) {
     const cta = document.getElementById('validateCta');
@@ -770,13 +797,6 @@
     document.querySelectorAll('.btn-validate').forEach(b => {
       if (b.id !== 'btnValidarGlobal') b.remove();
     });
-
-    // Reset visual state on every fresh render so browser cache/BFCache
-    // doesn't leave the button stuck in "pendiente" from a prior visit.
-    btn.disabled = false;
-    btn.classList.remove('success','error','pending','rival-pending','btn');
-    btn.classList.add('btn-validate');
-    btn.textContent = 'VALIDAR PLANILLA';
 
     cta.style.display = 'flex';
 
@@ -831,6 +851,197 @@ function computeTotalsFrom(rootId) {
   return { triangulos, puntosTotales };
 }
 
+function collectScoreRows(rootId) {
+  const root = document.getElementById(rootId);
+  if (!root) return [];
+  return Array.from(root.querySelectorAll('.pts-select')).map(sel => {
+    const n = parseInt(sel.value, 10);
+    return Number.isFinite(n) ? n : 0;
+  });
+}
+
+function normalizeCompareText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+function clearMismatchVisual() {
+  document.querySelectorAll('.slot-error, .pts-error, .total-error, .wins-error').forEach(el => {
+    el.classList.remove('slot-error', 'pts-error', 'total-error', 'wins-error');
+  });
+}
+
+function markPtsError(rootId, scoreIndex) {
+  const root = document.getElementById(rootId);
+  if (!root) return;
+  const boxes = Array.from(root.querySelectorAll('.pts-edit')).filter(box => box.querySelector('.pts-select'));
+  const box = boxes[scoreIndex];
+  if (box) box.classList.add('pts-error');
+}
+
+function markTotalError(rootId, metric) {
+  const root = document.getElementById(rootId);
+  if (!root) return;
+  if (metric === 'triangulos') {
+    const el = root.querySelector('.total-box');
+    if (el) el.classList.add('total-error');
+  } else if (metric === 'puntos') {
+    const el = root.querySelector('.wins-box');
+    if (el) el.classList.add('wins-error');
+  }
+}
+
+function markPlanillaSlotError(rootId, section, index) {
+  const root = document.getElementById(rootId);
+  if (!root) return;
+  const wanted = String(section || '').toUpperCase();
+  const secEl = Array.from(root.querySelectorAll('.section'))
+    .find(sec => (sec.querySelector('h2')?.textContent || '').toUpperCase() === wanted);
+  if (!secEl) return;
+  const slot = secEl.querySelectorAll('.slot')[index];
+  if (slot) slot.classList.add('slot-error');
+}
+
+function applyMismatchDiff(diffList) {
+  clearMismatchVisual();
+  if (!Array.isArray(diffList)) return;
+
+  diffList.forEach(item => {
+    const side = item?.side === 'visitante' ? 'planilla-root-right' : 'planilla-root-left';
+    if (item?.type === 'score') {
+      markPtsError(side, Number(item.scoreIndex || 0));
+    } else if (item?.type === 'total') {
+      markTotalError(side, item.metric);
+    } else if (item?.type === 'slot') {
+      markPlanillaSlotError(side, item.section, Number(item.index || 0));
+    }
+  });
+}
+
+function buildValidationSnapshot(status) {
+  const source = status || buildMatchStatus(true);
+  return {
+    fechaISO: source.fechaISO,
+    localSlug: source.localSlug,
+    visitanteSlug: source.visitanteSlug,
+    localPlanilla: source.localPlanilla,
+    visitantePlanilla: source.visitantePlanilla,
+    local: {
+      triangulos: source?.local?.triangulosTotales ?? 0,
+      puntosTotales: source?.local?.puntosTotales ?? 0,
+      scoreRows: Array.isArray(source?.local?.scoreRows) ? source.local.scoreRows : []
+    },
+    visitante: {
+      triangulos: source?.visitante?.triangulosTotales ?? 0,
+      puntosTotales: source?.visitante?.puntosTotales ?? 0,
+      scoreRows: Array.isArray(source?.visitante?.scoreRows) ? source.visitante.scoreRows : []
+    }
+  };
+}
+
+let validationPollTimer = null;
+function stopValidationPolling() {
+  if (validationPollTimer) {
+    clearInterval(validationPollTimer);
+    validationPollTimer = null;
+  }
+}
+
+
+async function checkFinalLockOnLoad() {
+  try {
+    const qs = withBust({
+      fechaISO: todayISO_AR,
+      equipoSlug: mySlug,
+      localSlug,
+      visitanteSlug
+    });
+
+    const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) return false;
+
+    const btn = document.getElementById('btnValidarGlobal');
+
+    if (data?.tipo === 'validado' || data?.locked) {
+      stopValidationPolling();
+      autosaveClear();
+      clearMismatchVisual();
+      lockValidatedMatchUI();
+      if (btn) setBtnState('success', data?.mensaje || 'VALIDADO');
+      return true;
+    }
+
+    if (data?.tipo === 'pendiente') {
+      if (btn) {
+        setBtnState('pending', data?.mensaje || 'Validado: esperando que valide su rival');
+        startValidationPolling(btn);
+      }
+      return false;
+    }
+
+    if (data?.tipo === 'mismatch') {
+      if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
+      if (btn) {
+        setBtnState('error', data?.error || 'Los datos no coinciden, consulte con su rival');
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.classList.remove('success','error','pending','rival-pending','btn');
+          btn.classList.add('btn-validate');
+          btn.textContent = 'VALIDAR PLANILLA';
+        }, 3000);
+      }
+      return false;
+    }
+
+    return false;
+  } catch (e) {
+    console.warn('checkFinalLockOnLoad', e);
+    return false;
+  }
+}
+
+function startValidationPolling(btn) {
+  stopValidationPolling();
+  validationPollTimer = setInterval(async () => {
+    try {
+      const qs = withBust({ fechaISO: todayISO_AR, localSlug, visitanteSlug, equipoSlug: mySlug });
+      const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) return;
+
+      if (data?.tipo === 'validado' || data?.locked) {
+        stopValidationPolling();
+        autosaveClear();
+        lockValidatedMatchUI();
+        clearMismatchVisual();
+        setBtnState('success', data?.mensaje || 'VALIDACIÓN EXITOSA');
+        showToast('Validación exitosa', 'success');
+      } else if (data?.tipo === 'mismatch') {
+        stopValidationPolling();
+        if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
+        setBtnState('error', data?.error || 'Los datos no coinciden, verificar con su rival');
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.classList.remove('success','error','pending','rival-pending','btn');
+          btn.classList.add('btn-validate');
+          btn.textContent = 'VALIDAR PLANILLA';
+        }, 3000);
+      }
+    } catch (_) {}
+  }, 4000);
+}
+
 function sliceToStatus(values) {
   const jugadores = values.slice(0,7);
   const pareja1 = { j1: values[7]  ?? 0, j2: values[8]  ?? 0 };
@@ -841,6 +1052,8 @@ function sliceToStatus(values) {
 function buildMatchStatus(validated = false) {
   const leftVals  = readAllSelects('planilla-root-left');
   const rightVals = readAllSelects('planilla-root-right');
+  const leftScoreRows = collectScoreRows('planilla-root-left');
+  const rightScoreRows = collectScoreRows('planilla-root-right');
   const leftT  = computeTotalsFrom('planilla-root-left');
   const rightT = computeTotalsFrom('planilla-root-right');
   const localData     = sliceToStatus(leftVals);
@@ -852,8 +1065,8 @@ function buildMatchStatus(validated = false) {
     visitanteSlug,
     localPlanilla: collectPlanilla('planilla-root-left'),
     visitantePlanilla: collectPlanilla('planilla-root-right'),
-    local:     { ...localData,     triangulosTotales: leftT.triangulos,  puntosTotales: leftT.puntosTotales },
-    visitante: { ...visitanteData, triangulosTotales: rightT.triangulos, puntosTotales: rightT.puntosTotales }
+    local:     { ...localData,     triangulosTotales: leftT.triangulos,  puntosTotales: leftT.puntosTotales, scoreRows: leftScoreRows },
+    visitante: { ...visitanteData, triangulosTotales: rightT.triangulos, puntosTotales: rightT.puntosTotales, scoreRows: rightScoreRows }
   };
 }
 
@@ -909,21 +1122,22 @@ function autosaveAttachListeners(){
   ['planilla-root-left','planilla-root-right'].forEach(id=>{
     const root = document.getElementById(id);
     root.addEventListener('change', ev => {
-      if (ev.target && ev.target.classList && ev.target.classList.contains('pts-select')) scheduleAutosave();
+      if (ev.target && ev.target.classList && ev.target.classList.contains('pts-select')) {
+        clearMismatchVisual();
+        scheduleAutosave();
+      }
     });
-    root.addEventListener('cruces:changed', scheduleAutosave);
+    root.addEventListener('cruces:changed', () => {
+      clearMismatchVisual();
+      scheduleAutosave();
+    });
   });
 }
 
 // STATUS autocarga: primero borrador propio, si no existe compartido final
 async function tryApplyStatusIfExists(){
   try {
-    const qs = new URLSearchParams({
-      localSlug,
-      visitanteSlug,
-      fechaISO: todayISO_AR,
-      equipoSlug: mySlug
-    });
+    const qs = withBust({ localSlug, visitanteSlug, fechaISO: todayISO_AR, equipoSlug: mySlug });
     const res = await fetch(apiUrl('/api/cruces/match-status?') + qs.toString(), {
       cache: 'no-store',
       credentials: 'same-origin'
@@ -932,8 +1146,12 @@ async function tryApplyStatusIfExists(){
     if (!res.ok || !result?.ok || !result?.data) return false;
 
     const data = result.data;
-    if (data.localPlanilla) applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
-    if (data.visitantePlanilla) applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
+    if (planillaTieneContenido(data.localPlanilla)) {
+      applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
+    }
+    if (planillaTieneContenido(data.visitantePlanilla)) {
+      applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
+    }
 
     const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
     const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
@@ -953,23 +1171,75 @@ async function tryApplyStatusIfExists(){
 autosaveApplyIfAny();
 autosaveAttachListeners();
 tryApplyStatusIfExists();
-btn.onclick = async () => {
-  const btnVolver = document.getElementById('btnVolver');
-  const volverClass = btnVolver ? btnVolver.className : 'btn';
 
-  const setBtnState = (mode, text) => {
-    btn.disabled = (mode === 'success');
-    btn.classList.remove('success','error','pending','rival-pending','btn','btn-validate');
-    if (mode === 'pending') {
-      text && (btn.textContent = text);
-      volverClass.split(/\s+/).forEach(c => c && btn.classList.add(c));
-    } else {
-      btn.classList.add('btn-validate');
-      btn.classList.add(mode);
-      text && (btn.textContent = text);
+const btnVolver = document.getElementById('btnVolver');
+const volverClass = btnVolver ? btnVolver.className : 'btn';
+
+const setBtnState = (mode, text) => {
+  btn.disabled = (mode === 'success');
+  btn.classList.remove('success','error','pending','rival-pending','btn','btn-validate');
+  if (mode === 'pending') {
+    text && (btn.textContent = text);
+    volverClass.split(/\s+/).forEach(c => c && btn.classList.add(c));
+  } else {
+    btn.classList.add('btn-validate');
+    btn.classList.add(mode);
+    text && (btn.textContent = text);
+  }
+};
+
+async function hydrateValidatedState() {
+  try {
+    const qs = withBust({
+      fechaISO: todayISO_AR,
+      equipoSlug: mySlug,
+      localSlug,
+      visitanteSlug
+    });
+    const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) return false;
+
+    if (data?.tipo === 'validado' || data?.locked) {
+      stopValidationPolling();
+      autosaveClear();
+      clearMismatchVisual();
+      lockValidatedMatchUI();
+      setBtnState('success', 'VALIDADO');
+      return true;
     }
-  };
 
+    if (data?.tipo === 'pendiente') {
+      setBtnState('pending', data?.mensaje || 'Validado: esperando que valide su rival');
+      startValidationPolling(btn);
+      return false;
+    }
+
+    if (data?.tipo === 'mismatch') {
+      if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
+      setBtnState('error', data?.error || 'Los datos no coinciden, consulte con su rival');
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.classList.remove('success','error','pending','rival-pending','btn');
+        btn.classList.add('btn-validate');
+        btn.textContent = 'VALIDAR PLANILLA';
+      }, 3000);
+      return false;
+    }
+
+    return false;
+  } catch (e) {
+    console.warn('hydrateValidatedState', e);
+    return false;
+  }
+}
+
+setTimeout(() => { hydrateValidatedState(); }, 0);
+
+btn.onclick = async () => {
   const sameTotalsStrict = (a, b) => {
     return (
       a.equipo1.triangulos    === b.equipo1.triangulos   &&
@@ -990,7 +1260,11 @@ btn.onclick = async () => {
     const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
-      if (lock?.locked || lock?.validatedFinal) { setBtnState('success','VALIDADO'); return; }
+      if (lock?.locked || lock?.validatedFinal || lock?.tipo === 'validado') {
+        lockValidatedMatchUI();
+        setBtnState('success','VALIDADO');
+        return;
+      }
     }
 
     const left  = computeTotalsFrom('planilla-root-left');
@@ -1006,13 +1280,11 @@ btn.onclick = async () => {
     return;
     }
 
-    const mine = {
-      fechaISO: todayISO_AR,
-      equipo1: { triangulos:left.triangulos,  puntosTotales:left.puntosTotales },
-      equipo2: { triangulos:right.triangulos, puntosTotales:right.puntosTotales }
-    };
+    clearMismatchVisual();
 
     const statusForValidate = buildMatchStatus(true);
+    const mine = buildValidationSnapshot(statusForValidate);
+
     const save = await fetch(apiUrl('/api/cruces/validate'), {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -1030,10 +1302,12 @@ btn.onclick = async () => {
 
     if (saveData?.tipo === 'pendiente') {
       setBtnState('pending', saveData?.mensaje || 'PENDIENTE: tu rival todavía no validó');
+      startValidationPolling(btn);
       return;
     }
 
     if (saveData?.tipo === 'mismatch' || saveData?.ok === false) {
+      if (Array.isArray(saveData?.diff)) applyMismatchDiff(saveData.diff);
       setBtnState('error', saveData?.error || 'Los datos no coinciden, verificar con su rival');
       setTimeout(() => {
         btn.disabled = false;
@@ -1046,19 +1320,21 @@ btn.onclick = async () => {
 
     const statusResult = saveData;
 
-    if (statusResult?.tipo !== 'validado' && statusResult?.ok !== true) {
+    console.log('VALIDATE RESPONSE:', statusResult);
+
+    if (statusResult?.tipo !== 'validado') {
       setBtnState('pending', statusResult?.mensaje || 'PENDIENTE: falta coincidencia final con tu rival');
       return;
     }
 
+    stopValidationPolling();
     autosaveClear();
+    clearMismatchVisual();
     lockValidatedMatchUI();
 
-    setBtnState('success','VALIDACIÓN EXITOSA');
+    setBtnState('success','VALIDADO');
     showToast('Validación exitosa','success');
-    setTimeout(() => {
-      window.location.reload();
-    }, 3000);
+    await hydrateValidatedState();
   } catch (e) {
     console.error(e);
     setBtnState('error', e?.message || 'Error inesperado');
