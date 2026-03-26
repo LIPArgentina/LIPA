@@ -1263,7 +1263,9 @@ btn.onclick = async () => {
 
     const statusResult = saveData;
 
-    if (statusResult?.tipo !== 'validado' && statusResult?.ok !== true) {
+    console.log('VALIDATE RESPONSE:', statusResult);
+
+    if (statusResult?.tipo !== 'validado') {
       setBtnState('pending', statusResult?.mensaje || 'PENDIENTE: falta coincidencia final con tu rival');
       return;
     }
