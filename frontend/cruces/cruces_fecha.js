@@ -1312,13 +1312,8 @@ btn.onclick = async () => {
 
     if (saveData?.tipo === 'mismatch' || saveData?.ok === false) {
       if (Array.isArray(saveData?.diff)) applyMismatchDiff(saveData.diff);
-      setBtnState('error', saveData?.error || 'Los datos no coinciden, verificar con su rival');
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.classList.remove('success','error','pending','rival-pending','btn');
-        btn.classList.add('btn-validate');
-        btn.textContent = 'VALIDAR PLANILLA';
-      }, 3000);
+      setBtnState('pending', 'Esperando que el rival corrija y valide');
+      startValidationPolling(btn);
       return;
     }
 
