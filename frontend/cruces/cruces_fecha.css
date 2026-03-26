@@ -409,7 +409,13 @@ header.lpi-top {
   transform: translateY(-2px);
 }
 
-.btn-validate.success { background: #00c853 !important; cursor: default; }
+.btn-validate.success { 
+  background: linear-gradient(145deg, #00c853, #009624) !important;
+  border: 1px solid #0f5132 !important;
+  color: #ffffff;
+  box-shadow: 0 0 6px rgba(0,200,83,0.4);
+  cursor: default;
+}
 .btn-validate.pending { background: #ffa000; }
 .btn-validate.error { background: #d32f2f !important; animation: shake 0.5s; }
 .btn-validate.rival-pending { background: #d81b60; }
