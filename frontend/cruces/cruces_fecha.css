@@ -782,3 +782,17 @@ header.lpi-top {
   }
 }
 
+
+
+.slot-error {
+  background: #ff5252 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 2px #b30000 inset !important;
+}
+
+.pts-error,
+.total-error,
+.wins-error {
+  background: #ffdfdf !important;
+  box-shadow: 0 0 0 2px #d32f2f inset !important;
+}
