@@ -1029,6 +1029,7 @@ function startValidationPolling(btn) {
         showToast('Validación exitosa', 'success');
       } else if (data?.tipo === 'mismatch') {
         stopValidationPolling();
+        if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
         setBtnState('error', data?.error || 'Los datos no coinciden, verificar con su rival');
         setTimeout(() => {
           btn.disabled = false;
@@ -1170,23 +1171,75 @@ async function tryApplyStatusIfExists(){
 autosaveApplyIfAny();
 autosaveAttachListeners();
 tryApplyStatusIfExists();
-btn.onclick = async () => {
-  const btnVolver = document.getElementById('btnVolver');
-  const volverClass = btnVolver ? btnVolver.className : 'btn';
 
-  const setBtnState = (mode, text) => {
-    btn.disabled = (mode === 'success');
-    btn.classList.remove('success','error','pending','rival-pending','btn','btn-validate');
-    if (mode === 'pending') {
-      text && (btn.textContent = text);
-      volverClass.split(/\s+/).forEach(c => c && btn.classList.add(c));
-    } else {
-      btn.classList.add('btn-validate');
-      btn.classList.add(mode);
-      text && (btn.textContent = text);
+const btnVolver = document.getElementById('btnVolver');
+const volverClass = btnVolver ? btnVolver.className : 'btn';
+
+const setBtnState = (mode, text) => {
+  btn.disabled = (mode === 'success');
+  btn.classList.remove('success','error','pending','rival-pending','btn','btn-validate');
+  if (mode === 'pending') {
+    text && (btn.textContent = text);
+    volverClass.split(/\s+/).forEach(c => c && btn.classList.add(c));
+  } else {
+    btn.classList.add('btn-validate');
+    btn.classList.add(mode);
+    text && (btn.textContent = text);
+  }
+};
+
+async function hydrateValidatedState() {
+  try {
+    const qs = withBust({
+      fechaISO: todayISO_AR,
+      equipoSlug: mySlug,
+      localSlug,
+      visitanteSlug
+    });
+    const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) return false;
+
+    if (data?.tipo === 'validado' || data?.locked) {
+      stopValidationPolling();
+      autosaveClear();
+      clearMismatchVisual();
+      lockValidatedMatchUI();
+      setBtnState('success', 'VALIDADO');
+      return true;
     }
-  };
 
+    if (data?.tipo === 'pendiente') {
+      setBtnState('pending', data?.mensaje || 'Validado: esperando que valide su rival');
+      startValidationPolling(btn);
+      return false;
+    }
+
+    if (data?.tipo === 'mismatch') {
+      if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
+      setBtnState('error', data?.error || 'Los datos no coinciden, consulte con su rival');
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.classList.remove('success','error','pending','rival-pending','btn');
+        btn.classList.add('btn-validate');
+        btn.textContent = 'VALIDAR PLANILLA';
+      }, 3000);
+      return false;
+    }
+
+    return false;
+  } catch (e) {
+    console.warn('hydrateValidatedState', e);
+    return false;
+  }
+}
+
+setTimeout(() => { hydrateValidatedState(); }, 0);
+
+btn.onclick = async () => {
   const sameTotalsStrict = (a, b) => {
     return (
       a.equipo1.triangulos    === b.equipo1.triangulos   &&
@@ -1207,7 +1260,11 @@ btn.onclick = async () => {
     const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
-      if (lock?.locked || lock?.validatedFinal) { setBtnState('success','VALIDADO'); return; }
+      if (lock?.locked || lock?.validatedFinal || lock?.tipo === 'validado') {
+        lockValidatedMatchUI();
+        setBtnState('success','VALIDADO');
+        return;
+      }
     }
 
     const left  = computeTotalsFrom('planilla-root-left');
@@ -1275,11 +1332,9 @@ btn.onclick = async () => {
     clearMismatchVisual();
     lockValidatedMatchUI();
 
-    setBtnState('success','VALIDACIÓN EXITOSA');
+    setBtnState('success','VALIDADO');
     showToast('Validación exitosa','success');
-    setTimeout(() => {
-      window.location.reload();
-    }, 3000);
+    await hydrateValidatedState();
   } catch (e) {
     console.error(e);
     setBtnState('error', e?.message || 'Error inesperado');
