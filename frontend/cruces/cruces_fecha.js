@@ -102,7 +102,13 @@
     return [...variants].filter(Boolean);
   }
 
-  function apiUrl(path){
+  function withBust(params){
+  const qs = new URLSearchParams(params);
+  qs.set('_', String(Date.now()));
+  return qs;
+}
+
+function apiUrl(path){
     if (!API_BASE) return path;
     return API_BASE + path;
   }
@@ -945,16 +951,68 @@ function stopValidationPolling() {
   }
 }
 
+
+async function checkFinalLockOnLoad() {
+  try {
+    const qs = withBust({
+      fechaISO: todayISO_AR,
+      equipoSlug: mySlug,
+      localSlug,
+      visitanteSlug
+    });
+
+    const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) return false;
+
+    const btn = document.getElementById('btnValidarGlobal');
+
+    if (data?.tipo === 'validado' || data?.locked) {
+      stopValidationPolling();
+      autosaveClear();
+      clearMismatchVisual();
+      lockValidatedMatchUI();
+      if (btn) setBtnState('success', data?.mensaje || 'VALIDADO');
+      return true;
+    }
+
+    if (data?.tipo === 'pendiente') {
+      if (btn) {
+        setBtnState('pending', data?.mensaje || 'Validado: esperando que valide su rival');
+        startValidationPolling(btn);
+      }
+      return false;
+    }
+
+    if (data?.tipo === 'mismatch') {
+      if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
+      if (btn) {
+        setBtnState('error', data?.error || 'Los datos no coinciden, consulte con su rival');
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.classList.remove('success','error','pending','rival-pending','btn');
+          btn.classList.add('btn-validate');
+          btn.textContent = 'VALIDAR PLANILLA';
+        }, 3000);
+      }
+      return false;
+    }
+
+    return false;
+  } catch (e) {
+    console.warn('checkFinalLockOnLoad', e);
+    return false;
+  }
+}
+
 function startValidationPolling(btn) {
   stopValidationPolling();
   validationPollTimer = setInterval(async () => {
     try {
-      const qs = new URLSearchParams({
-        fechaISO: todayISO_AR,
-        localSlug,
-        visitanteSlug,
-        equipoSlug: mySlug
-      });
+      const qs = withBust({ fechaISO: todayISO_AR, localSlug, visitanteSlug, equipoSlug: mySlug });
       const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
         cache: 'no-store',
         credentials: 'same-origin'
@@ -1078,12 +1136,7 @@ function autosaveAttachListeners(){
 // STATUS autocarga: primero borrador propio, si no existe compartido final
 async function tryApplyStatusIfExists(){
   try {
-    const qs = new URLSearchParams({
-      localSlug,
-      visitanteSlug,
-      fechaISO: todayISO_AR,
-      equipoSlug: mySlug
-    });
+    const qs = withBust({ localSlug, visitanteSlug, fechaISO: todayISO_AR, equipoSlug: mySlug });
     const res = await fetch(apiUrl('/api/cruces/match-status?') + qs.toString(), {
       cache: 'no-store',
       credentials: 'same-origin'
