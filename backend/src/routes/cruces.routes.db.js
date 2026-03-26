@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
 
-// ===== ADMIN CRUCES (sin fecha) =====
+// ===== ADMIN CRUCES (sin fecha / compat legacy) =====
 const crucesEnabledByTeam = new Map();
 
 function normalizeCrucesAdminKey(team) {
@@ -65,7 +65,26 @@ router.get('/stream', (req, res) => {
   });
 });
 
-// ===== CRUCES DESDE DB =====
+// ===== HELPERS =====
+
+function normalizeSlug(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function slugMatchesTeam(teamSlug, matchSlug) {
+  const a = normalizeSlug(teamSlug);
+  const b = normalizeSlug(matchSlug);
+  return a === b || a.startsWith(`${b}_`);
+}
+
+function sameTotalsStrict(a, b) {
+  return (
+    a?.equipo1?.triangulos === b?.equipo1?.triangulos &&
+    a?.equipo1?.puntosTotales === b?.equipo1?.puntosTotales &&
+    a?.equipo2?.triangulos === b?.equipo2?.triangulos &&
+    a?.equipo2?.puntosTotales === b?.equipo2?.puntosTotales
+  );
+}
 
 function inferCategoryFromTeamMarker(team = '') {
   const value = String(team || '').trim().toLowerCase();
@@ -145,6 +164,8 @@ async function fetchCrucesFromDB(team) {
   };
 }
 
+// ===== CRUCES DESDE DB =====
+
 router.get('/cruces', async (req, res) => {
   const team = String(req.query.team || '').trim();
   if (!team) {
@@ -174,7 +195,6 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ ok: false, error: 'Error obteniendo cruces.' });
   }
 });
-
 
 // ===== AUTOSAVE / VALIDACIÓN CRUCES =====
 
@@ -266,24 +286,59 @@ router.get('/match-status', async (req, res) => {
 
 router.post('/validate', async (req, res) => {
   try {
-    const { team, fechaKey, data } = req.body || {};
-    if (!team || !fechaKey || data === undefined) {
+    const {
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      equipoSlug,
+      validacion,
+      status
+    } = req.body || {};
+
+    if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug || validacion === undefined) {
       return res.status(400).json({ ok: false, error: 'Faltan datos' });
     }
 
+    const equipoNorm = normalizeSlug(equipoSlug);
+    let teamKey = null;
+
+    if (slugMatchesTeam(equipoNorm, localSlug)) {
+      teamKey = normalizeSlug(localSlug);
+    } else if (slugMatchesTeam(equipoNorm, visitanteSlug)) {
+      teamKey = normalizeSlug(visitanteSlug);
+    } else {
+      return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
+    }
+
+    const fechaKey = `${fechaISO}::${normalizeSlug(localSlug)}::${normalizeSlug(visitanteSlug)}`;
+
     const result = await pool.query(
       `
-      INSERT INTO cruces_validations (team, fecha_key, validacion_json, validated, locked_until, updated_at)
-      VALUES ($1, $2, $3::jsonb, true, NOW() + interval '24 hours', NOW())
+      INSERT INTO cruces_validations (
+        team,
+        fecha_key,
+        validacion_json,
+        status_json,
+        validated,
+        locked_until,
+        updated_at
+      )
+      VALUES ($1, $2, $3::jsonb, $4::jsonb, true, NOW() + interval '24 hours', NOW())
       ON CONFLICT (team, fecha_key)
       DO UPDATE SET
         validacion_json = EXCLUDED.validacion_json,
+        status_json = EXCLUDED.status_json,
         validated = true,
         locked_until = NOW() + interval '24 hours',
         updated_at = NOW()
       RETURNING team, fecha_key, validated, locked_until, updated_at
       `,
-      [team, fechaKey, JSON.stringify(data)]
+      [
+        teamKey,
+        fechaKey,
+        JSON.stringify(validacion || {}),
+        JSON.stringify(status || {})
+      ]
     );
 
     return res.json({ ok: true, validation: result.rows[0] });
@@ -295,21 +350,37 @@ router.post('/validate', async (req, res) => {
 
 router.get('/lock-status', async (req, res) => {
   try {
-    const team = String(req.query.team || '').trim();
-    const fechaKey = String(req.query.fechaKey || '').trim();
+    const fechaISO = String(req.query.fechaISO || '').trim();
+    const equipoSlug = String(req.query.equipoSlug || '').trim();
+    const localSlug = String(req.query.localSlug || '').trim();
+    const visitanteSlug = String(req.query.visitanteSlug || '').trim();
 
-    if (!team || !fechaKey) {
-      return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey' });
+    if (!fechaISO || !equipoSlug || !localSlug || !visitanteSlug) {
+      return res.status(400).json({ ok: false, error: 'Faltan parámetros' });
     }
+
+    const equipoNorm = normalizeSlug(equipoSlug);
+    let teamKey = null;
+
+    if (slugMatchesTeam(equipoNorm, localSlug)) {
+      teamKey = normalizeSlug(localSlug);
+    } else if (slugMatchesTeam(equipoNorm, visitanteSlug)) {
+      teamKey = normalizeSlug(visitanteSlug);
+    } else {
+      return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
+    }
+
+    const fechaKey = `${fechaISO}::${normalizeSlug(localSlug)}::${normalizeSlug(visitanteSlug)}`;
 
     const result = await pool.query(
       `
       SELECT validated, locked_until, updated_at
       FROM cruces_validations
-      WHERE team = $1 AND fecha_key = $2
+      WHERE team = $1
+        AND fecha_key = $2
       LIMIT 1
       `,
-      [team, fechaKey]
+      [teamKey, fechaKey]
     );
 
     if (!result.rows.length) {
