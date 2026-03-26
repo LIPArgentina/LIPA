@@ -945,6 +945,61 @@ function stopValidationPolling() {
   }
 }
 
+
+async function checkFinalLockOnLoad(){
+  try {
+    const qs = new URLSearchParams({
+      fechaISO: todayISO_AR,
+      localSlug,
+      visitanteSlug,
+      equipoSlug: mySlug
+    });
+    const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) return false;
+
+    if (data?.tipo === 'validado' || data?.locked) {
+      stopValidationPolling();
+      autosaveClear();
+      clearMismatchVisual();
+      lockValidatedMatchUI();
+      setBtnState('success', data?.mensaje || 'VALIDACIÓN EXITOSA');
+      return true;
+    }
+
+    if (data?.tipo === 'mismatch') {
+      if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
+      const btn = document.getElementById('btnValidarGlobal');
+      if (btn) {
+        setBtnState('error', data?.error || 'Los datos no coinciden, verificar con su rival');
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.classList.remove('success','error','pending','rival-pending','btn');
+          btn.classList.add('btn-validate');
+          btn.textContent = 'VALIDAR PLANILLA';
+        }, 3000);
+      }
+      return false;
+    }
+
+    if (data?.tipo === 'pendiente') {
+      const btn = document.getElementById('btnValidarGlobal');
+      if (btn) {
+        setBtnState('pending', data?.mensaje || 'Validado: esperando que valide su rival');
+        startValidationPolling(btn);
+      }
+      return false;
+    }
+
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
 function startValidationPolling(btn) {
   stopValidationPolling();
   validationPollTimer = setInterval(async () => {
@@ -1221,6 +1276,7 @@ btn.onclick = async () => {
     lockValidatedMatchUI();
 
     setBtnState('success','VALIDACIÓN EXITOSA');
+    await checkFinalLockOnLoad();
     showToast('Validación exitosa','success');
     setTimeout(() => {
       window.location.reload();

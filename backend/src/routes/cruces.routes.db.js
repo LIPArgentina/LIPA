@@ -331,6 +331,7 @@ router.post('/match-status', async (req, res) => {
 });
 
 router.get('/match-status', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   try {
     const localSlug = String(req.query.localSlug || '').trim();
     const visitanteSlug = String(req.query.visitanteSlug || '').trim();
@@ -488,6 +489,7 @@ router.post('/validate', async (req, res) => {
 });
 
 router.get('/lock-status', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   try {
     const fechaISO = String(req.query.fechaISO || '').trim();
     const equipoSlug = String(req.query.equipoSlug || '').trim();
