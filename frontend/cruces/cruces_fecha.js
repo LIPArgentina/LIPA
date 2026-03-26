@@ -1035,15 +1035,9 @@ function startValidationPolling(btn) {
         setBtnState('success', data?.mensaje || 'VALIDACIÓN EXITOSA');
         showToast('Validación exitosa', 'success');
       } else if (data?.tipo === 'mismatch') {
-        stopValidationPolling();
         if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
-        setBtnState('error', data?.error || 'Los datos no coinciden, verificar con su rival');
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.classList.remove('success','error','pending','rival-pending','btn');
-          btn.classList.add('btn-validate');
-          btn.textContent = 'VALIDAR PLANILLA';
-        }, 3000);
+        // NO cortamos polling: seguimos esperando que el rival corrija
+        setBtnState('pending', 'Esperando que el rival corrija y valide');
       }
     } catch (_) {}
   }, 4000);
@@ -1234,13 +1228,9 @@ async function hydrateValidatedState() {
 
     if (data?.tipo === 'mismatch') {
       if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
-      setBtnState('error', data?.error || 'Los datos no coinciden, consulte con su rival');
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.classList.remove('success','error','pending','rival-pending','btn');
-        btn.classList.add('btn-validate');
-        btn.textContent = 'VALIDAR PLANILLA';
-      }, 3000);
+      // Mantener polling activo si ya validó este equipo
+      setBtnState('pending', 'Esperando que el rival corrija y valide');
+      startValidationPolling(btn);
       return false;
     }
 
