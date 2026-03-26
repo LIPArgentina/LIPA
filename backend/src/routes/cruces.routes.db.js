@@ -331,9 +331,6 @@ router.post('/match-status', async (req, res) => {
 });
 
 router.get('/match-status', async (req, res) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
   try {
     const localSlug = String(req.query.localSlug || '').trim();
     const visitanteSlug = String(req.query.visitanteSlug || '').trim();
@@ -374,18 +371,78 @@ router.get('/match-status', async (req, res) => {
 
 router.post('/validate', async (req, res) => {
   try {
-    const {
-      fechaISO,
-      localSlug,
-      visitanteSlug,
-      equipoSlug,
-      validacion,
-      status
-    } = req.body || {};
+    const { fechaISO, localSlug, visitanteSlug, equipoSlug, status } = req.body;
 
-    if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug || validacion === undefined) {
+    if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug || !status) {
       return res.status(400).json({ ok: false, error: 'Faltan datos' });
     }
+
+    const fechaKey = `${fechaISO}::${localSlug}::${visitanteSlug}`;
+
+    await db.query(`
+      DELETE FROM cruces_validations
+      WHERE fecha_key = $1 AND team = $2
+    `, [fechaKey, equipoSlug]);
+
+    await db.query(`
+      INSERT INTO cruces_validations (team, fecha_key, validacion_json, validated, updated_at)
+      VALUES ($1, $2, $3, true, NOW())
+    `, [equipoSlug, fechaKey, status]);
+
+    const rival = await db.query(`
+      SELECT *
+      FROM cruces_validations
+      WHERE fecha_key = $1
+        AND team != $2
+        AND validated = true
+      LIMIT 1
+    `, [fechaKey, equipoSlug]);
+
+    if (rival.rowCount === 0) {
+      return res.json({
+        ok: true,
+        tipo: 'pendiente',
+        mensaje: 'Esperando validación del rival'
+      });
+    }
+
+    const miData = status;
+    const rivalData = rival.rows[0].validacion_json;
+
+    const iguales = JSON.stringify(miData) === JSON.stringify(rivalData);
+
+    if (!iguales) {
+      return res.json({
+        ok: false,
+        tipo: 'mismatch',
+        error: 'Los datos no coinciden'
+      });
+    }
+
+    const lockUntil = new Date(Date.now() + 1000 * 60 * 60 * 6);
+
+    await db.query(`
+      UPDATE cruces_validations
+      SET locked_until = $2
+      WHERE fecha_key = $1
+    `, [fechaKey, lockUntil]);
+
+    return res.json({
+      ok: true,
+      tipo: 'validado',
+      locked: true,
+      validated: true,
+      lockedUntil: lockUntil,
+      mensaje: 'Validación exitosa'
+    });
+
+  } catch (err) {
+    console.error('VALIDATE ERROR', err);
+    return res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+}
 
     const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
     if (!teamKey) {
@@ -491,9 +548,6 @@ router.post('/validate', async (req, res) => {
 });
 
 router.get('/lock-status', async (req, res) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
   try {
     const fechaISO = String(req.query.fechaISO || '').trim();
     const equipoSlug = String(req.query.equipoSlug || '').trim();
