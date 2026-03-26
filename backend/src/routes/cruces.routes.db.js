@@ -22,6 +22,12 @@ function sameTotalsStrict(a, b) {
   );
 }
 
+function slugMatchesTeam(teamSlug, matchSlug) {
+  const a = normalizeSlug(teamSlug);
+  const b = normalizeSlug(matchSlug);
+  return a === b || a.startsWith(`${b}_`);
+}
+
 async function getOrCreateMatch(client, fechaISO, localSlug, visitanteSlug) {
   const { rows } = await client.query(
     `
@@ -130,16 +136,18 @@ router.post('/match-status', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Faltan datos obligatorios.' });
   }
 
-  if (![localSlug, visitanteSlug].includes(equipoSlug)) {
+  if (!slugMatchesTeam(equipoSlug, localSlug) && !slugMatchesTeam(equipoSlug, visitanteSlug)) {
     return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
   }
+
+  const equipoMatchSlug = slugMatchesTeam(equipoSlug, localSlug) ? localSlug : visitanteSlug;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const match = await getOrCreateMatch(client, fechaISO, localSlug, visitanteSlug);
-    await getOrCreateSubmission(client, match.id, equipoSlug);
+    await getOrCreateSubmission(client, match.id, equipoMatchSlug);
 
     await client.query(
       `
@@ -150,7 +158,7 @@ router.post('/match-status', async (req, res) => {
         WHERE match_id = $2
           AND equipo_slug = $3
       `,
-      [JSON.stringify(status), match.id, equipoSlug]
+      [JSON.stringify(status), match.id, equipoMatchSlug]
     );
 
     const row = await getMatchAndSubmissions(client, fechaISO, localSlug, visitanteSlug);
@@ -198,22 +206,24 @@ router.post('/validate', async (req, res) => {
 
   const { localSlug, visitanteSlug } = sortMatchSlugs(rawLocalSlug, rawVisitanteSlug);
   const equipoSlug = normalizeSlug(rawEquipoSlug);
-  const rivalSlug = equipoSlug === localSlug ? visitanteSlug : localSlug;
 
   if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug || !validacion) {
     return res.status(400).json({ ok: false, error: 'Faltan datos obligatorios.' });
   }
 
-  if (![localSlug, visitanteSlug].includes(equipoSlug)) {
+  if (!slugMatchesTeam(equipoSlug, localSlug) && !slugMatchesTeam(equipoSlug, visitanteSlug)) {
     return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
   }
+
+  const equipoMatchSlug = slugMatchesTeam(equipoSlug, localSlug) ? localSlug : visitanteSlug;
+  const rivalSlug = equipoMatchSlug === localSlug ? visitanteSlug : localSlug;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const match = await getOrCreateMatch(client, fechaISO, localSlug, visitanteSlug);
-    await getOrCreateSubmission(client, match.id, equipoSlug);
+    await getOrCreateSubmission(client, match.id, equipoMatchSlug);
     await getOrCreateSubmission(client, match.id, rivalSlug);
 
     await client.query(
@@ -228,7 +238,7 @@ router.post('/validate', async (req, res) => {
         WHERE match_id = $3
           AND equipo_slug = $4
       `,
-      [status ? JSON.stringify(status) : null, JSON.stringify(validacion), match.id, equipoSlug]
+      [status ? JSON.stringify(status) : null, JSON.stringify(validacion), match.id, equipoMatchSlug]
     );
 
     const { rows: submissions } = await client.query(
@@ -241,7 +251,7 @@ router.post('/validate', async (req, res) => {
       [match.id, localSlug, visitanteSlug]
     );
 
-    const mine = submissions.find(x => x.equipo_slug === equipoSlug) || null;
+    const mine = submissions.find(x => x.equipo_slug === equipoMatchSlug) || null;
     const rival = submissions.find(x => x.equipo_slug === rivalSlug) || null;
 
     if (!rival?.validated || !rival?.validacion_json) {
@@ -316,8 +326,8 @@ router.get('/lock-status', async (req, res) => {
     if (!row) return res.json({ ok: true, locked: false });
 
     const lockedUntil =
-      equipoSlug === localSlug ? row.local_locked_until :
-      equipoSlug === visitanteSlug ? row.visitante_locked_until :
+      slugMatchesTeam(equipoSlug, localSlug) ? row.local_locked_until :
+      slugMatchesTeam(equipoSlug, visitanteSlug) ? row.visitante_locked_until :
       null;
 
     const locked = !!(lockedUntil && new Date(lockedUntil) > new Date());
@@ -339,7 +349,7 @@ const crucesEnabledUntilByKey = new Map();
 
 function normalizeCrucesAdminKey(team, fechaKey) {
   const normalizedTeam = String(team || '').trim().toLowerCase();
-  const normalizedFecha = String(fechaKey || '').trim();
+  const normalizedFecha = String(fechaKey || '__legacy__').trim();
   return `${normalizedTeam}::${normalizedFecha}`;
 }
 
@@ -363,10 +373,10 @@ function getCrucesEntry(team, fechaKey) {
 
 router.get('/status', (req, res) => {
   const team = req.query.team;
-  const fechaKey = req.query.fechaKey;
+  const fechaKey = String(req.query.fechaKey || '__legacy__').trim();
 
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
 
   const state = getCrucesEntry(team, fechaKey);
@@ -374,7 +384,7 @@ router.get('/status', (req, res) => {
   res.json({
     ok: true,
     team: String(team),
-    fechaKey: String(fechaKey),
+    fechaKey,
     enabled: state.enabled,
     remainingMs: state.remainingMs
   });
@@ -382,21 +392,22 @@ router.get('/status', (req, res) => {
 
 router.post('/enable', (req, res) => {
   const team = req.body?.team;
-  const fechaKey = req.body?.fechaKey;
+  const fechaKey = String(req.body?.fechaKey || '__legacy__').trim();
 
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
 
   const now = Date.now();
   const key = normalizeCrucesAdminKey(team, fechaKey);
   const until = now + (48 * 60 * 60 * 1000);
+
   crucesEnabledUntilByKey.set(key, until);
 
   res.json({
     ok: true,
     team: String(team),
-    fechaKey: String(fechaKey),
+    fechaKey,
     enabled: true,
     remainingMs: until - now
   });
@@ -404,10 +415,10 @@ router.post('/enable', (req, res) => {
 
 router.post('/disable', (req, res) => {
   const team = req.body?.team;
-  const fechaKey = req.body?.fechaKey;
+  const fechaKey = String(req.body?.fechaKey || '__legacy__').trim();
 
-  if (!team || !fechaKey) {
-    return res.status(400).json({ ok: false, error: 'Faltan parámetros team o fechaKey.' });
+  if (!team) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
 
   const key = normalizeCrucesAdminKey(team, fechaKey);
@@ -416,7 +427,7 @@ router.post('/disable', (req, res) => {
   res.json({
     ok: true,
     team: String(team),
-    fechaKey: String(fechaKey),
+    fechaKey,
     enabled: false,
     remainingMs: 0
   });
@@ -520,6 +531,7 @@ async function fetchCrucesFromDB(team) {
 
 router.get('/cruces', async (req, res) => {
   const team = String(req.query.team || '').trim();
+
   if (!team) {
     return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
@@ -535,6 +547,7 @@ router.get('/cruces', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const team = String(req.body?.team || '').trim();
+
   if (!team) {
     return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
   }
