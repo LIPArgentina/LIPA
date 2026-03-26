@@ -981,8 +981,15 @@ async function checkFinalLockOnLoad() {
 
     if (data?.tipo === 'pendiente') {
       if (btn) {
-        setBtnState('pending', data?.mensaje || 'Validado: esperando que valide su rival');
-        startValidationPolling(btn);
+        if (data?.validated) {
+          setBtnState('pending', data?.mensaje || 'Validado: esperando que valide su rival');
+          startValidationPolling(btn);
+        } else {
+          btn.disabled = false;
+          btn.classList.remove('success','error','pending','rival-pending','btn');
+          btn.classList.add('btn-validate');
+          btn.textContent = 'VALIDAR PLANILLA';
+        }
       }
       return false;
     }
