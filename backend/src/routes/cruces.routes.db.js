@@ -379,17 +379,17 @@ router.post('/validate', async (req, res) => {
 
     const fechaKey = `${fechaISO}::${localSlug}::${visitanteSlug}`;
 
-    await db.query(`
+    await pool.query(`
       DELETE FROM cruces_validations
       WHERE fecha_key = $1 AND team = $2
     `, [fechaKey, equipoSlug]);
 
-    await db.query(`
+    await pool.query(`
       INSERT INTO cruces_validations (team, fecha_key, validacion_json, validated, updated_at)
       VALUES ($1, $2, $3, true, NOW())
     `, [equipoSlug, fechaKey, status]);
 
-    const rival = await db.query(`
+    const rival = await pool.query(`
       SELECT *
       FROM cruces_validations
       WHERE fecha_key = $1
@@ -421,7 +421,7 @@ router.post('/validate', async (req, res) => {
 
     const lockUntil = new Date(Date.now() + 1000 * 60 * 60 * 6);
 
-    await db.query(`
+    await pool.query(`
       UPDATE cruces_validations
       SET locked_until = $2
       WHERE fecha_key = $1
@@ -442,110 +442,6 @@ router.post('/validate', async (req, res) => {
   }
 });
 
-}
-
-    const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
-    if (!teamKey) {
-      return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
-    }
-
-    const rivalKey = teamKey === normalizeSlug(localSlug)
-      ? normalizeSlug(visitanteSlug)
-      : normalizeSlug(localSlug);
-
-    const fechaKey = buildFechaKey(fechaISO, localSlug, visitanteSlug);
-
-    await pool.query(
-      `
-      INSERT INTO cruces_validations (
-        team,
-        fecha_key,
-        validacion_json,
-        status_json,
-        validated,
-        locked_until,
-        updated_at
-      )
-      VALUES ($1, $2, $3::jsonb, $4::jsonb, true, NULL, NOW())
-      ON CONFLICT (team, fecha_key)
-      DO UPDATE SET
-        validacion_json = EXCLUDED.validacion_json,
-        status_json = EXCLUDED.status_json,
-        validated = true,
-        locked_until = NULL,
-        updated_at = NOW()
-      `,
-      [
-        teamKey,
-        fechaKey,
-        JSON.stringify(validacion || {}),
-        JSON.stringify(status || {})
-      ]
-    );
-
-    const { rows } = await pool.query(
-      `
-      SELECT team, validacion_json, status_json, validated, locked_until, updated_at
-      FROM cruces_validations
-      WHERE fecha_key = $1
-        AND team IN ($2, $3)
-      `,
-      [fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]
-    );
-
-    const mine = rows.find(r => r.team === teamKey) || null;
-    const rival = rows.find(r => r.team === rivalKey) || null;
-
-    if (!rival?.validated || !rival?.status_json) {
-      return res.json({
-        ok: true,
-        tipo: 'pendiente',
-        mensaje: 'Validado: esperando que valide su rival'
-      });
-    }
-
-    const diff = compareFullStatus(mine?.status_json || {}, rival?.status_json || {});
-    if (diff.length) {
-      await pool.query(
-        `
-        UPDATE cruces_validations
-        SET locked_until = NULL, updated_at = NOW()
-        WHERE fecha_key = $1
-          AND team IN ($2, $3)
-        `,
-        [fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]
-      );
-
-      return res.json({
-        ok: false,
-        tipo: 'mismatch',
-        error: 'Los datos no son correctos, consulte con su rival',
-        diff
-      });
-    }
-
-    const lockUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-    await pool.query(
-      `
-      UPDATE cruces_validations
-      SET locked_until = $1::timestamptz, updated_at = NOW()
-      WHERE fecha_key = $2
-        AND team IN ($3, $4)
-      `,
-      [lockUntil, fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]
-    );
-
-    return res.json({
-      ok: true,
-      tipo: 'validado',
-      mensaje: 'Validación exitosa'
-    });
-  } catch (err) {
-    console.error('POST /validate', err);
-    return res.status(500).json({ ok: false, error: 'No se pudo validar el cruce' });
-  }
-});
 
 router.get('/lock-status', async (req, res) => {
   try {
