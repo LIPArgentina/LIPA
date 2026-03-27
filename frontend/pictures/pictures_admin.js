@@ -2,6 +2,7 @@
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const adminList = document.getElementById('adminList');
   const btnReload = document.getElementById('btnReload');
+  const blobUrlCache = new Map();
 
   function getToken() {
     try {
@@ -27,6 +28,38 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function revokeBlobCache() {
+    for (const url of blobUrlCache.values()) {
+      try { URL.revokeObjectURL(url); } catch {}
+    }
+    blobUrlCache.clear();
+  }
+
+  async function fetchBlobUrl(resourceUrl) {
+    if (!resourceUrl) return '';
+    if (blobUrlCache.has(resourceUrl)) return blobUrlCache.get(resourceUrl);
+
+    const res = await fetch(resourceUrl, {
+      headers: authHeaders(),
+      credentials: 'include',
+      cache: 'no-store'
+    });
+
+    if (!res.ok) {
+      let msg = 'No se pudo cargar la imagen.';
+      try {
+        const data = await res.json();
+        msg = data?.error || data?.msg || msg;
+      } catch {}
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    blobUrlCache.set(resourceUrl, objectUrl);
+    return objectUrl;
   }
 
   async function downloadGroupZip(fechaISO, teamSlug, zipFilename) {
@@ -71,7 +104,7 @@
       const itemCount = Array.isArray(group.items) ? group.items.length : 0;
       const preview = (group.items || []).slice(0, 9).map(item => `
         <button class="thumb-btn" type="button" data-open-img="${escapeHtml(item.thumbUrl)}" data-open-title="${escapeHtml(item.filename)}">
-          <img class="thumb-img" src="${escapeHtml(item.thumbUrl)}" alt="${escapeHtml(item.filename)}" loading="lazy" />
+          <img class="thumb-img" src="" alt="${escapeHtml(item.filename)}" data-thumb-src="${escapeHtml(item.thumbUrl)}" loading="lazy" />
         </button>
       `).join('');
 
@@ -94,7 +127,22 @@
     }).join('');
   }
 
+  async function hydrateThumbs() {
+    const imgs = Array.from(adminList.querySelectorAll('img[data-thumb-src]'));
+    await Promise.all(imgs.map(async (img) => {
+      const src = img.dataset.thumbSrc || '';
+      if (!src) return;
+      try {
+        img.src = await fetchBlobUrl(src);
+      } catch {
+        img.alt = 'No se pudo cargar la miniatura';
+        img.closest('.thumb-btn')?.classList.add('thumb-failed');
+      }
+    }));
+  }
+
   async function load() {
+    revokeBlobCache();
     adminList.innerHTML = '<p class="muted">Cargando…</p>';
     const res = await fetch(API_BASE + '/api/pictures/admin/list', {
       headers: authHeaders(),
@@ -114,6 +162,7 @@
         : [];
 
     renderGroups(groups);
+    await hydrateThumbs();
   }
 
   adminList?.addEventListener('click', async (ev) => {
@@ -123,7 +172,13 @@
     const openBtn = ev.target.closest('[data-open-img]');
     if (openBtn) {
       const src = openBtn.dataset.openImg || '';
-      if (src) window.open(src, '_blank', 'noopener');
+      if (!src) return;
+      try {
+        const blobUrl = await fetchBlobUrl(src);
+        window.open(blobUrl, '_blank', 'noopener');
+      } catch (err) {
+        alert(err?.message || 'No se pudo abrir la imagen.');
+      }
       return;
     }
 
@@ -157,5 +212,6 @@
   });
 
   btnReload?.addEventListener('click', load);
+  window.addEventListener('beforeunload', revokeBlobCache);
   load();
 })();

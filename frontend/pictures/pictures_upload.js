@@ -13,8 +13,7 @@
   const pickedFilesText = document.getElementById('pickedFilesText');
   const previewContainer = document.getElementById('previewContainer');
   const btnUpload = document.getElementById('btnUpload');
-  const myFiles = document.getElementById('myFiles');
-  const btnVolver = document.getElementById('btnVolver');
+    const btnVolver = document.getElementById('btnVolver');
 
   function getToken() {
     try {
@@ -114,16 +113,7 @@
     setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
 
-  async function loadMyFiles() {
-    myFiles.innerHTML = '<p class="muted">Cargando…</p>';
-    const url = new URL(API_BASE + '/api/pictures/my');
-    url.searchParams.set('fechaISO', fechaISO);
-    const res = await fetch(url.toString(), { headers: authHeaders(), credentials: 'include', cache: 'no-store' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data?.ok) {
-      myFiles.innerHTML = '<p class="muted">No se pudieron cargar tus fotos.</p>';
-      return;
-    }
+  
     const files = Array.isArray(data.files) ? data.files : [];
     if (!files.length) {
       myFiles.innerHTML = '<p class="muted">Todavía no subiste fotos.</p>';
@@ -148,9 +138,7 @@
 
   picturesInput?.addEventListener('change', updatePreview);
 
-  myFiles?.addEventListener('click', async (ev) => {
-    const btn = ev.target.closest('[data-my-download]');
-    if (!btn) return;
+      if (!btn) return;
     await downloadMyFile(decodeURIComponent(btn.dataset.myFecha || ''), decodeURIComponent(btn.dataset.myDownload || 'foto'));
   });
 
@@ -181,8 +169,9 @@
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'No se pudieron subir las fotos');
       picturesInput.value = '';
       updatePreview();
+      pickedFilesText.textContent = "No se eligió ningún archivo";
       setStatus('Fotos subidas correctamente.', 'success');
-      await loadMyFiles();
+      
     } catch (err) {
       setStatus(err.message || 'No se pudieron subir las fotos.', 'error');
     } finally {
@@ -190,5 +179,5 @@
     }
   });
 
-  checkStatus().then(loadMyFiles).catch(() => setStatus('No se pudo verificar el estado del cruce.', 'error'));
+  checkStatus().catch(() => setStatus('No se pudo verificar el estado del cruce.', 'error'));
 })();
