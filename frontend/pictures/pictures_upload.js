@@ -13,7 +13,7 @@
   const pickedFilesText = document.getElementById('pickedFilesText');
   const previewContainer = document.getElementById('previewContainer');
   const btnUpload = document.getElementById('btnUpload');
-    const btnVolver = document.getElementById('btnVolver');
+  const btnVolver = document.getElementById('btnVolver');
 
   function getToken() {
     try {
@@ -81,66 +81,11 @@
     setStatus(ok ? 'Cruce validado. Ya podés subir fotos.' : 'Todavía no está habilitada la subida de fotos.', ok ? 'success' : 'error');
   }
 
-  async function downloadMyFile(fechaISOValue, filename) {
-    const url = new URL(API_BASE + '/api/pictures/team/download');
-    url.searchParams.set('fechaISO', fechaISOValue);
-    url.searchParams.set('filename', filename);
-
-    const res = await fetch(url.toString(), {
-      headers: authHeaders(),
-      credentials: 'include',
-      cache: 'no-store'
-    });
-
-    if (!res.ok) {
-      let msg = 'No se pudo descargar.';
-      try {
-        const data = await res.json();
-        msg = data?.error || data?.msg || msg;
-      } catch {}
-      alert(msg);
-      return;
-    }
-
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objectUrl;
-    a.download = filename || 'foto';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-  }
-
-  
-    const files = Array.isArray(data.files) ? data.files : [];
-    if (!files.length) {
-      myFiles.innerHTML = '<p class="muted">Todavía no subiste fotos.</p>';
-      return;
-    }
-    myFiles.innerHTML = files.map(file => `
-      <div class="file-row">
-        <div class="file-meta">
-          <strong>${file.filename}</strong>
-          <span>${file.fechaISO}</span>
-        </div>
-        <div class="file-actions">
-          <button class="btn" type="button" data-my-download="${encodeURIComponent(file.filename)}" data-my-fecha="${encodeURIComponent(file.fechaISO)}">DESCARGAR</button>
-        </div>
-      </div>
-    `).join('');
-  }
-
   btnChoosePhotos?.addEventListener('click', () => {
     if (!btnChoosePhotos.disabled) picturesInput.click();
   });
 
   picturesInput?.addEventListener('change', updatePreview);
-
-      if (!btn) return;
-    await downloadMyFile(decodeURIComponent(btn.dataset.myFecha || ''), decodeURIComponent(btn.dataset.myDownload || 'foto'));
-  });
 
   btnUpload?.addEventListener('click', async () => {
     const files = Array.from(picturesInput.files || []);
@@ -169,9 +114,8 @@
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'No se pudieron subir las fotos');
       picturesInput.value = '';
       updatePreview();
-      pickedFilesText.textContent = "No se eligió ningún archivo";
+      pickedFilesText.textContent = 'No se eligió ningún archivo';
       setStatus('Fotos subidas correctamente.', 'success');
-      
     } catch (err) {
       setStatus(err.message || 'No se pudieron subir las fotos.', 'error');
     } finally {
