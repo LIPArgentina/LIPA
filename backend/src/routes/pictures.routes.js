@@ -79,6 +79,116 @@ module.exports = function createPicturesRouter(deps) {
     return Boolean(mine?.validated && rival?.validated && mine?.status_json && rival?.status_json && locked);
   }
 
+  function resolveSafeFullPath(relativePath) {
+    const root = path.resolve(picturesRoot);
+    const normalized = path.normalize(String(relativePath || '')).replace(/^([.][./\\])+/, '');
+    const fullPath = path.resolve(path.join(root, normalized));
+    if (!fullPath.startsWith(root + path.sep) && fullPath !== root) {
+      return null;
+    }
+    return fullPath;
+  }
+
+  function getZipName(fechaISO, teamSlug) {
+    return `${safeName(teamSlug)}_${String(fechaISO || '').slice(0, 10)}.zip`;
+  }
+
+  function buildAdminThumbUrl(filePath) {
+    return `/api/pictures/admin/thumb?file=${encodeURIComponent(filePath)}`;
+  }
+
+  const crcTable = new Uint32Array(256).map((_, index) => {
+    let c = index;
+    for (let k = 0; k < 8; k += 1) {
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    return c >>> 0;
+  });
+
+  function crc32(buffer) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < buffer.length; i += 1) {
+      crc = crcTable[(crc ^ buffer[i]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function dosDateTime(dateInput) {
+    const date = new Date(dateInput || Date.now());
+    const year = Math.max(1980, date.getFullYear());
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = Math.floor(date.getSeconds() / 2);
+    const dosTime = (hours << 11) | (minutes << 5) | seconds;
+    const dosDate = ((year - 1980) << 9) | (month << 5) | day;
+    return { dosDate, dosTime };
+  }
+
+  function makeZipStore(entries) {
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+
+    for (const entry of entries) {
+      const nameBuf = Buffer.from(String(entry.name || 'archivo'), 'utf8');
+      const dataBuf = Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(entry.data || '');
+      const crc = crc32(dataBuf);
+      const { dosDate, dosTime } = dosDateTime(entry.modifiedAt);
+
+      const localHeader = Buffer.alloc(30);
+      localHeader.writeUInt32LE(0x04034b50, 0);
+      localHeader.writeUInt16LE(20, 4);
+      localHeader.writeUInt16LE(0, 6);
+      localHeader.writeUInt16LE(0, 8);
+      localHeader.writeUInt16LE(dosTime, 10);
+      localHeader.writeUInt16LE(dosDate, 12);
+      localHeader.writeUInt32LE(crc, 14);
+      localHeader.writeUInt32LE(dataBuf.length, 18);
+      localHeader.writeUInt32LE(dataBuf.length, 22);
+      localHeader.writeUInt16LE(nameBuf.length, 26);
+      localHeader.writeUInt16LE(0, 28);
+      localParts.push(localHeader, nameBuf, dataBuf);
+
+      const centralHeader = Buffer.alloc(46);
+      centralHeader.writeUInt32LE(0x02014b50, 0);
+      centralHeader.writeUInt16LE(20, 4);
+      centralHeader.writeUInt16LE(20, 6);
+      centralHeader.writeUInt16LE(0, 8);
+      centralHeader.writeUInt16LE(0, 10);
+      centralHeader.writeUInt16LE(dosTime, 12);
+      centralHeader.writeUInt16LE(dosDate, 14);
+      centralHeader.writeUInt32LE(crc, 16);
+      centralHeader.writeUInt32LE(dataBuf.length, 20);
+      centralHeader.writeUInt32LE(dataBuf.length, 24);
+      centralHeader.writeUInt16LE(nameBuf.length, 28);
+      centralHeader.writeUInt16LE(0, 30);
+      centralHeader.writeUInt16LE(0, 32);
+      centralHeader.writeUInt16LE(0, 34);
+      centralHeader.writeUInt16LE(0, 36);
+      centralHeader.writeUInt32LE(0, 38);
+      centralHeader.writeUInt32LE(offset, 42);
+      centralParts.push(centralHeader, nameBuf);
+
+      offset += localHeader.length + nameBuf.length + dataBuf.length;
+    }
+
+    const centralDir = Buffer.concat(centralParts);
+    const localDir = Buffer.concat(localParts);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(0, 4);
+    end.writeUInt16LE(0, 6);
+    end.writeUInt16LE(entries.length, 8);
+    end.writeUInt16LE(entries.length, 10);
+    end.writeUInt32LE(centralDir.length, 12);
+    end.writeUInt32LE(localDir.length, 16);
+    end.writeUInt16LE(0, 20);
+
+    return Buffer.concat([localDir, centralDir, end]);
+  }
+
   const storage = multer.diskStorage({
     destination: async (req, file, cb) => {
       try {
@@ -112,10 +222,6 @@ module.exports = function createPicturesRouter(deps) {
       cb(null, true);
     }
   });
-
-  function buildAdminDownloadUrl(filePath) {
-    return `/api/pictures/admin/download?file=${encodeURIComponent(filePath)}`;
-  }
 
   router.post('/upload', requireTeam, (req, res, next) => {
     upload.array('pictures', 10)(req, res, (err) => {
@@ -205,7 +311,7 @@ module.exports = function createPicturesRouter(deps) {
     try {
       await ensureDir(picturesRoot);
       const fechas = await fs.promises.readdir(picturesRoot, { withFileTypes: true });
-      const items = [];
+      const groups = [];
 
       for (const fechaDir of fechas) {
         if (!fechaDir.isDirectory()) continue;
@@ -219,6 +325,7 @@ module.exports = function createPicturesRouter(deps) {
           const teamPath = path.join(fechaPath, teamSlug);
           const teamDisplayName = await getDisplayNameBySlug(teamSlug);
           const files = await fs.promises.readdir(teamPath, { withFileTypes: true });
+          const items = [];
 
           for (const file of files) {
             if (!file.isFile()) continue;
@@ -227,53 +334,80 @@ module.exports = function createPicturesRouter(deps) {
             const stat = await fs.promises.stat(fullPath);
             const relFile = `${fechaISO}/${teamSlug}/${file.name}`;
             items.push({
-              fechaISO,
-              teamSlug,
-              teamName: teamDisplayName,
               filename: file.name,
               size: stat.size,
               modifiedAt: stat.mtime.toISOString(),
-              downloadUrl: buildAdminDownloadUrl(relFile)
+              thumbUrl: buildAdminThumbUrl(relFile)
             });
           }
+
+          items.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+          if (!items.length) continue;
+
+          groups.push({
+            fechaISO,
+            teamSlug,
+            teamName: teamDisplayName,
+            zipFilename: getZipName(fechaISO, teamSlug),
+            items
+          });
         }
       }
 
-      items.sort((a, b) => `${b.fechaISO} ${b.modifiedAt}`.localeCompare(`${a.fechaISO} ${a.modifiedAt}`));
-      return res.json({ ok: true, items });
+      groups.sort((a, b) => `${b.fechaISO} ${b.items[0]?.modifiedAt || ''}`.localeCompare(`${a.fechaISO} ${a.items[0]?.modifiedAt || ''}`));
+      return res.json({ ok: true, groups });
     } catch (err) {
       console.error('GET /api/pictures/admin/list', err);
       return res.status(500).json({ ok: false, error: 'No se pudieron listar las fotos' });
     }
   });
 
-  router.get('/admin/download', requireAdmin, async (req, res) => {
+  router.get('/admin/thumb', requireAdmin, async (req, res) => {
     try {
-      const rel = String(req.query?.file || '');
-      const normalized = path.normalize(rel).replace(/^([.][./\\])+/, '');
-      const fullPath = path.join(picturesRoot, normalized);
-      if (!fullPath.startsWith(path.resolve(picturesRoot))) {
+      const fullPath = resolveSafeFullPath(req.query?.file || '');
+      if (!fullPath) {
         return res.status(400).json({ ok: false, error: 'Ruta inválida' });
       }
       await fs.promises.access(fullPath, fs.constants.R_OK);
-      return res.download(fullPath, path.basename(fullPath));
+      return res.sendFile(fullPath);
     } catch {
       return res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
     }
   });
 
-  router.delete('/admin/file', requireAdmin, async (req, res) => {
+  router.get('/admin/group-download', requireAdmin, async (req, res) => {
     try {
-      const rel = String(req.body?.file || '');
-      const normalized = path.normalize(rel).replace(/^([.][./\\])+/, '');
-      const fullPath = path.join(picturesRoot, normalized);
-      if (!fullPath.startsWith(path.resolve(picturesRoot))) {
-        return res.status(400).json({ ok: false, error: 'Ruta inválida' });
+      const fechaISO = String(req.query?.fechaISO || '').slice(0, 10);
+      const teamSlug = normalizeSlug(req.query?.teamSlug || '');
+      if (!fechaISO || !teamSlug) {
+        return res.status(400).json({ ok: false, error: 'Faltan datos' });
       }
-      await fs.promises.unlink(fullPath);
-      return res.json({ ok: true });
+      const dir = path.join(picturesRoot, fechaISO, teamSlug);
+      await fs.promises.access(dir, fs.constants.R_OK);
+      const entries = [];
+      const files = await fs.promises.readdir(dir, { withFileTypes: true });
+      for (const file of files) {
+        if (!file.isFile()) continue;
+        if (!/\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name)) continue;
+        const fullPath = path.join(dir, file.name);
+        const [data, stat] = await Promise.all([
+          fs.promises.readFile(fullPath),
+          fs.promises.stat(fullPath)
+        ]);
+        entries.push({ name: file.name, data, modifiedAt: stat.mtime });
+      }
+      if (!entries.length) {
+        return res.status(404).json({ ok: false, error: 'No hay fotos para descargar' });
+      }
+      const zipBuffer = makeZipStore(entries);
+      const zipFilename = getZipName(fechaISO, teamSlug);
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+      res.setHeader('Content-Length', zipBuffer.length);
+      return res.end(zipBuffer);
     } catch (err) {
-      return res.status(404).json({ ok: false, error: err?.message || 'No se pudo eliminar el archivo' });
+      console.error('GET /api/pictures/admin/group-download', err);
+      return res.status(500).json({ ok: false, error: 'No se pudo generar el ZIP' });
     }
   });
 

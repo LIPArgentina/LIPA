@@ -20,14 +20,78 @@
     return headers;
   }
 
-  function groupBy(items, keyFn) {
-    const map = new Map();
-    for (const item of items) {
-      const key = keyFn(item);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(item);
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  async function downloadGroupZip(fechaISO, teamSlug, zipFilename) {
+    const url = new URL(API_BASE + '/api/pictures/admin/group-download');
+    url.searchParams.set('fechaISO', fechaISO);
+    url.searchParams.set('teamSlug', teamSlug);
+
+    const res = await fetch(url.toString(), {
+      headers: authHeaders(),
+      credentials: 'include',
+      cache: 'no-store'
+    });
+
+    if (!res.ok) {
+      let msg = 'No se pudo descargar el ZIP.';
+      try {
+        const data = await res.json();
+        msg = data?.error || data?.msg || msg;
+      } catch {}
+      alert(msg);
+      return;
     }
-    return map;
+
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = zipFilename || 'pictures.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+
+  function renderGroups(groups) {
+    if (!groups.length) {
+      adminList.innerHTML = '<p class="muted">No hay fotos cargadas.</p>';
+      return;
+    }
+
+    adminList.innerHTML = groups.map(group => {
+      const itemCount = Array.isArray(group.items) ? group.items.length : 0;
+      const preview = (group.items || []).slice(0, 9).map(item => `
+        <button class="thumb-btn" type="button" data-open-img="${escapeHtml(item.thumbUrl)}" data-open-title="${escapeHtml(item.filename)}">
+          <img class="thumb-img" src="${escapeHtml(item.thumbUrl)}" alt="${escapeHtml(item.filename)}" loading="lazy" />
+        </button>
+      `).join('');
+
+      return `
+        <div class="group-card" data-fecha="${escapeHtml(group.fechaISO)}" data-team="${escapeHtml(group.teamSlug)}" data-zipname="${escapeHtml(group.zipFilename || 'pictures.zip')}">
+          <div class="group-header group-header-stack">
+            <div>
+              <h3>${escapeHtml(group.teamName || group.teamSlug)}</h3>
+              <div class="muted">${escapeHtml(group.teamSlug)} · ${escapeHtml(group.fechaISO)}</div>
+              <div class="muted">${itemCount} foto${itemCount === 1 ? '' : 's'}</div>
+            </div>
+            <div class="group-actions">
+              <button class="btn" type="button" data-download-zip="1">DESCARGAR ZIP</button>
+              <button class="btn btn-danger" type="button" data-empty-folder="1">VACIAR CONTENIDO</button>
+            </div>
+          </div>
+          <div class="thumb-grid">${preview}</div>
+        </div>
+      `;
+    }).join('');
   }
 
   async function load() {
@@ -43,75 +107,40 @@
       return;
     }
 
-    const items = Array.isArray(data.items) ? data.items : [];
-    if (!items.length) {
-      adminList.innerHTML = '<p class="muted">No hay fotos cargadas.</p>';
-      return;
-    }
+    const groups = Array.isArray(data.groups)
+      ? data.groups
+      : Array.isArray(data.items)
+        ? []
+        : [];
 
-    const groups = groupBy(items, item => `${item.fechaISO}__${item.teamSlug}`);
-    const html = [];
-
-    for (const [key, rows] of groups.entries()) {
-      const first = rows[0];
-      html.push(`
-        <div class="group" data-fecha="${first.fechaISO}" data-team="${first.teamSlug}">
-          <div class="group-header">
-            <div>
-              <h3>${first.teamName}</h3>
-              <div class="muted">${first.teamSlug} · ${first.fechaISO}</div>
-            </div>
-            <button class="btn btn-danger" data-empty-folder="${key}">VACIAR CONTENIDO</button>
-          </div>
-          <div class="list">
-            ${rows.map(row => `
-              <div class="file-row">
-                <div class="file-meta">
-                  <strong>${row.filename}</strong>
-                  <span>${Math.round((row.size || 0) / 1024)} KB · ${new Date(row.modifiedAt).toLocaleString('es-AR')}</span>
-                </div>
-                <div class="file-actions">
-                  <a class="btn" href="${API_BASE}${row.downloadUrl}">DESCARGAR</a>
-                  <button class="btn btn-danger" data-file="${encodeURIComponent(`${row.fechaISO}/${row.teamSlug}/${row.filename}`)}">ELIMINAR</button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `);
-    }
-
-    adminList.innerHTML = html.join('');
+    renderGroups(groups);
   }
 
   adminList?.addEventListener('click', async (ev) => {
-    const deleteBtn = ev.target.closest('[data-file]');
-    const emptyBtn = ev.target.closest('[data-empty-folder]');
+    const card = ev.target.closest('.group-card');
+    if (!card) return;
 
-    if (deleteBtn) {
-      const rel = decodeURIComponent(deleteBtn.dataset.file || '');
-      if (!confirm('¿Eliminar esta foto?')) return;
-      const res = await fetch(API_BASE + '/api/pictures/admin/file', {
-        method: 'DELETE',
-        headers: authHeaders({ 'Content-Type': 'application/json' }),
-        credentials: 'include',
-        body: JSON.stringify({ file: rel })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) {
-        alert(data?.error || 'No se pudo eliminar.');
-        return;
-      }
-      load();
+    const openBtn = ev.target.closest('[data-open-img]');
+    if (openBtn) {
+      const src = openBtn.dataset.openImg || '';
+      if (src) window.open(src, '_blank', 'noopener');
       return;
     }
 
+    const downloadBtn = ev.target.closest('[data-download-zip]');
+    if (downloadBtn) {
+      await downloadGroupZip(card.dataset.fecha || '', card.dataset.team || '', card.dataset.zipname || 'pictures.zip');
+      return;
+    }
+
+    const emptyBtn = ev.target.closest('[data-empty-folder]');
     if (emptyBtn) {
-      const group = emptyBtn.closest('.group');
-      const fechaISO = group?.dataset.fecha || '';
-      const teamSlug = group?.dataset.team || '';
+      const fechaISO = card.dataset.fecha || '';
+      const teamSlug = card.dataset.team || '';
       if (!fechaISO || !teamSlug) return;
-      if (!confirm('¿Vaciar todas las fotos de esta carpeta?')) return;
+      const ok = confirm(`¿Vaciar todas las fotos de ${teamSlug} del ${fechaISO}? Esta acción no se puede deshacer.`);
+      if (!ok) return;
+
       const res = await fetch(API_BASE + '/api/pictures/admin/team-folder', {
         method: 'DELETE',
         headers: authHeaders({ 'Content-Type': 'application/json' }),

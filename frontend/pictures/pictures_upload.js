@@ -9,6 +9,9 @@
   const matchInfo = document.getElementById('matchInfo');
   const statusBox = document.getElementById('statusBox');
   const picturesInput = document.getElementById('picturesInput');
+  const btnChoosePhotos = document.getElementById('btnChoosePhotos');
+  const pickedFilesText = document.getElementById('pickedFilesText');
+  const previewContainer = document.getElementById('previewContainer');
   const btnUpload = document.getElementById('btnUpload');
   const myFiles = document.getElementById('myFiles');
   const btnVolver = document.getElementById('btnVolver');
@@ -35,6 +38,31 @@
     statusBox.className = 'status' + (type ? ' ' + type : '');
   }
 
+  function updatePreview() {
+    const files = Array.from(picturesInput.files || []);
+    previewContainer.innerHTML = '';
+
+    if (!files.length) {
+      pickedFilesText.textContent = 'No se eligió ningún archivo';
+      return;
+    }
+
+    pickedFilesText.textContent = `${files.length} archivo${files.length === 1 ? '' : 's'} seleccionado${files.length === 1 ? '' : 's'}`;
+
+    files.forEach(file => {
+      if (!String(file.type || '').startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = document.createElement('img');
+        img.className = 'preview-img';
+        img.src = event.target?.result || '';
+        img.alt = file.name;
+        previewContainer.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   async function checkStatus() {
     matchInfo.textContent = `Fecha ${fechaISO} · ${localSlug} vs ${visitanteSlug}`;
     if (btnVolver) btnVolver.href = `../cruces/cruces_fecha.html?team=${encodeURIComponent(team)}`;
@@ -50,7 +78,40 @@
     const ok = res.ok && data?.ok && (data?.tipo === 'validado' || data?.locked);
     btnUpload.disabled = !ok;
     picturesInput.disabled = !ok;
+    btnChoosePhotos.disabled = !ok;
     setStatus(ok ? 'Cruce validado. Ya podés subir fotos.' : 'Todavía no está habilitada la subida de fotos.', ok ? 'success' : 'error');
+  }
+
+  async function downloadMyFile(fechaISOValue, filename) {
+    const url = new URL(API_BASE + '/api/pictures/team/download');
+    url.searchParams.set('fechaISO', fechaISOValue);
+    url.searchParams.set('filename', filename);
+
+    const res = await fetch(url.toString(), {
+      headers: authHeaders(),
+      credentials: 'include',
+      cache: 'no-store'
+    });
+
+    if (!res.ok) {
+      let msg = 'No se pudo descargar.';
+      try {
+        const data = await res.json();
+        msg = data?.error || data?.msg || msg;
+      } catch {}
+      alert(msg);
+      return;
+    }
+
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename || 'foto';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
 
   async function loadMyFiles() {
@@ -75,11 +136,23 @@
           <span>${file.fechaISO}</span>
         </div>
         <div class="file-actions">
-          <a class="btn" href="${API_BASE}/api/pictures/team/download?fechaISO=${encodeURIComponent(file.fechaISO)}&filename=${encodeURIComponent(file.filename)}">DESCARGAR</a>
+          <button class="btn" type="button" data-my-download="${encodeURIComponent(file.filename)}" data-my-fecha="${encodeURIComponent(file.fechaISO)}">DESCARGAR</button>
         </div>
       </div>
     `).join('');
   }
+
+  btnChoosePhotos?.addEventListener('click', () => {
+    if (!btnChoosePhotos.disabled) picturesInput.click();
+  });
+
+  picturesInput?.addEventListener('change', updatePreview);
+
+  myFiles?.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('[data-my-download]');
+    if (!btn) return;
+    await downloadMyFile(decodeURIComponent(btn.dataset.myFecha || ''), decodeURIComponent(btn.dataset.myDownload || 'foto'));
+  });
 
   btnUpload?.addEventListener('click', async () => {
     const files = Array.from(picturesInput.files || []);
@@ -107,6 +180,7 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'No se pudieron subir las fotos');
       picturesInput.value = '';
+      updatePreview();
       setStatus('Fotos subidas correctamente.', 'success');
       await loadMyFiles();
     } catch (err) {

@@ -17,7 +17,12 @@
       <p id="matchInfo" class="muted">Cargando datos del cruce…</p>
       <p id="statusBox" class="status"></p>
       <label class="file-label" for="picturesInput">Elegí una o varias fotos</label>
-      <input id="picturesInput" type="file" accept="image/*" multiple />
+      <input id="picturesInput" type="file" accept="image/*" multiple hidden />
+      <div class="picker-row">
+        <button class="btn btn-gold" id="btnChoosePhotos" type="button">ELEGIR FOTOS</button>
+        <span id="pickedFilesText" class="muted">No se eligió ningún archivo</span>
+      </div>
+      <div id="previewContainer" class="preview-grid"></div>
       <div class="actions">
         <button class="btn" id="btnUpload" type="button">SUBIR FOTOS</button>
       </div>
