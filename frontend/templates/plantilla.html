@@ -130,15 +130,23 @@
 
 <script>
 (function () {
-  const params = new URLSearchParams(window.location.search);
-  const isApp = params.get("app") === "true";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const hasAppParam = params.get("app") === "true";
 
-  if (isApp) {
-    const header = document.querySelector("header");
-    if (header) {
-      header.style.display = "none";
+    if (hasAppParam) {
+      sessionStorage.setItem("lipa_app_mode", "true");
     }
-  }
+
+    const isApp = hasAppParam || sessionStorage.getItem("lipa_app_mode") === "true";
+
+    if (isApp) {
+      const header = document.querySelector("header");
+      if (header) {
+        header.style.display = "none";
+      }
+    }
+  } catch (e) {}
 })();
 </script>
 
