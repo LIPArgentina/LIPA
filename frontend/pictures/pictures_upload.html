@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subir fotos</title>
+  <link rel="stylesheet" href="./pictures.css" />
+</head>
+<body>
+  <main class="wrap">
+    <div class="topbar">
+      <a class="btn" id="btnVolver" href="../cruces/cruces_fecha.html">VOLVER</a>
+      <h1>Subir fotos del cruce</h1>
+    </div>
+
+    <section class="card">
+      <p id="matchInfo" class="muted">Cargando datos del cruce…</p>
+      <p id="statusBox" class="status"></p>
+      <label class="file-label" for="picturesInput">Elegí una o varias fotos</label>
+      <input id="picturesInput" type="file" accept="image/*" multiple />
+      <div class="actions">
+        <button class="btn" id="btnUpload" type="button">SUBIR FOTOS</button>
+      </div>
+      <p class="hint">Máximo 10 fotos por subida, hasta 10 MB cada una.</p>
+    </section>
+
+    <section class="card">
+      <h2>Mis fotos subidas</h2>
+      <div id="myFiles" class="list"></div>
+    </section>
+  </main>
+
+  <script src="../config.js"></script>
+  <script src="./pictures_upload.js"></script>
+</body>
+</html>

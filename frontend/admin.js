@@ -10,8 +10,10 @@
     };
     const btnFixture = document.getElementById('btnFixture');
     const btnFecha   = document.getElementById('btnFecha');
+    const btnPictures = document.getElementById('btnPictures');
     if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
     if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
+    if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 
@@ -28,8 +30,10 @@
     };
     const btnFixture = document.getElementById('btnFixture');
     const btnFecha   = document.getElementById('btnFecha');
+    const btnPictures = document.getElementById('btnPictures');
     if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
     if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
+    if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 

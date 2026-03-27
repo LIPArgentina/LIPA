@@ -5,6 +5,7 @@ const createEquiposRouter = require('./equipos.routes');
 const createFechasRouter = require('./fechas.routes');
 const createTeamPlayersRouter = require('./teamPlayers.routes');
 const adminPlanillas = require('./admin.planillas');
+const createPicturesRouter = require('./pictures.routes');
 
 module.exports = function createApiRouter(deps) {
   const { DATA_DIR } = deps;
@@ -33,6 +34,9 @@ module.exports = function createApiRouter(deps) {
 
   // Players
   router.use('/', createTeamPlayersRouter(deps));
+
+  // Pictures
+  router.use('/pictures', createPicturesRouter(deps));
 
   return router;
 };

@@ -269,13 +269,16 @@ async function submitAdminLogin(ev) {
       return;
     }
 
+    const data = await res.json().catch(() => ({}));
+
     adminError.classList.add("hidden");
 
     const sess = establishSession({
       role: "admin",
       displayName: "Admin",
       slug: null,
-      category: "admin"
+      category: "admin",
+      token: data.token || ""
     });
 
     finishLogin(sess);

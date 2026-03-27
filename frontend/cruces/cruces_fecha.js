@@ -976,6 +976,7 @@ async function checkFinalLockOnLoad() {
       clearMismatchVisual();
       lockValidatedMatchUI();
       if (btn) setBtnState('success', data?.mensaje || 'VALIDADO');
+      updatePictureButton(true);
       return true;
     }
 
@@ -1033,6 +1034,7 @@ function startValidationPolling(btn) {
         lockValidatedMatchUI();
         clearMismatchVisual();
         setBtnState('success', data?.mensaje || 'VALIDACIÓN EXITOSA');
+        updatePictureButton(true);
         showToast('Validación exitosa', 'success');
       } else if (data?.tipo === 'mismatch') {
         if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
@@ -1173,8 +1175,41 @@ autosaveApplyIfAny();
 autosaveAttachListeners();
 tryApplyStatusIfExists();
 
+const btnSubirFotos = document.getElementById('btnSubirFotos');
 const btnVolver = document.getElementById('btnVolver');
 const volverClass = btnVolver ? btnVolver.className : 'btn';
+
+function getSessionToken() {
+  try {
+    const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+    const sess = raw ? JSON.parse(raw) : null;
+    return String(sess?.token || sess?.accessToken || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function updatePictureButton(enabled) {
+  if (!btnSubirFotos) return;
+  const url = new URL('../pictures/pictures_upload.html', location.href);
+  url.searchParams.set('fechaISO', todayISO_AR);
+  url.searchParams.set('localSlug', localSlug);
+  url.searchParams.set('visitanteSlug', visitanteSlug);
+  url.searchParams.set('team', mySlug);
+
+  btnSubirFotos.href = enabled ? url.toString() : '#';
+  btnSubirFotos.classList.toggle('disabled', !enabled);
+  btnSubirFotos.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+}
+
+btnSubirFotos?.addEventListener('click', (ev) => {
+  if (btnSubirFotos.classList.contains('disabled')) {
+    ev.preventDefault();
+    showToast('Primero tienen que validar el cruce.', 'error');
+  }
+});
+
+updatePictureButton(false);
 
 const setBtnState = (mode, text) => {
   btn.disabled = (mode === 'success');
@@ -1210,6 +1245,7 @@ async function hydrateValidatedState() {
       clearMismatchVisual();
       lockValidatedMatchUI();
       setBtnState('success', 'VALIDADO');
+      updatePictureButton(true);
       return true;
     }
 
@@ -1222,6 +1258,7 @@ async function hydrateValidatedState() {
         btn.classList.remove('success','error','pending','rival-pending','btn');
         btn.classList.add('btn-validate');
         btn.textContent = 'VALIDAR PLANILLA';
+        updatePictureButton(false);
       }
       return false;
     }
@@ -1230,6 +1267,7 @@ async function hydrateValidatedState() {
       if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
       // Mantener polling activo si ya validó este equipo
       setBtnState('pending', 'Esperando que el rival corrija y valide');
+      updatePictureButton(false);
       startValidationPolling(btn);
       return false;
     }
@@ -1334,6 +1372,7 @@ btn.onclick = async () => {
     setBtnState('success','VALIDADO');
     showToast('Validación exitosa','success');
     await hydrateValidatedState();
+    updatePictureButton(true);
   } catch (e) {
     console.error(e);
     setBtnState('error', e?.message || 'Error inesperado');

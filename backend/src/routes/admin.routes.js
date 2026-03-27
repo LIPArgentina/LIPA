@@ -59,7 +59,24 @@ module.exports = function createAdminRouter(deps) {
     if (!password) return res.status(400).json({ ok: false, msg: 'faltan campos' });
     const ok = await bcrypt.compare(password, adminPassword.hash);
     if (!ok) return res.status(401).json({ ok: false });
-    return res.json({ ok: true });
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return res.status(500).json({ ok:false, msg:'Falta JWT_SECRET en servidor' });
+
+    const token = jwt.sign(
+      { role: 'admin' },
+      secret,
+      { expiresIn: '12h' }
+    );
+
+    res.cookie('lpi_auth', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 12 * 60 * 60 * 1000,
+    });
+
+    return res.json({ ok: true, token });
   });
 
   router.post('/admin/change-password', async (req, res) => {

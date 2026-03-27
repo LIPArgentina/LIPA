@@ -802,3 +802,9 @@ header.lpi-top {
   background: #ffdfdf !important;
   box-shadow: 0 0 0 2px #d32f2f inset !important;
 }
+
+
+/* Pictures */
+.btn-picture{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 16px;border-radius:12px;border:1px solid #caa24b;background:transparent;color:#fff;text-decoration:none;font-weight:700;}
+.btn-picture.disabled{opacity:.45;pointer-events:none;}
+.validate-cta{gap:12px;flex-wrap:wrap;}
