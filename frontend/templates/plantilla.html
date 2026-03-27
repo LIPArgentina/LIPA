@@ -128,16 +128,19 @@
 
 <!-- Unificador: usar un solo evento para cargar lista de jugadores -->
 
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const isApp = params.get("app") === "true";
 
-
-
-
-
-
-
-
-
-
+  if (isApp) {
+    const header = document.querySelector("header");
+    if (header) {
+      header.style.display = "none";
+    }
+  }
+})();
+</script>
 
 
 <script src="../config.js"></script>
