@@ -26,13 +26,6 @@ body {
 /* Contenedor principal sin escalado global */
 #pageScaleRoot {
   width: 100%;
-  zoom: 0.62;
-}
-
-@media (max-width: 600px) {
-  #pageScaleRoot {
-    zoom: 1;
-  }
 }
 /* === LAYOUT PRINCIPAL === */
 .wrap {
