@@ -759,3 +759,57 @@ body{
   }
 }
 
+
+
+/* ===== Estado remoto de envío de planilla ===== */
+.btn-enviar:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  filter:grayscale(.35);
+  background:#111 !important;
+  color:#b8b8b8 !important;
+  border-color:#555 !important;
+}
+.send-status{
+  margin-top:8px;
+  text-align:center;
+  font-size:12px;
+  font-weight:700;
+  color:#ffcc66;
+  min-height:16px;
+}
+.send-status.is-open{
+  color:#4cd964;
+}
+.send-status.is-closed{
+  color:#ff8a80;
+}
+
+
+.planilla-toolbar{
+  width:100%;
+  display:flex;
+  justify-content:center;
+  margin:-2px 0 8px;
+}
+.btn-vaciar{
+  padding:8px 12px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.25);
+  background:transparent;
+  color:#ffd966;
+  font-weight:800;
+  cursor:pointer;
+}
+.btn-vaciar:hover{ background:rgba(255,255,255,.08); }
+
+@media (max-width: 768px){
+  .planilla-toolbar{
+    margin:0 0 6px;
+  }
+  .btn-vaciar{
+    width:100%;
+    font-size:11px;
+    padding:7px 10px;
+  }
+}

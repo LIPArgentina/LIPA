@@ -52,6 +52,7 @@
 <!-- Planilla Liga (ORIGINAL) -->
 <div class="extra-column">
 <h2>PLANILLA LIGA</h2>
+<div class="planilla-toolbar"><button type="button" class="btn-vaciar" id="btnVaciarPlanilla">Vaciar planilla</button></div>
 <!-- === Bloque Capitán (DnD limpio) === -->
 <div class="group-container" data-group="capitan">
 <div class="group-title">CAPITÁN</div>
@@ -86,7 +87,8 @@
 <div class="fila-extra"><div class="white-box">1</div><div class="yellow-box" data-player="" draggable="true"></div></div>
 <div class="fila-extra"><div class="white-box">2</div><div class="yellow-box" data-player="" draggable="true"></div></div>
 </div>
-<div class="send-wrap"><button class="btn-enviar" id="btnEnviar">Enviar planilla</button></div>
+<div class="send-wrap"><button class="btn-enviar" id="btnEnviar" disabled title="No disponible mientras los cruces estén habilitados o hasta que el admin habilite la carga">Enviar planilla</button></div>
+<div class="send-status" id="sendPlanillaStatus" aria-live="polite">La carga de planilla está cerrada.</div>
 </div>
 </div>
 <!-- Papelera -->
