@@ -1,3 +1,4 @@
+
 (function(){
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const adminList = document.getElementById('adminList');
@@ -37,6 +38,70 @@
     blobUrlCache.clear();
   }
 
+  function normalizeApiUrl(url) {
+    const value = String(url || '').trim();
+    if (!value) return '';
+    if (/^https?:\/\//i.test(value)) return value;
+    if (value.startsWith('/')) return API_BASE + value;
+    return API_BASE + '/' + value.replace(/^\/+/, '');
+  }
+
+  function buildFilePath(fechaISO, teamSlug, filename) {
+    const parts = [fechaISO, teamSlug, filename]
+      .map(v => String(v || '').trim())
+      .filter(Boolean);
+    return parts.join('/');
+  }
+
+  function unique(values) {
+    const out = [];
+    const seen = new Set();
+    values.forEach((value) => {
+      const v = String(value || '').trim();
+      if (!v || seen.has(v)) return;
+      seen.add(v);
+      out.push(v);
+    });
+    return out;
+  }
+
+  function buildImageCandidates(item, card) {
+    const fechaISO = card?.dataset?.fecha || '';
+    const teamSlug = card?.dataset?.team || '';
+    const filename = item?.filename || item?.name || item?.basename || '';
+
+    const filePath = item?.filePath || item?.relativePath || item?.path || buildFilePath(fechaISO, teamSlug, filename);
+
+    const directCandidates = [
+      item?.thumbUrl,
+      item?.previewUrl,
+      item?.imageUrl,
+      item?.image,
+      item?.url,
+      item?.downloadUrl,
+      item?.viewUrl,
+      item?.src
+    ].map(normalizeApiUrl);
+
+    const fileParamCandidates = [];
+    if (filePath) {
+      const qp = new URLSearchParams({ file: filePath }).toString();
+      fileParamCandidates.push(
+        API_BASE + '/api/pictures/admin/thumb?' + qp,
+        API_BASE + '/api/pictures/admin/file?' + qp,
+        API_BASE + '/api/pictures/admin/image?' + qp,
+        API_BASE + '/api/pictures/admin/view?' + qp,
+        API_BASE + '/api/pictures/file?' + qp,
+        API_BASE + '/api/pictures/thumb?' + qp
+      );
+    }
+
+    return unique([
+      ...directCandidates,
+      ...fileParamCandidates
+    ]);
+  }
+
   async function fetchBlobUrl(resourceUrl) {
     if (!resourceUrl) return '';
     if (blobUrlCache.has(resourceUrl)) return blobUrlCache.get(resourceUrl);
@@ -60,6 +125,18 @@
     const objectUrl = URL.createObjectURL(blob);
     blobUrlCache.set(resourceUrl, objectUrl);
     return objectUrl;
+  }
+
+  async function fetchFirstAvailableBlobUrl(candidates) {
+    let lastError = null;
+    for (const url of candidates) {
+      try {
+        return await fetchBlobUrl(url);
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError || new Error('No se pudo cargar la imagen.');
   }
 
   async function downloadGroupZip(fechaISO, teamSlug, zipFilename) {
@@ -102,11 +179,26 @@
 
     adminList.innerHTML = groups.map(group => {
       const itemCount = Array.isArray(group.items) ? group.items.length : 0;
-      const preview = (group.items || []).slice(0, 9).map(item => `
-        <button class="thumb-btn" type="button" data-open-img="${escapeHtml(item.thumbUrl)}" data-open-title="${escapeHtml(item.filename)}">
-          <img class="thumb-img" src="" alt="${escapeHtml(item.filename)}" data-thumb-src="${escapeHtml(item.thumbUrl)}" loading="lazy" />
-        </button>
-      `).join('');
+      const preview = (group.items || []).slice(0, 9).map(item => {
+        const candidates = buildImageCandidates(item, {
+          dataset: {
+            fecha: group.fechaISO || '',
+            team: group.teamSlug || ''
+          }
+        });
+
+        return `
+          <button class="thumb-btn" type="button" data-open-img-candidates="${escapeHtml(JSON.stringify(candidates))}" data-open-title="${escapeHtml(item.filename || item.name || '')}">
+            <img
+              class="thumb-img"
+              src=""
+              alt="${escapeHtml(item.filename || item.name || '')}"
+              data-thumb-candidates="${escapeHtml(JSON.stringify(candidates))}"
+              loading="lazy"
+            />
+          </button>
+        `;
+      }).join('');
 
       return `
         <div class="group-card" data-fecha="${escapeHtml(group.fechaISO)}" data-team="${escapeHtml(group.teamSlug)}" data-zipname="${escapeHtml(group.zipFilename || 'pictures.zip')}">
@@ -128,12 +220,16 @@
   }
 
   async function hydrateThumbs() {
-    const imgs = Array.from(adminList.querySelectorAll('img[data-thumb-src]'));
+    const imgs = Array.from(adminList.querySelectorAll('img[data-thumb-candidates]'));
     await Promise.all(imgs.map(async (img) => {
-      const src = img.dataset.thumbSrc || '';
-      if (!src) return;
+      let candidates = [];
       try {
-        img.src = await fetchBlobUrl(src);
+        candidates = JSON.parse(img.dataset.thumbCandidates || '[]');
+      } catch {}
+      if (!Array.isArray(candidates) || !candidates.length) return;
+
+      try {
+        img.src = await fetchFirstAvailableBlobUrl(candidates);
       } catch {
         img.alt = 'No se pudo cargar la miniatura';
         img.closest('.thumb-btn')?.classList.add('thumb-failed');
@@ -169,12 +265,15 @@
     const card = ev.target.closest('.group-card');
     if (!card) return;
 
-    const openBtn = ev.target.closest('[data-open-img]');
+    const openBtn = ev.target.closest('[data-open-img-candidates]');
     if (openBtn) {
-      const src = openBtn.dataset.openImg || '';
-      if (!src) return;
+      let candidates = [];
       try {
-        const blobUrl = await fetchBlobUrl(src);
+        candidates = JSON.parse(openBtn.dataset.openImgCandidates || '[]');
+      } catch {}
+      if (!Array.isArray(candidates) || !candidates.length) return;
+      try {
+        const blobUrl = await fetchFirstAvailableBlobUrl(candidates);
         window.open(blobUrl, '_blank', 'noopener');
       } catch (err) {
         alert(err?.message || 'No se pudo abrir la imagen.');
