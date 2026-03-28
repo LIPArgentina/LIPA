@@ -822,8 +822,7 @@ trash.addEventListener('drop', e => {
 
 })();
 
-
-function getPlanillaPayload(){
+function collectPlanillaPayload(){
     const pick = (group) => {
       const sel = `.group-container[data-group="${group}"] .yellow-box`;
       return Array.from(document.querySelectorAll(sel)).map(x => (x.dataset.player || '').trim());
@@ -840,83 +839,40 @@ function getPlanillaPayload(){
       suplentes: pick('suplentes'),
       capitan: pickFree()
     };
-}
+  }
 
-function isPlanillaCompletelyEmpty(payloadObj){
-    return ![
-      ...(payloadObj.capitan || []),
-      ...(payloadObj.individuales || []),
-      ...(payloadObj.pareja1 || []),
-      ...(payloadObj.pareja2 || []),
-      ...(payloadObj.suplentes || [])
-    ].some(value => String(value || '').trim());
-}
+  function planillaHasAnyPlayer(payloadObj){
+    const groups = [
+      payloadObj && payloadObj.capitan,
+      payloadObj && payloadObj.individuales,
+      payloadObj && payloadObj.pareja1,
+      payloadObj && payloadObj.pareja2,
+      payloadObj && payloadObj.suplentes
+    ];
 
-function clearPlanillaFields(){
-    document.querySelectorAll('.yellow-box, .yellow-box-free').forEach(box => {
+    return groups.some(arr => Array.isArray(arr) && arr.some(name => String(name || '').trim()));
+  }
+
+  function clearPlanillaFields(){
+    document.querySelectorAll('.yellow-box, .yellow-box-free').forEach(function(box){
       box.dataset.player = '';
       box.textContent = '';
     });
-    if (typeof updateRepeatedHighlight === 'function') {
-      updateRepeatedHighlight();
-    }
-}
+    if (typeof updateRepeatedHighlight === 'function') updateRepeatedHighlight();
+  }
 
 async function savePlanilla(){
-    if (window.__LPI_PLANILLA_SEND_ENABLED__ === false){
-      if (typeof showAlert === 'function') {
-        showAlert('La carga de planilla está cerrada mientras los cruces estén habilitados.');
-      }
-      return { ok:false, error:'send-disabled' };
+    if (window.__LPI_PLANILLA_SEND_ENABLED__ === false) {
+      if (typeof showAlert === 'function') showAlert('La carga de planilla está cerrada mientras los cruces estén habilitados.');
+      return { ok:false, blocked:true };
     }
 
-    const payloadObj = getPlanillaPayload();
+    const payloadObj = collectPlanillaPayload();
 
-    if (isPlanillaCompletelyEmpty(payloadObj)){
-      if (typeof showAlert === 'function') {
-        showAlert('No se puede enviar una planilla totalmente vacía.');
-      }
-      return { ok:false, error:'empty-planilla' };
+    if (!planillaHasAnyPlayer(payloadObj)) {
+      if (typeof showAlert === 'function') showAlert('No se puede enviar una planilla totalmente vacía.');
+      return { ok:false, empty:true };
     }
-
-    try {
-      const r = await fetch(LPI_apiUrl('/api/save-planilla'), {
-        credentials: 'include',
-        method: 'POST',
-        headers: LPI_getAuthHeaders(),
-        body: JSON.stringify({ planilla: payloadObj })
-      });
-      if (!r.ok) {
-        const t = await r.text().catch(()=> '');
-        let msg = t || ('HTTP ' + r.status);
-        try { const j = JSON.parse(t); if (j && (j.msg || j.error)) msg = j.msg || j.error; } catch(_) {}
-        if (typeof showAlert === 'function') showAlert('No se pudo guardar la planilla: ' + msg);
-        return { ok:false };
-      }
-      const json = await r.json().catch(() => ({}));
-      if (json && json.ok) {
-        if (typeof showToastOK === 'function') showToastOK('Enviada correctamente');
-      } else {
-        if (typeof showAlert === 'function') showAlert('No se pudo guardar la planilla.');
-      }
-      return json;
-    } catch (e) {
-      if (typeof showAlert === 'function') showAlert('Error de red al guardar la planilla.');
-      return { ok:false, error: String((e && e.message) || e) };
-    }
-  };
-    const pickFree = () => Array.from(document.querySelectorAll('.yellow-box-free')).map(x => (x.dataset.player || '').trim());
-    const team = (typeof deriveTeamKey === 'function') ? deriveTeamKey() : ((typeof deriveTeam === 'function') ? deriveTeam() : '');
-
-    const payloadObj = {
-      team,
-      createdAt: new Date().toISOString(),
-      individuales: pick('individual'),
-      pareja1: pick('pareja1'),
-      pareja2: pick('pareja2'),
-      suplentes: pick('suplentes'),
-      capitan: pickFree()
-    };
 
     try {
       const r = await fetch(LPI_apiUrl('/api/save-planilla'), {
@@ -980,7 +936,6 @@ document.addEventListener('DOMContentLoaded', function(){
   if (btnVaciar) {
     btnVaciar.addEventListener('click', function(){
       clearPlanillaFields();
-      if (typeof showToastOK === 'function') showToastOK('Planilla vaciada');
     });
   }
 });
@@ -1503,8 +1458,23 @@ document.addEventListener('DOMContentLoaded', function(){
   }catch(e){ /* no-op */ }
 })();
 
-// === Autocarga de la última planilla enviada vía API privada ===
+// === Autocarga de planilla por defecto (hoy o mañana) vía API privada ===
 (function(){
+  function sameDay(a,b){
+    return a && b &&
+      a.getFullYear()===b.getFullYear() &&
+      a.getMonth()===b.getMonth() &&
+      a.getDate()===b.getDate();
+  }
+  function shouldLoad(createdAt){
+    if (!createdAt) return false;
+    const d = new Date(createdAt);
+    if (isNaN(d)) return false;
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate()+1);
+    return sameDay(d, now) || sameDay(d, tomorrow);
+  }
   function setBox(el, name){
     if (!el) return;
     const value = (name || '').trim();
@@ -1525,7 +1495,6 @@ document.addEventListener('DOMContentLoaded', function(){
       fillGroup('pareja1',     plan.pareja1      || [], false);
       fillGroup('pareja2',     plan.pareja2      || [], false);
       fillGroup('suplentes',   plan.suplentes    || [], false);
-      if (typeof updateRepeatedHighlight === 'function') updateRepeatedHighlight();
     } catch(_) { }
   }
   async function tryAutoload(){
@@ -1562,7 +1531,6 @@ document.addEventListener('DOMContentLoaded', function(){
   } else {
     document.addEventListener('DOMContentLoaded', tryAutoload);
   }
-})();
 })();
 
 // === Control remoto de "ver cruces" (habilitado por admin por categoría) ===
@@ -1793,236 +1761,3 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-
-
-// === Sincroniza "ver cruces" y "enviar planilla" por categoría ===
-(function(){
-  if (window.__LPI_CRUCES_PLANILLA_SYNC__) return;
-  window.__LPI_CRUCES_PLANILLA_SYNC__ = true;
-
-  const CATEGORY_KEYS = {
-    tercera: '__categoria_tercera__',
-    segunda: '__categoria_segunda__'
-  };
-
-  function normalizeCategoryValue(value){
-    const v = String(value || '').trim().toLowerCase();
-    if (!v) return null;
-    if (v.includes('terc')) return 'tercera';
-    if (v.includes('seg')) return 'segunda';
-    if (v === '3' || v === 'c') return 'tercera';
-    if (v === '2' || v === 'b') return 'segunda';
-    return null;
-  }
-
-  function readLoggedSession(){
-    try {
-      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
-      if (sess) return sess;
-    } catch(_) {}
-    try {
-      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
-      if (sess2) return sess2;
-    } catch(_) {}
-    return null;
-  }
-
-  function resolveCategoryFromSession(){
-    const sess = readLoggedSession();
-    if (!sess || typeof sess !== 'object') return null;
-
-    const directKeys = [
-      'category', 'categoria', 'cat', 'division', 'división', 'leagueCategory',
-      'teamCategory', 'fixtureCategory', 'grupoCategoria'
-    ];
-
-    for (const key of directKeys){
-      const value = normalizeCategoryValue(sess[key]);
-      if (value) return value;
-    }
-
-    if (sess.team && typeof sess.team === 'object'){
-      for (const key of directKeys){
-        const value = normalizeCategoryValue(sess.team[key]);
-        if (value) return value;
-      }
-    }
-
-    if (sess.user && typeof sess.user === 'object'){
-      for (const key of directKeys){
-        const value = normalizeCategoryValue(sess.user[key]);
-        if (value) return value;
-      }
-    }
-
-    return null;
-  }
-
-  function deriveCurrentTeam(){
-    try {
-      if (typeof deriveTeam === 'function') return deriveTeam() || '';
-    } catch(_) {}
-    try {
-      if (typeof deriveTeamKey === 'function') return deriveTeamKey() || '';
-    } catch(_) {}
-    return '';
-  }
-
-  async function resolveCategoryByTeam(teamSlug){
-    const fromSession = resolveCategoryFromSession();
-    if (fromSession) return fromSession;
-
-    const key = String(teamSlug || '').trim().toLowerCase();
-    if (key.endsWith('tercera')) return 'tercera';
-    if (key.endsWith('segunda')) return 'segunda';
-
-    return null;
-  }
-
-  const btnCruces = document.getElementById('btnVerCruces');
-  const btnEnviar = document.getElementById('btnEnviar');
-  const sendStatus = document.getElementById('sendPlanillaStatus');
-  const fechaKey = new Date().toISOString().slice(0,10);
-
-  function setCrucesEnabled(enabled, category){
-    if (!btnCruces) return;
-    btnCruces.classList.toggle('is-disabled', !enabled);
-    if (!enabled){
-      btnCruces.setAttribute('aria-disabled', 'true');
-      btnCruces.title = category
-        ? ('Esperando habilitación del admin para ' + category + '…')
-        : 'Esperando habilitación del admin…';
-    } else {
-      btnCruces.removeAttribute('aria-disabled');
-      btnCruces.title = category ? ('Cruces habilitados para ' + category) : 'Cruces habilitados';
-    }
-  }
-
-  function setEnviarEnabled(enabled, category){
-    if (!btnEnviar) return;
-    btnEnviar.disabled = !enabled;
-    btnEnviar.classList.toggle('is-disabled', !enabled);
-
-    if (enabled){
-      btnEnviar.title = category
-        ? ('Carga de planilla habilitada para ' + category)
-        : 'Carga de planilla habilitada';
-      if (sendStatus){
-        sendStatus.textContent = 'La carga de planilla está habilitada.';
-        sendStatus.classList.add('is-open');
-        sendStatus.classList.remove('is-closed');
-      }
-    } else {
-      btnEnviar.title = category
-        ? ('No disponible mientras los cruces estén habilitados en ' + category)
-        : 'No disponible mientras los cruces estén habilitados';
-      if (sendStatus){
-        sendStatus.textContent = 'La carga de planilla está cerrada.';
-        sendStatus.classList.add('is-closed');
-        sendStatus.classList.remove('is-open');
-      }
-    }
-  }
-
-  function applyState(crucesEnabled, category){
-    setCrucesEnabled(!!crucesEnabled, category);
-    setEnviarEnabled(!crucesEnabled, category);
-    window.__LPI_PLANILLA_SEND_ENABLED__ = !crucesEnabled;
-  }
-
-  if (btnCruces && !btnCruces.__lpiGuardWired2){
-    btnCruces.__lpiGuardWired2 = true;
-    btnCruces.addEventListener('click', function(ev){
-      if (btnCruces.getAttribute('aria-disabled') === 'true'){
-        ev.preventDefault();
-        ev.stopPropagation();
-      }
-    });
-  }
-
-  if (btnEnviar && !btnEnviar.__lpiGuardWired){
-    btnEnviar.__lpiGuardWired = true;
-    btnEnviar.addEventListener('click', function(ev){
-      if (btnEnviar.disabled || window.__LPI_PLANILLA_SEND_ENABLED__ === false){
-        ev.preventDefault();
-        ev.stopPropagation();
-        if (typeof showAlert === 'function') {
-          showAlert('La carga de planilla está cerrada mientras los cruces estén habilitados.');
-        }
-      }
-    }, true);
-  }
-
-  let refreshTimer = null;
-  let refreshInFlight = false;
-
-  async function checkRemoteState(){
-    if (refreshInFlight) return;
-    refreshInFlight = true;
-    try {
-      const team = deriveCurrentTeam();
-      const category = await resolveCategoryByTeam(team);
-
-      if (!category || !CATEGORY_KEYS[category]){
-        applyState(false, null);
-        return;
-      }
-
-      const qs = new URLSearchParams({
-        team: CATEGORY_KEYS[category],
-        fechaKey
-      });
-
-      const r = await fetch(
-        LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(),
-        { cache: 'no-store', credentials: 'include' }
-      );
-
-      const j = await r.json().catch(() => ({}));
-      applyState(!!(j && j.enabled), category);
-    } catch(_) {
-      applyState(false, null);
-    } finally {
-      refreshInFlight = false;
-    }
-  }
-
-  function queueCheck(){
-    clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(checkRemoteState, 250);
-  }
-
-  applyState(false, null);
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', checkRemoteState, { once: true });
-  } else {
-    checkRemoteState();
-  }
-
-  try {
-    const es = new EventSource(LPI_apiUrl('/api/cruces/stream'), { withCredentials: true });
-    es.onmessage = function(){ queueCheck(); };
-  } catch(_) {}
-
-  setInterval(queueCheck, 60000);
-})();
-
-// === Hard-stop de envío si admin abrió cruces ===
-(function(){
-  if (window.__LPI_SAVE_PLANILLA_GUARD__) return;
-  window.__LPI_SAVE_PLANILLA_GUARD__ = true;
-
-  const originalSavePlanilla = window.savePlanilla;
-  if (typeof originalSavePlanilla !== 'function') return;
-
-  window.savePlanilla = async function(){
-    if (window.__LPI_PLANILLA_SEND_ENABLED__ === false) {
-      if (typeof showAlert === 'function') {
-        showAlert('La carga de planilla está cerrada mientras los cruces estén habilitados.');
-      }
-      return { ok:false, blocked:true };
-    }
-    return await originalSavePlanilla.apply(this, arguments);
-  };
-})();

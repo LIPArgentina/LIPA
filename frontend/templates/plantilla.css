@@ -786,30 +786,6 @@ body{
 }
 
 
-.planilla-toolbar{
-  width:100%;
-  display:flex;
-  justify-content:center;
-  margin:-2px 0 8px;
-}
-.btn-vaciar{
-  padding:8px 12px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,.25);
-  background:transparent;
-  color:#ffd966;
-  font-weight:800;
-  cursor:pointer;
-}
-.btn-vaciar:hover{ background:rgba(255,255,255,.08); }
-
-@media (max-width: 768px){
-  .planilla-toolbar{
-    margin:0 0 6px;
-  }
-  .btn-vaciar{
-    width:100%;
-    font-size:11px;
-    padding:7px 10px;
-  }
-}
+.planilla-tools{ width:100%; display:flex; justify-content:center; margin:2px 0 6px; }
+.btn-vaciar-planilla{ width:200px; max-width:100%; padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.22); background:transparent; color:#fff1a6; font-weight:800; cursor:pointer; }
+.btn-vaciar-planilla:hover{ background:rgba(255,255,255,.06); }
