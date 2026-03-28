@@ -331,11 +331,7 @@
   </div>
 
   <div class="top-actions">
-    <div class="cruces-button-wrap category-header-wrap">
-      <div class="category-header-status status-left">
-        <div id="globalIndicatorTercera" class="fresh-indicator fresh-stale" title="Comprobando planillas de tercera…"></div>
-        <span id="globalCounterTercera" class="category-header-counter">0 planillas actualizadas de 0</span>
-      </div>
+    <div class="cruces-button-wrap">
       <button type="button" class="btn-gold" id="btnHabilitarCrucesTercera">habilitar cruces tercera</button>
       <div id="crucesStatusLabelTercera" class="cruces-status-label">los cruces de tercera están deshabilitados</div>
     </div>
@@ -344,11 +340,7 @@
       <a href="https://lipa.ar/export/planillas_auto.html" class="btn-gold btn-gold-link">generar cruces</a>
     </div>
 
-    <div class="cruces-button-wrap category-header-wrap">
-      <div class="category-header-status status-right">
-        <span id="globalCounterSegunda" class="category-header-counter">0 planillas actualizadas de 0</span>
-        <div id="globalIndicatorSegunda" class="fresh-indicator fresh-stale" title="Comprobando planillas de segunda…"></div>
-      </div>
+    <div class="cruces-button-wrap">
       <button type="button" class="btn-gold" id="btnHabilitarCrucesSegunda">habilitar cruces segunda</button>
       <div id="crucesStatusLabelSegunda" class="cruces-status-label">los cruces de segunda están deshabilitados</div>
     </div>
@@ -361,9 +353,21 @@
 <div class="container">
 <main>
 <section class="category-filter-bar" aria-label="Filtros de categoría">
-<button type="button" class="btn-gold btn-filter" data-category-filter="tercera" aria-pressed="false">tercera</button>
-<button type="button" class="btn-gold btn-filter" data-category-filter="segunda" aria-pressed="false">segunda</button>
-<span id="categoryFilterStatus" class="category-filter-status">Mostrando todas las planillas</span>
+  <div class="filter-side filter-side-left">
+    <div class="category-global-indicator" id="globalStatusTercera">
+      <div id="globalIndicatorTercera" class="fresh-indicator fresh-stale" title="Comprobando planillas de tercera…"></div>
+      <span id="globalCounterTercera" class="category-global-counter">0 planillas actualizadas de 0</span>
+    </div>
+    <button type="button" class="btn-gold btn-filter" data-category-filter="tercera" aria-pressed="false">tercera</button>
+  </div>
+
+  <div class="filter-side filter-side-right">
+    <button type="button" class="btn-gold btn-filter" data-category-filter="segunda" aria-pressed="false">segunda</button>
+    <div class="category-global-indicator" id="globalStatusSegunda">
+      <span id="globalCounterSegunda" class="category-global-counter">0 planillas actualizadas de 0</span>
+      <div id="globalIndicatorSegunda" class="fresh-indicator fresh-stale" title="Comprobando planillas de segunda…"></div>
+    </div>
+  </div>
 </section>
 <section aria-label="Planillas por equipo" class="grid-boards" id="boards">
 <!-- Se generan por JS -->

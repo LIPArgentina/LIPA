@@ -309,13 +309,6 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
 
-    const badge = document.getElementById('categoryFilterStatus');
-    if(!badge) return;
-    if(!state.activeCategory){
-      badge.textContent = 'Mostrando todas las planillas';
-      return;
-    }
-    badge.textContent = 'Filtro activo: ' + state.activeCategory;
   }
 
   function renderBoards(){
