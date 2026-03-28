@@ -301,6 +301,19 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
     return state.allFiles.filter(item => item.__category === state.activeCategory);
   }
 
+  function compareUpdatedAtAsc(a, b){
+    const timeA = a && a.updatedAt ? new Date(a.updatedAt).getTime() : Number.NEGATIVE_INFINITY;
+    const timeB = b && b.updatedAt ? new Date(b.updatedAt).getTime() : Number.NEGATIVE_INFINITY;
+    const safeA = Number.isFinite(timeA) ? timeA : Number.NEGATIVE_INFINITY;
+    const safeB = Number.isFinite(timeB) ? timeB : Number.NEGATIVE_INFINITY;
+
+    if(safeA !== safeB) return safeA - safeB;
+
+    const nameA = String(a?.team || '').toLowerCase();
+    const nameB = String(b?.team || '').toLowerCase();
+    return nameA.localeCompare(nameB, 'es');
+  }
+
   function updateCategoryButtons(){
     const buttons = document.querySelectorAll('[data-category-filter]');
     buttons.forEach(btn => {
@@ -308,14 +321,6 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       btn.classList.toggle('active', isActive);
       btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
-
-    const badge = document.getElementById('categoryFilterStatus');
-    if(!badge) return;
-    if(!state.activeCategory){
-      badge.textContent = 'Mostrando todas las planillas';
-      return;
-    }
-    badge.textContent = 'Filtro activo: ' + state.activeCategory;
   }
 
   function renderBoards(){
@@ -325,7 +330,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
     boards.innerHTML = '';
     updateHeaderIndicators();
 
-    const visibleFiles = getVisibleFiles();
+    const visibleFiles = getVisibleFiles().sort(compareUpdatedAtAsc);
 
     if(!visibleFiles.length){
       const empty = document.createElement('div');
@@ -370,10 +375,6 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       }
 
       boards.appendChild(card);
-    }
-
-    if(typeof window._sortBoards === 'function'){
-      window._sortBoards('team-asc');
     }
 
     updateHeaderIndicators();

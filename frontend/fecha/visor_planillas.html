@@ -320,6 +320,72 @@
     .top-actions, .top-right-actions{ display:none !important; }
   }
 
+
+.single-line-filters{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:40px;
+  flex-wrap:nowrap !important;
+}
+
+.filter-inline-group{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex:0 0 auto;
+}
+
+.filter-inline-group-left{ justify-content:flex-end; }
+.filter-inline-group-right{ justify-content:flex-start; }
+
+.category-global-indicator{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--gold);
+  font-size:12px;
+  font-weight:700;
+  min-height:24px;
+  flex:0 0 auto;
+}
+
+.category-global-indicator .fresh-indicator{
+  align-self:center;
+  margin-top:0;
+}
+
+.category-global-counter{
+  white-space:nowrap;
+  line-height:1.1;
+}
+
+@media (max-width: 900px){
+  .single-line-filters{ gap:18px; }
+  .filter-inline-group{ gap:8px; }
+  .category-global-counter{ font-size:11px; }
+}
+
+@media (max-width: 760px){
+  .single-line-filters{
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap !important;
+  }
+
+  .filter-inline-group{
+    width:100%;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+
+  .category-global-counter{
+    white-space:normal;
+    text-align:center;
+  }
+}
+
 </style>
 </head>
 <body>
