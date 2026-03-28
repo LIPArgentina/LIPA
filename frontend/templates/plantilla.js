@@ -1761,3 +1761,229 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+
+
+// === Sincronización central: "ver cruces" y "enviar planilla" por categoría ===
+(function(){
+  if (window.__LPI_CRUCES_PLANILLA_SYNC_V2__) return;
+  window.__LPI_CRUCES_PLANILLA_SYNC_V2__ = true;
+
+  const CATEGORY_KEYS = {
+    tercera: '__categoria_tercera__',
+    segunda: '__categoria_segunda__'
+  };
+
+  const fechaKey = new Date().toISOString().slice(0,10);
+  const btnCruces = document.getElementById('btnVerCruces');
+  const btnEnviar = document.getElementById('btnEnviar');
+  const sendStatus = document.getElementById('sendPlanillaStatus');
+
+  function normalizeCategoryValue(value){
+    const v = String(value || '').trim().toLowerCase();
+    if (!v) return null;
+    if (v.includes('terc')) return 'tercera';
+    if (v.includes('seg')) return 'segunda';
+    if (v === '3' || v === 'c') return 'tercera';
+    if (v === '2' || v === 'b') return 'segunda';
+    return null;
+  }
+
+  function readLoggedSession(){
+    try {
+      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
+      if (sess) return sess;
+    } catch(_) {}
+    try {
+      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
+      if (sess2) return sess2;
+    } catch(_) {}
+    return null;
+  }
+
+  function resolveCategoryFromSession(){
+    const sess = readLoggedSession();
+    if (!sess || typeof sess !== 'object') return null;
+
+    const directKeys = [
+      'category', 'categoria', 'cat', 'division', 'división', 'leagueCategory',
+      'teamCategory', 'fixtureCategory', 'grupoCategoria'
+    ];
+
+    for (const key of directKeys){
+      const value = normalizeCategoryValue(sess[key]);
+      if (value) return value;
+    }
+
+    if (sess.team && typeof sess.team === 'object'){
+      for (const key of directKeys){
+        const value = normalizeCategoryValue(sess.team[key]);
+        if (value) return value;
+      }
+    }
+
+    if (sess.user && typeof sess.user === 'object'){
+      for (const key of directKeys){
+        const value = normalizeCategoryValue(sess.user[key]);
+        if (value) return value;
+      }
+    }
+
+    return null;
+  }
+
+  function deriveCurrentTeam(){
+    try {
+      if (typeof deriveTeam === 'function') return deriveTeam() || '';
+    } catch(_) {}
+    try {
+      if (typeof deriveTeamKey === 'function') return deriveTeamKey() || '';
+    } catch(_) {}
+    return '';
+  }
+
+  async function resolveCategoryByTeam(teamSlug){
+    const fromSession = resolveCategoryFromSession();
+    if (fromSession) return fromSession;
+
+    const key = String(teamSlug || '').trim().toLowerCase();
+    if (key.endsWith('tercera')) return 'tercera';
+    if (key.endsWith('segunda')) return 'segunda';
+
+    return null;
+  }
+
+  function setCrucesEnabled(enabled, category){
+    if (!btnCruces) return;
+
+    btnCruces.classList.toggle('is-disabled', !enabled);
+
+    if (!enabled){
+      btnCruces.setAttribute('aria-disabled', 'true');
+      btnCruces.title = category
+        ? ('Esperando habilitación del admin para ' + category + '…')
+        : 'Esperando habilitación del admin…';
+    } else {
+      btnCruces.removeAttribute('aria-disabled');
+      btnCruces.title = category
+        ? ('Cruces habilitados para ' + category)
+        : 'Cruces habilitados';
+    }
+  }
+
+  function setEnviarEnabled(enabled, category){
+    if (!btnEnviar) return;
+
+    btnEnviar.disabled = !enabled;
+    btnEnviar.classList.toggle('is-disabled', !enabled);
+
+    if (enabled){
+      btnEnviar.title = category
+        ? ('La carga está habilitada para ' + category)
+        : 'La carga está habilitada';
+      if (sendStatus){
+        sendStatus.textContent = 'La carga de planilla está habilitada.';
+        sendStatus.classList.add('is-open');
+        sendStatus.classList.remove('is-closed');
+      }
+    } else {
+      btnEnviar.title = category
+        ? ('La carga está deshabilitada por el administrador para ' + category)
+        : 'La carga está deshabilitada por el administrador';
+      if (sendStatus){
+        sendStatus.textContent = 'La carga de planilla está deshabilitada por el administrador.';
+        sendStatus.classList.add('is-closed');
+        sendStatus.classList.remove('is-open');
+      }
+    }
+  }
+
+  function applyState(crucesEnabled, category){
+    const sendEnabled = !crucesEnabled;
+    setCrucesEnabled(!!crucesEnabled, category);
+    setEnviarEnabled(sendEnabled, category);
+    window.__LPI_PLANILLA_SEND_ENABLED__ = sendEnabled;
+  }
+
+  if (btnCruces && !btnCruces.__lpiCrucesGuardV2){
+    btnCruces.__lpiCrucesGuardV2 = true;
+    btnCruces.addEventListener('click', function(ev){
+      if (btnCruces.getAttribute('aria-disabled') === 'true'){
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+    }, true);
+  }
+
+  if (btnEnviar && !btnEnviar.__lpiSendGuardV2){
+    btnEnviar.__lpiSendGuardV2 = true;
+    btnEnviar.addEventListener('click', function(ev){
+      if (btnEnviar.disabled || window.__LPI_PLANILLA_SEND_ENABLED__ === false){
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (typeof showAlert === 'function') {
+          showAlert('La carga de planilla está deshabilitada por el administrador.');
+        }
+      }
+    }, true);
+  }
+
+  let refreshInFlight = false;
+  let refreshTimer = null;
+
+  async function checkRemoteState(){
+    if (refreshInFlight) return;
+    refreshInFlight = true;
+
+    try {
+      const team = deriveCurrentTeam();
+      const category = await resolveCategoryByTeam(team);
+
+      if (!category || !CATEGORY_KEYS[category]){
+        applyState(false, category);
+        return;
+      }
+
+      const qs = new URLSearchParams({
+        team: CATEGORY_KEYS[category],
+        fechaKey: fechaKey
+      });
+
+      const r = await fetch(
+        LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(),
+        { cache:'no-store', credentials:'include' }
+      );
+
+      const j = await r.json().catch(() => ({}));
+      applyState(!!(j && j.enabled), category);
+    } catch(_) {
+      applyState(false, null);
+    } finally {
+      refreshInFlight = false;
+    }
+  }
+
+  function queueCheck(){
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(checkRemoteState, 250);
+  }
+
+  // Estado inicial coherente con la regla:
+  // cruces deshabilitados => enviar planilla habilitado
+  applyState(false, null);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkRemoteState, { once:true });
+  } else {
+    checkRemoteState();
+  }
+
+  try{
+    const es = new EventSource(LPI_apiUrl('/api/cruces/stream'), { withCredentials: true });
+    es.onmessage = function(){
+      queueCheck();
+    };
+    es.onerror = function(){};
+  } catch(_) {}
+
+  setInterval(queueCheck, 60000);
+})();
