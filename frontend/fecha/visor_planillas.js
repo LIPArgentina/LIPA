@@ -111,7 +111,6 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
   function markFreshness(card, updatedAt){
     try{
       const isToday = !!updatedAt && isSameLocalDay(updatedAt);
-      updateGlobalJsIndicator(isToday);
 
       let wrap = card.querySelector('.title-indicator');
       if(!wrap){ wrap = document.createElement('div'); wrap.className='title-indicator'; card.insertBefore(wrap, card.querySelector('h2').nextSibling); }
@@ -129,6 +128,45 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
         dot.title = 'Planilla sin fecha de actualización';
       }
     }catch(e){}
+  }
+
+  function getCategoryFreshStats(category){
+    const files = state.allFiles.filter(item => item.__category === category);
+    const total = files.length;
+    const updated = files.filter(item => !!item.updatedAt && isSameLocalDay(item.updatedAt)).length;
+    return {
+      total,
+      updated,
+      allFresh: total > 0 && updated === total
+    };
+  }
+
+  function updateCategoryHeaderIndicator(category){
+    const stats = getCategoryFreshStats(category);
+    const suffix = category.charAt(0).toUpperCase() + category.slice(1);
+    const dot = document.getElementById('globalIndicator' + suffix);
+    const counter = document.getElementById('globalCounter' + suffix);
+
+    if(counter){
+      counter.textContent = stats.updated + ' planillas actualizadas de ' + stats.total;
+    }
+
+    if(dot){
+      dot.classList.remove('fresh-ok','fresh-stale');
+      dot.classList.add(stats.allFresh ? 'fresh-ok' : 'fresh-stale');
+      if(stats.total === 0){
+        dot.title = 'No hay planillas de ' + category + ' para comprobar';
+      }else if(stats.allFresh){
+        dot.title = 'Todas las planillas de ' + category + ' cumplen la regla de fecha';
+      }else{
+        dot.title = 'Hay planillas de ' + category + ' que no cumplen la regla de fecha';
+      }
+    }
+  }
+
+  function updateHeaderIndicators(){
+    updateCategoryHeaderIndicator('tercera');
+    updateCategoryHeaderIndicator('segunda');
   }
 
   function extractTeamNamesFromData(data){
@@ -285,7 +323,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
     if(!boards) return;
 
     boards.innerHTML = '';
-    resetGlobalJsIndicator();
+    updateHeaderIndicators();
 
     const visibleFiles = getVisibleFiles();
 
@@ -294,7 +332,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       empty.className = 'empty-state';
       empty.textContent = 'No hay planillas para mostrar en esta categoría';
       boards.appendChild(empty);
-      updateGlobalJsIndicator(true);
+      updateHeaderIndicators();
       updateCategoryButtons();
       return;
     }
@@ -338,6 +376,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       window._sortBoards('team-asc');
     }
 
+    updateHeaderIndicators();
     updateCategoryButtons();
   }
 
@@ -362,6 +401,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
       }
 
       setupCategoryFilters();
+      resetCategoryHeaderIndicators();
 
       const [_, planillasResponse] = await Promise.all([
         loadCategoryMaps(),
@@ -407,32 +447,21 @@ window._sortBoards = function(mode){
   cards.forEach(c=>cont.appendChild(c));
 };
 
-// === Indicador global de actualidad ===
-let GLOBAL_JS_ALL_TODAY = true;
-let GLOBAL_JS_CHECKS = 0;
-
-function resetGlobalJsIndicator(){
-  GLOBAL_JS_ALL_TODAY = true;
-  GLOBAL_JS_CHECKS = 0;
-  const dot = document.getElementById('globalJsIndicator');
-  if (!dot) return;
-  dot.classList.remove('fresh-ok','fresh-stale');
-  dot.classList.add('fresh-stale');
-  dot.title = 'Comprobando fecha de planillas…';
-}
-
-function updateGlobalJsIndicator(isToday){
-  GLOBAL_JS_CHECKS++;
-  if (!isToday) GLOBAL_JS_ALL_TODAY = false;
-  const dot = document.getElementById('globalJsIndicator');
-  if (!dot) return;
-  dot.classList.remove('fresh-ok','fresh-stale');
-  dot.classList.add(GLOBAL_JS_ALL_TODAY ? 'fresh-ok' : 'fresh-stale');
-  dot.title = GLOBAL_JS_CHECKS === 0
-    ? 'Comprobando fecha de planillas…'
-    : (GLOBAL_JS_ALL_TODAY
-      ? 'Todas las planillas visibles son del día'
-      : 'Hay planillas visibles con fecha anterior');
+// === Indicadores generales por categoría ===
+function resetCategoryHeaderIndicators(){
+  ['tercera','segunda'].forEach((category) => {
+    const suffix = category.charAt(0).toUpperCase() + category.slice(1);
+    const dot = document.getElementById('globalIndicator' + suffix);
+    const counter = document.getElementById('globalCounter' + suffix);
+    if(dot){
+      dot.classList.remove('fresh-ok','fresh-stale');
+      dot.classList.add('fresh-stale');
+      dot.title = 'Comprobando planillas de ' + category + '…';
+    }
+    if(counter){
+      counter.textContent = '0 planillas actualizadas de 0';
+    }
+  });
 }
 
 (function(){

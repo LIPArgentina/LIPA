@@ -84,6 +84,26 @@
     display:block;
     max-width:170px;
   }
+  .category-header-wrap{
+    min-width:240px;
+    gap:6px;
+  }
+  .category-header-status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    min-height:24px;
+  }
+  .category-header-status.status-left{ justify-content:flex-start; }
+  .category-header-status.status-right{ justify-content:flex-end; }
+  .category-header-counter{
+    font-size:12px;
+    line-height:1.1;
+    color:var(--gold);
+    font-weight:700;
+    white-space:nowrap;
+  }
 
   .top-right-actions{
     grid-area:right;
@@ -201,6 +221,10 @@
     margin-top:9px;
     flex:0 0 auto;
   }
+  .category-header-status .fresh-indicator{
+    align-self:center;
+    margin-top:0;
+  }
   .fresh-ok{ background:#22c55e !important; }
   .fresh-stale{ background:#ef4444 !important; }
 
@@ -283,6 +307,9 @@
     .title{ font-size:1.35rem; }
     .top-actions{ gap:8px; }
     .cruces-button-wrap{ min-width:150px; flex:1 1 150px; }
+    .category-header-wrap{ min-width:100%; }
+    .category-header-status{ justify-content:center !important; flex-wrap:wrap; }
+    .category-header-counter{ white-space:normal; text-align:center; }
     .cruces-button-wrap-link{ flex:1 1 100%; }
     .btn-gold{ width:100%; font-size:.76rem; padding:8px 12px; min-height:42px; }
     .btn-gold-link{ width:100%; }
@@ -304,21 +331,27 @@
   </div>
 
   <div class="top-actions">
-    <div class="cruces-button-wrap">
+    <div class="cruces-button-wrap category-header-wrap">
+      <div class="category-header-status status-left">
+        <div id="globalIndicatorTercera" class="fresh-indicator fresh-stale" title="Comprobando planillas de tercera…"></div>
+        <span id="globalCounterTercera" class="category-header-counter">0 planillas actualizadas de 0</span>
+      </div>
       <button type="button" class="btn-gold" id="btnHabilitarCrucesTercera">habilitar cruces tercera</button>
       <div id="crucesStatusLabelTercera" class="cruces-status-label">los cruces de tercera están deshabilitados</div>
-    </div>
-
-    <div class="cruces-button-wrap">
-      <button type="button" class="btn-gold" id="btnHabilitarCrucesSegunda">habilitar cruces segunda</button>
-      <div id="crucesStatusLabelSegunda" class="cruces-status-label">los cruces de segunda están deshabilitados</div>
     </div>
 
     <div class="cruces-button-wrap cruces-button-wrap-link">
       <a href="https://lipa.ar/export/planillas_auto.html" class="btn-gold btn-gold-link">generar cruces</a>
     </div>
 
-    <div id="globalJsIndicator" class="fresh-indicator fresh-stale" title="Comprobando fecha de planillas…"></div>
+    <div class="cruces-button-wrap category-header-wrap">
+      <div class="category-header-status status-right">
+        <span id="globalCounterSegunda" class="category-header-counter">0 planillas actualizadas de 0</span>
+        <div id="globalIndicatorSegunda" class="fresh-indicator fresh-stale" title="Comprobando planillas de segunda…"></div>
+      </div>
+      <button type="button" class="btn-gold" id="btnHabilitarCrucesSegunda">habilitar cruces segunda</button>
+      <div id="crucesStatusLabelSegunda" class="cruces-status-label">los cruces de segunda están deshabilitados</div>
+    </div>
   </div>
 
   <div class="top-right-actions">
