@@ -121,10 +121,20 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
 
       dot.className = 'fresh-indicator ' + (isToday ? 'fresh-ok' : 'fresh-stale');
 
-      if (updatedAt) {
-        dot.title = isToday
-          ? ('Planilla cargada hoy: ' + formatDateTime(updatedAt))
-          : ('Planilla cargada el: ' + formatDateTime(updatedAt));
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const target = new Date(new Date(updatedAt).getFullYear(), new Date(updatedAt).getMonth(), new Date(updatedAt).getDate());
+ 
+      const diffMs = today.getTime() - target.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+ 
+      if(diffDays === 0){
+        dot.title = 'Planilla cargada hoy: ' + formatDateTime(updatedAt);
+      }else if(diffDays === 1){
+        dot.title = 'Planilla cargada ayer: ' + formatDateTime(updatedAt);
+      }else{
+        dot.title = 'Planilla cargada hace ' + diffDays + ' días: ' + formatDateTime(updatedAt);
+ 
       } else {
         dot.title = 'Planilla sin fecha de actualización';
       }
