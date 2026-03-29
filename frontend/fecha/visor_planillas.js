@@ -110,36 +110,52 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
 }
 
   function markFreshness(card, updatedAt){
-    try{
-      const isToday = !!updatedAt && isSameLocalDay(updatedAt);
+  try{
+    const isToday = !!updatedAt && isSameLocalDay(updatedAt);
 
-      let wrap = card.querySelector('.title-indicator');
-      if(!wrap){ wrap = document.createElement('div'); wrap.className='title-indicator'; card.insertBefore(wrap, card.querySelector('h2').nextSibling); }
+    let wrap = card.querySelector('.title-indicator');
+    if(!wrap){
+      wrap = document.createElement('div');
+      wrap.className='title-indicator';
+      card.insertBefore(wrap, card.querySelector('h2').nextSibling);
+    }
 
-      let dot = wrap.querySelector('.fresh-indicator');
-      if(!dot){ dot = document.createElement('div'); dot.className='fresh-indicator'; wrap.appendChild(dot); }
+    let dot = wrap.querySelector('.fresh-indicator');
+    if(!dot){
+      dot = document.createElement('div');
+      dot.className='fresh-indicator';
+      wrap.appendChild(dot);
+    }
 
-      dot.className = 'fresh-indicator ' + (isToday ? 'fresh-ok' : 'fresh-stale');
+    dot.className = 'fresh-indicator ' + (isToday ? 'fresh-ok' : 'fresh-stale');
+
+    if(updatedAt){
 
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const target = new Date(new Date(updatedAt).getFullYear(), new Date(updatedAt).getMonth(), new Date(updatedAt).getDate());
- 
+      const target = new Date(
+        new Date(updatedAt).getFullYear(),
+        new Date(updatedAt).getMonth(),
+        new Date(updatedAt).getDate()
+      );
+
       const diffMs = today.getTime() - target.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
- 
+
       if(diffDays === 0){
         dot.title = 'Planilla cargada hoy: ' + formatDateTime(updatedAt);
       }else if(diffDays === 1){
         dot.title = 'Planilla cargada ayer: ' + formatDateTime(updatedAt);
       }else{
         dot.title = 'Planilla cargada hace ' + diffDays + ' días: ' + formatDateTime(updatedAt);
- 
-      } else {
-        dot.title = 'Planilla sin fecha de actualización';
       }
-    }catch(e){}
-  }
+
+    } else {
+      dot.title = 'Planilla sin fecha de actualización';
+    }
+
+  }catch(e){}
+}
 
   function getCategoryFreshStats(category){
     const files = state.allFiles.filter(item => item.__category === category);
