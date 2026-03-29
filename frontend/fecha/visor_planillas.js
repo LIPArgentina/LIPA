@@ -91,22 +91,23 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
   }
 
   function isSameLocalDay(value){
-    try{
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) return false;
+  try{
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return false;
 
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-      return target.getTime() === today.getTime() ||
-        target.getTime() === yesterday.getTime();
-    }catch(_){
-      return false;
-    }
+    // diferencia en días
+    const diffMs = today.getTime() - target.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    return diffDays >= 0 && diffDays <= 3; // 👈 4 días (0,1,2,3)
+  }catch(_){
+    return false;
   }
+}
 
   function markFreshness(card, updatedAt){
     try{
