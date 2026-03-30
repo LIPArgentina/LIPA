@@ -235,18 +235,17 @@ function apiUrl(path){
   }
 
   function findCruceForTeam(cruces, teamCandidates){
-    const variants = new Set();
-    (Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates]).forEach(value => {
-      teamKeyVariants(value).forEach(v => variants.add(v));
-    });
+    const rawCandidates = Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates];
+    const slugCandidates = new Set();
+    const nameVariants = new Set();
 
-    const matches = cruces.filter(cruce => {
-      const localVariants = teamKeyVariants(cruce.local);
-      const visitanteVariants = teamKeyVariants(cruce.visitante);
-      return localVariants.some(v => variants.has(v)) || visitanteVariants.some(v => variants.has(v));
+    rawCandidates.forEach(value => {
+      const raw = String(value || '').trim();
+      if (!raw) return;
+      const slug = normPlanillaSlug(raw);
+      if (slug) slugCandidates.add(slug);
+      teamKeyVariants(raw).forEach(v => nameVariants.add(v));
     });
-
-    if (!matches.length) return null;
 
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -258,15 +257,34 @@ function apiUrl(path){
       return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     };
 
-    const scored = matches.map(item => {
+    const scoreMatch = (item, mode) => {
       const d = toDate(item.date);
       const diff = d ? Math.abs(d - today) : Number.MAX_SAFE_INTEGER;
       const inWindow = d ? (today >= new Date(d.getTime() - 5*24*60*60*1000) && today <= new Date(d.getTime() + 1*24*60*60*1000)) : false;
-      return { item, d, diff, inWindow };
-    });
+      return { item, d, diff, inWindow, mode };
+    };
 
-    const candidates = scored.filter(x => x.inWindow);
-    const pool = candidates.length ? candidates : scored;
+    const exactSlugMatches = cruces
+      .filter(cruce => slugCandidates.has(normPlanillaSlug(cruce.localSlug || '')) || slugCandidates.has(normPlanillaSlug(cruce.visitanteSlug || '')))
+      .map(item => scoreMatch(item, 'slug'));
+
+    if (exactSlugMatches.length) {
+      const candidates = exactSlugMatches.filter(x => x.inWindow);
+      const pool = candidates.length ? candidates : exactSlugMatches;
+      pool.sort((a, b) => a.diff - b.diff);
+      return pool[0]?.item || null;
+    }
+
+    const fuzzyMatches = cruces.filter(cruce => {
+      const localVariants = teamKeyVariants(cruce.local);
+      const visitanteVariants = teamKeyVariants(cruce.visitante);
+      return localVariants.some(v => nameVariants.has(v)) || visitanteVariants.some(v => nameVariants.has(v));
+    }).map(item => scoreMatch(item, 'name'));
+
+    if (!fuzzyMatches.length) return null;
+
+    const candidates = fuzzyMatches.filter(x => x.inWindow);
+    const pool = candidates.length ? candidates : fuzzyMatches;
     pool.sort((a, b) => a.diff - b.diff);
     return pool[0]?.item || null;
   }
