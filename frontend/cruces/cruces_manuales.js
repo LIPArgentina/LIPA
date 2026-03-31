@@ -3,7 +3,7 @@
 
   const state = {
     teams: [],
-    planCache: new Map()
+    rosterCache: new Map()
   };
 
   const sections = [
@@ -45,17 +45,6 @@
       .toLowerCase().replace(/[^a-z0-9]+/g,'');
   }
 
-  function emptyPlanilla(team=''){
-    return {
-      team,
-      capitan:['',''],
-      individuales:['','','','','','',''],
-      pareja1:['',''],
-      pareja2:['',''],
-      suplentes:['','']
-    };
-  }
-
   function normalizeTeamItem(item){
     const name = item?.username || item?.team || item?.teamName || item?.equipo || item?.nombre || item?.name || item?.slug || 'Equipo';
     const slug = item?.slug || slugify(name);
@@ -68,7 +57,7 @@
       credentials:'include'
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error((data && (data.error || data.message)) || ('HTTP ' + res.status));
+    if (!res.ok) throw new Error((data && (data.error || data.message || data.msg)) || ('HTTP ' + res.status));
     return data;
   }
 
@@ -91,7 +80,7 @@
     }
 
     setStatus(`<span class="ok">Equipos cargados para ${category}.</span>`);
-    renderBoth();
+    await renderBoth();
   }
 
   function fillTeamSelects(){
@@ -122,55 +111,45 @@
     }
   }
 
-  async function loadPlanilla(teamSlug){
-    if (!teamSlug) return emptyPlanilla('');
-    if (state.planCache.has(teamSlug)) return state.planCache.get(teamSlug);
+  async function loadRoster(teamSlug){
+    if (!teamSlug) return [];
+    if (state.rosterCache.has(teamSlug)) return state.rosterCache.get(teamSlug);
 
     try{
-      const data = await fetchJson('/api/team/planilla?team=' + encodeURIComponent(teamSlug));
-      const plan = data?.planilla || data || {};
-      const normalized = {
-        team: data?.team || plan?.team || state.teams.find(t => t.slug === teamSlug)?.name || teamSlug,
-        slug: teamSlug,
-        capitan: Array.isArray(plan.capitan) ? plan.capitan : ['',''],
-        individuales: Array.isArray(plan.individuales) ? plan.individuales : ['','','','','','',''],
-        pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['',''],
-        pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['',''],
-        suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['','']
-      };
-      state.planCache.set(teamSlug, normalized);
-      return normalized;
+      const data = await fetchJson('/api/team-assets?team=' + encodeURIComponent(teamSlug));
+      const players = Array.isArray(data?.players) ? data.players : [];
+      state.rosterCache.set(teamSlug, players);
+      return players;
     }catch(err){
-      console.warn('loadPlanilla', teamSlug, err);
-      const fallback = emptyPlanilla(state.teams.find(t => t.slug === teamSlug)?.name || teamSlug);
-      fallback.slug = teamSlug;
-      state.planCache.set(teamSlug, fallback);
-      return fallback;
+      console.warn('loadRoster', teamSlug, err);
+      state.rosterCache.set(teamSlug, []);
+      return [];
     }
   }
 
-  function makePtsSelect(max=6){
+  function makePointsSelect(max=6){
     let opts = '';
     for(let i=0;i<=max;i++) opts += `<option value="${i}">${i}</option>`;
-    return `<div class="ptsbox"><select>${opts}</select></div>`;
+    return `<div class="ptsbox"><select class="pts-select">${opts}</select></div>`;
   }
 
-  function escapeHtml(str=''){
-    return String(str)
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;');
+  function makePlayerSelect(players, selected = ''){
+    const options = ['<option value="">— Seleccionar —</option>']
+      .concat(players.map(name => {
+        const safe = String(name).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+        const isSel = String(name) === String(selected) ? ' selected' : '';
+        return `<option value="${safe}"${isSel}>${safe}</option>`;
+      })).join('');
+    return `<select class="player-select">${options}</select>`;
   }
 
-  function renderTeam(rootId, role, plan, isRight=false){
+  function renderTeam(rootId, role, teamName, players, isRight=false){
     const root = document.getElementById(rootId);
     root.innerHTML = '';
-    if (!plan?.team) return;
 
     const card = document.getElementById('cardTpl').content.firstElementChild.cloneNode(true);
     card.querySelector('.team-role').textContent = role;
-    card.querySelector('.team-title').textContent = String(plan.team || '').toUpperCase();
+    card.querySelector('.team-title').textContent = String(teamName || '').toUpperCase();
 
     const totalWrap = card.querySelector('.total-wrap');
     const winsWrap = card.querySelector('.wins-wrap');
@@ -188,24 +167,22 @@
       sec.dataset.section = section.key;
       sec.innerHTML = `<h3>${section.title}</h3>`;
 
-      const values = plan[section.key] || [];
       for(let i=0;i<section.count;i++){
-        const val = values[i] || '';
         const row = document.createElement('div');
         row.className = 'row' + (isRight ? ' right' : '');
         row.dataset.section = section.key;
 
         const badge = `<div class="badge">${i+1}</div>`;
-        const slot = `<div class="slot ${val ? '' : 'empty'}" data-full="${escapeHtml(val)}">${escapeHtml(val || '—')}</div>`;
+        const field = `<div class="select-wrap">${makePlayerSelect(players)}</div>`;
         let pts = `<div class="ptsbox hidden-box"></div>`;
 
         if(section.score === true){
-          pts = makePtsSelect(6);
+          pts = makePointsSelect(6);
         }else if(section.score === 'single' && i === 0){
-          pts = makePtsSelect(6);
+          pts = makePointsSelect(6);
         }
 
-        row.innerHTML = isRight ? `${pts}${slot}${badge}` : `${badge}${slot}${pts}`;
+        row.innerHTML = isRight ? `${pts}${field}${badge}` : `${badge}${field}${pts}`;
         sec.appendChild(row);
       }
 
@@ -216,17 +193,16 @@
   }
 
   function scoreRowsFor(rootId){
-    return Array.from(document.querySelectorAll(`#${rootId} .ptsbox select`)).map(s => Number(s.value || 0));
+    return Array.from(document.querySelectorAll(`#${rootId} .pts-select`)).map(s => Number(s.value || 0));
   }
 
   function collectPlanilla(rootId){
     const out = { capitan:[], individuales:[], pareja1:[], pareja2:[], suplentes:[] };
     document.querySelectorAll(`#${rootId} .section`).forEach(sec => {
       const key = sec.dataset.section;
-      out[key] = Array.from(sec.querySelectorAll('.slot')).map(s => {
-        const txt = s.dataset.full || '';
-        return txt === '—' ? '' : txt;
-      }).filter(Boolean);
+      out[key] = Array.from(sec.querySelectorAll('.player-select'))
+        .map(s => s.value || '')
+        .filter(Boolean);
     });
 
     const scores = scoreRowsFor(rootId);
@@ -266,8 +242,8 @@
     if (rWin) rWin.textContent = rightPts;
   }
 
-  function bindScoreEvents(){
-    document.querySelectorAll('.ptsbox select').forEach(sel => {
+  function bindFieldEvents(){
+    document.querySelectorAll('.pts-select').forEach(sel => {
       sel.addEventListener('change', recalc);
     });
   }
@@ -294,14 +270,17 @@
       return;
     }
 
-    const [localPlan, visitantePlan] = await Promise.all([
-      loadPlanilla(localSlug),
-      loadPlanilla(visitanteSlug)
+    const [localRoster, visitanteRoster] = await Promise.all([
+      loadRoster(localSlug),
+      loadRoster(visitanteSlug)
     ]);
 
-    renderTeam('localRoot', 'LOCAL', localPlan, false);
-    renderTeam('visitanteRoot', 'VISITANTE', visitantePlan, true);
-    bindScoreEvents();
+    const localName = state.teams.find(t => t.slug === localSlug)?.name || localSlug;
+    const visitanteName = state.teams.find(t => t.slug === visitanteSlug)?.name || visitanteSlug;
+
+    renderTeam('localRoot', 'LOCAL', localName, localRoster, false);
+    renderTeam('visitanteRoot', 'VISITANTE', visitanteName, visitanteRoster, true);
+    bindFieldEvents();
     recalc();
   }
 
@@ -388,7 +367,7 @@
     });
     const data = await res.json().catch(() => ({}));
     if(!res.ok || data?.ok === false){
-      throw new Error(data?.error || data?.message || ('HTTP ' + res.status));
+      throw new Error(data?.error || data?.message || data?.msg || ('HTTP ' + res.status));
     }
     return data;
   }
@@ -466,7 +445,7 @@
     $('#btnGuardar').addEventListener('click', saveToDb);
 
     $('#categoria').addEventListener('change', async () => {
-      state.planCache.clear();
+      state.rosterCache.clear();
       await loadTeamsByCategory($('#categoria').value);
     });
 
