@@ -45,10 +45,14 @@
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
-  function safeArr(value, expected){
-    const arr = Array.isArray(value) ? value.map(v => String(v || '').trim()) : [];
-    while (arr.length < expected) arr.push('');
-    return arr.slice(0, expected);
+  function safeArr(value){
+    return Array.isArray(value)
+      ? value.map(v => String(v || '').trim()).filter(Boolean)
+      : [];
+  }
+
+  function hasMeaningfulContent(items){
+    return Array.isArray(items) && items.some(v => String(v || '').trim());
   }
 
   function createPtsBox(value){
@@ -112,14 +116,16 @@
         div.appendChild(makeRow(idx + 1, name, side, scoreRows[idx] ?? 0, section));
       });
     } else if (section === 'PAREJA 1') {
-      div.appendChild(makeRow(1, items[0] || '', side, scoreRows[7] ?? 0, section));
-      div.appendChild(makeRow(2, items[1] || '', side, null, section));
+      if (items[0]) div.appendChild(makeRow(1, items[0], side, scoreRows[7] ?? 0, section));
+      if (items[1]) div.appendChild(makeRow(2, items[1], side, null, section));
     } else if (section === 'PAREJA 2') {
-      div.appendChild(makeRow(1, items[0] || '', side, scoreRows[8] ?? 0, section));
-      div.appendChild(makeRow(2, items[1] || '', side, null, section));
+      if (items[0]) div.appendChild(makeRow(1, items[0], side, scoreRows[8] ?? 0, section));
+      if (items[1]) div.appendChild(makeRow(2, items[1], side, null, section));
     } else {
       items.forEach((name, idx) => {
-        div.appendChild(makeRow(idx + 1, name, side, null, section));
+        if (name && name.trim()) {
+          div.appendChild(makeRow(idx + 1, name, side, null, section));
+        }
       });
     }
 
@@ -136,16 +142,19 @@
 
     const scoreRows = Array.isArray(scoreData?.scoreRows) ? scoreData.scoreRows : [];
     const data = {
-      'CAPITÁN': safeArr(planilla?.capitan, 2),
-      'INDIVIDUALES': safeArr(planilla?.individuales, 7),
-      'PAREJA 1': safeArr(planilla?.pareja1, 2),
-      'PAREJA 2': safeArr(planilla?.pareja2, 2),
-      'SUPLENTES': safeArr(planilla?.suplentes, 3)
+      'CAPITÁN': safeArr(planilla?.capitan),
+      'INDIVIDUALES': safeArr(planilla?.individuales),
+      'PAREJA 1': safeArr(planilla?.pareja1),
+      'PAREJA 2': safeArr(planilla?.pareja2),
+      'SUPLENTES': safeArr(planilla?.suplentes)
     };
 
     const secs = card.querySelector('.sections');
     ['CAPITÁN', 'INDIVIDUALES', 'PAREJA 1', 'PAREJA 2', 'SUPLENTES'].forEach((section) => {
-      secs.appendChild(renderSection(section, data[section], side, scoreRows));
+      const items = data[section];
+      if (hasMeaningfulContent(items)) {
+        secs.appendChild(renderSection(section, items, side, scoreRows));
+      }
     });
 
     const totalInput = card.querySelector('.total-input');

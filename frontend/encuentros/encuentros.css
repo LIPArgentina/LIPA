@@ -51,17 +51,19 @@
 }
 
 .results-list{
-  display:flex;
-  flex-direction:column;
-  gap:28px;
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:22px;
+  align-items:start;
 }
 
 .encounter-shell{
   background:#101113;
   border:1px solid #ffffff16;
   border-radius:24px;
-  padding:18px 14px 18px;
+  padding:14px 12px 14px;
   box-shadow:0 10px 30px #00000055;
+  min-width:0;
 }
 
 .encounter-head{
@@ -162,6 +164,19 @@
 
 .error{
   margin-bottom:18px;
+}
+
+
+@media (max-width: 1500px){
+  .results-list{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px){
+  .results-list{
+    grid-template-columns:1fr;
+  }
 }
 
 @media (max-width: 1100px){
