@@ -82,6 +82,14 @@ function ensureFechaBlock(section, fechaIndex, fechaText){
   const clone = document.importNode(tpl.content, true);
   clone.querySelector('.h2').textContent = `${fechaIndex}ª FECHA`;
   clone.querySelector('.fecha-text').textContent = formatDateDMY(fechaText);
+
+  const encuentrosBtn = clone.querySelector('.encuentros-btn');
+  if (encuentrosBtn) {
+    const dateValue = String(fechaText || '').trim();
+    const href = `../encuentros/encuentros.html?category=segunda&kind=${encodeURIComponent(selectedKind)}&date=${encodeURIComponent(dateValue)}&fecha=${encodeURIComponent(String(fechaIndex))}`;
+    encuentrosBtn.href = href;
+  }
+
   clone.querySelector('.rows').setAttribute('data-fecha', String(fechaIndex));
   section.appendChild(clone);
   return section.querySelector(`.rows[data-fecha="${fechaIndex}"]`);
