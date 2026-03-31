@@ -51,10 +51,6 @@
       : [];
   }
 
-  function hasMeaningfulContent(items){
-    return Array.isArray(items) && items.some(v => String(v || '').trim());
-  }
-
   function createPtsBox(value){
     const wrap = document.createElement('div');
     wrap.className = 'pts-edit readonly';
@@ -116,16 +112,14 @@
         div.appendChild(makeRow(idx + 1, name, side, scoreRows[idx] ?? 0, section));
       });
     } else if (section === 'PAREJA 1') {
-      if (items[0]) div.appendChild(makeRow(1, items[0], side, scoreRows[7] ?? 0, section));
-      if (items[1]) div.appendChild(makeRow(2, items[1], side, null, section));
+      div.appendChild(makeRow(1, items[0] || '', side, scoreRows[7] ?? 0, section));
+      div.appendChild(makeRow(2, items[1] || '', side, null, section));
     } else if (section === 'PAREJA 2') {
-      if (items[0]) div.appendChild(makeRow(1, items[0], side, scoreRows[8] ?? 0, section));
-      if (items[1]) div.appendChild(makeRow(2, items[1], side, null, section));
+      div.appendChild(makeRow(1, items[0] || '', side, scoreRows[8] ?? 0, section));
+      div.appendChild(makeRow(2, items[1] || '', side, null, section));
     } else {
       items.forEach((name, idx) => {
-        if (name && name.trim()) {
-          div.appendChild(makeRow(idx + 1, name, side, null, section));
-        }
+        div.appendChild(makeRow(idx + 1, name, side, null, section));
       });
     }
 
@@ -151,10 +145,9 @@
 
     const secs = card.querySelector('.sections');
     ['CAPITÁN', 'INDIVIDUALES', 'PAREJA 1', 'PAREJA 2', 'SUPLENTES'].forEach((section) => {
-      const items = data[section];
-      if (hasMeaningfulContent(items)) {
-        secs.appendChild(renderSection(section, items, side, scoreRows));
-      }
+      const items = data[section] || [];
+      if (!items.length) return;
+      secs.appendChild(renderSection(section, items, side, scoreRows));
     });
 
     const totalInput = card.querySelector('.total-input');
