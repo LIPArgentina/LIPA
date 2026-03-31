@@ -102,80 +102,16 @@ function pickFixtureFecha(fechas = []) {
   const normalized = fechas
     .map((fecha) => ({
       raw: fecha,
-      originalDate: fecha?.date,
       dateKey: normalizeDateOnly(fecha?.date)
     }))
-    .filter((item) => {
-      const valid = /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey);
-      if (!valid) {
-        console.log('[cruces][pickFixtureFecha] fecha descartada', {
-          originalDate: item.originalDate,
-          dateKey: item.dateKey
-        });
-      }
-      return valid;
-    })
+    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey))
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
-  const now = new Date();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const todayKey = today.toISOString().slice(0, 10);
+  if (!normalized.length) return null;
 
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowKey = tomorrow.toISOString().slice(0, 10);
-
-  console.log('[cruces][pickFixtureFecha] entrada', {
-    totalFechas: Array.isArray(fechas) ? fechas.length : 0,
-    todayKey,
-    tomorrowKey,
-    normalized: normalized.map((item) => ({
-      originalDate: item.originalDate,
-      dateKey: item.dateKey
-    }))
-  });
-
-  if (!normalized.length) {
-    console.log('[cruces][pickFixtureFecha] sin fechas validas');
-    return null;
-  }
-
-  const exactToday = normalized.find((f) => f.dateKey === todayKey);
-  if (exactToday) {
-    console.log('[cruces][pickFixtureFecha] eligio hoy', {
-      originalDate: exactToday.originalDate,
-      dateKey: exactToday.dateKey
-    });
-    return exactToday.raw;
-  }
-
-  const exactTomorrow = normalized.find((f) => f.dateKey === tomorrowKey);
-  if (exactTomorrow) {
-    console.log('[cruces][pickFixtureFecha] eligio manana', {
-      originalDate: exactTomorrow.originalDate,
-      dateKey: exactTomorrow.dateKey
-    });
-    return exactTomorrow.raw;
-  }
-
-  const nextFuture = normalized.find((f) => f.dateKey > tomorrowKey);
-  if (nextFuture) {
-    console.log('[cruces][pickFixtureFecha] eligio proxima futura', {
-      originalDate: nextFuture.originalDate,
-      dateKey: nextFuture.dateKey
-    });
-    return nextFuture.raw;
-  }
-
-  const fallback = normalized[normalized.length - 1].raw;
-  console.log('[cruces][pickFixtureFecha] eligio fallback ultima fecha', {
-    originalDate: normalized[normalized.length - 1].originalDate,
-    dateKey: normalized[normalized.length - 1].dateKey
-  });
-  return fallback;
+  const todayKey = new Date().toISOString().slice(0, 10);
+  return normalized.find((f) => f.dateKey >= todayKey)?.raw || normalized[normalized.length - 1].raw;
 }
-
 
 function extractCrucesFromFecha(fechaNode) {
   const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
@@ -220,15 +156,6 @@ async function fetchCrucesFromDB(team) {
 
   const fechas = rows[0]?.data?.fechas || [];
   const fecha = pickFixtureFecha(fechas);
-
-  console.log('[cruces][fetchCrucesFromDB]', {
-    team,
-    category,
-    totalFechas: fechas.length,
-    fechasOriginales: fechas.map((f) => f?.date),
-    fechaElegida: fecha?.date || null,
-    fechaElegidaNormalizada: normalizeDateOnly(fecha?.date)
-  });
 
   if (!fecha) return { cruces: [], fechaFixture: null };
 
@@ -645,6 +572,152 @@ router.get('/lock-status', async (req, res) => {
   } catch (err) {
     console.error('GET /lock-status', err);
     return res.status(500).json({ ok: false, error: 'No se pudo obtener el lock del cruce' });
+  }
+});
+
+
+async function resolveEquipoInfoBySlug(slug, categoryHint = '') {
+  const slugNorm = normalizeSlug(slug);
+  if (!slugNorm) return null;
+
+  const { rows } = await pool.query(
+    `
+    SELECT slug_uid, slug_base, display_name, division
+    FROM equipos
+    WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1
+    ORDER BY
+      CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END,
+      CASE WHEN LOWER(division) = $2 THEN 0 ELSE 1 END,
+      id ASC
+    LIMIT 1
+    `,
+    [slugNorm, String(categoryHint || '').trim().toLowerCase()]
+  );
+
+  return rows[0] || null;
+}
+
+router.get('/results', async (req, res) => {
+  setNoCache(res);
+  try {
+    const fechaISO = normalizeDateOnly(req.query.fechaISO || req.query.date || '');
+    const category = String(req.query.category || '').trim().toLowerCase();
+
+    if (!fechaISO) {
+      return res.status(400).json({ ok: false, error: 'Falta parámetro fechaISO.' });
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT fecha_key, team, status_json, validated, updated_at
+      FROM cruces_validations
+      WHERE split_part(fecha_key, '::', 1) = $1
+      ORDER BY updated_at DESC
+      `,
+      [fechaISO]
+    );
+
+    const grouped = new Map();
+    for (const row of rows) {
+      const key = String(row.fecha_key || '');
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(row);
+    }
+
+    const teamCache = new Map();
+    const resolveCached = async (slug) => {
+      const key = `${String(category || '').toLowerCase()}::${normalizeSlug(slug)}`;
+      if (teamCache.has(key)) return teamCache.get(key);
+      const info = await resolveEquipoInfoBySlug(slug, category);
+      teamCache.set(key, info);
+      return info;
+    };
+
+    const results = [];
+
+    for (const [fechaKey, entries] of grouped.entries()) {
+      const parts = String(fechaKey).split('::');
+      const matchDate = parts[0] || fechaISO;
+      const localSlug = normalizeSlug(parts[1] || '');
+      const visitanteSlug = normalizeSlug(parts[2] || '');
+
+      if (!localSlug || !visitanteSlug) continue;
+
+      const localEntry = entries.find((row) => normalizeSlug(row.team) === localSlug) || null;
+      const visitanteEntry = entries.find((row) => normalizeSlug(row.team) === visitanteSlug) || null;
+
+      if (!localEntry || !visitanteEntry) continue;
+      if (!localEntry.validated || !visitanteEntry.validated) continue;
+
+      const diff = compareFullStatus(localEntry.status_json || {}, visitanteEntry.status_json || {});
+      if (diff.length) continue;
+
+      const [localInfo, visitanteInfo] = await Promise.all([
+        resolveCached(localSlug),
+        resolveCached(visitanteSlug)
+      ]);
+
+      if (category) {
+        const localDivision = String(localInfo?.division || '').trim().toLowerCase();
+        const visitanteDivision = String(visitanteInfo?.division || '').trim().toLowerCase();
+        const hasKnownDivision = !!(localDivision || visitanteDivision);
+
+        if (hasKnownDivision && (localDivision !== category || visitanteDivision !== category)) {
+          continue;
+        }
+      }
+
+      const localUpdatedAt = localEntry?.updated_at ? new Date(localEntry.updated_at).getTime() : 0;
+      const visitanteUpdatedAt = visitanteEntry?.updated_at ? new Date(visitanteEntry.updated_at).getTime() : 0;
+      const snapshot = localUpdatedAt >= visitanteUpdatedAt
+        ? (localEntry.status_json || visitanteEntry.status_json || {})
+        : (visitanteEntry.status_json || localEntry.status_json || {});
+
+      const localStatus = snapshot?.local || {};
+      const visitanteStatus = snapshot?.visitante || {};
+
+      results.push({
+        fechaISO: matchDate,
+        category: category || localInfo?.division || visitanteInfo?.division || null,
+        localSlug,
+        visitanteSlug,
+        localName: localInfo?.display_name || localSlug,
+        visitanteName: visitanteInfo?.display_name || visitanteSlug,
+        localPlanilla: snapshot?.localPlanilla || null,
+        visitantePlanilla: snapshot?.visitantePlanilla || null,
+        local: {
+          scoreRows: Array.isArray(localStatus?.scoreRows) ? localStatus.scoreRows : [],
+          triangulosTotales: Number(localStatus?.triangulosTotales ?? localStatus?.triangulos ?? 0),
+          puntosTotales: Number(localStatus?.puntosTotales ?? 0)
+        },
+        visitante: {
+          scoreRows: Array.isArray(visitanteStatus?.scoreRows) ? visitanteStatus.scoreRows : [],
+          triangulosTotales: Number(visitanteStatus?.triangulosTotales ?? visitanteStatus?.triangulos ?? 0),
+          puntosTotales: Number(visitanteStatus?.puntosTotales ?? 0)
+        },
+        updatedAt: localEntry?.updated_at || visitanteEntry?.updated_at || null,
+        validated: true
+      });
+    }
+
+    results.sort((a, b) => {
+      const byDate = String(a.fechaISO || '').localeCompare(String(b.fechaISO || ''));
+      if (byDate !== 0) return byDate;
+      const byLocal = String(a.localName || '').localeCompare(String(b.localName || ''));
+      if (byLocal !== 0) return byLocal;
+      return String(a.visitanteName || '').localeCompare(String(b.visitanteName || ''));
+    });
+
+    return res.json({
+      ok: true,
+      fechaISO,
+      category: category || null,
+      total: results.length,
+      results
+    });
+  } catch (err) {
+    console.error('GET /results', err);
+    return res.status(500).json({ ok: false, error: 'No se pudieron obtener los resultados validados.' });
   }
 });
 

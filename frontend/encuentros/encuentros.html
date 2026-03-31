@@ -1,44 +1,83 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Encuentros | Liga de Pool Independiente</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
-  <link href="encuentros.css" rel="stylesheet"/>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <a class="logo-link" href="../index.html" aria-label="Ir al inicio">
-        <img class="liga-logo" src="../logo_liga.png" alt="Logo de la liga" width="60" height="60"/>
-      </a>
-      <div class="title">ENCUENTROS</div>
-      <nav class="actions"><a class="btn" href="#" id="btnVolver">VOLVER</a></nav>
-    </header>
-
-    <section class="hero-card">
-      <div class="hero-top">
-        <div>
-          <div class="hero-sub" id="categoryLabel">Categoría</div>
-          <h1 id="heroTitle">Encuentros de la fecha</h1>
-        </div>
-        <div class="date-pill" id="datePill">--/--/----</div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ENCUENTROS · Resultados</title>
+    <link rel="stylesheet" href="../cruces/cruces_fecha.css" />
+    <link rel="stylesheet" href="./encuentros.css" />
+  </head>
+  <body>
+    <div class="header-bg">
+      <div class="container">
+        <header class="lpi-top" role="banner">
+          <a href="../index.html" aria-label="Ir al inicio" class="logo-link" id="homeLink">
+            <img class="liga-logo" id="logoImg" src="../logo_liga.png" alt="Logo de la liga" width="60" height="60" />
+          </a>
+          <h1 class="title" id="headerTitle">ENCUENTROS</h1>
+          <nav class="actions" aria-label="Acciones de navegación">
+            <a class="btn" id="btnVolver" href="#" aria-label="Volver">VOLVER</a>
+          </nav>
+        </header>
       </div>
-      <div class="meta" id="metaText"></div>
-    </section>
+    </div>
 
-    <main id="groupsContainer" class="groups"></main>
-  </div>
+    <main class="container encuentros-page" id="app-root">
+      <section class="hero-card">
+        <div class="hero-top">
+          <div>
+            <div class="hero-sub" id="categoryLabel">Categoría</div>
+            <h2 class="hero-title" id="heroTitle">Resultados validados</h2>
+          </div>
+          <div class="date-pill" id="datePill">--/--/----</div>
+        </div>
+        <div class="meta" id="metaText">Cargando resultados...</div>
+      </section>
 
-  <template id="tpl-group">
-    <section class="group-card">
-      <h2 class="group-title"></h2>
-      <div class="rule"></div>
-      <div class="rows"></div>
-    </section>
-  </template>
+      <div id="appError" class="error" style="display:none;"></div>
+      <div id="resultsContainer" class="results-list"></div>
+    </main>
 
-  <script type="module" src="encuentros.js"></script>
-</body>
+    <template id="encounter-template">
+      <article class="encounter-shell">
+        <div class="encounter-head">
+          <div class="encounter-title"></div>
+        </div>
+        <div class="cruces-grid encounter-grid">
+          <section class="encounter-left"></section>
+          <section class="encounter-right"></section>
+        </div>
+      </article>
+    </template>
+
+    <template id="card-template">
+      <div class="wrap">
+        <div class="card">
+          <h2 class="title"></h2>
+          <div class="meta"></div>
+          <div class="hint" aria-live="polite"></div>
+          <div class="sections"></div>
+
+          <div class="totals-wrap">
+            <div class="totals-chip">
+              <span class="label">TRIÁNGULOS TOTALES</span>
+              <div class="total-box">
+                <input class="total-input" value="0" readonly />
+              </div>
+            </div>
+          </div>
+
+          <div class="wins-wrap">
+            <div class="wins-chip">
+              <span class="label">PUNTOS</span>
+              <div class="wins-box" data-wins>0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <script src="../config.js"></script>
+    <script src="./encuentros.js" defer></script>
+  </body>
 </html>
