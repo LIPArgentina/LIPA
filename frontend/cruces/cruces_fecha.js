@@ -741,36 +741,77 @@ function apiUrl(path){
   }
 
   // ---------------- SCORES: TRIÁNGULOS ARRIBA, PUNTOS ABAJO ----------------
-  function updateScoresFor(rootId) {
+  function getScoreRows(rootId) {
     const root = document.getElementById(rootId);
-    if (!root) return;
+    if (!root) return [];
 
-    let totalEquipo = 0;
-    let totalPts = 0;
-
-    root.querySelectorAll('.row').forEach(row => {
+    return Array.from(root.querySelectorAll('.row')).map(row => {
       const sel = row.querySelector('.pts-select');
-      if (!sel) return;
+      if (!sel) return null;
 
       const val = parseInt(sel.value, 10);
-      if (isNaN(val)) return;
+      return {
+        row,
+        value: Number.isFinite(val) ? val : 0,
+        section: String(row.dataset.section || '').toUpperCase()
+      };
+    }).filter(Boolean);
+  }
 
-      totalPts += val;
+  function isWinningScore(section, ownValue, rivalValue) {
+    if (!Number.isFinite(ownValue) || !Number.isFinite(rivalValue)) return false;
 
-      const section = String(row.dataset.section || '').toUpperCase();
+    if (section === 'INDIVIDUALES') {
+      return ownValue === 6 && rivalValue <= 5;
+    }
 
-      if (section === 'INDIVIDUALES') {
-        if (val === 5 || val === 6) totalEquipo++;
-      } else if (section === 'PAREJA 1' || section === 'PAREJA 2') {
-        if (val === 4 || val === 5 || val === 6) totalEquipo++;
-      }
-    });
+    if (section === 'PAREJA 1' || section === 'PAREJA 2') {
+      return ownValue >= 4 && ownValue > rivalValue;
+    }
 
-    const totalInput = root.querySelector('.total-input');
-    if (totalInput) totalInput.value = totalPts;
+    return false;
+  }
 
-    const winsBox = root.querySelector('.wins-box');
-    if (winsBox) winsBox.textContent = totalEquipo;
+  function updateScoresFor() {
+    const leftRows = getScoreRows('planilla-root-left');
+    const rightRows = getScoreRows('planilla-root-right');
+
+    let leftTriangles = 0;
+    let rightTriangles = 0;
+    let leftPoints = 0;
+    let rightPoints = 0;
+
+    const totalRows = Math.max(leftRows.length, rightRows.length);
+
+    for (let i = 0; i < totalRows; i++) {
+      const left = leftRows[i];
+      const right = rightRows[i];
+
+      if (left) leftTriangles += left.value;
+      if (right) rightTriangles += right.value;
+
+      const section = String(left?.section || right?.section || '').toUpperCase();
+      const leftValue = left?.value ?? 0;
+      const rightValue = right?.value ?? 0;
+
+      if (isWinningScore(section, leftValue, rightValue)) leftPoints++;
+      if (isWinningScore(section, rightValue, leftValue)) rightPoints++;
+    }
+
+    const leftRoot = document.getElementById('planilla-root-left');
+    const rightRoot = document.getElementById('planilla-root-right');
+
+    const leftTotalInput = leftRoot?.querySelector('.total-input');
+    if (leftTotalInput) leftTotalInput.value = leftTriangles;
+
+    const rightTotalInput = rightRoot?.querySelector('.total-input');
+    if (rightTotalInput) rightTotalInput.value = rightTriangles;
+
+    const leftWinsBox = leftRoot?.querySelector('.wins-box');
+    if (leftWinsBox) leftWinsBox.textContent = leftPoints;
+
+    const rightWinsBox = rightRoot?.querySelector('.wins-box');
+    if (rightWinsBox) rightWinsBox.textContent = rightPoints;
   }
 
 
@@ -1313,8 +1354,7 @@ async function tryApplyStatusIfExists(){
     const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
     writeAllSelects('planilla-root-left', L);
     writeAllSelects('planilla-root-right', R);
-    updateScoresFor('planilla-root-left');
-    updateScoresFor('planilla-root-right');
+    updateScoresFor();
 
     if (data.validated === true) {
       lockValidatedMatchUI();
@@ -1693,12 +1733,11 @@ btn.onclick = async () => {
       ['planilla-root-left', 'planilla-root-right'].forEach(id => {
         const root = document.getElementById(id);
         root?.addEventListener('change', e => {
-          if (e.target?.classList?.contains('pts-select')) updateScoresFor(id);
+          if (e.target?.classList?.contains('pts-select')) updateScoresFor();
         });
       });
 
-      updateScoresFor('planilla-root-left');
-      updateScoresFor('planilla-root-right');
+      updateScoresFor();
 
       setupSuplentesSwap('planilla-root-left');
       setupSuplentesSwap('planilla-root-right');
