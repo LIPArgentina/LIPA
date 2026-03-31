@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Carga manual de cruces</title>
+  <link rel="stylesheet" href="./cruces_manuales.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" title="Inicio" class="logo-link">
+      <img src="../logo_liga.png" alt="LPI" />
+    </a>
+
+    <div class="header-center">
+      <h1>CARGA MANUAL DE CRUCES</h1>
+    </div>
+
+    <div class="header-actions">
+      <a id="btnVolverAdmin" class="btn" href="../admin.html" aria-label="Volver a administración">VOLVER</a>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="topbar">
+      <div class="controls">
+        <label>Fecha
+          <input id="fechaISO" type="date" />
+        </label>
+        <label>Categoría
+          <select id="categoria">
+            <option value="segunda">Segunda</option>
+            <option value="tercera">Tercera</option>
+            <option value="primera">Primera</option>
+          </select>
+        </label>
+        <label>Equipo local
+          <select id="localTeam"></select>
+        </label>
+        <label>Equipo visitante
+          <select id="visitanteTeam"></select>
+        </label>
+        <label>Ganador final
+          <select id="winnerMode">
+            <option value="auto">Automático por puntos</option>
+            <option value="local">Forzar local</option>
+            <option value="visitante">Forzar visitante</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="btnCargar" type="button">Cargar equipos</button>
+        <button id="btnGenerarSql" type="button">Generar SQL</button>
+        <button id="btnCopiar" class="secondary" type="button">Copiar SQL</button>
+      </div>
+
+      <div id="status" class="hint">
+        La carga de equipos intenta leer desde <code>/api/admin/planillas</code>. Si no responde, entra en modo ejemplo.
+      </div>
+    </section>
+
+    <section class="layout">
+      <div id="localRoot"></div>
+      <div id="visitanteRoot"></div>
+    </section>
+
+    <section class="sql-wrap">
+      <h2>Salida SQL</h2>
+      <p class="hint">Genera el bloque para <code>cruces_match_status</code>, <code>cruces_validations</code> y <code>cruces_matches</code>.</p>
+      <textarea id="sqlOutput" spellcheck="false"></textarea>
+    </section>
+  </main>
+
+  <template id="cardTpl">
+    <div class="card">
+      <div class="team-role"></div>
+      <h2 class="team-title"></h2>
+      <div class="sections"></div>
+      <div class="totals total-wrap">
+        <div class="chip total-chip">
+          <span class="label">TRIÁNGULOS TOTALES</span>
+          <div class="totalbox totalValue">0</div>
+        </div>
+      </div>
+      <div class="totals wins-wrap">
+        <div class="chip wins-chip">
+          <span class="label">PUNTOS</span>
+          <div class="winsbox winsValue">0</div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script src="../config.js"></script>
+  <script src="./cruces_manuales.js"></script>
+</body>
+</html>

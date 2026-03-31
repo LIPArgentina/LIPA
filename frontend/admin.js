@@ -9,9 +9,11 @@
       return u.pathname + u.search;
     };
     const btnFixture = document.getElementById('btnFixture');
+    const btnCrucesManual = document.getElementById('btnCrucesManual');
     const btnFecha   = document.getElementById('btnFecha');
     const btnPictures = document.getElementById('btnPictures');
     if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
+    if(btnCrucesManual) btnCrucesManual.href = withMode(btnCrucesManual.getAttribute('href') || 'cruces/cruces_manuales.html');
     if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
     if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
   }catch(e){ console.warn('Nav admin patch:', e); }
@@ -29,9 +31,11 @@
       return u.pathname + u.search;
     };
     const btnFixture = document.getElementById('btnFixture');
+    const btnCrucesManual = document.getElementById('btnCrucesManual');
     const btnFecha   = document.getElementById('btnFecha');
     const btnPictures = document.getElementById('btnPictures');
     if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
+    if(btnCrucesManual) btnCrucesManual.href = withMode(btnCrucesManual.getAttribute('href') || 'cruces/cruces_manuales.html');
     if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
     if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
   }catch(e){ console.warn('Nav admin patch:', e); }

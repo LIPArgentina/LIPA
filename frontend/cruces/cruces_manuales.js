@@ -1,0 +1,485 @@
+(() => {
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  const PLANILLAS_ENDPOINT = '/api/admin/planillas';
+
+  const state = {
+    teamsRaw: [],
+    localPlan: null,
+    visitantePlan: null
+  };
+
+  const sections = [
+    { key:'capitan', title:'CAPITÁN', count:2, score:false },
+    { key:'individuales', title:'INDIVIDUALES', count:7, score:true },
+    { key:'pareja1', title:'PAREJA 1', count:2, score:'single' },
+    { key:'pareja2', title:'PAREJA 2', count:2, score:'single' },
+    { key:'suplentes', title:'SUPLENTES', count:2, score:false }
+  ];
+
+  const $ = (sel) => document.querySelector(sel);
+
+  const normalize = (s='') => String(s)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'').trim();
+
+  function withAdminMode(url){
+    try{
+      const params = new URLSearchParams(location.search);
+      const isAdmin = params.get('admin') === '1' || params.get('mode') === 'admin';
+      const u = new URL(url, location.href);
+      if (isAdmin) u.searchParams.set('admin', '1');
+      return u.pathname + u.search + u.hash;
+    }catch{
+      return url;
+    }
+  }
+
+  function apiUrl(path){
+    return (API_BASE || '') + path;
+  }
+
+  function emptyPlanilla(team=''){
+    return {
+      team,
+      capitan:['',''],
+      individuales:['','','','','','',''],
+      pareja1:['',''],
+      pareja2:['',''],
+      suplentes:['','']
+    };
+  }
+
+  function teamDivisionValue(item){
+    return String(item?.division || item?.categoria || item?.teamCategory || '').toLowerCase();
+  }
+
+  function teamDisplay(item){
+    return item?.team || item?.teamName || item?.equipo || item?.nombre || item?.slug || 'Equipo';
+  }
+
+  function teamSlug(item){
+    return item?.slug || normalize(teamDisplay(item));
+  }
+
+  async function loadTeams(){
+    const status = $('#status');
+    status.textContent = 'Cargando equipos desde DB...';
+    try{
+      const res = await fetch(apiUrl(PLANILLAS_ENDPOINT), { cache:'no-store', credentials:'include' });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const arr = await res.json();
+      if(!Array.isArray(arr)) throw new Error('La respuesta no es un array');
+      state.teamsRaw = arr;
+      fillTeamSelects();
+      status.innerHTML = '<span class="ok">Equipos cargados desde DB.</span>';
+    }catch(err){
+      console.error(err);
+      state.teamsRaw = sampleTeams();
+      fillTeamSelects();
+      status.innerHTML = '<span class="error">No se pudo leer la DB real. Quedó cargado un modo de ejemplo para que puedas probar el modelo.</span>';
+    }
+  }
+
+  function sampleTeams(){
+    return [
+      { slug:'takospro', team:'TAKOS PRO', division:'segunda', planilla:{
+        capitan:['Favio Godoy', 'Nestor Gomez'],
+        individuales:['Javier Jerez','Emanuel Dengler','Mauro Moyano','Jose Alarcon','Pablo Sconza','Carlos Dominguez','Matias De Trueba'],
+        pareja1:['Antonio Haberkorn','Dylan Sierra'],
+        pareja2:['Javier Nicola','Favio Godoy'],
+        suplentes:['Cesar Corvillon','Braian Fursa']
+      }},
+      { slug:'oldies', team:'OLDIES', division:'segunda', planilla:{
+        capitan:['Enrique Rosales', 'Fabian Rodriguez'],
+        individuales:['Alan Nuñez','Fabian Rodriguez','Cristian Chavez','Enrique Rosales','Emanuel Garcia','Jorge Chavez','Jose Ortega'],
+        pareja1:['Adrian Bravo','Hector Gonzalez'],
+        pareja2:['Diego Paradiso','Alan Nuñez'],
+        suplentes:['Leonardo Longobardi','Fabian Rodriguez']
+      }}
+    ];
+  }
+
+  function filteredTeams(){
+    const cat = $('#categoria').value;
+    return state.teamsRaw.filter(t => {
+      const div = teamDivisionValue(t);
+      return !cat || !div || div.includes(cat);
+    });
+  }
+
+  function fillTeamSelects(){
+    const teams = filteredTeams();
+    const localSel = $('#localTeam');
+    const visSel = $('#visitanteTeam');
+
+    const currentLocal = localSel.value;
+    const currentVis = visSel.value;
+
+    [localSel, visSel].forEach(sel => sel.innerHTML = '<option value="">Seleccionar...</option>');
+    teams.forEach(t => {
+      const label = teamDisplay(t);
+      const slug = teamSlug(t);
+      localSel.insertAdjacentHTML('beforeend', `<option value="${slug}">${label}</option>`);
+      visSel.insertAdjacentHTML('beforeend', `<option value="${slug}">${label}</option>`);
+    });
+
+    if ([...localSel.options].some(o => o.value === currentLocal)) localSel.value = currentLocal;
+    if ([...visSel.options].some(o => o.value === currentVis)) visSel.value = currentVis;
+
+    if (!localSel.value && teams[0]) localSel.value = teamSlug(teams[0]);
+    if (!visSel.value && teams[1]) visSel.value = teamSlug(teams[1]);
+  }
+
+  function findPlan(slug){
+    const item = state.teamsRaw.find(t => teamSlug(t) === slug);
+    if(!item) return emptyPlanilla(slug);
+    const plan = item.planilla || item.plan || item;
+    return {
+      team: teamDisplay(item),
+      slug: teamSlug(item),
+      capitan: Array.isArray(plan.capitan) ? plan.capitan : ['',''],
+      individuales: Array.isArray(plan.individuales) ? plan.individuales : ['','','','','','',''],
+      pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['',''],
+      pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['',''],
+      suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['','']
+    };
+  }
+
+  function makePtsSelect(max=6){
+    let opts = '';
+    for(let i=0;i<=max;i++) opts += `<option value="${i}">${i}</option>`;
+    return `<div class="ptsbox"><select>${opts}</select></div>`;
+  }
+
+  function renderTeam(rootId, role, plan, isRight=false){
+    const root = document.getElementById(rootId);
+    root.innerHTML = '';
+    const card = document.getElementById('cardTpl').content.firstElementChild.cloneNode(true);
+    card.querySelector('.team-role').textContent = role;
+    card.querySelector('.team-title').textContent = (plan.team || '').toUpperCase();
+
+    const totalWrap = card.querySelector('.total-wrap');
+    const winsWrap = card.querySelector('.wins-wrap');
+    if(isRight){
+      totalWrap.classList.add('right');
+      winsWrap.classList.add('right');
+      card.querySelector('.total-chip').classList.add('reverse');
+      card.querySelector('.wins-chip').classList.add('reverse');
+    }
+
+    const sectionsNode = card.querySelector('.sections');
+    sections.forEach(section => {
+      const sec = document.createElement('div');
+      sec.className = 'section';
+      sec.dataset.section = section.key;
+      sec.innerHTML = `<h3>${section.title}</h3>`;
+
+      const values = plan[section.key] || [];
+      for(let i=0;i<section.count;i++){
+        const val = values[i] || '';
+        const row = document.createElement('div');
+        row.className = 'row' + (isRight ? ' right' : '');
+        row.dataset.section = section.key;
+
+        const badge = `<div class="badge">${i+1}</div>`;
+        const slot = `<div class="slot ${val ? '' : 'empty'}" data-full="${escapeHtml(val)}">${escapeHtml(val || '—')}</div>`;
+        let pts = `<div class="ptsbox" style="visibility:hidden"></div>`;
+
+        if(section.score === true){
+          pts = makePtsSelect(6);
+        }else if(section.score === 'single' && i === 0){
+          pts = makePtsSelect(6);
+        }
+
+        row.innerHTML = isRight ? `${pts}${slot}${badge}` : `${badge}${slot}${pts}`;
+        sec.appendChild(row);
+      }
+
+      sectionsNode.appendChild(sec);
+    });
+
+    root.appendChild(card);
+  }
+
+  function escapeHtml(str=''){
+    return String(str)
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;');
+  }
+
+  function scoreRowsFor(rootId){
+    return Array.from(document.querySelectorAll(`#${rootId} .ptsbox select`)).map(s => Number(s.value || 0));
+  }
+
+  function collectPlanilla(rootId){
+    const out = { capitan:[], individuales:[], pareja1:[], pareja2:[], suplentes:[] };
+    document.querySelectorAll(`#${rootId} .section`).forEach(sec => {
+      const key = sec.dataset.section;
+      out[key] = Array.from(sec.querySelectorAll('.slot')).map(s => {
+        const txt = s.dataset.full || '';
+        return txt === '—' ? '' : txt;
+      }).filter(Boolean);
+    });
+
+    out.individualesPts = scoreRowsFor(rootId).slice(0,7);
+    out.pareja1Pts = [scoreRowsFor(rootId)[7] || 0];
+    out.pareja2Pts = [scoreRowsFor(rootId)[8] || 0];
+    return out;
+  }
+
+  function matchWins(a, b){
+    if(a === b) return [0,0];
+    return a > b ? [1,0] : [0,1];
+  }
+
+  function recalc(){
+    const left = scoreRowsFor('localRoot');
+    const right = scoreRowsFor('visitanteRoot');
+
+    const leftTriangles = left.reduce((a,b)=>a+b,0);
+    const rightTriangles = right.reduce((a,b)=>a+b,0);
+    let leftPts = 0;
+    let rightPts = 0;
+
+    for(let i=0;i<9;i++){
+      const [l,r] = matchWins(left[i] || 0, right[i] || 0);
+      leftPts += l;
+      rightPts += r;
+    }
+
+    document.querySelector('#localRoot .totalValue').textContent = leftTriangles;
+    document.querySelector('#visitanteRoot .totalValue').textContent = rightTriangles;
+    document.querySelector('#localRoot .winsValue').textContent = leftPts;
+    document.querySelector('#visitanteRoot .winsValue').textContent = rightPts;
+  }
+
+  function bindScoreEvents(){
+    document.querySelectorAll('.ptsbox select').forEach(sel => {
+      sel.addEventListener('change', recalc);
+    });
+  }
+
+  function renderBoth(){
+    const localSlug = $('#localTeam').value;
+    const visitanteSlug = $('#visitanteTeam').value;
+    state.localPlan = findPlan(localSlug);
+    state.visitantePlan = findPlan(visitanteSlug);
+
+    renderTeam('localRoot', 'LOCAL', state.localPlan, false);
+    renderTeam('visitanteRoot', 'VISITANTE', state.visitantePlan, true);
+    bindScoreEvents();
+    recalc();
+  }
+
+  function collectStatus(){
+    const fechaISO = $('#fechaISO').value;
+    const localSlug = $('#localTeam').value;
+    const visitanteSlug = $('#visitanteTeam').value;
+
+    const localRows = scoreRowsFor('localRoot');
+    const visRows = scoreRowsFor('visitanteRoot');
+
+    const localTri = Number(document.querySelector('#localRoot .totalValue').textContent || 0);
+    const visTri = Number(document.querySelector('#visitanteRoot .totalValue').textContent || 0);
+    const localPts = Number(document.querySelector('#localRoot .winsValue').textContent || 0);
+    const visPts = Number(document.querySelector('#visitanteRoot .winsValue').textContent || 0);
+
+    return {
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      validated: true,
+      local: {
+        parejas: {
+          pareja1: { j1: localRows[7] || 0, j2: 0 },
+          pareja2: { j1: localRows[8] || 0, j2: 0 }
+        },
+        jugadores: localRows.slice(0,7),
+        scoreRows: localRows,
+        puntosTotales: localPts,
+        triangulosTotales: localTri
+      },
+      visitante: {
+        parejas: {
+          pareja1: { j1: visRows[7] || 0, j2: 0 },
+          pareja2: { j1: visRows[8] || 0, j2: 0 }
+        },
+        jugadores: visRows.slice(0,7),
+        scoreRows: visRows,
+        puntosTotales: visPts,
+        triangulosTotales: visTri
+      },
+      localPlanilla: collectPlanilla('localRoot'),
+      visitantePlanilla: collectPlanilla('visitanteRoot')
+    };
+  }
+
+  function buildValidation(status){
+    return {
+      fechaISO: status.fechaISO,
+      localSlug: status.localSlug,
+      visitanteSlug: status.visitanteSlug,
+      local: {
+        scoreRows: status.local.scoreRows,
+        triangulos: status.local.triangulosTotales,
+        puntosTotales: status.local.puntosTotales
+      },
+      visitante: {
+        scoreRows: status.visitante.scoreRows,
+        triangulos: status.visitante.triangulosTotales,
+        puntosTotales: status.visitante.puntosTotales
+      },
+      localPlanilla: status.localPlanilla,
+      visitantePlanilla: status.visitantePlanilla
+    };
+  }
+
+  function jsonSql(obj){
+    return JSON.stringify(obj, null, 2).replaceAll("'", "''");
+  }
+
+  function teamSlugWithCategory(baseSlug, categoria){
+    return `${baseSlug}_${categoria}`;
+  }
+
+  function resolveWinner(status){
+    const mode = $('#winnerMode').value;
+    if(mode === 'local') return status.localSlug;
+    if(mode === 'visitante') return status.visitanteSlug;
+    return status.local.puntosTotales > status.visitante.puntosTotales ? status.localSlug : status.visitanteSlug;
+  }
+
+  function buildSql(){
+    const status = collectStatus();
+    const validation = buildValidation(status);
+    const winnerSlug = resolveWinner(status);
+    const fechaKey = `${status.fechaISO}::${status.localSlug}::${status.visitanteSlug}`;
+    const categoria = $('#categoria').value;
+    const localTeamDb = teamSlugWithCategory(status.localSlug, categoria);
+    const visTeamDb = teamSlugWithCategory(status.visitanteSlug, categoria);
+
+    const statusJson = jsonSql(status);
+    const validacionJson = jsonSql(validation);
+
+    return `-- =========================
+-- CRUCE: ${status.localSlug.toUpperCase()} VS ${status.visitanteSlug.toUpperCase()}
+-- FECHA: ${status.fechaISO}
+-- =========================
+
+-- 1) cruces_match_status
+UPDATE cruces_match_status
+SET status_json = $$${statusJson}$$::jsonb,
+updated_at = NOW()
+WHERE local_slug = '${status.localSlug}'
+  AND visitante_slug = '${status.visitanteSlug}'
+  AND fecha_iso = '${status.fechaISO}';
+
+INSERT INTO cruces_match_status
+(local_slug, visitante_slug, fecha_iso, equipo_slug, status_json, updated_at)
+SELECT
+  '${status.localSlug}',
+  '${status.visitanteSlug}',
+  '${status.fechaISO}',
+  x.equipo_slug,
+  $$${statusJson}$$::jsonb,
+  NOW()
+FROM (
+  VALUES
+    ('${localTeamDb}'),
+    ('${visTeamDb}')
+) AS x(equipo_slug)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM cruces_match_status s
+  WHERE s.local_slug = '${status.localSlug}'
+    AND s.visitante_slug = '${status.visitanteSlug}'
+    AND s.fecha_iso = '${status.fechaISO}'
+    AND s.equipo_slug = x.equipo_slug
+);
+
+-- 2) cruces_validations
+INSERT INTO cruces_validations
+(team, fecha_key, status_json, validacion_json, validated, updated_at)
+SELECT
+  x.team,
+  '${fechaKey}',
+  $$${statusJson}$$::jsonb,
+  $$${validacionJson}$$::jsonb,
+  true,
+  NOW()
+FROM (
+  VALUES
+    ('${status.localSlug}'),
+    ('${status.visitanteSlug}')
+) AS x(team)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM cruces_validations v
+  WHERE v.team = x.team
+    AND v.fecha_key = '${fechaKey}'
+);
+
+-- 3) cruces_matches
+INSERT INTO cruces_matches
+(fecha_iso, local_slug, visitante_slug, validated_final, winner_slug, created_at, updated_at)
+SELECT
+  '${status.fechaISO}',
+  '${status.localSlug}',
+  '${status.visitanteSlug}',
+  true,
+  '${winnerSlug}',
+  NOW(),
+  NOW()
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM cruces_matches m
+  WHERE m.fecha_iso = '${status.fechaISO}'
+    AND m.local_slug = '${status.localSlug}'
+    AND m.visitante_slug = '${status.visitanteSlug}'
+);`;
+  }
+
+  function copySql(){
+    const area = $('#sqlOutput');
+    if (!area.value) area.value = buildSql();
+    navigator.clipboard.writeText(area.value)
+      .then(() => {
+        $('#status').innerHTML = '<span class="ok">SQL copiado al portapapeles.</span>';
+      })
+      .catch(() => {
+        $('#status').innerHTML = '<span class="error">No se pudo copiar. Copialo manualmente desde la caja de texto.</span>';
+      });
+  }
+
+  function initHeaderLinks(){
+    const btnVolverAdmin = $('#btnVolverAdmin');
+    if (btnVolverAdmin) btnVolverAdmin.href = withAdminMode(btnVolverAdmin.getAttribute('href') || '../admin.html');
+  }
+
+  function init(){
+    initHeaderLinks();
+
+    $('#btnCargar').addEventListener('click', renderBoth);
+    $('#categoria').addEventListener('change', () => {
+      fillTeamSelects();
+      renderBoth();
+    });
+    $('#localTeam').addEventListener('change', renderBoth);
+    $('#visitanteTeam').addEventListener('change', renderBoth);
+    $('#btnGenerarSql').addEventListener('click', () => {
+      $('#sqlOutput').value = buildSql();
+    });
+    $('#btnCopiar').addEventListener('click', copySql);
+
+    const today = new Date();
+    const mm = String(today.getMonth()+1).padStart(2,'0');
+    const dd = String(today.getDate()).padStart(2,'0');
+    $('#fechaISO').value = `${today.getFullYear()}-${mm}-${dd}`;
+
+    loadTeams().then(renderBoth);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
