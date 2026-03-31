@@ -98,37 +98,82 @@ function normalizeDateOnly(value) {
   return String(value || '').slice(0, 10);
 }
 
-
 function pickFixtureFecha(fechas = []) {
   const normalized = fechas
     .map((fecha) => ({
       raw: fecha,
+      originalDate: fecha?.date,
       dateKey: normalizeDateOnly(fecha?.date)
     }))
-    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey))
+    .filter((item) => {
+      const valid = /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey);
+      if (!valid) {
+        console.log('[cruces][pickFixtureFecha] fecha descartada', {
+          originalDate: item.originalDate,
+          dateKey: item.dateKey
+        });
+      }
+      return valid;
+    })
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
-  if (!normalized.length) return null;
-
-  const today = new Date();
+  const now = new Date();
+  const today = new Date(now);
   today.setHours(0, 0, 0, 0);
-
   const todayKey = today.toISOString().slice(0, 10);
 
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowKey = tomorrow.toISOString().slice(0, 10);
 
+  console.log('[cruces][pickFixtureFecha] entrada', {
+    totalFechas: Array.isArray(fechas) ? fechas.length : 0,
+    todayKey,
+    tomorrowKey,
+    normalized: normalized.map((item) => ({
+      originalDate: item.originalDate,
+      dateKey: item.dateKey
+    }))
+  });
+
+  if (!normalized.length) {
+    console.log('[cruces][pickFixtureFecha] sin fechas validas');
+    return null;
+  }
+
   const exactToday = normalized.find((f) => f.dateKey === todayKey);
-  if (exactToday) return exactToday.raw;
+  if (exactToday) {
+    console.log('[cruces][pickFixtureFecha] eligio hoy', {
+      originalDate: exactToday.originalDate,
+      dateKey: exactToday.dateKey
+    });
+    return exactToday.raw;
+  }
 
   const exactTomorrow = normalized.find((f) => f.dateKey === tomorrowKey);
-  if (exactTomorrow) return exactTomorrow.raw;
+  if (exactTomorrow) {
+    console.log('[cruces][pickFixtureFecha] eligio manana', {
+      originalDate: exactTomorrow.originalDate,
+      dateKey: exactTomorrow.dateKey
+    });
+    return exactTomorrow.raw;
+  }
 
   const nextFuture = normalized.find((f) => f.dateKey > tomorrowKey);
-  if (nextFuture) return nextFuture.raw;
+  if (nextFuture) {
+    console.log('[cruces][pickFixtureFecha] eligio proxima futura', {
+      originalDate: nextFuture.originalDate,
+      dateKey: nextFuture.dateKey
+    });
+    return nextFuture.raw;
+  }
 
-  return normalized[normalized.length - 1].raw;
+  const fallback = normalized[normalized.length - 1].raw;
+  console.log('[cruces][pickFixtureFecha] eligio fallback ultima fecha', {
+    originalDate: normalized[normalized.length - 1].originalDate,
+    dateKey: normalized[normalized.length - 1].dateKey
+  });
+  return fallback;
 }
 
 
@@ -175,6 +220,15 @@ async function fetchCrucesFromDB(team) {
 
   const fechas = rows[0]?.data?.fechas || [];
   const fecha = pickFixtureFecha(fechas);
+
+  console.log('[cruces][fetchCrucesFromDB]', {
+    team,
+    category,
+    totalFechas: fechas.length,
+    fechasOriginales: fechas.map((f) => f?.date),
+    fechaElegida: fecha?.date || null,
+    fechaElegidaNormalizada: normalizeDateOnly(fecha?.date)
+  });
 
   if (!fecha) return { cruces: [], fechaFixture: null };
 
