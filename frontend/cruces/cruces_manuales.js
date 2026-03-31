@@ -4,6 +4,7 @@
 
   const state = {
     teamsRaw: [],
+    filteredTeams: [],
     localPlan: null,
     visitantePlan: null
   };
@@ -57,7 +58,7 @@
   }
 
   function teamDivisionValue(item){
-    return String(item?.division || item?.categoria || item?.teamCategory || '').toLowerCase();
+    return String(item?.division || item?.categoria || item?.teamCategory || item?.planilla?.division || item?.plan?.division || '').toLowerCase().trim();
   }
 
   function teamDisplay(item){
@@ -76,13 +77,13 @@
       const arr = await res.json();
       if(!Array.isArray(arr)) throw new Error('La respuesta no es un array');
       state.teamsRaw = arr;
-      fillTeamSelects();
+      applyCategoryFilter();
       setStatus('<span class="ok">Equipos cargados desde DB.</span>');
     }catch(err){
       console.error(err);
       state.teamsRaw = sampleTeams();
-      fillTeamSelects();
-      setStatus('<span class="error">No se pudo leer la DB real. Quedó cargado un modo de ejemplo para que puedas probar el modelo.</span>');
+      applyCategoryFilter();
+      setStatus('<span class="error">No se pudo leer la DB real. Quedó cargado un modo de ejemplo para probar la pantalla.</span>');
     }
   }
 
@@ -101,27 +102,47 @@
         pareja1:['Adrian Bravo','Hector Gonzalez'],
         pareja2:['Diego Paradiso','Alan Nuñez'],
         suplentes:['Leonardo Longobardi','Fabian Rodriguez']
+      }},
+      { slug:'anexo', team:'ANEXO', division:'tercera', planilla:{
+        capitan:['Luis Miguel Cruz Mercado', ''],
+        individuales:['Julio Molina','Federico Damian Herrera','Andres Carrillo','Juan Suarez','Diego Paterno','Gaston Alejandro Fernandez','Miguel Angel Aguirre'],
+        pareja1:['Israel Lugo','Carlos Ariel Cabrera'],
+        pareja2:['Matias Daniel Flores','L Luis Mercado'],
+        suplentes:['Elias Juan Saavedra','Gustavo Romero']
+      }},
+      { slug:'academiadepool', team:'ACADEMIA DE POOL', division:'tercera', planilla:{
+        capitan:['Fabian Eguez', 'Joel Koroluk'],
+        individuales:['Fernando Kowalczuk','Damian Argiello','Julian Gonzalez','Fernando Ruiz','Cristian Georgiovitch','Facundo Luna','Gerardo Cardozo'],
+        pareja1:['Gabriel Zambianchi','Hernan Cardozo'],
+        pareja2:['Fabian Eguez','Orion Pala'],
+        suplentes:['Fernando Gonzalez','Joel Koroluk']
       }}
     ];
   }
 
-  function filteredTeams(){
-    const cat = $('#categoria').value;
-    return state.teamsRaw.filter(t => {
-      const div = teamDivisionValue(t);
-      return !cat || !div || div.includes(cat);
-    });
+  function filteredTeamsByCategory(category){
+    return state.teamsRaw
+      .filter(t => teamDivisionValue(t) === category)
+      .sort((a,b) => teamDisplay(a).localeCompare(teamDisplay(b), 'es'));
+  }
+
+  function applyCategoryFilter(){
+    const category = $('#categoria').value;
+    state.filteredTeams = filteredTeamsByCategory(category);
+    fillTeamSelects();
+    renderBoth();
   }
 
   function fillTeamSelects(){
-    const teams = filteredTeams();
+    const teams = state.filteredTeams;
     const localSel = $('#localTeam');
     const visSel = $('#visitanteTeam');
+    const prevLocal = localSel.value;
+    const prevVis = visSel.value;
 
-    const currentLocal = localSel.value;
-    const currentVis = visSel.value;
+    localSel.innerHTML = '<option value="">Seleccionar...</option>';
+    visSel.innerHTML = '<option value="">Seleccionar...</option>';
 
-    [localSel, visSel].forEach(sel => sel.innerHTML = '<option value="">Seleccionar...</option>');
     teams.forEach(t => {
       const label = teamDisplay(t);
       const slug = teamSlug(t);
@@ -129,15 +150,22 @@
       visSel.insertAdjacentHTML('beforeend', `<option value="${slug}">${label}</option>`);
     });
 
-    if ([...localSel.options].some(o => o.value === currentLocal)) localSel.value = currentLocal;
-    if ([...visSel.options].some(o => o.value === currentVis)) visSel.value = currentVis;
+    if ([...localSel.options].some(o => o.value === prevLocal)) {
+      localSel.value = prevLocal;
+    } else if (teams[0]) {
+      localSel.value = teamSlug(teams[0]);
+    }
 
-    if (!localSel.value && teams[0]) localSel.value = teamSlug(teams[0]);
-    if (!visSel.value && teams[1]) visSel.value = teamSlug(teams[1]);
+    if ([...visSel.options].some(o => o.value === prevVis && o.value !== localSel.value)) {
+      visSel.value = prevVis;
+    } else {
+      const second = teams.find(t => teamSlug(t) !== localSel.value);
+      visSel.value = second ? teamSlug(second) : '';
+    }
   }
 
   function findPlan(slug){
-    const item = state.teamsRaw.find(t => teamSlug(t) === slug);
+    const item = state.filteredTeams.find(t => teamSlug(t) === slug) || state.teamsRaw.find(t => teamSlug(t) === slug);
     if(!item) return emptyPlanilla(slug);
     const plan = item.planilla || item.plan || item;
     return {
@@ -168,6 +196,8 @@
   function renderTeam(rootId, role, plan, isRight=false){
     const root = document.getElementById(rootId);
     root.innerHTML = '';
+    if (!plan?.team) return;
+
     const card = document.getElementById('cardTpl').content.firstElementChild.cloneNode(true);
     card.querySelector('.team-role').textContent = role;
     card.querySelector('.team-title').textContent = (plan.team || '').toUpperCase();
@@ -256,10 +286,14 @@
       rightPts += r;
     }
 
-    document.querySelector('#localRoot .totalValue').textContent = leftTriangles;
-    document.querySelector('#visitanteRoot .totalValue').textContent = rightTriangles;
-    document.querySelector('#localRoot .winsValue').textContent = leftPts;
-    document.querySelector('#visitanteRoot .winsValue').textContent = rightPts;
+    const lTri = document.querySelector('#localRoot .totalValue');
+    const rTri = document.querySelector('#visitanteRoot .totalValue');
+    const lWin = document.querySelector('#localRoot .winsValue');
+    const rWin = document.querySelector('#visitanteRoot .winsValue');
+    if (lTri) lTri.textContent = leftTriangles;
+    if (rTri) rTri.textContent = rightTriangles;
+    if (lWin) lWin.textContent = leftPts;
+    if (rWin) rWin.textContent = rightPts;
   }
 
   function bindScoreEvents(){
@@ -268,9 +302,35 @@
     });
   }
 
+  function ensureDistinctTeams(changed){
+    const localSel = $('#localTeam');
+    const visSel = $('#visitanteTeam');
+    if (!localSel.value || !visSel.value) return;
+    if (localSel.value !== visSel.value) return;
+
+    const alternative = state.filteredTeams.find(t => {
+      const slug = teamSlug(t);
+      return changed === 'local' ? slug !== localSel.value : slug !== visSel.value;
+    });
+
+    if (changed === 'local') {
+      visSel.value = alternative ? teamSlug(alternative) : '';
+    } else {
+      localSel.value = alternative ? teamSlug(alternative) : '';
+    }
+  }
+
   function renderBoth(){
     const localSlug = $('#localTeam').value;
     const visitanteSlug = $('#visitanteTeam').value;
+
+    if (!localSlug || !visitanteSlug) {
+      document.getElementById('localRoot').innerHTML = '';
+      document.getElementById('visitanteRoot').innerHTML = '';
+      setStatus('<span class="error">No hay suficientes equipos cargados para esta categoría.</span>');
+      return;
+    }
+
     state.localPlan = findPlan(localSlug);
     state.visitantePlan = findPlan(visitanteSlug);
 
@@ -288,10 +348,10 @@
     const localRows = scoreRowsFor('localRoot');
     const visRows = scoreRowsFor('visitanteRoot');
 
-    const localTri = Number(document.querySelector('#localRoot .totalValue').textContent || 0);
-    const visTri = Number(document.querySelector('#visitanteRoot .totalValue').textContent || 0);
-    const localPts = Number(document.querySelector('#localRoot .winsValue').textContent || 0);
-    const visPts = Number(document.querySelector('#visitanteRoot .winsValue').textContent || 0);
+    const localTri = Number(document.querySelector('#localRoot .totalValue')?.textContent || 0);
+    const visTri = Number(document.querySelector('#visitanteRoot .totalValue')?.textContent || 0);
+    const localPts = Number(document.querySelector('#localRoot .winsValue')?.textContent || 0);
+    const visPts = Number(document.querySelector('#visitanteRoot .winsValue')?.textContent || 0);
 
     return {
       fechaISO,
@@ -344,9 +404,6 @@
   }
 
   function resolveWinner(status){
-    const mode = $('#winnerMode').value;
-    if(mode === 'local') return status.localSlug;
-    if(mode === 'visitante') return status.visitanteSlug;
     return status.local.puntosTotales > status.visitante.puntosTotales ? status.localSlug : status.visitanteSlug;
   }
 
@@ -427,7 +484,7 @@
 
       setStatus(
         `<span class="ok">Cruce guardado en DB.</span> ` +
-        `Ganador final: <strong>${winnerSlug.toUpperCase()}</strong>.`
+        `Ganador automático: <strong>${winnerSlug.toUpperCase()}</strong>.`
       );
     }catch(err){
       console.error(err);
@@ -443,24 +500,34 @@
     if (btnVolverAdmin) btnVolverAdmin.href = withAdminMode(btnVolverAdmin.getAttribute('href') || '../admin.html');
   }
 
-  function init(){
-    initHeaderLinks();
-
-    $('#btnCargar').addEventListener('click', renderBoth);
+  function bindUi(){
     $('#btnGuardar').addEventListener('click', saveToDb);
+
     $('#categoria').addEventListener('change', () => {
-      fillTeamSelects();
+      applyCategoryFilter();
+    });
+
+    $('#localTeam').addEventListener('change', () => {
+      ensureDistinctTeams('local');
       renderBoth();
     });
-    $('#localTeam').addEventListener('change', renderBoth);
-    $('#visitanteTeam').addEventListener('change', renderBoth);
+
+    $('#visitanteTeam').addEventListener('change', () => {
+      ensureDistinctTeams('visitante');
+      renderBoth();
+    });
+  }
+
+  function init(){
+    initHeaderLinks();
+    bindUi();
 
     const today = new Date();
     const mm = String(today.getMonth()+1).padStart(2,'0');
     const dd = String(today.getDate()).padStart(2,'0');
     $('#fechaISO').value = `${today.getFullYear()}-${mm}-${dd}`;
 
-    loadTeams().then(renderBoth);
+    loadTeams();
   }
 
   document.addEventListener('DOMContentLoaded', init);
