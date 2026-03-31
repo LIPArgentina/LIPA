@@ -151,13 +151,15 @@ input,select{
 }
 .row{
   display:grid;
-  grid-template-columns:22px 1fr 28px;
+  grid-template-columns:22px 50% 28px;
+  justify-content:center;
   gap:6px;
   align-items:center;
   margin:4px 0;
 }
 .row.right{
-  grid-template-columns:28px 1fr 22px;
+  grid-template-columns:28px 50% 22px;
+  justify-content:center;
 }
 .badge,.ptsbox,.totalbox,.winsbox{
   display:grid;
@@ -288,4 +290,15 @@ input,select{
   .label{font-size:10px}
   .totalbox{width:24px;height:24px;font-size:11px}
   .winsbox{width:28px;height:28px;font-size:14px}
+}
+
+.select-wrap{
+  width:100%;
+  display:flex;
+  justify-content:center;
+}
+
+.player-select{
+  width:100%;
+  max-width:220px;
 }
