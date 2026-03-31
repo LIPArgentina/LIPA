@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Carga manual de cruces</title>
   <link rel="stylesheet" href="./cruces_manuales.css" />
 </head>
@@ -50,25 +50,18 @@
       </div>
 
       <div class="actions">
-        <button id="btnCargar" type="button">Cargar equipos</button>
-        <button id="btnGenerarSql" type="button">Generar SQL</button>
-        <button id="btnCopiar" class="secondary" type="button">Copiar SQL</button>
+        <button id="btnCargar" type="button">CARGAR EQUIPOS</button>
+        <button id="btnGuardar" type="button">GUARDAR EN DB</button>
       </div>
 
       <div id="status" class="hint">
-        La carga de equipos intenta leer desde <code>/api/admin/planillas</code>. Si no responde, entra en modo ejemplo.
+        La carga de equipos intenta leer desde <code>/api/admin/planillas</code>. El guardado impacta directo vía backend.
       </div>
     </section>
 
     <section class="layout">
       <div id="localRoot"></div>
       <div id="visitanteRoot"></div>
-    </section>
-
-    <section class="sql-wrap">
-      <h2>Salida SQL</h2>
-      <p class="hint">Genera el bloque para <code>cruces_match_status</code>, <code>cruces_validations</code> y <code>cruces_matches</code>.</p>
-      <textarea id="sqlOutput" spellcheck="false"></textarea>
     </section>
   </main>
 

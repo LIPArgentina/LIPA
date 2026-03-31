@@ -38,6 +38,13 @@
     return (API_BASE || '') + path;
   }
 
+  function setStatus(html, cls = ''){
+    const node = $('#status');
+    if (!node) return;
+    node.className = 'hint' + (cls ? ' ' + cls : '');
+    node.innerHTML = html;
+  }
+
   function emptyPlanilla(team=''){
     return {
       team,
@@ -62,8 +69,7 @@
   }
 
   async function loadTeams(){
-    const status = $('#status');
-    status.textContent = 'Cargando equipos desde DB...';
+    setStatus('Cargando equipos desde DB...');
     try{
       const res = await fetch(apiUrl(PLANILLAS_ENDPOINT), { cache:'no-store', credentials:'include' });
       if(!res.ok) throw new Error('HTTP ' + res.status);
@@ -71,12 +77,12 @@
       if(!Array.isArray(arr)) throw new Error('La respuesta no es un array');
       state.teamsRaw = arr;
       fillTeamSelects();
-      status.innerHTML = '<span class="ok">Equipos cargados desde DB.</span>';
+      setStatus('<span class="ok">Equipos cargados desde DB.</span>');
     }catch(err){
       console.error(err);
       state.teamsRaw = sampleTeams();
       fillTeamSelects();
-      status.innerHTML = '<span class="error">No se pudo leer la DB real. Quedó cargado un modo de ejemplo para que puedas probar el modelo.</span>';
+      setStatus('<span class="error">No se pudo leer la DB real. Quedó cargado un modo de ejemplo para que puedas probar el modelo.</span>');
     }
   }
 
@@ -151,6 +157,14 @@
     return `<div class="ptsbox"><select>${opts}</select></div>`;
   }
 
+  function escapeHtml(str=''){
+    return String(str)
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;');
+  }
+
   function renderTeam(rootId, role, plan, isRight=false){
     const root = document.getElementById(rootId);
     root.innerHTML = '';
@@ -183,7 +197,7 @@
 
         const badge = `<div class="badge">${i+1}</div>`;
         const slot = `<div class="slot ${val ? '' : 'empty'}" data-full="${escapeHtml(val)}">${escapeHtml(val || '—')}</div>`;
-        let pts = `<div class="ptsbox" style="visibility:hidden"></div>`;
+        let pts = `<div class="ptsbox hidden-box"></div>`;
 
         if(section.score === true){
           pts = makePtsSelect(6);
@@ -201,14 +215,6 @@
     root.appendChild(card);
   }
 
-  function escapeHtml(str=''){
-    return String(str)
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;');
-  }
-
   function scoreRowsFor(rootId){
     return Array.from(document.querySelectorAll(`#${rootId} .ptsbox select`)).map(s => Number(s.value || 0));
   }
@@ -223,9 +229,10 @@
       }).filter(Boolean);
     });
 
-    out.individualesPts = scoreRowsFor(rootId).slice(0,7);
-    out.pareja1Pts = [scoreRowsFor(rootId)[7] || 0];
-    out.pareja2Pts = [scoreRowsFor(rootId)[8] || 0];
+    const scores = scoreRowsFor(rootId);
+    out.individualesPts = scores.slice(0,7);
+    out.pareja1Pts = [scores[7] || 0];
+    out.pareja2Pts = [scores[8] || 0];
     return out;
   }
 
@@ -336,14 +343,6 @@
     };
   }
 
-  function jsonSql(obj){
-    return JSON.stringify(obj, null, 2).replaceAll("'", "''");
-  }
-
-  function teamSlugWithCategory(baseSlug, categoria){
-    return `${baseSlug}_${categoria}`;
-  }
-
   function resolveWinner(status){
     const mode = $('#winnerMode').value;
     if(mode === 'local') return status.localSlug;
@@ -351,106 +350,92 @@
     return status.local.puntosTotales > status.visitante.puntosTotales ? status.localSlug : status.visitanteSlug;
   }
 
-  function buildSql(){
-    const status = collectStatus();
-    const validation = buildValidation(status);
-    const winnerSlug = resolveWinner(status);
-    const fechaKey = `${status.fechaISO}::${status.localSlug}::${status.visitanteSlug}`;
-    const categoria = $('#categoria').value;
-    const localTeamDb = teamSlugWithCategory(status.localSlug, categoria);
-    const visTeamDb = teamSlugWithCategory(status.visitanteSlug, categoria);
-
-    const statusJson = jsonSql(status);
-    const validacionJson = jsonSql(validation);
-
-    return `-- =========================
--- CRUCE: ${status.localSlug.toUpperCase()} VS ${status.visitanteSlug.toUpperCase()}
--- FECHA: ${status.fechaISO}
--- =========================
-
--- 1) cruces_match_status
-UPDATE cruces_match_status
-SET status_json = $$${statusJson}$$::jsonb,
-updated_at = NOW()
-WHERE local_slug = '${status.localSlug}'
-  AND visitante_slug = '${status.visitanteSlug}'
-  AND fecha_iso = '${status.fechaISO}';
-
-INSERT INTO cruces_match_status
-(local_slug, visitante_slug, fecha_iso, equipo_slug, status_json, updated_at)
-SELECT
-  '${status.localSlug}',
-  '${status.visitanteSlug}',
-  '${status.fechaISO}',
-  x.equipo_slug,
-  $$${statusJson}$$::jsonb,
-  NOW()
-FROM (
-  VALUES
-    ('${localTeamDb}'),
-    ('${visTeamDb}')
-) AS x(equipo_slug)
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM cruces_match_status s
-  WHERE s.local_slug = '${status.localSlug}'
-    AND s.visitante_slug = '${status.visitanteSlug}'
-    AND s.fecha_iso = '${status.fechaISO}'
-    AND s.equipo_slug = x.equipo_slug
-);
-
--- 2) cruces_validations
-INSERT INTO cruces_validations
-(team, fecha_key, status_json, validacion_json, validated, updated_at)
-SELECT
-  x.team,
-  '${fechaKey}',
-  $$${statusJson}$$::jsonb,
-  $$${validacionJson}$$::jsonb,
-  true,
-  NOW()
-FROM (
-  VALUES
-    ('${status.localSlug}'),
-    ('${status.visitanteSlug}')
-) AS x(team)
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM cruces_validations v
-  WHERE v.team = x.team
-    AND v.fecha_key = '${fechaKey}'
-);
-
--- 3) cruces_matches
-INSERT INTO cruces_matches
-(fecha_iso, local_slug, visitante_slug, validated_final, winner_slug, created_at, updated_at)
-SELECT
-  '${status.fechaISO}',
-  '${status.localSlug}',
-  '${status.visitanteSlug}',
-  true,
-  '${winnerSlug}',
-  NOW(),
-  NOW()
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM cruces_matches m
-  WHERE m.fecha_iso = '${status.fechaISO}'
-    AND m.local_slug = '${status.localSlug}'
-    AND m.visitante_slug = '${status.visitanteSlug}'
-);`;
+  function validateInputs(status){
+    if(!status.fechaISO) throw new Error('Falta la fecha.');
+    if(!status.localSlug) throw new Error('Falta seleccionar el equipo local.');
+    if(!status.visitanteSlug) throw new Error('Falta seleccionar el equipo visitante.');
+    if(status.localSlug === status.visitanteSlug) throw new Error('Local y visitante no pueden ser el mismo equipo.');
   }
 
-  function copySql(){
-    const area = $('#sqlOutput');
-    if (!area.value) area.value = buildSql();
-    navigator.clipboard.writeText(area.value)
-      .then(() => {
-        $('#status').innerHTML = '<span class="ok">SQL copiado al portapapeles.</span>';
-      })
-      .catch(() => {
-        $('#status').innerHTML = '<span class="error">No se pudo copiar. Copialo manualmente desde la caja de texto.</span>';
+  async function postJson(path, body){
+    const res = await fetch(apiUrl(path), {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      credentials:'include',
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok || data?.ok === false){
+      throw new Error(data?.error || data?.message || ('HTTP ' + res.status));
+    }
+    return data;
+  }
+
+  async function saveToDb(){
+    const btn = $('#btnGuardar');
+    const originalText = btn.textContent;
+
+    try{
+      const status = collectStatus();
+      validateInputs(status);
+
+      btn.disabled = true;
+      btn.textContent = 'GUARDANDO...';
+      setStatus('Guardando cruce manual en DB...');
+
+      const categoria = $('#categoria').value;
+      const localEquipoSlug = `${status.localSlug}_${categoria}`;
+      const visitanteEquipoSlug = `${status.visitanteSlug}_${categoria}`;
+      const validacion = buildValidation(status);
+      const winnerSlug = resolveWinner(status);
+
+      await postJson('/api/cruces/match-status', {
+        localSlug: status.localSlug,
+        visitanteSlug: status.visitanteSlug,
+        fechaISO: status.fechaISO,
+        equipoSlug: localEquipoSlug,
+        status,
+        validar: true
       });
+
+      await postJson('/api/cruces/match-status', {
+        localSlug: status.localSlug,
+        visitanteSlug: status.visitanteSlug,
+        fechaISO: status.fechaISO,
+        equipoSlug: visitanteEquipoSlug,
+        status,
+        validar: true
+      });
+
+      await postJson('/api/cruces/validate', {
+        fechaISO: status.fechaISO,
+        localSlug: status.localSlug,
+        visitanteSlug: status.visitanteSlug,
+        equipoSlug: status.localSlug,
+        validacion,
+        status
+      });
+
+      await postJson('/api/cruces/validate', {
+        fechaISO: status.fechaISO,
+        localSlug: status.localSlug,
+        visitanteSlug: status.visitanteSlug,
+        equipoSlug: status.visitanteSlug,
+        validacion,
+        status
+      });
+
+      setStatus(
+        `<span class="ok">Cruce guardado en DB.</span> ` +
+        `Ganador final: <strong>${winnerSlug.toUpperCase()}</strong>.`
+      );
+    }catch(err){
+      console.error(err);
+      setStatus(`<span class="error">No se pudo guardar en DB: ${err.message || 'error desconocido'}.</span>`);
+    }finally{
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   }
 
   function initHeaderLinks(){
@@ -462,16 +447,13 @@ WHERE NOT EXISTS (
     initHeaderLinks();
 
     $('#btnCargar').addEventListener('click', renderBoth);
+    $('#btnGuardar').addEventListener('click', saveToDb);
     $('#categoria').addEventListener('change', () => {
       fillTeamSelects();
       renderBoth();
     });
     $('#localTeam').addEventListener('change', renderBoth);
     $('#visitanteTeam').addEventListener('change', renderBoth);
-    $('#btnGenerarSql').addEventListener('click', () => {
-      $('#sqlOutput').value = buildSql();
-    });
-    $('#btnCopiar').addEventListener('click', copySql);
 
     const today = new Date();
     const mm = String(today.getMonth()+1).padStart(2,'0');
