@@ -235,12 +235,21 @@ function apiUrl(path){
   }
 
   function findCruceForTeam(cruces, teamCandidates){
+    const candidateList = Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates];
+    const requestedSlugs = new Set(candidateList.map(v => normPlanillaSlug(v)).filter(Boolean));
     const variants = new Set();
-    (Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates]).forEach(value => {
+
+    candidateList.forEach(value => {
       teamKeyVariants(value).forEach(v => variants.add(v));
     });
 
     const matches = cruces.filter(cruce => {
+      const localSlug = normPlanillaSlug(cruce.localSlug);
+      const visitanteSlug = normPlanillaSlug(cruce.visitanteSlug);
+      if ((localSlug && requestedSlugs.has(localSlug)) || (visitanteSlug && requestedSlugs.has(visitanteSlug))) {
+        return true;
+      }
+
       const localVariants = teamKeyVariants(cruce.local);
       const visitanteVariants = teamKeyVariants(cruce.visitante);
       return localVariants.some(v => variants.has(v)) || visitanteVariants.some(v => variants.has(v));
@@ -251,6 +260,9 @@ function apiUrl(path){
     const today = new Date();
     today.setHours(0,0,0,0);
 
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
     const toDate = (raw) => {
       if (!raw) return null;
       const m = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -258,17 +270,34 @@ function apiUrl(path){
       return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     };
 
-    const scored = matches.map(item => {
-      const d = toDate(item.date);
-      const diff = d ? Math.abs(d - today) : Number.MAX_SAFE_INTEGER;
-      const inWindow = d ? (today >= new Date(d.getTime() - 5*24*60*60*1000) && today <= new Date(d.getTime() + 1*24*60*60*1000)) : false;
-      return { item, d, diff, inWindow };
+    const scored = matches.map(item => ({
+      item,
+      d: toDate(item.date)
+    }));
+
+    const exactSlugMatches = scored.filter(({ item }) => {
+      const localSlug = normPlanillaSlug(item.localSlug);
+      const visitanteSlug = normPlanillaSlug(item.visitanteSlug);
+      return (localSlug && requestedSlugs.has(localSlug)) || (visitanteSlug && requestedSlugs.has(visitanteSlug));
     });
 
-    const candidates = scored.filter(x => x.inWindow);
-    const pool = candidates.length ? candidates : scored;
-    pool.sort((a, b) => a.diff - b.diff);
-    return pool[0]?.item || null;
+    const pool = exactSlugMatches.length ? exactSlugMatches : scored;
+    const datedPool = pool.filter(x => x.d);
+    if (!datedPool.length) return pool[0]?.item || null;
+
+    const todayMatch = datedPool.find(x => x.d.getTime() === today.getTime());
+    if (todayMatch) return todayMatch.item;
+
+    const tomorrowMatch = datedPool.find(x => x.d.getTime() === tomorrow.getTime());
+    if (tomorrowMatch) return tomorrowMatch.item;
+
+    const future = datedPool
+      .filter(x => x.d >= today)
+      .sort((a, b) => a.d - b.d);
+    if (future.length) return future[0].item;
+
+    datedPool.sort((a, b) => Math.abs(a.d - today) - Math.abs(b.d - today));
+    return datedPool[0]?.item || pool[0]?.item || null;
   }
 
   async function loadCrucesFromDb(category){
