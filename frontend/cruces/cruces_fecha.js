@@ -169,36 +169,20 @@ function apiUrl(path){
     return normPlanillaSlug(ref.slug || ref.teamSlug || ref.team || ref.equipo || ref.nombre || ref.displayName || '');
   }
 
-  function qualifyTeamSlug(slug, category){
-    const base = normPlanillaSlug(String(slug || '').replace(/_(tercera|segunda)$/i, ''));
-    const cat = String(category || '').trim().toLowerCase();
-    if (!base) return '';
-    if (cat === 'tercera' || cat === 'segunda') return `${base}_${cat}`;
-    return base;
-  }
-
-  function dequalifyTeamSlug(slug){
-    return normPlanillaSlug(String(slug || '').replace(/_(tercera|segunda)$/i, ''));
-  }
-
-  function pushCruce(list, localRef, visitanteRef, date, category){
+  function pushCruce(list, localRef, visitanteRef, date){
     const localName = teamNameFromRef(localRef);
     const visitanteName = teamNameFromRef(visitanteRef);
     if (!localName || !visitanteName) return;
-
-    const rawLocalSlug = teamSlugFromRef(localRef) || normPlanillaSlug(localName);
-    const rawVisitanteSlug = teamSlugFromRef(visitanteRef) || normPlanillaSlug(visitanteName);
-
     list.push({
       local: localName,
       visitante: visitanteName,
-      localSlug: qualifyTeamSlug(rawLocalSlug, category),
-      visitanteSlug: qualifyTeamSlug(rawVisitanteSlug, category),
+      localSlug: teamSlugFromRef(localRef) || normPlanillaSlug(localName),
+      visitanteSlug: teamSlugFromRef(visitanteRef) || normPlanillaSlug(visitanteName),
       date: date || null
     });
   }
 
-  function extractCruces(input, category){
+  function extractCruces(input){
     const result = [];
     const visited = new WeakSet();
 
@@ -215,10 +199,10 @@ function apiUrl(path){
 
       const nodeDate = node.date || node.fecha || node.fechaISO || node.fechaKey || inheritedDate || null;
 
-      if (node.local && node.visitante) pushCruce(result, node.local, node.visitante, nodeDate, category);
-      if (node.equipoLocal && node.equipoVisitante) pushCruce(result, node.equipoLocal, node.equipoVisitante, nodeDate, category);
-      if (node.home && node.away) pushCruce(result, node.home, node.away, nodeDate, category);
-      if (node.left && node.right) pushCruce(result, node.left, node.right, nodeDate, category);
+      if (node.local && node.visitante) pushCruce(result, node.local, node.visitante, nodeDate);
+      if (node.equipoLocal && node.equipoVisitante) pushCruce(result, node.equipoLocal, node.equipoVisitante, nodeDate);
+      if (node.home && node.away) pushCruce(result, node.home, node.away, nodeDate);
+      if (node.left && node.right) pushCruce(result, node.left, node.right, nodeDate);
 
       if (Array.isArray(node.equipos) && node.equipos.length >= 2) {
         const equipos = node.equipos.filter(Boolean);
@@ -227,12 +211,12 @@ function apiUrl(path){
           visitante: equipos.find(item => String(item?.categoria || '').toLowerCase() === 'visitante')
         };
         if (byCategory.local && byCategory.visitante) {
-          pushCruce(result, byCategory.local, byCategory.visitante, nodeDate, category);
+          pushCruce(result, byCategory.local, byCategory.visitante, nodeDate);
         } else {
           for (let i = 0; i < equipos.length; i += 2) {
             const a = equipos[i];
             const b = equipos[i + 1];
-            if (a && b) pushCruce(result, a, b, nodeDate, category);
+            if (a && b) pushCruce(result, a, b, nodeDate);
           }
         }
       }
@@ -250,27 +234,13 @@ function apiUrl(path){
     return [...dedup.values()];
   }
 
-  function findCruceForTeam(cruces, teamCandidates, category){
+  function findCruceForTeam(cruces, teamCandidates){
     const variants = new Set();
-    const slugCandidates = new Set();
-
     (Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates]).forEach(value => {
-      const plain = dequalifyTeamSlug(value);
-      const qualified = qualifyTeamSlug(value, category);
-      if (plain) slugCandidates.add(plain);
-      if (qualified) slugCandidates.add(qualified);
       teamKeyVariants(value).forEach(v => variants.add(v));
-      if (plain) teamKeyVariants(plain).forEach(v => variants.add(v));
-      if (qualified) teamKeyVariants(qualified).forEach(v => variants.add(v));
     });
 
-    const exactSlugMatches = cruces.filter(cruce => {
-      const localSlug = qualifyTeamSlug(cruce.localSlug || cruce.local, category);
-      const visitanteSlug = qualifyTeamSlug(cruce.visitanteSlug || cruce.visitante, category);
-      return slugCandidates.has(localSlug) || slugCandidates.has(visitanteSlug) || slugCandidates.has(dequalifyTeamSlug(localSlug)) || slugCandidates.has(dequalifyTeamSlug(visitanteSlug));
-    });
-
-    const matches = exactSlugMatches.length ? exactSlugMatches : cruces.filter(cruce => {
+    const matches = cruces.filter(cruce => {
       const localVariants = teamKeyVariants(cruce.local);
       const visitanteVariants = teamKeyVariants(cruce.visitante);
       return localVariants.some(v => variants.has(v)) || visitanteVariants.some(v => variants.has(v));
@@ -431,6 +401,30 @@ function apiUrl(path){
     };
   }
 
+  function hasCategoryMarker(value){
+    return /(tercera|segunda|primera|3ra|3era|2da|2nda|1ra)/i.test(String(value || ''));
+  }
+
+  function buildPlanillaLookupKeys(value){
+    const exact = normPlanillaSlug(value);
+    const variants = teamKeyVariants(value).map(v => normPlanillaSlug(v)).filter(Boolean);
+    const keys = [];
+    const push = (k) => {
+      const clean = normPlanillaSlug(k);
+      if (clean && !keys.includes(clean)) keys.push(clean);
+    };
+
+    push(exact);
+    variants.forEach(push);
+
+    return {
+      exact,
+      variants,
+      keys,
+      hasCategory: hasCategoryMarker(value)
+    };
+  }
+
   async function loadPlanillasIndex() {
     if (__PLANILLAS_CACHE) return __PLANILLAS_CACHE;
 
@@ -447,22 +441,34 @@ function apiUrl(path){
       if (Array.isArray(arr)) {
         arr.forEach(item => {
           const rawTeam = item?.team || item?.slug || item?.equipo || item?.nombre || '';
-          const teamKey = normPlanillaSlug(rawTeam);
           const plan = item?.planilla || item?.plan || item || {};
-          if (teamKey) {
-            const normalizedPlan = {
-              team: item?.team || rawTeam || teamKey,
-              capitan: Array.isArray(plan.capitan) ? plan.capitan : ['', ''],
-              individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(7).fill(''),
-              pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['', ''],
-              pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['', ''],
-              suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', '']
-            };
-            map.set(teamKey, normalizedPlan);
-            teamKeyVariants(rawTeam).forEach(aliasKey => {
-              if (aliasKey) map.set(normPlanillaSlug(aliasKey), normalizedPlan);
-            });
-          }
+          const planTeam = plan?.team || '';
+          const normalizedPlan = {
+            team: item?.team || rawTeam || planTeam || '',
+            capitan: Array.isArray(plan.capitan) ? plan.capitan : ['', ''],
+            individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(7).fill(''),
+            pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['', ''],
+            pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['', ''],
+            suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', '']
+          };
+
+          const rawLookup = buildPlanillaLookupKeys(rawTeam);
+          const planLookup = buildPlanillaLookupKeys(planTeam);
+
+          [rawLookup.exact, planLookup.exact].forEach(key => {
+            if (key) map.set(key, normalizedPlan);
+          });
+
+          const aliasSources = [];
+          if (!rawLookup.hasCategory) aliasSources.push(...rawLookup.variants);
+          if (planTeam && !planLookup.hasCategory) aliasSources.push(...planLookup.variants);
+
+          aliasSources.forEach(aliasKey => {
+            const normalizedAlias = normPlanillaSlug(aliasKey);
+            if (normalizedAlias && !map.has(normalizedAlias)) {
+              map.set(normalizedAlias, normalizedPlan);
+            }
+          });
         });
       }
     } catch (e) {
@@ -474,26 +480,21 @@ function apiUrl(path){
   }
 
   async function loadFirstExistingPlanilla(slug) {
-    const plainSlug = dequalifyTeamSlug(slug);
-    const qualifiedSlug = normPlanillaSlug(slug);
-    const variants = Array.from(new Set([
-      qualifiedSlug,
-      plainSlug,
-      ...teamKeyVariants(slug).map(v => normPlanillaSlug(v)).filter(Boolean),
-      ...teamKeyVariants(plainSlug).map(v => normPlanillaSlug(v)).filter(Boolean)
-    ].filter(Boolean)));
-    const team = variants[0] || plainSlug || qualifiedSlug;
+    const lookup = buildPlanillaLookupKeys(slug);
+    const exactKeys = [lookup.exact].filter(Boolean);
+    const fallbackKeys = lookup.hasCategory ? [] : lookup.variants;
+    const candidateKeys = [...exactKeys, ...fallbackKeys];
 
     try {
       const planillas = await loadPlanillasIndex();
-      for (const key of [team, ...variants]) {
+      for (const key of candidateKeys) {
         if (planillas && planillas.has(key)) return planillas.get(key);
       }
     } catch (e) {
       console.warn('Índice de planillas no disponible para', slug, e);
     }
 
-    for (const key of [team, ...variants]) {
+    for (const key of candidateKeys) {
       try {
         const r = await fetch(apiUrl('/api/team/planilla?team=' + encodeURIComponent(key)), {
           cache: 'no-store',
@@ -518,7 +519,7 @@ function apiUrl(path){
       }
     }
 
-    return emptyPlanilla(slug || team);
+    return emptyPlanilla(slug || lookup.exact);
   }
 
 
@@ -1559,10 +1560,10 @@ btn.onclick = async () => {
       if (!category) throw new Error('Falta categoría');
 
       const crucesRaw = await loadCrucesFromDb(category);
-      const cruces = extractCruces(crucesRaw, category);
+      const cruces = extractCruces(crucesRaw);
       if (!cruces.length) throw new Error('No se encontraron cruces en la base de datos para esta categoría.');
 
-      const match = findCruceForTeam(cruces, teamCandidates, category);
+      const match = findCruceForTeam(cruces, teamCandidates);
       if (!match) throw new Error('No se encontró un cruce para el equipo logueado.');
 
       const local = { name: match.local, teamSlug: match.localSlug || normPlanillaSlug(match.local) };
