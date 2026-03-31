@@ -18,21 +18,6 @@
     return data;
   }
 
-  function normalizeText(value){
-    return String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/&/g, ' Y ')
-      .replace(/[._-]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toUpperCase();
-  }
-
-  function compactKey(value){
-    return normalizeText(value).replace(/[^A-Z0-9]/g, '');
-  }
-
   function parseISOAsLocal(iso) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
     if (m) return new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0);
@@ -76,9 +61,19 @@
     return wrap;
   }
 
-  function makeRow(num, text, side, pointsValue = null){
+  function createEmptyPtsBox(){
+    const wrap = document.createElement('div');
+    wrap.className = 'pts-edit readonly empty-pts';
+    const box = document.createElement('div');
+    box.className = 'pts-static';
+    wrap.appendChild(box);
+    return wrap;
+  }
+
+  function makeRow(num, text, side, pointsValue = null, sectionKey = ''){
     const row = document.createElement('div');
     row.className = 'row';
+    if (sectionKey) row.dataset.section = sectionKey;
 
     const badge = document.createElement('div');
     badge.className = 'badge';
@@ -92,14 +87,7 @@
       slot.textContent = String(text).trim();
     }
 
-    const ptsElement = pointsValue == null
-      ? (() => {
-          const ghost = document.createElement('div');
-          ghost.className = 'pts-edit readonly empty-pts';
-          ghost.innerHTML = '<div class="pts-static"></div>';
-          return ghost;
-        })()
-      : createPtsBox(pointsValue);
+    const ptsElement = pointsValue == null ? createEmptyPtsBox() : createPtsBox(pointsValue);
 
     if (side === 'left') {
       row.appendChild(badge);
@@ -114,14 +102,39 @@
     return row;
   }
 
+  function renderSection(section, items, side, scoreRows){
+    const div = document.createElement('div');
+    div.className = 'section';
+    div.innerHTML = `<h2>${section}</h2>`;
+
+    if (section === 'INDIVIDUALES') {
+      items.forEach((name, idx) => {
+        div.appendChild(makeRow(idx + 1, name, side, scoreRows[idx] ?? 0, section));
+      });
+    } else if (section === 'PAREJA 1') {
+      div.appendChild(makeRow(1, items[0] || '', side, scoreRows[7] ?? 0, section));
+      div.appendChild(makeRow(2, items[1] || '', side, null, section));
+    } else if (section === 'PAREJA 2') {
+      div.appendChild(makeRow(1, items[0] || '', side, scoreRows[8] ?? 0, section));
+      div.appendChild(makeRow(2, items[1] || '', side, null, section));
+    } else {
+      items.forEach((name, idx) => {
+        div.appendChild(makeRow(idx + 1, name, side, null, section));
+      });
+    }
+
+    return div;
+  }
+
   function renderSideCard(planilla, scoreData, opponent, date, teamName, side){
     const card = document.querySelector('#card-template').content.cloneNode(true).querySelector('.card');
     card.querySelector('.title').textContent = String(teamName || '').toUpperCase();
     const formattedDate = formatDate(date);
     card.querySelector('.meta').textContent = formattedDate ? `vs ${opponent} · ${formattedDate}` : `vs ${opponent}`;
+    const hint = card.querySelector('.hint');
+    if (hint) hint.remove();
 
     const scoreRows = Array.isArray(scoreData?.scoreRows) ? scoreData.scoreRows : [];
-    const secs = card.querySelector('.sections');
     const data = {
       'CAPITÁN': safeArr(planilla?.capitan, 2),
       'INDIVIDUALES': safeArr(planilla?.individuales, 7),
@@ -130,29 +143,9 @@
       'SUPLENTES': safeArr(planilla?.suplentes, 3)
     };
 
+    const secs = card.querySelector('.sections');
     ['CAPITÁN', 'INDIVIDUALES', 'PAREJA 1', 'PAREJA 2', 'SUPLENTES'].forEach((section) => {
-      const div = document.createElement('div');
-      div.className = 'section';
-      div.innerHTML = `<h2>${section}</h2>`;
-
-      const items = data[section];
-      if (section === 'INDIVIDUALES') {
-        items.forEach((name, idx) => {
-          div.appendChild(makeRow(idx + 1, name, side, scoreRows[idx] ?? 0));
-        });
-      } else if (section === 'PAREJA 1') {
-        div.appendChild(makeRow(1, items[0], side, scoreRows[7] ?? 0));
-        div.appendChild(makeRow(2, items[1], side, scoreRows[8] ?? 0));
-      } else if (section === 'PAREJA 2') {
-        div.appendChild(makeRow(1, items[0], side, scoreRows[9] ?? 0));
-        div.appendChild(makeRow(2, items[1], side, scoreRows[10] ?? 0));
-      } else {
-        items.forEach((name, idx) => {
-          div.appendChild(makeRow(idx + 1, name, side, null));
-        });
-      }
-
-      secs.appendChild(div);
+      secs.appendChild(renderSection(section, data[section], side, scoreRows));
     });
 
     const totalInput = card.querySelector('.total-input');
@@ -161,10 +154,12 @@
     const winsBox = card.querySelector('.wins-box');
     if (winsBox) winsBox.textContent = String(Number(scoreData?.puntosTotales ?? 0) || 0);
 
-    return card.parentElement;
+    const wrap = card.parentElement;
+    wrap.classList.add(side === 'left' ? 'readonly-left' : 'readonly-right');
+    return wrap;
   }
 
-  function renderEncounter(item, index){
+  function renderEncounter(item){
     const node = document.importNode(document.getElementById('encounter-template').content, true);
     node.querySelector('.encounter-title').textContent =
       `${String(item.localName || '').toUpperCase()} VS ${String(item.visitanteName || '').toUpperCase()}`;
@@ -172,25 +167,28 @@
     const leftRoot = node.querySelector('.encounter-left');
     const rightRoot = node.querySelector('.encounter-right');
 
-    const leftCard = renderSideCard(
-      item.localPlanilla || {},
-      item.local || {},
-      item.visitanteName || item.visitanteSlug || '',
-      item.fechaISO,
-      item.localName || item.localSlug || '',
-      'left'
-    );
-    const rightCard = renderSideCard(
-      item.visitantePlanilla || {},
-      item.visitante || {},
-      item.localName || item.localSlug || '',
-      item.fechaISO,
-      item.visitanteName || item.visitanteSlug || '',
-      'right'
+    leftRoot.appendChild(
+      renderSideCard(
+        item.localPlanilla || {},
+        item.local || {},
+        item.visitanteName || item.visitanteSlug || '',
+        item.fechaISO,
+        item.localName || item.localSlug || '',
+        'left'
+      )
     );
 
-    leftRoot.appendChild(leftCard);
-    rightRoot.appendChild(rightCard);
+    rightRoot.appendChild(
+      renderSideCard(
+        item.visitantePlanilla || {},
+        item.visitante || {},
+        item.localName || item.localSlug || '',
+        item.fechaISO,
+        item.visitanteName || item.visitanteSlug || '',
+        'right'
+      )
+    );
+
     return node;
   }
 
@@ -221,9 +219,7 @@
     container.innerHTML = '';
 
     const results = Array.isArray(data?.results) ? data.results : [];
-    document.getElementById('heroTitle').textContent = results.length
-      ? 'Encuentros validados'
-      : 'Sin encuentros validados';
+    document.getElementById('heroTitle').textContent = results.length ? 'Encuentros validados' : 'Sin encuentros validados';
     document.getElementById('metaText').textContent = results.length
       ? `${results.length} encuentro${results.length === 1 ? '' : 's'} validado${results.length === 1 ? '' : 's'}`
       : 'Todavía no hay cruces validados para esta fecha.';
@@ -233,8 +229,8 @@
       return;
     }
 
-    results.forEach((item, index) => {
-      container.appendChild(renderEncounter(item, index));
+    results.forEach((item) => {
+      container.appendChild(renderEncounter(item));
     });
   }
 
