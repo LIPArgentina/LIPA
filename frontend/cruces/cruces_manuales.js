@@ -1,12 +1,9 @@
 (() => {
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
-  const PLANILLAS_ENDPOINT = '/api/admin/planillas';
 
   const state = {
-    teamsRaw: [],
-    filteredTeams: [],
-    localPlan: null,
-    visitantePlan: null
+    teams: [],
+    planCache: new Map()
   };
 
   const sections = [
@@ -18,10 +15,6 @@
   ];
 
   const $ = (sel) => document.querySelector(sel);
-
-  const normalize = (s='') => String(s)
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .toLowerCase().replace(/[^a-z0-9]+/g,'').trim();
 
   function withAdminMode(url){
     try{
@@ -46,6 +39,12 @@
     node.innerHTML = html;
   }
 
+  function slugify(s=''){
+    return String(s)
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase().replace(/[^a-z0-9]+/g,'');
+  }
+
   function emptyPlanilla(team=''){
     return {
       team,
@@ -57,84 +56,45 @@
     };
   }
 
-  function teamDivisionValue(item){
-    return String(item?.division || item?.categoria || item?.teamCategory || item?.planilla?.division || item?.plan?.division || '').toLowerCase().trim();
+  function normalizeTeamItem(item){
+    const name = item?.username || item?.team || item?.teamName || item?.equipo || item?.nombre || item?.name || item?.slug || 'Equipo';
+    const slug = item?.slug || slugify(name);
+    return { name, slug };
   }
 
-  function teamDisplay(item){
-    return item?.team || item?.teamName || item?.equipo || item?.nombre || item?.slug || 'Equipo';
+  async function fetchJson(path){
+    const res = await fetch(apiUrl(path), {
+      cache:'no-store',
+      credentials:'include'
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((data && (data.error || data.message)) || ('HTTP ' + res.status));
+    return data;
   }
 
-  function teamSlug(item){
-    return item?.slug || normalize(teamDisplay(item));
-  }
+  async function loadTeamsByCategory(category){
+    setStatus(`Cargando equipos de ${category}...`);
+    const data = await fetchJson('/api/teams?division=' + encodeURIComponent(category));
+    const raw = Array.isArray(data) ? data : Array.isArray(data?.teams) ? data.teams : Array.isArray(data?.users) ? data.users : [];
+    state.teams = raw
+      .map(normalizeTeamItem)
+      .filter(t => t.slug && t.name)
+      .sort((a,b) => a.name.localeCompare(b.name, 'es'));
 
-  async function loadTeams(){
-    setStatus('Cargando equipos desde DB...');
-    try{
-      const res = await fetch(apiUrl(PLANILLAS_ENDPOINT), { cache:'no-store', credentials:'include' });
-      if(!res.ok) throw new Error('HTTP ' + res.status);
-      const arr = await res.json();
-      if(!Array.isArray(arr)) throw new Error('La respuesta no es un array');
-      state.teamsRaw = arr;
-      applyCategoryFilter();
-      setStatus('<span class="ok">Equipos cargados desde DB.</span>');
-    }catch(err){
-      console.error(err);
-      state.teamsRaw = sampleTeams();
-      applyCategoryFilter();
-      setStatus('<span class="error">No se pudo leer la DB real. Quedó cargado un modo de ejemplo para probar la pantalla.</span>');
-    }
-  }
-
-  function sampleTeams(){
-    return [
-      { slug:'takospro', team:'TAKOS PRO', division:'segunda', planilla:{
-        capitan:['Favio Godoy', 'Nestor Gomez'],
-        individuales:['Javier Jerez','Emanuel Dengler','Mauro Moyano','Jose Alarcon','Pablo Sconza','Carlos Dominguez','Matias De Trueba'],
-        pareja1:['Antonio Haberkorn','Dylan Sierra'],
-        pareja2:['Javier Nicola','Favio Godoy'],
-        suplentes:['Cesar Corvillon','Braian Fursa']
-      }},
-      { slug:'oldies', team:'OLDIES', division:'segunda', planilla:{
-        capitan:['Enrique Rosales', 'Fabian Rodriguez'],
-        individuales:['Alan Nuñez','Fabian Rodriguez','Cristian Chavez','Enrique Rosales','Emanuel Garcia','Jorge Chavez','Jose Ortega'],
-        pareja1:['Adrian Bravo','Hector Gonzalez'],
-        pareja2:['Diego Paradiso','Alan Nuñez'],
-        suplentes:['Leonardo Longobardi','Fabian Rodriguez']
-      }},
-      { slug:'anexo', team:'ANEXO', division:'tercera', planilla:{
-        capitan:['Luis Miguel Cruz Mercado', ''],
-        individuales:['Julio Molina','Federico Damian Herrera','Andres Carrillo','Juan Suarez','Diego Paterno','Gaston Alejandro Fernandez','Miguel Angel Aguirre'],
-        pareja1:['Israel Lugo','Carlos Ariel Cabrera'],
-        pareja2:['Matias Daniel Flores','L Luis Mercado'],
-        suplentes:['Elias Juan Saavedra','Gustavo Romero']
-      }},
-      { slug:'academiadepool', team:'ACADEMIA DE POOL', division:'tercera', planilla:{
-        capitan:['Fabian Eguez', 'Joel Koroluk'],
-        individuales:['Fernando Kowalczuk','Damian Argiello','Julian Gonzalez','Fernando Ruiz','Cristian Georgiovitch','Facundo Luna','Gerardo Cardozo'],
-        pareja1:['Gabriel Zambianchi','Hernan Cardozo'],
-        pareja2:['Fabian Eguez','Orion Pala'],
-        suplentes:['Fernando Gonzalez','Joel Koroluk']
-      }}
-    ];
-  }
-
-  function filteredTeamsByCategory(category){
-    return state.teamsRaw
-      .filter(t => teamDivisionValue(t) === category)
-      .sort((a,b) => teamDisplay(a).localeCompare(teamDisplay(b), 'es'));
-  }
-
-  function applyCategoryFilter(){
-    const category = $('#categoria').value;
-    state.filteredTeams = filteredTeamsByCategory(category);
     fillTeamSelects();
+
+    if (state.teams.length < 2) {
+      document.getElementById('localRoot').innerHTML = '';
+      document.getElementById('visitanteRoot').innerHTML = '';
+      setStatus('<span class="error">No hay suficientes equipos cargados para esta categoría.</span>');
+      return;
+    }
+
+    setStatus(`<span class="ok">Equipos cargados para ${category}.</span>`);
     renderBoth();
   }
 
   function fillTeamSelects(){
-    const teams = state.filteredTeams;
     const localSel = $('#localTeam');
     const visSel = $('#visitanteTeam');
     const prevLocal = localSel.value;
@@ -143,40 +103,50 @@
     localSel.innerHTML = '<option value="">Seleccionar...</option>';
     visSel.innerHTML = '<option value="">Seleccionar...</option>';
 
-    teams.forEach(t => {
-      const label = teamDisplay(t);
-      const slug = teamSlug(t);
-      localSel.insertAdjacentHTML('beforeend', `<option value="${slug}">${label}</option>`);
-      visSel.insertAdjacentHTML('beforeend', `<option value="${slug}">${label}</option>`);
+    state.teams.forEach(t => {
+      localSel.insertAdjacentHTML('beforeend', `<option value="${t.slug}">${t.name}</option>`);
+      visSel.insertAdjacentHTML('beforeend', `<option value="${t.slug}">${t.name}</option>`);
     });
 
     if ([...localSel.options].some(o => o.value === prevLocal)) {
       localSel.value = prevLocal;
-    } else if (teams[0]) {
-      localSel.value = teamSlug(teams[0]);
+    } else if (state.teams[0]) {
+      localSel.value = state.teams[0].slug;
     }
 
     if ([...visSel.options].some(o => o.value === prevVis && o.value !== localSel.value)) {
       visSel.value = prevVis;
     } else {
-      const second = teams.find(t => teamSlug(t) !== localSel.value);
-      visSel.value = second ? teamSlug(second) : '';
+      const other = state.teams.find(t => t.slug !== localSel.value);
+      visSel.value = other ? other.slug : '';
     }
   }
 
-  function findPlan(slug){
-    const item = state.filteredTeams.find(t => teamSlug(t) === slug) || state.teamsRaw.find(t => teamSlug(t) === slug);
-    if(!item) return emptyPlanilla(slug);
-    const plan = item.planilla || item.plan || item;
-    return {
-      team: teamDisplay(item),
-      slug: teamSlug(item),
-      capitan: Array.isArray(plan.capitan) ? plan.capitan : ['',''],
-      individuales: Array.isArray(plan.individuales) ? plan.individuales : ['','','','','','',''],
-      pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['',''],
-      pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['',''],
-      suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['','']
-    };
+  async function loadPlanilla(teamSlug){
+    if (!teamSlug) return emptyPlanilla('');
+    if (state.planCache.has(teamSlug)) return state.planCache.get(teamSlug);
+
+    try{
+      const data = await fetchJson('/api/team/planilla?team=' + encodeURIComponent(teamSlug));
+      const plan = data?.planilla || data || {};
+      const normalized = {
+        team: data?.team || plan?.team || state.teams.find(t => t.slug === teamSlug)?.name || teamSlug,
+        slug: teamSlug,
+        capitan: Array.isArray(plan.capitan) ? plan.capitan : ['',''],
+        individuales: Array.isArray(plan.individuales) ? plan.individuales : ['','','','','','',''],
+        pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['',''],
+        pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['',''],
+        suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['','']
+      };
+      state.planCache.set(teamSlug, normalized);
+      return normalized;
+    }catch(err){
+      console.warn('loadPlanilla', teamSlug, err);
+      const fallback = emptyPlanilla(state.teams.find(t => t.slug === teamSlug)?.name || teamSlug);
+      fallback.slug = teamSlug;
+      state.planCache.set(teamSlug, fallback);
+      return fallback;
+    }
   }
 
   function makePtsSelect(max=6){
@@ -200,7 +170,7 @@
 
     const card = document.getElementById('cardTpl').content.firstElementChild.cloneNode(true);
     card.querySelector('.team-role').textContent = role;
-    card.querySelector('.team-title').textContent = (plan.team || '').toUpperCase();
+    card.querySelector('.team-title').textContent = String(plan.team || '').toUpperCase();
 
     const totalWrap = card.querySelector('.total-wrap');
     const winsWrap = card.querySelector('.wins-wrap');
@@ -308,19 +278,12 @@
     if (!localSel.value || !visSel.value) return;
     if (localSel.value !== visSel.value) return;
 
-    const alternative = state.filteredTeams.find(t => {
-      const slug = teamSlug(t);
-      return changed === 'local' ? slug !== localSel.value : slug !== visSel.value;
-    });
-
-    if (changed === 'local') {
-      visSel.value = alternative ? teamSlug(alternative) : '';
-    } else {
-      localSel.value = alternative ? teamSlug(alternative) : '';
-    }
+    const alternative = state.teams.find(t => changed === 'local' ? t.slug !== localSel.value : t.slug !== visSel.value);
+    if (changed === 'local') visSel.value = alternative ? alternative.slug : '';
+    else localSel.value = alternative ? alternative.slug : '';
   }
 
-  function renderBoth(){
+  async function renderBoth(){
     const localSlug = $('#localTeam').value;
     const visitanteSlug = $('#visitanteTeam').value;
 
@@ -331,11 +294,13 @@
       return;
     }
 
-    state.localPlan = findPlan(localSlug);
-    state.visitantePlan = findPlan(visitanteSlug);
+    const [localPlan, visitantePlan] = await Promise.all([
+      loadPlanilla(localSlug),
+      loadPlanilla(visitanteSlug)
+    ]);
 
-    renderTeam('localRoot', 'LOCAL', state.localPlan, false);
-    renderTeam('visitanteRoot', 'VISITANTE', state.visitantePlan, true);
+    renderTeam('localRoot', 'LOCAL', localPlan, false);
+    renderTeam('visitanteRoot', 'VISITANTE', visitantePlan, true);
     bindScoreEvents();
     recalc();
   }
@@ -482,10 +447,7 @@
         status
       });
 
-      setStatus(
-        `<span class="ok">Cruce guardado en DB.</span> ` +
-        `Ganador automático: <strong>${winnerSlug.toUpperCase()}</strong>.`
-      );
+      setStatus(`<span class="ok">Cruce guardado en DB.</span> Ganador automático: <strong>${winnerSlug.toUpperCase()}</strong>.`);
     }catch(err){
       console.error(err);
       setStatus(`<span class="error">No se pudo guardar en DB: ${err.message || 'error desconocido'}.</span>`);
@@ -503,22 +465,23 @@
   function bindUi(){
     $('#btnGuardar').addEventListener('click', saveToDb);
 
-    $('#categoria').addEventListener('change', () => {
-      applyCategoryFilter();
+    $('#categoria').addEventListener('change', async () => {
+      state.planCache.clear();
+      await loadTeamsByCategory($('#categoria').value);
     });
 
-    $('#localTeam').addEventListener('change', () => {
+    $('#localTeam').addEventListener('change', async () => {
       ensureDistinctTeams('local');
-      renderBoth();
+      await renderBoth();
     });
 
-    $('#visitanteTeam').addEventListener('change', () => {
+    $('#visitanteTeam').addEventListener('change', async () => {
       ensureDistinctTeams('visitante');
-      renderBoth();
+      await renderBoth();
     });
   }
 
-  function init(){
+  async function init(){
     initHeaderLinks();
     bindUi();
 
@@ -527,7 +490,7 @@
     const dd = String(today.getDate()).padStart(2,'0');
     $('#fechaISO').value = `${today.getFullYear()}-${mm}-${dd}`;
 
-    loadTeams();
+    await loadTeamsByCategory($('#categoria').value);
   }
 
   document.addEventListener('DOMContentLoaded', init);

@@ -30,7 +30,7 @@
         <label>Categoría
           <select id="categoria">
             <option value="segunda">Segunda</option>
-            <option value="tercera">Tercera</option>
+            <option value="tercera" selected>Tercera</option>
             <option value="primera">Primera</option>
           </select>
         </label>
@@ -47,7 +47,7 @@
       </div>
 
       <div id="status" class="hint">
-        La carga de equipos intenta leer desde <code>/api/admin/planillas</code>. El guardado impacta directo vía backend.
+        Los equipos se cargan por división desde <code>/api/teams?division=...</code> y las planillas desde <code>/api/team/planilla?team=...</code>.
       </div>
     </section>
 
