@@ -223,8 +223,7 @@
 }
 
 
-
-/* Ajustes compactos para encuentros */
+/* Ajustes compactos sin perder simetría entre local y visitante */
 .results-list{
   display:grid;
   grid-template-columns:repeat(3, minmax(0, 1fr));
@@ -303,6 +302,19 @@
 .encounter-left .wins-wrap,
 .encounter-right .wins-wrap{
   margin-top:8px;
+}
+
+.encounter-right .totals-chip,
+.encounter-right .wins-chip{
+  display:flex;
+  flex-direction:row-reverse;
+  align-items:center;
+  gap:8px;
+}
+
+.encounter-right .totals-chip .label,
+.encounter-right .wins-chip .label{
+  text-align:right;
 }
 
 @media (max-width: 1500px){

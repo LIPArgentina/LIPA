@@ -45,10 +45,12 @@
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
-  function safeArr(value){
-    return Array.isArray(value)
-      ? value.map(v => String(v || '').trim()).filter(Boolean)
-      : [];
+  function safeArr(value, expected){
+    const arr = Array.isArray(value) ? value.map(v => String(v || '').trim()) : [];
+    const hasContent = arr.some(Boolean);
+    if (!hasContent) return [];
+    while (arr.length < expected) arr.push('');
+    return arr.slice(0, expected);
   }
 
   function createPtsBox(value){
@@ -136,11 +138,11 @@
 
     const scoreRows = Array.isArray(scoreData?.scoreRows) ? scoreData.scoreRows : [];
     const data = {
-      'CAPITÁN': safeArr(planilla?.capitan),
-      'INDIVIDUALES': safeArr(planilla?.individuales),
-      'PAREJA 1': safeArr(planilla?.pareja1),
-      'PAREJA 2': safeArr(planilla?.pareja2),
-      'SUPLENTES': safeArr(planilla?.suplentes)
+      'CAPITÁN': safeArr(planilla?.capitan, 2),
+      'INDIVIDUALES': safeArr(planilla?.individuales, 7),
+      'PAREJA 1': safeArr(planilla?.pareja1, 2),
+      'PAREJA 2': safeArr(planilla?.pareja2, 2),
+      'SUPLENTES': safeArr(planilla?.suplentes, 3)
     };
 
     const secs = card.querySelector('.sections');
