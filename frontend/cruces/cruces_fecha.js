@@ -197,7 +197,7 @@ function apiUrl(path){
         return;
       }
 
-      const nodeDate = node.date || node.fecha || node.fechaISO || node.fechaKey || inheritedDate || null;
+      const nodeDate = node.date || node.fecha || node.fechaISO || node.fechaKey || node.fechaFixture || inheritedDate || null;
 
       if (node.local && node.visitante) pushCruce(result, node.local, node.visitante, nodeDate);
       if (node.equipoLocal && node.equipoVisitante) pushCruce(result, node.equipoLocal, node.equipoVisitante, nodeDate);
