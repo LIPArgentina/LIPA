@@ -169,20 +169,36 @@ function apiUrl(path){
     return normPlanillaSlug(ref.slug || ref.teamSlug || ref.team || ref.equipo || ref.nombre || ref.displayName || '');
   }
 
-  function pushCruce(list, localRef, visitanteRef, date){
+  function qualifyTeamSlug(slug, category){
+    const base = normPlanillaSlug(String(slug || '').replace(/_(tercera|segunda)$/i, ''));
+    const cat = String(category || '').trim().toLowerCase();
+    if (!base) return '';
+    if (cat === 'tercera' || cat === 'segunda') return `${base}_${cat}`;
+    return base;
+  }
+
+  function dequalifyTeamSlug(slug){
+    return normPlanillaSlug(String(slug || '').replace(/_(tercera|segunda)$/i, ''));
+  }
+
+  function pushCruce(list, localRef, visitanteRef, date, category){
     const localName = teamNameFromRef(localRef);
     const visitanteName = teamNameFromRef(visitanteRef);
     if (!localName || !visitanteName) return;
+
+    const rawLocalSlug = teamSlugFromRef(localRef) || normPlanillaSlug(localName);
+    const rawVisitanteSlug = teamSlugFromRef(visitanteRef) || normPlanillaSlug(visitanteName);
+
     list.push({
       local: localName,
       visitante: visitanteName,
-      localSlug: teamSlugFromRef(localRef) || normPlanillaSlug(localName),
-      visitanteSlug: teamSlugFromRef(visitanteRef) || normPlanillaSlug(visitanteName),
+      localSlug: qualifyTeamSlug(rawLocalSlug, category),
+      visitanteSlug: qualifyTeamSlug(rawVisitanteSlug, category),
       date: date || null
     });
   }
 
-  function extractCruces(input){
+  function extractCruces(input, category){
     const result = [];
     const visited = new WeakSet();
 
@@ -199,10 +215,10 @@ function apiUrl(path){
 
       const nodeDate = node.date || node.fecha || node.fechaISO || node.fechaKey || inheritedDate || null;
 
-      if (node.local && node.visitante) pushCruce(result, node.local, node.visitante, nodeDate);
-      if (node.equipoLocal && node.equipoVisitante) pushCruce(result, node.equipoLocal, node.equipoVisitante, nodeDate);
-      if (node.home && node.away) pushCruce(result, node.home, node.away, nodeDate);
-      if (node.left && node.right) pushCruce(result, node.left, node.right, nodeDate);
+      if (node.local && node.visitante) pushCruce(result, node.local, node.visitante, nodeDate, category);
+      if (node.equipoLocal && node.equipoVisitante) pushCruce(result, node.equipoLocal, node.equipoVisitante, nodeDate, category);
+      if (node.home && node.away) pushCruce(result, node.home, node.away, nodeDate, category);
+      if (node.left && node.right) pushCruce(result, node.left, node.right, nodeDate, category);
 
       if (Array.isArray(node.equipos) && node.equipos.length >= 2) {
         const equipos = node.equipos.filter(Boolean);
@@ -211,12 +227,12 @@ function apiUrl(path){
           visitante: equipos.find(item => String(item?.categoria || '').toLowerCase() === 'visitante')
         };
         if (byCategory.local && byCategory.visitante) {
-          pushCruce(result, byCategory.local, byCategory.visitante, nodeDate);
+          pushCruce(result, byCategory.local, byCategory.visitante, nodeDate, category);
         } else {
           for (let i = 0; i < equipos.length; i += 2) {
             const a = equipos[i];
             const b = equipos[i + 1];
-            if (a && b) pushCruce(result, a, b, nodeDate);
+            if (a && b) pushCruce(result, a, b, nodeDate, category);
           }
         }
       }
@@ -234,18 +250,33 @@ function apiUrl(path){
     return [...dedup.values()];
   }
 
-  function findCruceForTeam(cruces, teamCandidates){
-    const rawCandidates = Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates];
+  function findCruceForTeam(cruces, teamCandidates, category){
+    const variants = new Set();
     const slugCandidates = new Set();
-    const nameVariants = new Set();
 
-    rawCandidates.forEach(value => {
-      const raw = String(value || '').trim();
-      if (!raw) return;
-      const slug = normPlanillaSlug(raw);
-      if (slug) slugCandidates.add(slug);
-      teamKeyVariants(raw).forEach(v => nameVariants.add(v));
+    (Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates]).forEach(value => {
+      const plain = dequalifyTeamSlug(value);
+      const qualified = qualifyTeamSlug(value, category);
+      if (plain) slugCandidates.add(plain);
+      if (qualified) slugCandidates.add(qualified);
+      teamKeyVariants(value).forEach(v => variants.add(v));
+      if (plain) teamKeyVariants(plain).forEach(v => variants.add(v));
+      if (qualified) teamKeyVariants(qualified).forEach(v => variants.add(v));
     });
+
+    const exactSlugMatches = cruces.filter(cruce => {
+      const localSlug = qualifyTeamSlug(cruce.localSlug || cruce.local, category);
+      const visitanteSlug = qualifyTeamSlug(cruce.visitanteSlug || cruce.visitante, category);
+      return slugCandidates.has(localSlug) || slugCandidates.has(visitanteSlug) || slugCandidates.has(dequalifyTeamSlug(localSlug)) || slugCandidates.has(dequalifyTeamSlug(visitanteSlug));
+    });
+
+    const matches = exactSlugMatches.length ? exactSlugMatches : cruces.filter(cruce => {
+      const localVariants = teamKeyVariants(cruce.local);
+      const visitanteVariants = teamKeyVariants(cruce.visitante);
+      return localVariants.some(v => variants.has(v)) || visitanteVariants.some(v => variants.has(v));
+    });
+
+    if (!matches.length) return null;
 
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -257,34 +288,15 @@ function apiUrl(path){
       return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     };
 
-    const scoreMatch = (item, mode) => {
+    const scored = matches.map(item => {
       const d = toDate(item.date);
       const diff = d ? Math.abs(d - today) : Number.MAX_SAFE_INTEGER;
       const inWindow = d ? (today >= new Date(d.getTime() - 5*24*60*60*1000) && today <= new Date(d.getTime() + 1*24*60*60*1000)) : false;
-      return { item, d, diff, inWindow, mode };
-    };
+      return { item, d, diff, inWindow };
+    });
 
-    const exactSlugMatches = cruces
-      .filter(cruce => slugCandidates.has(normPlanillaSlug(cruce.localSlug || '')) || slugCandidates.has(normPlanillaSlug(cruce.visitanteSlug || '')))
-      .map(item => scoreMatch(item, 'slug'));
-
-    if (exactSlugMatches.length) {
-      const candidates = exactSlugMatches.filter(x => x.inWindow);
-      const pool = candidates.length ? candidates : exactSlugMatches;
-      pool.sort((a, b) => a.diff - b.diff);
-      return pool[0]?.item || null;
-    }
-
-    const fuzzyMatches = cruces.filter(cruce => {
-      const localVariants = teamKeyVariants(cruce.local);
-      const visitanteVariants = teamKeyVariants(cruce.visitante);
-      return localVariants.some(v => nameVariants.has(v)) || visitanteVariants.some(v => nameVariants.has(v));
-    }).map(item => scoreMatch(item, 'name'));
-
-    if (!fuzzyMatches.length) return null;
-
-    const candidates = fuzzyMatches.filter(x => x.inWindow);
-    const pool = candidates.length ? candidates : fuzzyMatches;
+    const candidates = scored.filter(x => x.inWindow);
+    const pool = candidates.length ? candidates : scored;
     pool.sort((a, b) => a.diff - b.diff);
     return pool[0]?.item || null;
   }
@@ -462,8 +474,15 @@ function apiUrl(path){
   }
 
   async function loadFirstExistingPlanilla(slug) {
-    const variants = teamKeyVariants(slug).map(v => normPlanillaSlug(v)).filter(Boolean);
-    const team = variants[0] || normPlanillaSlug(slug);
+    const plainSlug = dequalifyTeamSlug(slug);
+    const qualifiedSlug = normPlanillaSlug(slug);
+    const variants = Array.from(new Set([
+      qualifiedSlug,
+      plainSlug,
+      ...teamKeyVariants(slug).map(v => normPlanillaSlug(v)).filter(Boolean),
+      ...teamKeyVariants(plainSlug).map(v => normPlanillaSlug(v)).filter(Boolean)
+    ].filter(Boolean)));
+    const team = variants[0] || plainSlug || qualifiedSlug;
 
     try {
       const planillas = await loadPlanillasIndex();
@@ -1540,10 +1559,10 @@ btn.onclick = async () => {
       if (!category) throw new Error('Falta categoría');
 
       const crucesRaw = await loadCrucesFromDb(category);
-      const cruces = extractCruces(crucesRaw);
+      const cruces = extractCruces(crucesRaw, category);
       if (!cruces.length) throw new Error('No se encontraron cruces en la base de datos para esta categoría.');
 
-      const match = findCruceForTeam(cruces, teamCandidates);
+      const match = findCruceForTeam(cruces, teamCandidates, category);
       if (!match) throw new Error('No se encontró un cruce para el equipo logueado.');
 
       const local = { name: match.local, teamSlug: match.localSlug || normPlanillaSlug(match.local) };
