@@ -53,9 +53,9 @@ body{
   cursor:pointer;
 }
 .page{
-  max-width:980px;
+  max-width:860px;
   margin:0 auto;
-  padding:12px 10px 18px;
+  padding:10px 8px 16px;
 }
 .topbar,.card{
   background:var(--panel);
@@ -63,7 +63,7 @@ body{
   border-radius:12px;
 }
 .topbar{
-  padding:12px;
+  padding:10px;
 }
 .controls{
   display:grid;
@@ -115,50 +115,50 @@ input,select{
 .layout{
   display:grid;
   grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
-  gap:10px;
-  margin-top:12px;
+  gap:8px;
+  margin-top:10px;
   align-items:start;
 }
 #localRoot, #visitanteRoot{
   width:100%;
-  max-width:485px;
+  max-width:426px;
 }
 #localRoot{justify-self:end}
 #visitanteRoot{justify-self:start}
 .card{
-  padding:12px 10px;
+  padding:10px 9px;
 }
 .team-role{
   text-align:center;
   color:var(--muted);
-  font-size:9px;
+  font-size:8px;
   letter-spacing:.08em;
-  margin:0 0 6px;
+  margin:0 0 5px;
 }
 .team-title{
   text-align:center;
   color:var(--accent);
-  font-size:16px;
-  margin:0 0 4px;
+  font-size:14px;
+  margin:0 0 3px;
 }
-.section{margin-top:10px}
+.section{margin-top:9px}
 .section h3{
-  margin:0 0 6px;
+  margin:0 0 5px;
   text-align:center;
   color:var(--accent);
   letter-spacing:.06em;
-  font-size:9px;
+  font-size:8px;
 }
 .row{
   display:grid;
-  grid-template-columns:22px 50% 28px;
+  grid-template-columns:20px 46% 26px;
   justify-content:center;
-  gap:6px;
+  gap:5px;
   align-items:center;
   margin:4px 0;
 }
 .row.right{
-  grid-template-columns:28px 50% 22px;
+  grid-template-columns:26px 46% 20px;
   justify-content:center;
 }
 .badge,.ptsbox,.totalbox,.winsbox{
@@ -168,27 +168,31 @@ input,select{
   font-weight:900;
 }
 .badge{
-  height:22px;
+  height:20px;
   background:var(--accent);
   color:#111;
-  font-size:10px;
+  font-size:9px;
 }
 .select-wrap{
+  width:100%;
+  display:flex;
+  justify-content:center;
   min-width:0;
 }
 .player-select{
   width:100%;
-  min-height:24px;
+  max-width:188px;
+  min-height:22px;
   border-radius:7px;
   background:#fff;
   color:#111;
   border:0;
   padding:4px 8px;
   font-weight:700;
-  font-size:10px;
+  font-size:9px;
 }
 .ptsbox{
-  height:22px;
+  height:20px;
   background:#fff;
 }
 .ptsbox select{
@@ -198,7 +202,7 @@ input,select{
   padding:0;
   text-align:center;
   font-weight:900;
-  font-size:11px;
+  font-size:10px;
 }
 .hidden-box{
   visibility:hidden;
@@ -206,7 +210,7 @@ input,select{
 .totals{
   display:flex;
   justify-content:flex-end;
-  margin-top:10px;
+  margin-top:9px;
 }
 .totals.right{
   justify-content:flex-start;
@@ -221,28 +225,28 @@ input,select{
   background:#0d0e10;
   border:1px solid #2d3136;
   border-radius:8px;
-  padding:6px 8px;
+  padding:6px 7px;
 }
 .chip.reverse{
   flex-direction:row-reverse;
 }
 .label{
-  font-size:9px;
+  font-size:8px;
   font-weight:900;
 }
 .totalbox{
-  width:22px;
-  height:22px;
+  width:20px;
+  height:20px;
   background:#fff;
   color:#111;
-  font-size:11px;
+  font-size:10px;
 }
 .winsbox{
-  width:28px;
-  height:28px;
+  width:26px;
+  height:26px;
   background:var(--accent);
   color:#111;
-  font-size:14px;
+  font-size:13px;
 }
 .ok{color:var(--ok);font-weight:700}
 .error{color:var(--danger);font-weight:700}
@@ -257,6 +261,15 @@ input,select{
   #localRoot, #visitanteRoot{
     max-width:none;
     justify-self:stretch;
+  }
+  .row{
+    grid-template-columns:22px 56% 28px;
+  }
+  .row.right{
+    grid-template-columns:28px 56% 22px;
+  }
+  .player-select{
+    max-width:none;
   }
 }
 @media (max-width:700px){
@@ -281,7 +294,7 @@ input,select{
   .row{grid-template-columns:24px 1fr 34px;gap:6px}
   .row.right{grid-template-columns:34px 1fr 24px}
   .badge{height:24px;font-size:10px}
-  .player-select{min-height:28px;font-size:11px;padding:6px 8px}
+  .player-select{min-height:28px;font-size:11px;padding:6px 8px;max-width:none}
   .ptsbox{height:24px}
   .ptsbox select{font-size:11px}
   .totals{margin-top:10px}
@@ -290,15 +303,4 @@ input,select{
   .label{font-size:10px}
   .totalbox{width:24px;height:24px;font-size:11px}
   .winsbox{width:28px;height:28px;font-size:14px}
-}
-
-.select-wrap{
-  width:100%;
-  display:flex;
-  justify-content:center;
-}
-
-.player-select{
-  width:100%;
-  max-width:220px;
 }

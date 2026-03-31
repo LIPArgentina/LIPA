@@ -474,3 +474,25 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
+(function(){
+  function wireDatePicker(){
+    const input = document.getElementById('fechaISO');
+    if (!input) return;
+
+    const openPicker = () => {
+      if (typeof input.showPicker === 'function') {
+        try { input.showPicker(); } catch (_) {}
+      }
+    };
+
+    input.addEventListener('click', openPicker);
+    input.addEventListener('focus', openPicker);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wireDatePicker);
+  } else {
+    wireDatePicker();
+  }
+})();
