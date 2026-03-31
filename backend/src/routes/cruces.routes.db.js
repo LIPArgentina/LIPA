@@ -98,6 +98,7 @@ function normalizeDateOnly(value) {
   return String(value || '').slice(0, 10);
 }
 
+
 function pickFixtureFecha(fechas = []) {
   const normalized = fechas
     .map((fecha) => ({
@@ -109,9 +110,27 @@ function pickFixtureFecha(fechas = []) {
 
   if (!normalized.length) return null;
 
-  const todayKey = new Date().toISOString().slice(0, 10);
-  return normalized.find((f) => f.dateKey >= todayKey)?.raw || normalized[normalized.length - 1].raw;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayKey = today.toISOString().slice(0, 10);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = tomorrow.toISOString().slice(0, 10);
+
+  const exactToday = normalized.find((f) => f.dateKey === todayKey);
+  if (exactToday) return exactToday.raw;
+
+  const exactTomorrow = normalized.find((f) => f.dateKey === tomorrowKey);
+  if (exactTomorrow) return exactTomorrow.raw;
+
+  const nextFuture = normalized.find((f) => f.dateKey > tomorrowKey);
+  if (nextFuture) return nextFuture.raw;
+
+  return normalized[normalized.length - 1].raw;
 }
+
 
 function extractCrucesFromFecha(fechaNode) {
   const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
