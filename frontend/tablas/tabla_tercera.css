@@ -506,3 +506,35 @@ header .logo-link{ display:inline-block; line-height:0; }
     padding:0 3px;
   }
 }
+
+
+.encuentros-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:.35rem .7rem;
+  border:1px solid #b28900;
+  border-radius:.5rem;
+  background:transparent;
+  color:#ffcc00;
+  text-decoration:none;
+  font-weight:800;
+  letter-spacing:.04em;
+  font-size:12px;
+  white-space:nowrap;
+}
+
+.encuentros-btn:hover{
+  filter:brightness(1.08);
+}
+
+.grid > section.card[data-group] .fecha-header{
+  gap:.45rem;
+}
+
+@media (max-width:640px){
+  .encuentros-btn{
+    font-size:11px;
+    padding:.3rem .55rem;
+  }
+}

@@ -51,6 +51,21 @@ function formatDateDMY(val){
   return s;
 }
 
+function buildDateKey(val){
+  const s = String(val || '').trim();
+  if (!s) return '';
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
+  const t = Date.parse(s);
+  if (!Number.isNaN(t)) {
+    const d = new Date(t);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  return s;
+}
+
 const API_BASE = 'https://liga-backend-tt82.onrender.com/api';
 
 async function fetchFixture(kind){
@@ -95,7 +110,21 @@ function ensureFechaBlock(section, fechaIndex, fechaText){
   const tpl = document.getElementById('tpl-fecha');
   const clone = document.importNode(tpl.content, true);
   clone.querySelector('.h2').textContent = `${fechaIndex}ª FECHA`;
-  clone.querySelector('.fecha-text').textContent = formatDateDMY(fechaText);
+
+  const formattedDate = formatDateDMY(fechaText);
+  clone.querySelector('.fecha-text').textContent = formattedDate;
+
+  const encuentrosBtn = clone.querySelector('.encuentros-btn');
+  if (encuentrosBtn) {
+    const params = new URLSearchParams({
+      category: 'tercera',
+      kind: selectedKind,
+      date: buildDateKey(fechaText),
+      fecha: String(fechaIndex)
+    });
+    encuentrosBtn.href = `../encuentros/encuentros.html?${params.toString()}`;
+  }
+
   clone.querySelector('.rows').setAttribute('data-fecha', String(fechaIndex));
   section.appendChild(clone);
   return section.querySelector(`.rows[data-fecha="${fechaIndex}"]`);
