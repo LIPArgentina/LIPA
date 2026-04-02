@@ -700,3 +700,38 @@ document.addEventListener('DOMContentLoaded', () => {
     wirePasswordToggles();
   }
 })();
+
+
+/* ====== Fallback robusto: botón Probar cruces ====== */
+(function(){
+  function bindCrucesTestButton(){
+    const btn = document.getElementById('btnTestCruces');
+    if (!btn || btn.dataset.boundCrucesTest === '1') return;
+    btn.dataset.boundCrucesTest = '1';
+
+    const handler = function(ev){
+      if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+      if (typeof openCrucesTestMode === 'function') {
+        openCrucesTestMode();
+      }
+    };
+
+    btn.onclick = handler;
+    btn.addEventListener('click', handler);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindCrucesTestButton);
+  } else {
+    bindCrucesTestButton();
+  }
+
+  document.addEventListener('click', function(ev){
+    const btn = ev.target && ev.target.closest ? ev.target.closest('#btnTestCruces') : null;
+    if (!btn) return;
+    ev.preventDefault();
+    if (typeof openCrucesTestMode === 'function') {
+      openCrucesTestMode();
+    }
+  });
+})();
