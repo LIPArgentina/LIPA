@@ -25,6 +25,8 @@ window.addEventListener('load', () => {
 const GROUPS = ['A', 'B'];
 const cache = { ida: null, vuelta: null };
 let selectedKind = 'ida';
+let standingsSteps = [];
+let selectedStandingsIndex = -1;
 
 function normalizeName(s){
   const raw = (s || '').toString().trim().replace(/\s+/g, ' ');
@@ -164,48 +166,63 @@ function renderSelectedFixture(){
   GROUPS.forEach(group => buildFixtureCard(group, fx.fechas));
 }
 
-function calcRows(feeds){
+function collectStandingsEntries(feeds){
+  const entries = [];
+  (feeds || []).forEach(feed => {
+    if (!feed) return;
+    const kind = String(feed.kind || '').toLowerCase();
+    (feed?.fechas || []).forEach((fecha, idx) => {
+      entries.push({
+        kind,
+        fechaIndex: idx + 1,
+        fecha
+      });
+    });
+  });
+  return entries;
+}
+
+function calcRowsFromEntries(entries){
   const puntos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const ju = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const tr = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const teamsSeen = Object.fromEntries(GROUPS.map(g => [g, new Map()]));
 
-  (feeds || []).forEach(feed => {
-    (feed?.fechas || []).forEach(fecha => {
-      (fecha?.tablas || []).forEach(tabla => {
-        const g = String(tabla?.grupo || '').toUpperCase();
-        if (!GROUPS.includes(g)) return;
+  (entries || []).forEach(entry => {
+    const fecha = entry?.fecha;
+    (fecha?.tablas || []).forEach(tabla => {
+      const g = String(tabla?.grupo || '').toUpperCase();
+      if (!GROUPS.includes(g)) return;
 
-        const equipos = (tabla?.equipos || []).map(e => ({
-          equipo: e?.equipo || '',
-          puntos: parseInt(e?.puntos ?? 0, 10) || 0,
-          puntosExtra: parseInt(e?.puntosExtra ?? 0, 10) || 0
-        }));
+      const equipos = (tabla?.equipos || []).map(e => ({
+        equipo: e?.equipo || '',
+        puntos: parseInt(e?.puntos ?? 0, 10) || 0,
+        puntosExtra: parseInt(e?.puntosExtra ?? 0, 10) || 0
+      }));
 
-        equipos.forEach(it => {
-          const key = normalizeName(it.equipo);
-          if (!key || key === 'WO') return;
-          if (!puntos[g][key]) puntos[g][key] = { equipo: key, pts: 0 };
-          puntos[g][key].pts += it.puntos;
-          tr[g][key] = (tr[g][key] || 0) + it.puntosExtra;
-          if (!teamsSeen[g].has(key)) teamsSeen[g].set(key, it.equipo);
-        });
-
-        for (let i = 0; i < equipos.length; i += 2){
-          const A = equipos[i];
-          const B = equipos[i + 1];
-          if (!A || !B) continue;
-
-          const aK = normalizeName(A.equipo);
-          const bK = normalizeName(B.equipo);
-          if (!aK || !bK) continue;
-          if (aK === 'WO' || bK === 'WO') continue;
-          if (A.puntos === 0 && B.puntos === 0) continue;
-
-          ju[g][aK] = (ju[g][aK] || 0) + 1;
-          ju[g][bK] = (ju[g][bK] || 0) + 1;
-        }
+      equipos.forEach(it => {
+        const key = normalizeName(it.equipo);
+        if (!key || key === 'WO') return;
+        if (!puntos[g][key]) puntos[g][key] = { equipo: key, pts: 0 };
+        puntos[g][key].pts += it.puntos;
+        tr[g][key] = (tr[g][key] || 0) + it.puntosExtra;
+        if (!teamsSeen[g].has(key)) teamsSeen[g].set(key, it.equipo);
       });
+
+      for (let i = 0; i < equipos.length; i += 2){
+        const A = equipos[i];
+        const B = equipos[i + 1];
+        if (!A || !B) continue;
+
+        const aK = normalizeName(A.equipo);
+        const bK = normalizeName(B.equipo);
+        if (!aK || !bK) continue;
+        if (aK === 'WO' || bK === 'WO') continue;
+        if (A.puntos === 0 && B.puntos === 0 && A.puntosExtra === 0 && B.puntosExtra === 0) continue;
+
+        ju[g][aK] = (ju[g][aK] || 0) + 1;
+        ju[g][bK] = (ju[g][bK] || 0) + 1;
+      }
     });
   });
 
@@ -230,6 +247,26 @@ function calcRows(feeds){
   return result;
 }
 
+function buildStandingsSteps(){
+  const idaEntries = collectStandingsEntries(cache.ida ? [{ ...cache.ida, kind: 'ida' }] : []);
+  const vueltaEntries = collectStandingsEntries(cache.vuelta ? [{ ...cache.vuelta, kind: 'vuelta' }] : []);
+  const ordered = [...idaEntries, ...vueltaEntries];
+
+  standingsSteps = ordered.map((entry, idx) => ({
+    index: idx,
+    label: `Fecha ${entry.fechaIndex} ${entry.kind}`,
+    result: calcRowsFromEntries(ordered.slice(0, idx + 1))
+  }));
+
+  standingsSteps.push({
+    index: ordered.length,
+    label: 'Tabla final',
+    result: calcRowsFromEntries(ordered)
+  });
+
+  selectedStandingsIndex = standingsSteps.length ? standingsSteps.length - 1 : -1;
+}
+
 function buildStandingRow(d, idx){
   const row = document.createElement('div');
   row.className = 'row';
@@ -252,12 +289,52 @@ function fillBoard(group, data){
   (data || []).forEach((d, idx) => holder.appendChild(buildStandingRow(d, idx)));
 }
 
-function renderStandings(kind = selectedKind){
-  const feed = cache[kind];
-  if (!feed) return;
-  const result = calcRows([feed]);
+function renderStandings(){
+  if (!standingsSteps.length) return;
+  const safeIndex = Math.max(0, Math.min(selectedStandingsIndex, standingsSteps.length - 1));
+  selectedStandingsIndex = safeIndex;
+  const step = standingsSteps[safeIndex];
+  const result = step?.result || {};
+
   GROUPS.forEach(g => fillBoard(g, result[g] || []));
+  syncStandingsControls();
   equalizeTableWidths();
+}
+
+function syncStandingsControls(){
+  const select = document.getElementById('standingsStep');
+  const prev = document.getElementById('standingsPrev');
+  const next = document.getElementById('standingsNext');
+
+  if (select){
+    const currentValue = String(selectedStandingsIndex);
+    if (select.value !== currentValue) select.value = currentValue;
+  }
+
+  if (prev) prev.disabled = selectedStandingsIndex <= 0;
+  if (next) next.disabled = selectedStandingsIndex >= standingsSteps.length - 1;
+}
+
+function populateStandingsControls(){
+  const select = document.getElementById('standingsStep');
+  if (!select) return;
+
+  select.innerHTML = '';
+  standingsSteps.forEach((step, idx) => {
+    const opt = document.createElement('option');
+    opt.value = String(idx);
+    opt.textContent = step.label;
+    select.appendChild(opt);
+  });
+
+  syncStandingsControls();
+}
+
+function setStandingsStep(index){
+  if (!standingsSteps.length) return;
+  const safeIndex = Math.max(0, Math.min(Number(index) || 0, standingsSteps.length - 1));
+  selectedStandingsIndex = safeIndex;
+  renderStandings();
 }
 
 function setActive(kind){
@@ -271,7 +348,6 @@ async function switchFixture(kind){
   try { localStorage.setItem('fixture_kind_segunda', kind); } catch(_) {}
   if (!cache[kind]) await fetchFixture(kind);
   renderSelectedFixture();
-  renderStandings(kind);
   setActive(kind);
 }
 
@@ -287,9 +363,25 @@ async function init(){
     });
   });
 
+  const select = document.getElementById('standingsStep');
+  const prev = document.getElementById('standingsPrev');
+  const next = document.getElementById('standingsNext');
+
+  if (select){
+    select.addEventListener('change', () => setStandingsStep(select.value));
+  }
+  if (prev){
+    prev.addEventListener('click', () => setStandingsStep(selectedStandingsIndex - 1));
+  }
+  if (next){
+    next.addEventListener('click', () => setStandingsStep(selectedStandingsIndex + 1));
+  }
+
   try {
     await Promise.all([fetchFixture('ida'), fetchFixture('vuelta')]);
-    renderStandings(selectedKind);
+    buildStandingsSteps();
+    populateStandingsControls();
+    renderStandings();
     renderSelectedFixture();
     setActive(selectedKind);
   } catch (err) {
