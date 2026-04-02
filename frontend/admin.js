@@ -322,6 +322,28 @@ function fillTeamSelect(){
   });
 }
 function getSelectedTeamSlug(){ return $('#teamSelect')?.value || ''; }
+function openCrucesTestMode(){
+  const teamSlug = getSelectedTeamSlug();
+  if (!teamSlug) {
+    toast('Elegí un equipo primero');
+    return;
+  }
+
+  const teamName = teamsInDiv.find(t => t.slug === teamSlug)?.name || teamSlug;
+  const url = new URL('cruces/cruces_fecha.html', location.href);
+  url.searchParams.set('team', teamSlug);
+  url.searchParams.set('cat', _activeDiv || 'primera');
+  url.searchParams.set('test', '1');
+  url.searchParams.set('admin', '1');
+
+  const win = window.open(url.toString(), '_blank', 'noopener');
+  if (!win) {
+    toast('El navegador bloqueó la pestaña. Habilitá popups para este sitio.');
+    return;
+  }
+
+  toast(`Modo prueba abierto para ${teamName}`);
+}
 function refreshDraftButtons(){
   return;
 }
@@ -539,6 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnSaveTeams').addEventListener('click', saveTeams);
   $('#btnSaveRoster').addEventListener('click', saveRoster);
   $('#teamSelect').addEventListener('change', changeTeam);
+  $('#btnTestCruces')?.addEventListener('click', openCrucesTestMode);
   $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());
   $('#btnApplyImport')?.addEventListener('click', importPlayersFromTextarea);
   $('#btnCancelImport')?.addEventListener('click', () => toggleImportBox(false));
