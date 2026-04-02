@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db');
 const { readJSON, writeJSON } = require('../utils/fileStorage');
+const { requireAdmin } = require('../middleware/auth');
 
 const DEFAULT_TEAM_PASSWORD = '1234';
 
@@ -29,6 +30,22 @@ module.exports = function createAdminRouter(deps) {
         ORDER BY CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END, id ASC
         LIMIT 1`,
       [safeSlug]
+    );
+
+    return result.rows[0] || null;
+  }
+
+  async function findTeamById(teamId) {
+    const id = Number(teamId);
+    if (!Number.isFinite(id) || id <= 0) return null;
+
+    const result = await pool.query(
+      `SELECT id, slug_uid, slug_base, division, username, display_name,
+              password_hash, must_change_password, password_updated_at
+         FROM equipos
+        WHERE id = $1
+        LIMIT 1`,
+      [id]
     );
 
     return result.rows[0] || null;
@@ -165,6 +182,59 @@ module.exports = function createAdminRouter(deps) {
     );
 
     return res.json({ ok: true });
+  });
+
+
+  router.post('/admin/impersonate-team', requireAdmin, async (req, res) => {
+    try {
+      const teamId = req.body?.teamId;
+      const rawSlug = req.body?.slug;
+
+      let team = null;
+      if (teamId != null && teamId !== '') {
+        team = await findTeamById(teamId);
+      }
+      if (!team && rawSlug) {
+        team = await findTeamBySlug(rawSlug);
+      }
+
+      if (!team) {
+        return res.status(404).json({ ok: false, error: 'equipo inexistente' });
+      }
+
+      const secret = process.env.JWT_SECRET;
+      if (!secret) return res.status(500).json({ ok:false, msg:'Falta JWT_SECRET en servidor' });
+
+      const token = jwt.sign(
+        {
+          role: 'team',
+          teamId: team.id,
+          slug: team.slug_uid,
+          slugBase: team.slug_base,
+          category: team.division,
+          impersonatedBy: 'admin'
+        },
+        secret,
+        { expiresIn: '45m' }
+      );
+
+      return res.json({
+        ok: true,
+        session: {
+          role: 'team',
+          displayName: team.display_name || team.username || team.slug_uid,
+          team: team.slug_uid,
+          slug: team.slug_uid,
+          category: team.division,
+          token,
+          isTestSession: true,
+          ts: Date.now()
+        }
+      });
+    } catch (err) {
+      console.error('POST /admin/impersonate-team', err);
+      return res.status(500).json({ ok: false, error: 'No se pudo generar la sesión de prueba.' });
+    }
   });
 
   router.post('/logout', (req,res)=>{
