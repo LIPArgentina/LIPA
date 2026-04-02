@@ -54,7 +54,7 @@
   async function fetchJson(path){
     const res = await fetch(apiUrl(path), {
       cache:'no-store',
-      credentials:'include'
+      credentials:'omit'
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error((data && (data.error || data.message || data.msg)) || ('HTTP ' + res.status));
@@ -362,7 +362,7 @@
     const res = await fetch(apiUrl(path), {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
-      credentials:'include',
+      credentials:'omit',
       body: JSON.stringify(body)
     });
     const data = await res.json().catch(() => ({}));
@@ -412,7 +412,7 @@
         fechaISO: status.fechaISO,
         localSlug: status.localSlug,
         visitanteSlug: status.visitanteSlug,
-        equipoSlug: status.localSlug,
+        equipoSlug: localEquipoSlug,
         validacion,
         status
       });
@@ -421,7 +421,7 @@
         fechaISO: status.fechaISO,
         localSlug: status.localSlug,
         visitanteSlug: status.visitanteSlug,
-        equipoSlug: status.visitanteSlug,
+        equipoSlug: visitanteEquipoSlug,
         validacion,
         status
       });
