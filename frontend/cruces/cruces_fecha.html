@@ -71,6 +71,21 @@
 
   </div>
 
+
+  <script>
+    (function(){
+      try{
+        if(!window.name) return;
+        const data = JSON.parse(window.name);
+        const sess = data && data.lpiCrucesTestSession;
+        if(!sess || !sess.token) return;
+        sessionStorage.setItem('lpi.session', JSON.stringify(sess));
+        if (sess.slug) sessionStorage.setItem('lpi_cruces_team', String(sess.slug).toLowerCase());
+        try { delete data.lpiCrucesTestSession; window.name = JSON.stringify(data); } catch(_) { window.name = ''; }
+      }catch(_){}
+    })();
+  </script>
+
   <!-- CONFIG GLOBAL (IMPORTANTE) -->
   <script src="../config.js"></script>
 

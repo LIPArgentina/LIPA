@@ -113,8 +113,19 @@ function apiUrl(path){
     return API_BASE + path;
   }
 
+function getSessionAuthHeaders(extraHeaders){
+    const headers = { ...(extraHeaders || {}) };
+    try {
+      const raw = sessionStorage.getItem('lpi.session') || localStorage.getItem('lpi.session');
+      const sess = raw ? JSON.parse(raw) : null;
+      const token = String(sess?.token || sess?.accessToken || '').trim();
+      if (token) headers.Authorization = 'Bearer ' + token;
+    } catch (_) {}
+    return headers;
+  }
+
   async function fetchJson(url, options){
-    const response = await fetch(url, options);
+    const response = await fetch(url, { ...(options || {}), headers: getSessionAuthHeaders(options?.headers) });
     let data = null;
     try { data = await response.json(); } catch (_) {}
     if (!response.ok) {
@@ -338,7 +349,8 @@ function apiUrl(path){
 
     const data = await fetchJson(apiUrl('/api/fixture?kind=ida&category=' + encodeURIComponent(category)), {
       cache: 'no-store',
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      headers: getSessionAuthHeaders()
     });
 
     const fechas = Array.isArray(data?.data?.fechas) ? data.data.fechas : [];
@@ -1157,7 +1169,8 @@ async function checkFinalLockOnLoad() {
 
     const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
       cache: 'no-store',
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      headers: getSessionAuthHeaders()
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ok) return false;
@@ -1279,7 +1292,7 @@ async function saveMatchStatus(validated = false) {
   };
   const res = await fetch(apiUrl('/api/cruces/match-status'), {
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:getSessionAuthHeaders({'Content-Type':'application/json'}),
     body: JSON.stringify(body)
   });
   const data = await res.json().catch(() => null);
@@ -1337,7 +1350,8 @@ async function tryApplyStatusIfExists(){
     const qs = withBust({ localSlug, visitanteSlug, fechaISO: todayISO_AR, equipoSlug: mySlug });
     const res = await fetch(apiUrl('/api/cruces/match-status?') + qs.toString(), {
       cache: 'no-store',
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      headers: getSessionAuthHeaders()
     });
     const result = await res.json().catch(() => null);
     if (!res.ok || !result?.ok || !result?.data) return false;
@@ -1427,7 +1441,8 @@ async function hydrateValidatedState() {
     });
     const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
       cache: 'no-store',
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      headers: getSessionAuthHeaders()
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ok) return false;
@@ -1492,7 +1507,7 @@ btn.onclick = async () => {
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
-    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
+    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`), { headers: getSessionAuthHeaders() }).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
       if (lock?.locked || lock?.validatedFinal || lock?.tipo === 'validado') {
@@ -1522,7 +1537,7 @@ btn.onclick = async () => {
 
     const save = await fetch(apiUrl('/api/cruces/validate'), {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:getSessionAuthHeaders({'Content-Type':'application/json'}),
       body: JSON.stringify({
         fechaISO: todayISO_AR,
         localSlug,
