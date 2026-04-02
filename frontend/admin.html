@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Administración de equipos</title>
+
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- ===== Header arriba de todo (no sticky) ===== -->
+  <header class="site-header">
+    <a href="index.html" title="Inicio">
+      <img src="logo_liga.png" alt="LPI">
+    </a>
+
+    <nav class="top-actions" aria-label="Accesos rápidos">
+      <a id="btnFixture" class="btn btn-gold" href="fixture/fixture.html" aria-label="Abrir fixture">FIXTURE</a>
+      <a id="btnCrucesManual" class="btn btn-gold" href="cruces/cruces_manuales.html" aria-label="Abrir carga manual de cruces">CARGAR CRUCES MANUAL</a>
+      <a id="btnFecha" class="btn btn-gold" href="/fecha/visor_planillas.html" aria-label="Abrir planillas de fecha">PLANILLAS FECHA</a>
+      <a id="btnPictures" class="btn btn-gold" href="pictures/pictures_admin.html" aria-label="Abrir visor de fotos">PICTURES</a>
+    </nav>
+
+<div class="top-right-actions">
+  <a id="btnChangePassword" class="btn" href="#" aria-label="Cambiar contraseña">CAMBIAR CONTRASEÑA</a>
+  <a class="btn" href="index.html" aria-label="Volver a inicio">VOLVER</a>
+</div>
+</header>
+
+  <div class="wrap">
+    <div class="title-row" role="group" aria-label="Selector de división">
+      <h1 class="h1">Administración de equipos:</h1>
+      <div class="switches">
+        <button class="sw active" data-div="primera" aria-pressed="true">primera</button>
+        <button class="sw" data-div="segunda" aria-pressed="false">segunda</button>
+        <button class="sw" data-div="tercera" aria-pressed="false">tercera</button>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Izquierda: tabla de equipos de liga -->
+      <div class="card">
+        <div class="card-header"><h2 class="title">Equipos de liga</h2></div>
+        <div class="table-wrap">
+          <table aria-label="Tabla de equipos de liga">
+            <thead>
+              <tr>
+                <th class="col-idx">#</th>
+                <th>Nombre del equipo</th>
+                <th>Capitán</th>
+                <th>Correo electrónico</th>
+                <th>Teléfono</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTeams"></tbody>
+          </table>
+        </div>
+        <div class="footer">
+          <button id="btnSaveTeams" class="btn" type="button">Guardar</button>
+        </div>
+      </div>
+
+      <!-- Derecha: editor de plantel del equipo -->
+      <div class="card">
+        <div class="card-header"><h2 class="title">Plantel del equipo</h2></div>
+        <div class="panel">
+          <div class="row">
+            <label for="teamSelect"><strong>Equipo</strong></label>
+            <select id="teamSelect" aria-label="Equipo"></select>
+          </div>
+          <div class="row">
+            <div class="roster-head">
+              <label><strong>Jugadores</strong></label>
+              <div class="roster-tools">
+                <button id="btnToggleImport" class="btn btn-small" type="button">Importar lista</button>
+                <button id="btnExportRoster" class="btn btn-small" type="button">Exportar lista</button>
+              </div>
+            </div>
+            <div id="importBox" class="import-box" hidden>
+              <label for="importPlayersText"><strong>Pegá un jugador por línea</strong></label>
+              <textarea id="importPlayersText" class="input import-textarea" placeholder="Javier Martino&#10;Santiago Real&#10;Adrian Barrios"></textarea>
+              <div class="import-actions">
+                <button id="btnApplyImport" class="btn btn-small" type="button">Aplicar importación</button>
+                <button id="btnCancelImport" class="btn btn-small" type="button">Cancelar</button>
+              </div>
+            </div>
+            <div id="players" class="players"></div>
+          </div>
+          <div class="footer" style="padding:0;margin-top:6px;">
+            <button id="btnSaveRoster" class="btn-save" type="button">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+
+  <dialog class="modal" id="passModal">
+    <form autocomplete="off" class="modal__panel" id="passForm" method="dialog" style="min-width:320px;">
+      <div class="modal__header"><h3>Cambiar contraseña</h3></div>
+      <div class="modal__body">
+        <label class="field__label">Contraseña actual</label>
+        <input class="field__control" id="oldPass" type="password"/>
+        <label class="field__toggle" for="toggle_oldPass">
+          <input data-toggle="#oldPass" id="toggle_oldPass" type="checkbox"/> Mostrar
+        </label>
+
+        <label class="field__label">Nueva contraseña</label>
+        <input class="field__control" id="newPass" type="password">
+        <label class="field__toggle" for="toggle_newPass">
+          <input data-toggle="#newPass" id="toggle_newPass" type="checkbox"/> Mostrar
+        </label>
+
+        <label class="field__label">Repetir nueva contraseña</label>
+        <input class="field__control" id="newPass2" type="password">
+        <label class="field__toggle" for="toggle_newPass2">
+          <input data-toggle="#newPass2" id="toggle_newPass2" type="checkbox"/> Mostrar
+        </label>
+
+        <p class="error" id="passError" style="display:none;color:#ff6b6b;margin-top:8px;">Revisá los campos</p>
+        <p class="success" id="passSuccess" style="display:none;color:#4cd964;margin-top:8px;">¡Contraseña actualizada!</p>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-ghost" value="cancel">Cancelar</button>
+        <button class="btn btn-primary" id="submitPass" value="confirm">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="resetPassModal">
+    <div class="modal__panel modal__panel--reset">
+      <div class="modal__header">
+        <h3>Contraseña blanqueada</h3>
+      </div>
+      <div class="modal__body">
+        <p class="reset-pass-text">
+          Nueva contraseña temporal para <strong id="resetPassTeamName">Equipo</strong>
+        </p>
+        <div class="reset-pass-box">
+          <input class="field__control reset-pass-input" id="resetPassValue" type="text" readonly />
+          <button class="btn btn-primary btn-copy-pass" id="btnCopyResetPass" type="button">Copiar</button>
+        </div>
+        <p class="hint reset-pass-hint" id="resetPassHint">Copiala y enviásela al equipo. Al ingresar deberá cambiarla.</p>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-ghost" id="btnCloseResetPass" type="button">Cerrar</button>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>
