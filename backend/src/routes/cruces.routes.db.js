@@ -2,7 +2,6 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
-const { requireTeam } = require('../middleware/auth');
 
 // ===== ADMIN CRUCES (sin fecha / compat legacy) =====
 const crucesEnabledByTeam = new Map();
@@ -308,7 +307,7 @@ router.post('/', async (req, res) => {
 
 // ===== AUTOSAVE / VALIDACIÓN CRUCES =====
 
-router.post('/match-status', requireTeam, async (req, res) => {
+router.post('/match-status', async (req, res) => {
   try {
     const {
       localSlug,
@@ -317,7 +316,7 @@ router.post('/match-status', requireTeam, async (req, res) => {
       equipoSlug: rawEquipoSlug,
       status
     } = req.body || {};
-    const equipoSlug = ensureAuthorizedTeam(req, rawEquipoSlug);
+    const equipoSlug = normalizeSlug(rawEquipoSlug || '');
 
     if (!localSlug || !visitanteSlug || !fechaISO || !equipoSlug) {
       return res.status(400).json({ ok: false, error: 'Faltan datos' });
@@ -354,13 +353,13 @@ router.post('/match-status', requireTeam, async (req, res) => {
   }
 });
 
-router.get('/match-status', requireTeam, async (req, res) => {
+router.get('/match-status', async (req, res) => {
   setNoCache(res);
   try {
     const localSlug = normalizeSlug(req.query.localSlug || '');
     const visitanteSlug = normalizeSlug(req.query.visitanteSlug || '');
     const fechaISO = String(req.query.fechaISO || '').trim();
-    const equipoSlug = ensureAuthorizedTeam(req, req.query.equipoSlug);
+    const equipoSlug = normalizeSlug(req.query.equipoSlug || '');
 
     if (!localSlug || !visitanteSlug || !fechaISO || !equipoSlug) {
       return res.status(400).json({ ok: false, error: 'Faltan parámetros' });
@@ -394,7 +393,7 @@ router.get('/match-status', requireTeam, async (req, res) => {
   }
 });
 
-router.post('/validate', requireTeam, async (req, res) => {
+router.post('/validate', async (req, res) => {
   try {
     const {
       fechaISO,
@@ -404,13 +403,13 @@ router.post('/validate', requireTeam, async (req, res) => {
       validacion,
       status
     } = req.body || {};
-    const equipoSlug = ensureAuthorizedTeam(req, rawEquipoSlug);
+    const equipoSlug = normalizeSlug(rawEquipoSlug || '');
 
     if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug || !status) {
       return res.status(400).json({ ok: false, error: 'Faltan datos' });
     }
 
-    const teamKey = resolveTeamKey(ensureAuthorizedTeam(req, equipoSlug), localSlug, visitanteSlug);
+    const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
     if (!teamKey) {
       return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
     }
@@ -516,11 +515,11 @@ router.post('/validate', requireTeam, async (req, res) => {
   }
 });
 
-router.get('/lock-status', requireTeam, async (req, res) => {
+router.get('/lock-status', async (req, res) => {
   setNoCache(res);
   try {
     const fechaISO = String(req.query.fechaISO || '').trim();
-    const equipoSlug = ensureAuthorizedTeam(req, req.query.equipoSlug);
+    const equipoSlug = normalizeSlug(req.query.equipoSlug || '');
     const localSlug = String(req.query.localSlug || '').trim();
     const visitanteSlug = String(req.query.visitanteSlug || '').trim();
 
@@ -528,7 +527,7 @@ router.get('/lock-status', requireTeam, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Faltan parámetros' });
     }
 
-    const teamKey = resolveTeamKey(ensureAuthorizedTeam(req, equipoSlug), localSlug, visitanteSlug);
+    const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
     if (!teamKey) {
       return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
     }

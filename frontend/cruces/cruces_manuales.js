@@ -54,7 +54,6 @@
   async function fetchJson(path){
     const res = await fetch(apiUrl(path), {
       cache:'no-store',
-      credentials:'omit'
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error((data && (data.error || data.message || data.msg)) || ('HTTP ' + res.status));
@@ -362,7 +361,6 @@
     const res = await fetch(apiUrl(path), {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
-      credentials:'omit',
       body: JSON.stringify(body)
     });
     const data = await res.json().catch(() => ({}));
