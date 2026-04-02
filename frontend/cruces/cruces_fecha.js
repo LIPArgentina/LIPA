@@ -113,19 +113,38 @@ function apiUrl(path){
     return API_BASE + path;
   }
 
-function getSessionAuthHeaders(extraHeaders){
-    const headers = { ...(extraHeaders || {}) };
+  function isAdminTestMode(){
     try {
-      const raw = sessionStorage.getItem('lpi.session') || localStorage.getItem('lpi.session');
-      const sess = raw ? JSON.parse(raw) : null;
-      const token = String(sess?.token || sess?.accessToken || '').trim();
-      if (token) headers.Authorization = 'Bearer ' + token;
-    } catch (_) {}
-    return headers;
+      const qs = new URLSearchParams(location.search);
+      return qs.get('test') === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  const ADMIN_TEST_MODE = isAdminTestMode();
+
+  function setupAdminTestMode(){
+    if (!ADMIN_TEST_MODE) return;
+
+    const team = new URLSearchParams(location.search).get('team') || '';
+    const category = deriveCategory();
+    const title = document.getElementById('headerTitle');
+    const banner = document.getElementById('testModeBanner');
+
+    try { if (team) sessionStorage.setItem('lpi_cruces_team', normPlanillaSlug(team)); } catch(_) {}
+    try { if (team) localStorage.setItem('lpi_cruces_team', normPlanillaSlug(team)); } catch(_) {}
+    try { if (team) sessionStorage.setItem('teamSlug', normPlanillaSlug(team)); } catch(_) {}
+
+    if (title) title.textContent = 'CRUCES · MODO PRUEBA';
+    if (banner) {
+      banner.style.display = 'block';
+      banner.textContent = `MODO PRUEBA: ${team || 'equipo'}${category ? ' · ' + category : ''}. Los cambios quedan solo en tu navegador y no validan en backend.`;
+    }
   }
 
   async function fetchJson(url, options){
-    const response = await fetch(url, { ...(options || {}), headers: getSessionAuthHeaders(options?.headers) });
+    const response = await fetch(url, options);
     let data = null;
     try { data = await response.json(); } catch (_) {}
     if (!response.ok) {
@@ -349,8 +368,7 @@ function getSessionAuthHeaders(extraHeaders){
 
     const data = await fetchJson(apiUrl('/api/fixture?kind=ida&category=' + encodeURIComponent(category)), {
       cache: 'no-store',
-      credentials: 'same-origin',
-      headers: getSessionAuthHeaders()
+      credentials: 'same-origin'
     });
 
     const fechas = Array.isArray(data?.data?.fechas) ? data.data.fechas : [];
@@ -472,6 +490,7 @@ function getSessionAuthHeaders(extraHeaders){
   }
 
   async function checkCrucesEnabled(category) {
+    if (ADMIN_TEST_MODE) return true;
     const app = document.getElementById('app-root');
     const grid = document.getElementById('crucesGrid');
     const cta = document.getElementById('validateCta');
@@ -1159,6 +1178,7 @@ function stopValidationPolling() {
 
 
 async function checkFinalLockOnLoad() {
+  if (ADMIN_TEST_MODE) return false;
   try {
     const qs = withBust({
       fechaISO: todayISO_AR,
@@ -1169,8 +1189,7 @@ async function checkFinalLockOnLoad() {
 
     const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
       cache: 'no-store',
-      credentials: 'same-origin',
-      headers: getSessionAuthHeaders()
+      credentials: 'same-origin'
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ok) return false;
@@ -1224,6 +1243,7 @@ async function checkFinalLockOnLoad() {
 }
 
 function startValidationPolling(btn) {
+  if (ADMIN_TEST_MODE) return;
   stopValidationPolling();
   validationPollTimer = setInterval(async () => {
     try {
@@ -1282,6 +1302,12 @@ function buildMatchStatus(validated = false) {
 
 async function saveMatchStatus(validated = false) {
   const status = buildMatchStatus(validated);
+  if (ADMIN_TEST_MODE) {
+    try {
+      localStorage.setItem(`lpi.cruces.test.status.${mySlug}.${todayISO_AR}`, JSON.stringify(status));
+    } catch(_) {}
+    return { ok: true, testMode: true, validated: !!validated };
+  }
   const body = {
     localSlug,
     visitanteSlug,
@@ -1292,7 +1318,7 @@ async function saveMatchStatus(validated = false) {
   };
   const res = await fetch(apiUrl('/api/cruces/match-status'), {
     method:'POST',
-    headers:getSessionAuthHeaders({'Content-Type':'application/json'}),
+    headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)
   });
   const data = await res.json().catch(() => null);
@@ -1346,12 +1372,12 @@ function autosaveAttachListeners(){
 
 // STATUS autocarga: primero borrador propio, si no existe compartido final
 async function tryApplyStatusIfExists(){
+  if (ADMIN_TEST_MODE) return false;
   try {
     const qs = withBust({ localSlug, visitanteSlug, fechaISO: todayISO_AR, equipoSlug: mySlug });
     const res = await fetch(apiUrl('/api/cruces/match-status?') + qs.toString(), {
       cache: 'no-store',
-      credentials: 'same-origin',
-      headers: getSessionAuthHeaders()
+      credentials: 'same-origin'
     });
     const result = await res.json().catch(() => null);
     if (!res.ok || !result?.ok || !result?.data) return false;
@@ -1432,6 +1458,7 @@ const setBtnState = (mode, text) => {
 };
 
 async function hydrateValidatedState() {
+  if (ADMIN_TEST_MODE) return false;
   try {
     const qs = withBust({
       fechaISO: todayISO_AR,
@@ -1441,8 +1468,7 @@ async function hydrateValidatedState() {
     });
     const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
       cache: 'no-store',
-      credentials: 'same-origin',
-      headers: getSessionAuthHeaders()
+      credentials: 'same-origin'
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ok) return false;
@@ -1507,7 +1533,7 @@ btn.onclick = async () => {
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
-    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`), { headers: getSessionAuthHeaders() }).catch(()=>null);
+    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
       if (lock?.locked || lock?.validatedFinal || lock?.tipo === 'validado') {
@@ -1530,6 +1556,15 @@ btn.onclick = async () => {
     return;
     }
 
+    if (ADMIN_TEST_MODE) {
+      await saveMatchStatus(true);
+      clearMismatchVisual();
+      setBtnState('success', 'VALIDACIÓN DE PRUEBA');
+      updatePictureButton(false);
+      showToast('Modo prueba: validación simulada, sin guardar en backend.', 'success');
+      return;
+    }
+
     clearMismatchVisual();
 
     const statusForValidate = buildMatchStatus(true);
@@ -1537,7 +1572,7 @@ btn.onclick = async () => {
 
     const save = await fetch(apiUrl('/api/cruces/validate'), {
       method:'POST',
-      headers:getSessionAuthHeaders({'Content-Type':'application/json'}),
+      headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         fechaISO: todayISO_AR,
         localSlug,
@@ -1777,6 +1812,7 @@ btn.onclick = async () => {
 
   // ---------------- INIT ----------------
 window.addEventListener('load', async () => {
+  setupAdminTestMode();
   const category = deriveCategory();
   const allowed = await checkCrucesEnabled(category);
 
