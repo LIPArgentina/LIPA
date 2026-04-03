@@ -45,6 +45,108 @@
     segunda: '__categoria_segunda__'
   };
 
+  const normalizeCategoryValue = (raw) => {
+    const v = String(raw || '').trim().toLowerCase();
+    if (!v) return '';
+    if (v.includes('terc')) return 'tercera';
+    if (v.includes('seg')) return 'segunda';
+    if (v === '3' || v === 'c') return 'tercera';
+    if (v === '2' || v === 'b') return 'segunda';
+    return '';
+  };
+
+  function readStoredJson(...keys){
+    for (const key of keys) {
+      try {
+        const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function getLocationParam(name){
+    try {
+      return new URLSearchParams(location.search).get(name) || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function pushUniqueNormalized(list, value){
+    const clean = normPlanillaSlug(value);
+    if (clean && !list.includes(clean)) list.push(clean);
+  }
+
+  function collectSessionTeamCandidates(sessionLike, out){
+    if (!sessionLike || typeof sessionLike !== 'object') return;
+    pushUniqueNormalized(out, sessionLike.slug);
+    pushUniqueNormalized(out, sessionLike.team);
+    pushUniqueNormalized(out, sessionLike.displayName);
+    pushUniqueNormalized(out, sessionLike.teamName);
+    pushUniqueNormalized(out, sessionLike.name);
+
+    const user = sessionLike.user;
+    if (user && typeof user === 'object') {
+      pushUniqueNormalized(out, user.slug);
+      pushUniqueNormalized(out, user.team);
+      pushUniqueNormalized(out, user.displayName);
+      pushUniqueNormalized(out, user.teamName);
+      pushUniqueNormalized(out, user.name);
+    } else {
+      pushUniqueNormalized(out, user);
+    }
+  }
+
+  function persistCrucesTeam(value){
+    const clean = normPlanillaSlug(value);
+    if (!clean) return;
+    try { sessionStorage.setItem('lpi_cruces_team', clean); } catch(_) {}
+    try { localStorage.setItem('lpi_cruces_team', clean); } catch(_) {}
+    try { sessionStorage.setItem('teamSlug', clean); } catch(_) {}
+  }
+
+  function getCrucesTeamContext(){
+    const candidates = [];
+    const urlTeam = getLocationParam('team');
+    if (urlTeam) {
+      pushUniqueNormalized(candidates, urlTeam);
+      persistCrucesTeam(urlTeam);
+    }
+
+    const sessionA = readStoredJson('lpi.session');
+    const sessionB = readStoredJson('lpi_team_session');
+    collectSessionTeamCandidates(sessionA, candidates);
+    collectSessionTeamCandidates(sessionB, candidates);
+
+    try {
+      [
+        sessionStorage.getItem('lpi_cruces_team'),
+        localStorage.getItem('lpi_cruces_team'),
+        sessionStorage.getItem('teamSlug'),
+        localStorage.getItem('teamSlug'),
+        sessionStorage.getItem('team'),
+        localStorage.getItem('team')
+      ].forEach(value => pushUniqueNormalized(candidates, value));
+    } catch(_) {}
+
+    const category =
+      normalizeCategoryValue(getLocationParam('cat')) ||
+      normalizeCategoryValue(sessionA && (sessionA.category || sessionA.categoria || sessionA.cat || sessionA.division || sessionA['división'] || sessionA.teamCategory || (sessionA.user && (sessionA.user.category || sessionA.user.categoria || sessionA.user.division)))) ||
+      normalizeCategoryValue(sessionB && (sessionB.category || sessionB.categoria || sessionB.cat || sessionB.division || sessionB['división'] || sessionB.teamCategory || (sessionB.user && (sessionB.user.category || sessionB.user.categoria || sessionB.user.division)))) ||
+      (String(candidates[0] || '').includes('tercera') ? 'tercera' : '') ||
+      (String(candidates[0] || '').includes('segunda') ? 'segunda' : '');
+
+    return {
+      primaryTeam: candidates[0] || '',
+      candidates,
+      category
+    };
+  }
+
+
   const TEAM_ALIASES = {
     DOGOSBILLARDS: ['DOGOS BILLARDS', 'DOGOSBILLARDS'],
     PRBAR: ['PR BAR', 'PRBAR'],
@@ -155,36 +257,7 @@ function apiUrl(path){
   }
 
   function deriveCategory(){
-    const fromUrl = new URLSearchParams(location.search).get('cat');
-    const normalizeCategory = (raw) => {
-      const v = String(raw || '').trim().toLowerCase();
-      if (!v) return '';
-      if (v.includes('terc')) return 'tercera';
-      if (v.includes('seg')) return 'segunda';
-      if (v === '3' || v === 'c') return 'tercera';
-      if (v === '2' || v === 'b') return 'segunda';
-      return '';
-    };
-
-    const urlCat = normalizeCategory(fromUrl);
-    if (urlCat) return urlCat;
-
-    try {
-      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
-      const val = normalizeCategory(sess && (sess.category || sess.categoria || sess.cat || sess.division || sess['división'] || sess.teamCategory || (sess.user && (sess.user.category || sess.user.categoria || sess.user.division))));
-      if (val) return val;
-    } catch (_) {}
-
-    try {
-      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
-      const val = normalizeCategory(sess2 && (sess2.category || sess2.categoria || sess2.cat || sess2.division || sess2['división'] || sess2.teamCategory || (sess2.user && (sess2.user.category || sess2.user.categoria || sess2.user.division))));
-      if (val) return val;
-    } catch (_) {}
-
-    const team = getStoredCrucesTeam();
-    if (String(team).includes('tercera')) return 'tercera';
-    if (String(team).includes('segunda')) return 'segunda';
-    return '';
+    return getCrucesTeamContext().category || '';
   }
 
   function teamNameFromRef(ref){
@@ -428,65 +501,11 @@ function apiUrl(path){
 
   // ---------------- DATA LOADING ----------------
   function getStoredCrucesCandidates() {
-    const out = [];
-    const push = (value) => {
-      const clean = normPlanillaSlug(value);
-      if (clean && !out.includes(clean)) out.push(clean);
-    };
-
-    try {
-      const qs = new URLSearchParams(location.search).get('team');
-      if (qs) {
-        push(qs);
-        try { sessionStorage.setItem('lpi_cruces_team', normPlanillaSlug(qs)); } catch(_){}
-        try { localStorage.setItem('lpi_cruces_team', normPlanillaSlug(qs)); } catch(_){}
-        try {
-          const url = new URL(location.href);
-          url.searchParams.delete('team');
-          history.replaceState({}, '', url.pathname + url.search + url.hash);
-        } catch(_){}
-      }
-    } catch(_) {}
-
-    try {
-      const sess = JSON.parse(localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session') || 'null');
-      if (sess) {
-        push(sess.slug);
-        push(sess.team);
-        push(sess.displayName);
-        push(sess.teamName);
-        push(sess.name);
-        push(sess.user);
-      }
-    } catch(_) {}
-
-    try {
-      const sess2 = JSON.parse(localStorage.getItem('lpi_team_session') || sessionStorage.getItem('lpi_team_session') || 'null');
-      if (sess2) {
-        push(sess2.slug);
-        push(sess2.team);
-        push(sess2.displayName);
-        push(sess2.teamName);
-        push(sess2.name);
-        push(sess2.user);
-      }
-    } catch(_) {}
-
-    try {
-      push(sessionStorage.getItem('lpi_cruces_team'));
-      push(localStorage.getItem('lpi_cruces_team'));
-      push(sessionStorage.getItem('teamSlug'));
-      push(localStorage.getItem('teamSlug'));
-      push(sessionStorage.getItem('team'));
-      push(localStorage.getItem('team'));
-    } catch(_) {}
-
-    return out;
+    return getCrucesTeamContext().candidates.slice();
   }
 
   function getStoredCrucesTeam() {
-    const candidates = getStoredCrucesCandidates();
-    return candidates[0] || '';
+    return getCrucesTeamContext().primaryTeam || '';
   }
 
   async function checkCrucesEnabled(category) {
@@ -1040,16 +1059,7 @@ const todayISO_AR = toDateAR();
 const getCurrentFechaISO = () => window.__CRUCE_FECHA_ISO || todayISO_AR;
 const getAutosaveKey = () => `lpi.autosave.${mySlug}.${getCurrentFechaISO()}.${(mySlug===localSlug?visitanteSlug:localSlug)}`;
 
-const getLoggedSlug = () => {
-  const qs = new URLSearchParams(location.search).get('team');
-  if (qs) return String(qs).toLowerCase();
-  try {
-    const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
-    const sess = raw ? JSON.parse(raw) : null;
-    if (sess?.slug) return String(sess.slug).toLowerCase();
-  } catch {}
-  return String(sessionStorage.getItem('teamSlug') || localStorage.getItem('teamSlug') || '').toLowerCase();
-};
+const getLoggedSlug = () => getCrucesTeamContext().primaryTeam || '';
 const mySlug = getLoggedSlug();
 const localSlug = local.teamSlug;
 const visitanteSlug = visitante.teamSlug;
