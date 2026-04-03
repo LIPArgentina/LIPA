@@ -138,7 +138,7 @@ function apiUrl(path){
 
     if (title) title.textContent = 'CRUCES · MODO PRUEBA';
     if (banner) {
-      banner.style.display = 'block';
+      banner.hidden = false;
       banner.textContent = `MODO PRUEBA: ${team || 'equipo'}${category ? ' · ' + category : ''}. Los cambios quedan solo en tu navegador y no validan en backend.`;
     }
   }
@@ -498,7 +498,7 @@ function apiUrl(path){
 
     const block = (title, msg) => {
       if (grid) grid.innerHTML = '';
-      if (cta) cta.style.display = 'none';
+      if (cta) cta.hidden = true;
       if (err) err.style.display = 'none';
       if (app) {
         app.innerHTML = `
@@ -807,14 +807,14 @@ function apiUrl(path){
     const leftRows = getScoreRows('planilla-root-left');
     const rightRows = getScoreRows('planilla-root-right');
 
-    if (leftRows.length !== rightRows.length) {
-      console.warn('Cantidad desigual de filas puntuables', { left: leftRows.length, right: rightRows.length });
-    }
-
     let leftTriangles = 0;
     let rightTriangles = 0;
     let leftPoints = 0;
     let rightPoints = 0;
+
+    if (leftRows.length !== rightRows.length) {
+      console.warn('updateScoresFor: filas puntuables desalineadas', { left: leftRows.length, right: rightRows.length });
+    }
 
     const totalRows = Math.max(leftRows.length, rightRows.length);
 
@@ -1027,7 +1027,7 @@ function apiUrl(path){
       if (b.id !== 'btnValidarGlobal') b.remove();
     });
 
-    cta.style.display = 'flex';
+    cta.hidden = false;
 
      
 // === AUTOSAVE + STATUS HELPERS ===
@@ -1087,6 +1087,12 @@ function collectScoreRows(rootId) {
     const n = parseInt(sel.value, 10);
     return Number.isFinite(n) ? n : 0;
   });
+}
+
+function getScorableRowCount(rootId) {
+  const root = document.getElementById(rootId);
+  if (!root) return 0;
+  return root.querySelectorAll('.pts-select').length;
 }
 
 function normalizeCompareText(value) {
@@ -1185,7 +1191,7 @@ async function checkFinalLockOnLoad() {
   if (ADMIN_TEST_MODE) return false;
   try {
     const qs = withBust({
-      fechaISO: todayISO_AR,
+      fechaISO: (window.__CRUCE_FECHA_ISO || todayISO_AR),
       equipoSlug: mySlug,
       localSlug,
       visitanteSlug
@@ -1251,7 +1257,7 @@ function startValidationPolling(btn) {
   stopValidationPolling();
   validationPollTimer = setInterval(async () => {
     try {
-      const qs = withBust({ fechaISO: todayISO_AR, localSlug, visitanteSlug, equipoSlug: mySlug });
+      const qs = withBust({ fechaISO: (window.__CRUCE_FECHA_ISO || todayISO_AR), localSlug, visitanteSlug, equipoSlug: mySlug });
       const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
         cache: 'no-store',
         credentials: 'same-origin'
@@ -1292,8 +1298,9 @@ function buildMatchStatus(validated = false) {
   const rightT = computeTotalsFrom('planilla-root-right');
   const localData     = sliceToStatus(leftVals);
   const visitanteData = sliceToStatus(rightVals);
+  const fechaISO = window.__CRUCE_FECHA_ISO || todayISO_AR;
   return {
-    fechaISO: todayISO_AR,
+    fechaISO,
     validated: !!validated,
     localSlug,
     visitanteSlug,
@@ -1429,7 +1436,7 @@ function getSessionToken() {
 function updatePictureButton(enabled) {
   if (!btnSubirFotos) return;
   const url = new URL('../pictures/pictures_upload.html', location.href);
-  url.searchParams.set('fechaISO', todayISO_AR);
+  url.searchParams.set('fechaISO', (window.__CRUCE_FECHA_ISO || todayISO_AR));
   url.searchParams.set('localSlug', localSlug);
   url.searchParams.set('visitanteSlug', visitanteSlug);
   url.searchParams.set('team', mySlug);
@@ -1465,7 +1472,7 @@ async function hydrateValidatedState() {
   if (ADMIN_TEST_MODE) return false;
   try {
     const qs = withBust({
-      fechaISO: todayISO_AR,
+      fechaISO: (window.__CRUCE_FECHA_ISO || todayISO_AR),
       equipoSlug: mySlug,
       localSlug,
       visitanteSlug
@@ -1528,7 +1535,7 @@ btn.onclick = async () => {
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
-    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
+    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(window.__CRUCE_FECHA_ISO || todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
       if (lock?.locked || lock?.validatedFinal || lock?.tipo === 'validado') {
@@ -1539,6 +1546,20 @@ btn.onclick = async () => {
     }
 
     updateScoresFor();
+
+    const leftCount = getScorableRowCount('planilla-root-left');
+    const rightCount = getScorableRowCount('planilla-root-right');
+    if (leftCount !== rightCount) {
+      console.warn('Cruces desalineado: cantidad de filas puntuables distinta', { leftCount, rightCount });
+      setBtnState('error','ERROR: La planilla quedó desalineada');
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.classList.remove('success','error','pending','rival-pending','btn');
+        btn.classList.add('btn-validate');
+        btn.textContent = 'VALIDAR PLANILLA';
+      }, 3000);
+      return;
+    }
 
     const left  = computeTotalsFrom('planilla-root-left');
     const right = computeTotalsFrom('planilla-root-right');
@@ -1571,7 +1592,7 @@ btn.onclick = async () => {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        fechaISO: todayISO_AR,
+        fechaISO: (window.__CRUCE_FECHA_ISO || todayISO_AR),
         localSlug,
         visitanteSlug,
         equipoSlug: mySlug,
@@ -1619,7 +1640,7 @@ btn.onclick = async () => {
   } finally {
     if (!btn.classList.contains('success')) btn.disabled = false;
   }
-};
+};;;
 
   }
 
@@ -1767,6 +1788,8 @@ btn.onclick = async () => {
 
       const match = findCruceForTeam(cruces, teamCandidates);
       if (!match) throw new Error('No se encontró un cruce para el equipo logueado.');
+
+      window.__CRUCE_FECHA_ISO = match.date || crucesRaw?.fechaFixture || new Date().toISOString().slice(0,10);
 
       const local = { name: match.local, teamSlug: match.localSlug || normPlanillaSlug(match.local) };
       const visitante = { name: match.visitante, teamSlug: match.visitanteSlug || normPlanillaSlug(match.visitante) };

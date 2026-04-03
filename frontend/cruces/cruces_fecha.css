@@ -312,21 +312,6 @@ body {
   margin: 0;
 }
 
-.test-mode-banner {
-  display: block;
-  margin: 10px 0 0;
-  padding: 10px 14px;
-  border: 1px solid #ffe65a;
-  border-radius: 12px;
-  background: rgba(255,230,90,.08);
-  color: #ffe65a;
-  font-weight: 700;
-}
-
-.test-mode-banner[hidden] {
-  display: none !important;
-}
-
 main .container {
   max-width: 400px;
   margin: 0 auto;
@@ -342,14 +327,6 @@ header.lpi-top {
 .logo-link { display: inline-flex; line-height: 0; }
 .liga-logo { width: 42px; height: 42px; object-fit: contain; display: block; } /* ~30% más chico */
 
-.header-bg .header-title {
-  margin: 0;
-  font-weight: 900;
-  letter-spacing: .06em;
-  color: #ffcc00;
-  font-size: clamp(18px, 3.0vw, 24px); /* ~30% más chico */
-  text-align: center;
-}
 
 .actions { margin-left: auto; display: flex; }
 
@@ -397,8 +374,6 @@ header.lpi-top {
   display: flex;
   justify-content: center;
   margin: 40px 0;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 .btn-validate {
@@ -693,7 +668,7 @@ header.lpi-top {
     height: 34px;
   }
 
-  .header-bg .header-title {
+  .header-bg .title {
     font-size: 16px;
   }
 
@@ -819,4 +794,30 @@ header.lpi-top {
 .btn-picture.disabled{opacity:.45;pointer-events:none;}
 
 
-.validate-cta[hidden] { display: none !important; }
+
+/* Ajustes de cruces fecha */
+.header-title {
+  margin: 0;
+  font-weight: 900;
+  letter-spacing: .06em;
+  color: #ffcc00;
+  font-size: clamp(18px, 3.0vw, 24px);
+  text-align: center;
+}
+
+.test-mode-banner{
+  display:block;
+  margin:10px 0 0;
+  padding:10px 14px;
+  border:1px solid #ffe65a;
+  border-radius:12px;
+  background:rgba(255,230,90,.08);
+  color:#ffe65a;
+  font-weight:700;
+}
+.test-mode-banner[hidden]{
+  display:none !important;
+}
+.validate-cta[hidden]{
+  display:none !important;
+}
