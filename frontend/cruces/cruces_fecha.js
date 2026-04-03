@@ -1724,28 +1724,8 @@ btn.onclick = async () => {
 
   // ---------------- SYNC ----------------
   function syncSlotWidths() {
-    let max = 0;
-
-    const slots = document.querySelectorAll('.slot:not(.is-empty)');
-    slots.forEach(s => {
-      max = Math.max(max, s.scrollWidth);
-    });
-
-    const titles = document.querySelectorAll('#planilla-root-left .card .title, #planilla-root-right .card .title');
-    titles.forEach(t => {
-      max = Math.max(max, t.scrollWidth - 24);
-    });
-
-    const metas = document.querySelectorAll('#planilla-root-left .card .meta, #planilla-root-right .card .meta');
-    metas.forEach(m => {
-      max = Math.max(max, m.scrollWidth - 24);
-    });
-
     const mobile = window.matchMedia('(max-width: 900px)').matches;
-    const minWidth = mobile ? 120 : 160;
-    const maxWidth = mobile ? 220 : 420;
-    const target = Math.min(Math.max(minWidth, max + 34), maxWidth);
-
+    const target = mobile ? 300 : 300;
     document.documentElement.style.setProperty('--slot-base-w', target + 'px');
   }
 
