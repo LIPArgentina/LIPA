@@ -187,7 +187,6 @@ function renderRows(users){
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
-      <td><input class="input captain" type="text" value="${(by.cap.get(name)||'').replace(/"/g,'&quot;')}" aria-label="Capitán fila ${i+1}"></td>
       <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
       <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
       <td class="team-actions-cell">
@@ -248,11 +247,10 @@ function collectRows(){
   const rows = [];
   $$('#tbodyTeams tr').forEach(tr => {
     const name    = tr.querySelector('.team')?.value.trim()     || '';
-    const captain = tr.querySelector('.captain')?.value.trim()  || '';
     const email   = tr.querySelector('.email')?.value.trim()    || '';
     const phone   = tr.querySelector('.phone')?.value.trim()    || '';
     if(!name) return;
-    rows.push({ username:name, role:'team', captain, email, phone });
+    rows.push({ username:name, role:'team', captain:'', email, phone });
   });
   return rows;
 }
@@ -702,36 +700,3 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 
-/* ====== Fallback robusto: botón Probar cruces ====== */
-(function(){
-  function bindCrucesTestButton(){
-    const btn = document.getElementById('btnTestCruces');
-    if (!btn || btn.dataset.boundCrucesTest === '1') return;
-    btn.dataset.boundCrucesTest = '1';
-
-    const handler = function(ev){
-      if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-      if (typeof openCrucesTestMode === 'function') {
-        openCrucesTestMode();
-      }
-    };
-
-    btn.onclick = handler;
-    btn.addEventListener('click', handler);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindCrucesTestButton);
-  } else {
-    bindCrucesTestButton();
-  }
-
-  document.addEventListener('click', function(ev){
-    const btn = ev.target && ev.target.closest ? ev.target.closest('#btnTestCruces') : null;
-    if (!btn) return;
-    ev.preventDefault();
-    if (typeof openCrucesTestMode === 'function') {
-      openCrucesTestMode();
-    }
-  });
-})();
