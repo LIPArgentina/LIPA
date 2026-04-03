@@ -199,9 +199,6 @@ body {
 #planilla-root-right .row .slot     { order: 2; }
 #planilla-root-right .row .badge    { order: 3; }
 
-#planilla-root-left .row .slot  { text-align: right; }
-#planilla-root-right .row .slot { text-align: left; }
-
 /* === TOTALES === */
 .totals-wrap { margin-top: 18px; display: flex; }
 #planilla-root-left .totals-wrap  { justify-content: flex-end; }
@@ -445,10 +442,6 @@ header.lpi-top {
 }
 
 /* === RESPONSIVE === */
-@media (max-width: 600px) {
-  :root { --slot-base-w: 140px; }
-}
-
 /* === ESTADOS === */
 .error {
   background: #2b1212;

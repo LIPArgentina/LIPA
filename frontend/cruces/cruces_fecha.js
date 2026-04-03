@@ -234,9 +234,7 @@ function apiUrl(path){
     const title = document.getElementById('headerTitle');
     const banner = document.getElementById('testModeBanner');
 
-    try { if (team) sessionStorage.setItem('lpi_cruces_team', normPlanillaSlug(team)); } catch(_) {}
-    try { if (team) localStorage.setItem('lpi_cruces_team', normPlanillaSlug(team)); } catch(_) {}
-    try { if (team) sessionStorage.setItem('teamSlug', normPlanillaSlug(team)); } catch(_) {}
+    persistCrucesTeam(team);
 
     if (title) title.textContent = 'CRUCES · MODO PRUEBA';
     if (banner) {
@@ -316,58 +314,6 @@ function apiUrl(path){
     }
 
     return cruces;
-  }
-
-  function extractCruces(input){
-    const result = [];
-    const visited = new WeakSet();
-
-    function walk(node, inheritedDate = null){
-      if (!node) return;
-      if (typeof node !== 'object') return;
-      if (visited.has(node)) return;
-      visited.add(node);
-
-      if (Array.isArray(node)) {
-        node.forEach(item => walk(item, inheritedDate));
-        return;
-      }
-
-      const nodeDate = node.date || node.fecha || node.fechaISO || node.fechaKey || node.fechaFixture || inheritedDate || null;
-
-      if (node.local && node.visitante) pushCruce(result, node.local, node.visitante, nodeDate);
-      if (node.equipoLocal && node.equipoVisitante) pushCruce(result, node.equipoLocal, node.equipoVisitante, nodeDate);
-      if (node.home && node.away) pushCruce(result, node.home, node.away, nodeDate);
-      if (node.left && node.right) pushCruce(result, node.left, node.right, nodeDate);
-
-      if (Array.isArray(node.equipos) && node.equipos.length >= 2) {
-        const equipos = node.equipos.filter(Boolean);
-        const byCategory = {
-          local: equipos.find(item => String(item?.categoria || '').toLowerCase() === 'local'),
-          visitante: equipos.find(item => String(item?.categoria || '').toLowerCase() === 'visitante')
-        };
-        if (byCategory.local && byCategory.visitante) {
-          pushCruce(result, byCategory.local, byCategory.visitante, nodeDate);
-        } else {
-          for (let i = 0; i < equipos.length; i += 2) {
-            const a = equipos[i];
-            const b = equipos[i + 1];
-            if (a && b) pushCruce(result, a, b, nodeDate);
-          }
-        }
-      }
-
-      Object.values(node).forEach(value => walk(value, nodeDate));
-    }
-
-    walk(input);
-
-    const dedup = new Map();
-    result.forEach(item => {
-      const key = compactKey(item.local) + '::' + compactKey(item.visitante) + '::' + String(item.date || '');
-      if (!dedup.has(key)) dedup.set(key, item);
-    });
-    return [...dedup.values()];
   }
 
   function findCruceForTeam(cruces, teamCandidates){
@@ -504,9 +450,6 @@ function apiUrl(path){
     return getCrucesTeamContext().candidates.slice();
   }
 
-  function getStoredCrucesTeam() {
-    return getCrucesTeamContext().primaryTeam || '';
-  }
 
   async function checkCrucesEnabled(category) {
     if (ADMIN_TEST_MODE) return true;
@@ -808,9 +751,8 @@ function apiUrl(path){
     }).filter(Boolean);
   }
 
-  function isWinningScore(section, ownValue, rivalValue) {
-    if (!Number.isFinite(ownValue) || !Number.isFinite(rivalValue)) return false;
-    return ownValue > rivalValue;
+  function isWinningScore(ownValue, rivalValue) {
+    return Number.isFinite(ownValue) && Number.isFinite(rivalValue) && ownValue > rivalValue;
   }
 
   function updateScoresFor() {
@@ -835,12 +777,11 @@ function apiUrl(path){
       if (left) leftTriangles += left.value;
       if (right) rightTriangles += right.value;
 
-      const section = String(left?.section || right?.section || '').toUpperCase();
       const leftValue = left?.value ?? 0;
       const rightValue = right?.value ?? 0;
 
-      if (isWinningScore(section, leftValue, rightValue)) leftPoints++;
-      if (isWinningScore(section, rightValue, leftValue)) rightPoints++;
+      if (isWinningScore(leftValue, rightValue)) leftPoints++;
+      if (isWinningScore(rightValue, leftValue)) rightPoints++;
     }
 
     const leftRoot = document.getElementById('planilla-root-left');
@@ -1097,14 +1038,6 @@ function getScorableRowCount(rootId) {
   return root.querySelectorAll('.pts-select').length;
 }
 
-function normalizeCompareText(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase();
-}
 
 function clearMismatchVisual() {
   document.querySelectorAll('.slot-error, .pts-error, .total-error, .wins-error').forEach(el => {
@@ -1438,15 +1371,6 @@ const btnSubirFotos = document.getElementById('btnSubirFotos');
 const btnVolver = document.getElementById('btnVolver');
 const volverClass = btnVolver ? btnVolver.className : 'btn';
 
-function getSessionToken() {
-  try {
-    const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
-    const sess = raw ? JSON.parse(raw) : null;
-    return String(sess?.token || sess?.accessToken || '').trim();
-  } catch {
-    return '';
-  }
-}
 
 function updatePictureButton(enabled) {
   if (!btnSubirFotos) return;
@@ -1469,6 +1393,13 @@ btnSubirFotos?.addEventListener('click', (ev) => {
 });
 
 updatePictureButton(false);
+
+function restoreValidateButton() {
+  btn.disabled = false;
+  btn.classList.remove('success','error','pending','rival-pending','btn');
+  btn.classList.add('btn-validate');
+  btn.textContent = 'VALIDAR PLANILLA';
+}
 
 const setBtnState = (mode, text) => {
   btn.disabled = (mode === 'success');
@@ -1515,10 +1446,7 @@ async function hydrateValidatedState() {
         setBtnState('pending', data?.mensaje || 'Validado: esperando que valide su rival');
         startValidationPolling(btn);
       } else {
-        btn.disabled = false;
-        btn.classList.remove('success','error','pending','rival-pending','btn');
-        btn.classList.add('btn-validate');
-        btn.textContent = 'VALIDAR PLANILLA';
+        restoreValidateButton();
         updatePictureButton(false);
       }
       return false;
@@ -1530,10 +1458,7 @@ async function hydrateValidatedState() {
         setBtnState('pending', data?.mensaje || 'Esperando que el rival corrija y valide');
         startValidationPolling(btn);
       } else {
-        btn.disabled = false;
-        btn.classList.remove('success','error','pending','rival-pending','btn');
-        btn.classList.add('btn-validate');
-        btn.textContent = 'VALIDAR PLANILLA';
+        restoreValidateButton();
       }
       updatePictureButton(false);
       return false;
@@ -1555,7 +1480,6 @@ btn.onclick = async () => {
     setBtnState('pending','VALIDANDO...');
 
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
-    const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
     const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(getCurrentFechaISO())}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
     if (lockRes && lockRes.ok) {
@@ -1575,10 +1499,7 @@ btn.onclick = async () => {
       console.warn('Cruces desalineado: cantidad de filas puntuables distinta', { leftCount, rightCount });
       setBtnState('error','ERROR: La planilla quedó desalineada');
       setTimeout(() => {
-        btn.disabled = false;
-        btn.classList.remove('success','error','pending','rival-pending','btn');
-        btn.classList.add('btn-validate');
-        btn.textContent = 'VALIDAR PLANILLA';
+        restoreValidateButton();
       }, 3000);
       return;
     }
@@ -1667,7 +1588,7 @@ btn.onclick = async () => {
   } finally {
     if (!btn.classList.contains('success')) btn.disabled = false;
   }
-};;;
+};
 
   }
 
@@ -1724,9 +1645,7 @@ btn.onclick = async () => {
 
   // ---------------- SYNC ----------------
   function syncSlotWidths() {
-    const mobile = window.matchMedia('(max-width: 900px)').matches;
-    const target = mobile ? 300 : 300;
-    document.documentElement.style.setProperty('--slot-base-w', target + 'px');
+    document.documentElement.style.setProperty('--slot-base-w', '300px');
   }
 
   function syncHeaderHeights() {
