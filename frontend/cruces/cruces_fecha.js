@@ -1037,6 +1037,8 @@ const toDateAR = (d = new Date()) => {
   return `${z.getFullYear()}-${pad(z.getMonth()+1)}-${pad(z.getDate())}`;
 };
 const todayISO_AR = toDateAR();
+const getCurrentFechaISO = () => window.__CRUCE_FECHA_ISO || todayISO_AR;
+const getAutosaveKey = () => `lpi.autosave.${mySlug}.${getCurrentFechaISO()}.${(mySlug===localSlug?visitanteSlug:localSlug)}`;
 
 const getLoggedSlug = () => {
   const qs = new URLSearchParams(location.search).get('team');
@@ -1051,7 +1053,6 @@ const getLoggedSlug = () => {
 const mySlug = getLoggedSlug();
 const localSlug = local.teamSlug;
 const visitanteSlug = visitante.teamSlug;
-const AUTOSAVE_KEY = `lpi.autosave.${mySlug}.${todayISO_AR}.${(mySlug===localSlug?visitanteSlug:localSlug)}`;
 
 function readAllSelects(rootId) {
   const root = document.getElementById(rootId);
@@ -1191,7 +1192,7 @@ async function checkFinalLockOnLoad() {
   if (ADMIN_TEST_MODE) return false;
   try {
     const qs = withBust({
-      fechaISO: (window.__CRUCE_FECHA_ISO || todayISO_AR),
+      fechaISO: getCurrentFechaISO(),
       equipoSlug: mySlug,
       localSlug,
       visitanteSlug
@@ -1208,6 +1209,7 @@ async function checkFinalLockOnLoad() {
 
     if (data?.tipo === 'validado' || data?.locked) {
       stopValidationPolling();
+      cancelAutosaveTimers();
       autosaveClear();
       clearMismatchVisual();
       lockValidatedMatchUI();
@@ -1257,7 +1259,7 @@ function startValidationPolling(btn) {
   stopValidationPolling();
   validationPollTimer = setInterval(async () => {
     try {
-      const qs = withBust({ fechaISO: (window.__CRUCE_FECHA_ISO || todayISO_AR), localSlug, visitanteSlug, equipoSlug: mySlug });
+      const qs = withBust({ fechaISO: getCurrentFechaISO(), localSlug, visitanteSlug, equipoSlug: mySlug });
       const res = await fetch(apiUrl('/api/cruces/lock-status?') + qs.toString(), {
         cache: 'no-store',
         credentials: 'same-origin'
@@ -1267,6 +1269,7 @@ function startValidationPolling(btn) {
 
       if (data?.tipo === 'validado' || data?.locked) {
         stopValidationPolling();
+        cancelAutosaveTimers();
         autosaveClear();
         lockValidatedMatchUI();
         clearMismatchVisual();
@@ -1276,7 +1279,7 @@ function startValidationPolling(btn) {
       } else if (data?.tipo === 'mismatch') {
         if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
         // NO cortamos polling: seguimos esperando que el rival corrija
-        setBtnState('pending', 'Esperando que el rival corrija y valide');
+        setBtnState('pending', data?.mensaje || 'Esperando que el rival corrija y valide');
       }
     } catch (_) {}
   }, 4000);
@@ -1315,14 +1318,14 @@ async function saveMatchStatus(validated = false) {
   const status = buildMatchStatus(validated);
   if (ADMIN_TEST_MODE) {
     try {
-      localStorage.setItem(`lpi.cruces.test.status.${mySlug}.${todayISO_AR}`, JSON.stringify(status));
+      localStorage.setItem(`lpi.cruces.test.status.${mySlug}.${getCurrentFechaISO()}`, JSON.stringify(status));
     } catch(_) {}
     return { ok: true, testMode: true, validated: !!validated };
   }
   const body = {
     localSlug,
     visitanteSlug,
-    fechaISO: todayISO_AR,
+    fechaISO: getCurrentFechaISO(),
     equipoSlug: mySlug,
     status,
     validar: !!validated
@@ -1342,21 +1345,29 @@ async function saveMatchStatus(validated = false) {
 // AUTOSAVE
 function autosaveSave() {
   try {
-    const payload = { fechaISO: todayISO_AR, left: readAllSelects('planilla-root-left'), right: readAllSelects('planilla-root-right') };
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+    const payload = { fechaISO: getCurrentFechaISO(), left: readAllSelects('planilla-root-left'), right: readAllSelects('planilla-root-right') };
+    localStorage.setItem(getAutosaveKey(), JSON.stringify(payload));
   } catch {}
 }
-function autosaveLoad() { try{ const raw=localStorage.getItem(AUTOSAVE_KEY); return raw?JSON.parse(raw):null; }catch{ return null; } }
+function autosaveLoad() { try{ const raw=localStorage.getItem(getAutosaveKey()); return raw?JSON.parse(raw):null; }catch{ return null; } }
 function autosaveApplyIfAny() {
   const data = autosaveLoad();
-  if (!data || data.fechaISO !== todayISO_AR) return;
+  if (!data || data.fechaISO !== getCurrentFechaISO()) return;
   writeAllSelects('planilla-root-left', data.left||[]);
   writeAllSelects('planilla-root-right', data.right||[]);
 }
-function autosaveClear(){ try{ localStorage.removeItem(AUTOSAVE_KEY);}catch{} }
+function autosaveClear(){ try{ localStorage.removeItem(getAutosaveKey());}catch{} }
 let autosaveTimer=null;
 let serverSaveTimer=null;
+function cancelAutosaveTimers(){
+  clearTimeout(autosaveTimer);
+  clearTimeout(serverSaveTimer);
+  autosaveTimer = null;
+  serverSaveTimer = null;
+}
 function scheduleAutosave(){
+  if (document.getElementById('btnValidarGlobal')?.classList.contains('success')) return;
+
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(autosaveSave, 300);
 
@@ -1385,7 +1396,7 @@ function autosaveAttachListeners(){
 async function tryApplyStatusIfExists(){
   if (ADMIN_TEST_MODE) return false;
   try {
-    const qs = withBust({ localSlug, visitanteSlug, fechaISO: todayISO_AR, equipoSlug: mySlug });
+    const qs = withBust({ localSlug, visitanteSlug, fechaISO: getCurrentFechaISO(), equipoSlug: mySlug });
     const res = await fetch(apiUrl('/api/cruces/match-status?') + qs.toString(), {
       cache: 'no-store',
       credentials: 'same-origin'
@@ -1408,7 +1419,10 @@ async function tryApplyStatusIfExists(){
     updateScoresFor();
 
     if (data.validated === true) {
+      cancelAutosaveTimers();
+      autosaveClear();
       lockValidatedMatchUI();
+      updatePictureButton(true);
     }
     return true;
   } catch { return false; }
@@ -1436,7 +1450,7 @@ function getSessionToken() {
 function updatePictureButton(enabled) {
   if (!btnSubirFotos) return;
   const url = new URL('../pictures/pictures_upload.html', location.href);
-  url.searchParams.set('fechaISO', (window.__CRUCE_FECHA_ISO || todayISO_AR));
+  url.searchParams.set('fechaISO', getCurrentFechaISO());
   url.searchParams.set('localSlug', localSlug);
   url.searchParams.set('visitanteSlug', visitanteSlug);
   url.searchParams.set('team', mySlug);
@@ -1472,7 +1486,7 @@ async function hydrateValidatedState() {
   if (ADMIN_TEST_MODE) return false;
   try {
     const qs = withBust({
-      fechaISO: (window.__CRUCE_FECHA_ISO || todayISO_AR),
+      fechaISO: getCurrentFechaISO(),
       equipoSlug: mySlug,
       localSlug,
       visitanteSlug
@@ -1486,6 +1500,7 @@ async function hydrateValidatedState() {
 
     if (data?.tipo === 'validado' || data?.locked) {
       stopValidationPolling();
+      cancelAutosaveTimers();
       autosaveClear();
       clearMismatchVisual();
       lockValidatedMatchUI();
@@ -1510,10 +1525,16 @@ async function hydrateValidatedState() {
 
     if (data?.tipo === 'mismatch') {
       if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
-      // Mantener polling activo si ya validó este equipo
-      setBtnState('pending', 'Esperando que el rival corrija y valide');
+      if (data?.validated) {
+        setBtnState('pending', data?.mensaje || 'Esperando que el rival corrija y valide');
+        startValidationPolling(btn);
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('success','error','pending','rival-pending','btn');
+        btn.classList.add('btn-validate');
+        btn.textContent = 'VALIDAR PLANILLA';
+      }
       updatePictureButton(false);
-      startValidationPolling(btn);
       return false;
     }
 
@@ -1535,7 +1556,7 @@ btn.onclick = async () => {
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
-    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(window.__CRUCE_FECHA_ISO || todayISO_AR)}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
+    const lockRes = await fetch(apiUrl(`/api/cruces/lock-status?fechaISO=${encodeURIComponent(getCurrentFechaISO())}&equipoSlug=${encodeURIComponent(mySlug)}&localSlug=${encodeURIComponent(localSlug)}&visitanteSlug=${encodeURIComponent(visitanteSlug)}`)).catch(()=>null);
     if (lockRes && lockRes.ok) {
       const lock = await lockRes.json().catch(()=>null);
       if (lock?.locked || lock?.validatedFinal || lock?.tipo === 'validado') {
@@ -1592,7 +1613,7 @@ btn.onclick = async () => {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        fechaISO: (window.__CRUCE_FECHA_ISO || todayISO_AR),
+        fechaISO: getCurrentFechaISO(),
         localSlug,
         visitanteSlug,
         equipoSlug: mySlug,
@@ -1611,8 +1632,12 @@ btn.onclick = async () => {
 
     if (saveData?.tipo === 'mismatch' || saveData?.ok === false) {
       if (Array.isArray(saveData?.diff)) applyMismatchDiff(saveData.diff);
-      setBtnState('pending', 'Esperando que el rival corrija y valide');
-      startValidationPolling(btn);
+      if (saveData?.validated) {
+        setBtnState('pending', saveData?.mensaje || 'Esperando que el rival corrija y valide');
+        startValidationPolling(btn);
+      } else {
+        setBtnState('error', saveData?.error || saveData?.mensaje || 'Los datos no coinciden, revisá la planilla');
+      }
       return;
     }
 
@@ -1626,6 +1651,7 @@ btn.onclick = async () => {
     }
 
     stopValidationPolling();
+    cancelAutosaveTimers();
     autosaveClear();
     clearMismatchVisual();
     lockValidatedMatchUI();
