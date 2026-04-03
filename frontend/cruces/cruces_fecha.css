@@ -821,3 +821,68 @@ header.lpi-top {
 .validate-cta[hidden]{
   display:none !important;
 }
+
+
+/* Ajuste de nombres largos */
+#planilla-root-left .card .title,
+#planilla-root-right .card .title,
+#planilla-root-left .card .meta,
+#planilla-root-right .card .meta {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-wrap: balance;
+}
+
+.row {
+  min-width: 0;
+}
+
+.slot {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .row,
+  #planilla-root-right .row {
+    align-items: stretch;
+  }
+
+  .slot,
+  #planilla-root-left .row .slot,
+  #planilla-root-right .row .slot {
+    white-space: normal !important;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.15;
+    height: auto;
+    min-height: 30px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    display: flex;
+    align-items: center;
+  }
+
+  #planilla-root-left .card .title,
+  #planilla-root-right .card .title {
+    text-wrap: balance;
+    line-height: 1.05;
+  }
+
+  #planilla-root-left .card .meta,
+  #planilla-root-right .card .meta {
+    line-height: 1.2;
+  }
+}
+
+@media (max-width: 520px) {
+  .slot,
+  #planilla-root-left .row .slot,
+  #planilla-root-right .row .slot {
+    min-height: 28px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+}
