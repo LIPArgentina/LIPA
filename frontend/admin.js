@@ -187,9 +187,10 @@ function renderRows(users){
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
-      <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
+            <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
       <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
       <td class="team-actions-cell">
+        <button class="btn-test-cruces" type="button" title="Probar cruces">🎯</button>
         <button class="btn-reset-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${name || ('fila ' + (i+1))}" ${canReset ? '' : 'disabled'}>🔑</button>
         <button class="btn-del-team" type="button">Eliminar</button>
       </td>`;
@@ -240,6 +241,28 @@ function renderRows(users){
       }
     });
 
+    const testBtn = tr.querySelector('.btn-test-cruces');
+    testBtn?.addEventListener('click', () => {
+      const teamName = tr.querySelector('.team')?.value?.trim();
+      if (!teamName) {
+        toast('Ese equipo no tiene nombre');
+        return;
+      }
+      const teamSlug = slugify(teamName);
+      const url = new URL('cruces/cruces_fecha.html', location.href);
+      url.searchParams.set('team', teamSlug);
+      url.searchParams.set('cat', _activeDiv || 'primera');
+      url.searchParams.set('test', '1');
+      url.searchParams.set('admin', '1');
+      const win = window.open(url.toString(), '_blank', 'noopener');
+      if (!win) {
+        toast('El navegador bloqueó la pestaña');
+        return;
+      }
+      toast(`Modo prueba: ${teamName}`);
+    });
+
+
     tbody.appendChild(tr);
   }
 }
@@ -247,10 +270,11 @@ function collectRows(){
   const rows = [];
   $$('#tbodyTeams tr').forEach(tr => {
     const name    = tr.querySelector('.team')?.value.trim()     || '';
+    const captain = tr.querySelector('.captain')?.value.trim()  || '';
     const email   = tr.querySelector('.email')?.value.trim()    || '';
     const phone   = tr.querySelector('.phone')?.value.trim()    || '';
     if(!name) return;
-    rows.push({ username:name, role:'team', captain:'', email, phone });
+    rows.push({ username:name, role:'team', captain, email, phone });
   });
   return rows;
 }
@@ -559,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnSaveTeams').addEventListener('click', saveTeams);
   $('#btnSaveRoster').addEventListener('click', saveRoster);
   $('#teamSelect').addEventListener('change', changeTeam);
-  $('#btnTestCruces')?.addEventListener('click', openCrucesTestMode);
+  
   $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());
   $('#btnApplyImport')?.addEventListener('click', importPlayersFromTextarea);
   $('#btnCancelImport')?.addEventListener('click', () => toggleImportBox(false));
@@ -698,5 +722,6 @@ document.addEventListener('DOMContentLoaded', () => {
     wirePasswordToggles();
   }
 })();
+
 
 

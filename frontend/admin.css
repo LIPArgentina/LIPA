@@ -55,10 +55,10 @@ tr:last-child td{ border-bottom:0; }
 .input{ width:100%; background:var(--input-bg); color:var(--white); border:1px solid var(--input-border); border-radius:10px; padding:8px 10px; outline:none; }
 .input::placeholder{ color:#8a93a3; }
 .email{ max-width:320px; } .phone{ max-width:220px; }
-thead th:nth-child(2), tbody td:nth-child(2){width:320px;}
-thead th:nth-child(3), tbody td:nth-child(3){width:420px;}
-thead th:nth-child(4), tbody td:nth-child(4){width:170px;}
-thead th:nth-child(5), tbody td:nth-child(5){width:96px;}
+thead th:nth-child(2), tbody td:nth-child(2){width:280px;}
+thead th:nth-child(3), tbody td:nth-child(3){width:280px;}
+thead th:nth-child(4), tbody td:nth-child(4){width:400px;}
+thead th:nth-child(5), tbody td:nth-child(5){width:150px;}
 .footer{ display:flex; justify-content:flex-end; gap:10px; padding:14px 16px 18px; border-top:1px solid var(--border-2); background:rgba(0,0,0,.06); }
 .btn{ border:1px solid var(--gold-border); background:transparent; color:var(--gold); padding:9px 14px; border-radius:12px; font-weight:800; cursor:pointer; }
 
@@ -343,16 +343,6 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
   opacity:.45;
   cursor:not-allowed;
 }
-
-.roster-note-row{
-  margin-top:8px;
-}
-.roster-note{
-  font-size:12px;
-  line-height:1.35;
-  opacity:.9;
-  max-width:320px;
-}
 .import-box{
   margin-top:10px;
   padding:12px;
@@ -386,4 +376,25 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
   .btn-copy-pass{
     width:100%;
   }
+}
+
+
+/* Botón probar cruces por fila */
+.btn-test-cruces{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:34px;
+  height:34px;
+  margin-right:6px;
+  border:1px solid #4caf50;
+  background:#11161f;
+  color:#4caf50;
+  border-radius:10px;
+  font-size:16px;
+  cursor:pointer;
+}
+.btn-test-cruces:hover{
+  background:#1b1e22;
+  filter:brightness(1.1);
 }
