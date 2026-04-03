@@ -15,12 +15,12 @@
         <a href="../index.html" aria-label="Ir al inicio" class="logo-link" id="homeLink">
           <img class="liga-logo" id="logoImg" src="../logo_liga.png" alt="Logo de la liga" width="60" height="60" />
         </a>
-        <h1 class="title" id="headerTitle">CRUCES</h1>
+        <h1 class="header-title" id="headerTitle">CRUCES</h1>
         <nav class="actions" aria-label="Acciones de navegación">
           <a class="btn" id="btnVolver" href="#" aria-label="Volver">VOLVER</a>
         </nav>
       </header>
-      <div id="testModeBanner" style="display:none;margin:10px 0 0;padding:10px 14px;border:1px solid #ffe65a;border-radius:12px;background:rgba(255,230,90,.08);color:#ffe65a;font-weight:700;">
+      <div id="testModeBanner" class="test-mode-banner" hidden>
         MODO PRUEBA: esta pantalla simula el acceso como equipo desde admin y no envía validaciones al backend.
       </div>
     </div>
@@ -37,7 +37,7 @@
       </div>
 
       <!-- BOTÓN CENTRADO -->
-      <div class="validate-cta" id="validateCta" style="display:none;">
+      <div class="validate-cta" id="validateCta" hidden>
         <button class="btn-validate" id="btnValidarGlobal">VALIDAR PLANILLA</button>
         <a class="btn btn-picture disabled" id="btnSubirFotos" href="#" aria-disabled="true">SUBIR FOTOS</a>
       </div>

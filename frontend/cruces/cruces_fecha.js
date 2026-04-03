@@ -807,6 +807,10 @@ function apiUrl(path){
     const leftRows = getScoreRows('planilla-root-left');
     const rightRows = getScoreRows('planilla-root-right');
 
+    if (leftRows.length !== rightRows.length) {
+      console.warn('Cantidad desigual de filas puntuables', { left: leftRows.length, right: rightRows.length });
+    }
+
     let leftTriangles = 0;
     let rightTriangles = 0;
     let leftPoints = 0;
@@ -1516,20 +1520,11 @@ async function hydrateValidatedState() {
 setTimeout(() => { hydrateValidatedState(); }, 0);
 
 btn.onclick = async () => {
-  const sameTotalsStrict = (a, b) => {
-    return (
-      a.equipo1.triangulos    === b.equipo1.triangulos   &&
-      a.equipo1.puntosTotales === b.equipo1.puntosTotales &&
-      a.equipo2.triangulos    === b.equipo2.triangulos   &&
-      a.equipo2.puntosTotales === b.equipo2.puntosTotales
-    );
-  };
 
   try {
     btn.disabled = true;
     setBtnState('pending','VALIDANDO...');
 
-    const mySlug = getLoggedSlug();
     if (!mySlug) throw new Error('No pude determinar el equipo logueado.');
     const rivalSlug = (mySlug === localSlug) ? visitanteSlug : localSlug;
 
@@ -1542,6 +1537,8 @@ btn.onclick = async () => {
         return;
       }
     }
+
+    updateScoresFor();
 
     const left  = computeTotalsFrom('planilla-root-left');
     const right = computeTotalsFrom('planilla-root-right');
@@ -1622,7 +1619,7 @@ btn.onclick = async () => {
   } finally {
     if (!btn.classList.contains('success')) btn.disabled = false;
   }
-};;;
+};
 
   }
 
@@ -1765,7 +1762,7 @@ btn.onclick = async () => {
       if (!category) throw new Error('Falta categoría');
 
       const crucesRaw = await loadCrucesFromDb(category);
-      const cruces = extractCruces(crucesRaw);
+      const cruces = Array.isArray(crucesRaw?.cruces) ? crucesRaw.cruces : [];
       if (!cruces.length) throw new Error('No se encontraron cruces en la base de datos para esta categoría.');
 
       const match = findCruceForTeam(cruces, teamCandidates);
