@@ -790,7 +790,7 @@ function apiUrl(path){
     root.appendChild(card);
   }
 
-  // ---------------- SCORES: TRIÁNGULOS ARRIBA, PUNTOS ABAJO ----------------
+  // ---------------- SCORES: TRIÁNGULOS ARRIBA, PUNTO GENERAL POR COMPARACIÓN DIRECTA ----------------
   function getScoreRows(rootId) {
     const root = document.getElementById(rootId);
     if (!root) return [];
@@ -810,16 +810,7 @@ function apiUrl(path){
 
   function isWinningScore(section, ownValue, rivalValue) {
     if (!Number.isFinite(ownValue) || !Number.isFinite(rivalValue)) return false;
-
-    if (section === 'INDIVIDUALES') {
-      return ownValue === 6 && rivalValue <= 5;
-    }
-
-    if (section === 'PAREJA 1' || section === 'PAREJA 2') {
-      return ownValue >= 4 && ownValue > rivalValue;
-    }
-
-    return false;
+    return ownValue > rivalValue;
   }
 
   function updateScoresFor() {
