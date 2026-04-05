@@ -355,6 +355,14 @@ function normalizeText(value = '') {
 }
 
 
+
+function inferCategoryFromTeamMarker(team = '') {
+  const value = String(team || '').trim().toLowerCase();
+  if (value === '__categoria_segunda__') return 'segunda';
+  if (value === '__categoria_tercera__') return 'tercera';
+  return null;
+}
+
 function normalizeDateOnly(value) {
   return String(value || '').slice(0, 10);
 }
