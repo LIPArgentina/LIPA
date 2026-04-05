@@ -1,5 +1,12 @@
 // --- AUTH REDIRECT PATCH ---
 function redirectToLogin() {
+  try {
+    localStorage.removeItem("lpi.session");
+    sessionStorage.removeItem("lpi.session");
+    localStorage.removeItem("lpi_team_session");
+    sessionStorage.removeItem("lpi_team_session");
+  } catch (_) {}
+
   const next = encodeURIComponent(window.location.pathname + window.location.search);
   window.location.href = `/auth/login.html?next=${next}&reason=auth`;
 }
@@ -95,7 +102,7 @@ async function fetchWithAuth(url, options = {}) {
   }
 
   function fetchJson(url){
-    return fetch(url, {
+    return fetchWithAuth(url, {
       method: 'GET',
       cache: 'no-store',
       credentials: 'include',
@@ -696,7 +703,7 @@ trash.addEventListener('drop', e => {
       return;
     }
     var slug = getTeamSlug();
-    fetch(LPI_apiUrl('/api/team/change-password'), {
+    fetchWithAuth(LPI_apiUrl('/api/team/change-password'), {
       credentials: 'include',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -891,7 +898,7 @@ async function savePlanilla(){
     }
 
     try {
-      const r = await fetch(LPI_apiUrl('/api/save-planilla'), {
+      const r = await fetchWithAuth(LPI_apiUrl('/api/save-planilla'), {
         credentials: 'include',
         method: 'POST',
         headers: LPI_getAuthHeaders(),
@@ -1526,7 +1533,7 @@ document.addEventListener('DOMContentLoaded', function(){
       candidates.push(LPI_apiUrl('/api/team/planilla'));
 
       for (const url of candidates) {
-        const r = await fetch(url, {
+        const r = await fetchWithAuth(url, {
           credentials: 'include',
           method: 'GET',
           cache: 'no-store',
@@ -1710,7 +1717,7 @@ document.addEventListener('DOMContentLoaded', function(){
         fechaKey
       });
 
-      const r = await fetch(
+      const r = await fetchWithAuth(
         LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(),
         { cache:'no-store', credentials:'include' }
       );
@@ -1964,7 +1971,7 @@ document.addEventListener("DOMContentLoaded", function () {
         fechaKey: fechaKey
       });
 
-      const r = await fetch(
+      const r = await fetchWithAuth(
         LPI_apiUrl('/api/cruces/status') + '?' + qs.toString(),
         { cache:'no-store', credentials:'include' }
       );
