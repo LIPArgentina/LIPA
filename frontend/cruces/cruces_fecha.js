@@ -1643,6 +1643,341 @@ btn.onclick = async () => {
     setTimeout(() => toast.classList.remove('show'), 3000);
   }
 
+  
+  function sheetFileNameForMatch(ext){
+    const exportData = window.__CRUCE_EXPORT_DATA__ || {};
+    const localName = exportData.local?.name || 'local';
+    const visitanteName = exportData.visitante?.name || 'visitante';
+    const category = exportData.category || deriveCategory() || 'categoria';
+    const slugify = (value) => String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+    return `planilla-${slugify(category)}-${slugify(localName)}-vs-${slugify(visitanteName)}.${ext}`;
+  }
+
+  function downloadBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  function safeText(value){
+    return String(value || '').trim();
+  }
+
+  function safeArr(value, expected){
+    const arr = Array.isArray(value) ? value.map((item) => safeText(item)) : [];
+    if (typeof expected === 'number') {
+      while (arr.length < expected) arr.push('');
+      return arr.slice(0, expected);
+    }
+    return arr;
+  }
+
+  function escapeHtml(value){
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function buildExportIndividualRows(localPlan, visitantePlan){
+    const left = safeArr(localPlan?.individuales, 7);
+    const right = safeArr(visitantePlan?.individuales, 7);
+
+    return left.map((name, idx) => {
+      if (idx === 0) {
+        return `<tr>
+          <td>${escapeHtml(name)}</td>
+          <td></td>
+          <td class="export-vs" rowspan="7">VS.</td>
+          <td></td>
+          <td>${escapeHtml(right[idx])}</td>
+        </tr>`;
+      }
+      return `<tr>
+        <td>${escapeHtml(name)}</td>
+        <td></td>
+        <td></td>
+        <td>${escapeHtml(right[idx])}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function buildExportDoublesRows(localPair, visitantePair){
+    const l = safeArr(localPair, 2);
+    const r = safeArr(visitantePair, 2);
+    return `<tr>
+      <td>${escapeHtml(l[0])}</td>
+      <td rowspan="2"></td>
+      <td class="export-vs" rowspan="2">VS.</td>
+      <td rowspan="2"></td>
+      <td>${escapeHtml(r[0])}</td>
+    </tr>
+    <tr>
+      <td>${escapeHtml(l[1])}</td>
+      <td>${escapeHtml(r[1])}</td>
+    </tr>`;
+  }
+
+  function buildExportSubsRows(items){
+    return safeArr(items, 2).map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join('');
+  }
+
+  function buildExportSheetElement(){
+    const exportData = window.__CRUCE_EXPORT_DATA__;
+    if (!exportData) throw new Error('No hay datos del cruce para exportar.');
+
+    const local = exportData.local || {};
+    const visitante = exportData.visitante || {};
+    const localPlan = exportData.localPlan || {};
+    const visitantePlan = exportData.visitantePlan || {};
+    const category = String(exportData.category || '').toUpperCase();
+    const formattedDate = formatDate(exportData.date || window.__CRUCE_FECHA_ISO || '');
+
+    const wrapper = document.createElement('section');
+    wrapper.className = 'export-a4-sheet';
+    wrapper.innerHTML = `
+      <div class="export-meta">
+        <span>Categoría: ${escapeHtml(category)}</span>
+        <span>${formattedDate ? escapeHtml(formattedDate) : 'Planilla'}</span>
+      </div>
+
+      <h1 class="export-league-title">LIGA DE POOL INDEPENDIENTE</h1>
+      <div class="export-bar"></div>
+
+      <div class="export-header-grid">
+        <div>
+          <table class="export-form" aria-label="Datos de sala local">
+            <tr>
+              <td class="label-cell">SALA</td>
+              <td>${escapeHtml(local.name || '')}</td>
+            </tr>
+            <tr>
+              <td class="label-cell">CAPITANÍA</td>
+              <td>${escapeHtml(safeArr(localPlan.capitan, 2).filter(Boolean).join(' / '))}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="export-logo">
+          <img src="../logo_liga.png" alt="Logo Liga" onerror="this.style.display='none';" />
+        </div>
+
+        <div>
+          <table class="export-form" aria-label="Datos de sala visitante">
+            <tr>
+              <td>${escapeHtml(visitante.name || '')}</td>
+              <td class="label-cell">SALA</td>
+            </tr>
+            <tr>
+              <td>${escapeHtml(safeArr(visitantePlan.capitan, 2).filter(Boolean).join(' / '))}</td>
+              <td class="label-cell">CAPITANÍA</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="export-section">
+        <table aria-label="Partidos individuales">
+          <colgroup>
+            <col style="width:32.5%">
+            <col style="width:5%">
+            <col style="width:25%">
+            <col style="width:5%">
+            <col style="width:32.5%">
+          </colgroup>
+          <thead class="export-ind-head">
+            <tr>
+              <th colspan="2">NOMBRE Y APELLIDO</th>
+              <th>INDIVIDUALES</th>
+              <th colspan="2">NOMBRE Y APELLIDO</th>
+            </tr>
+          </thead>
+          <tbody>${buildExportIndividualRows(localPlan, visitantePlan)}</tbody>
+        </table>
+      </div>
+
+      <div class="export-doubles-wrap">
+        <div class="export-doubles-label">PAREJAS 1</div>
+        <table aria-label="Parejas 1">
+          <colgroup>
+            <col style="width:32.5%">
+            <col style="width:5%">
+            <col style="width:25%">
+            <col style="width:5%">
+            <col style="width:32.5%">
+          </colgroup>
+          <tbody>${buildExportDoublesRows(localPlan.pareja1, visitantePlan.pareja1)}</tbody>
+        </table>
+      </div>
+
+      <div class="export-doubles-wrap">
+        <div class="export-doubles-label">PAREJAS 2</div>
+        <table aria-label="Parejas 2">
+          <colgroup>
+            <col style="width:32.5%">
+            <col style="width:5%">
+            <col style="width:25%">
+            <col style="width:5%">
+            <col style="width:32.5%">
+          </colgroup>
+          <tbody>${buildExportDoublesRows(localPlan.pareja2, visitantePlan.pareja2)}</tbody>
+        </table>
+      </div>
+
+      <div class="export-section">
+        <table class="export-result" aria-label="Resultado final">
+          <colgroup>
+            <col style="width:42%">
+            <col style="width:8%">
+            <col style="width:8%">
+            <col style="width:42%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>SALA</th>
+              <th colspan="2">RESULTADO FINAL</th>
+              <th>SALA</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td></td><td></td><td></td><td></td></tr>
+            <tr>
+              <td class="export-tri-left">TRIÁNGULOS TOTALES :</td>
+              <td></td>
+              <td></td>
+              <td class="export-tri-right">: TRIÁNGULOS TOTALES</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="export-subs-grid">
+        <div>
+          <table class="export-subs-table" aria-label="Suplentes local">
+            <thead><tr><th>SUPLENTES</th></tr></thead>
+            <tbody>${buildExportSubsRows(localPlan.suplentes)}</tbody>
+          </table>
+        </div>
+        <div>
+          <table class="export-subs-table" aria-label="Suplentes visitante">
+            <thead><tr><th>SUPLENTES</th></tr></thead>
+            <tbody>${buildExportSubsRows(visitantePlan.suplentes)}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="export-signatures">
+        <div class="export-signature">
+          <div class="export-signature-line"></div>
+          <div class="export-signature-label">FIRMA LOCAL</div>
+        </div>
+        <div class="export-signature">
+          <div class="export-signature-line"></div>
+          <div class="export-signature-label">FIRMA VISITANTE</div>
+        </div>
+      </div>
+    `;
+    return wrapper;
+  }
+
+  async function renderExportCanvas(){
+    if (!window.html2canvas) throw new Error('Falta html2canvas para exportar.');
+    const sheet = buildExportSheetElement();
+    document.body.appendChild(sheet);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    try {
+      return await window.html2canvas(sheet, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: 794,
+        height: 1123,
+        windowWidth: 794,
+        windowHeight: 1123
+      });
+    } finally {
+      sheet.remove();
+    }
+  }
+
+  async function exportCurrentSheetAsPdf(){
+    if (!window.jspdf?.jsPDF) throw new Error('Falta jsPDF para exportar.');
+    const canvas = await renderExportCanvas();
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new window.jspdf.jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true
+    });
+    pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+    pdf.save(sheetFileNameForMatch('pdf'));
+  }
+
+  async function exportCurrentSheetAsJpg(){
+    const canvas = await renderExportCanvas();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.96));
+    if (!blob) throw new Error('No se pudo generar la imagen JPG.');
+    downloadBlob(blob, sheetFileNameForMatch('jpg'));
+  }
+
+  function wireExportButtons(){
+    const btnPdf = document.getElementById('btnDownloadPdf');
+    const btnJpg = document.getElementById('btnDownloadJpg');
+    if (!btnPdf || !btnJpg) return;
+
+    const guard = () => {
+      if (!window.__CRUCE_EXPORT_DATA__) {
+        showToast('Todavía no se cargó la planilla del cruce.', 'error');
+        return false;
+      }
+      return true;
+    };
+
+    btnPdf.addEventListener('click', async () => {
+      if (!guard()) return;
+      try {
+        btnPdf.disabled = true;
+        await exportCurrentSheetAsPdf();
+        showToast('PDF generado correctamente.', 'success');
+      } catch (e) {
+        console.error(e);
+        showToast(e?.message || 'No se pudo generar el PDF.', 'error');
+      } finally {
+        btnPdf.disabled = false;
+      }
+    });
+
+    btnJpg.addEventListener('click', async () => {
+      if (!guard()) return;
+      try {
+        btnJpg.disabled = true;
+        await exportCurrentSheetAsJpg();
+        showToast('JPG generado correctamente.', 'success');
+      } catch (e) {
+        console.error(e);
+        showToast(e?.message || 'No se pudo generar el JPG.', 'error');
+      } finally {
+        btnJpg.disabled = false;
+      }
+    });
+  }
+
+
   // ---------------- SYNC ----------------
   function syncSlotWidths() {
     document.documentElement.style.setProperty('--slot-base-w', '300px');
@@ -1741,6 +2076,15 @@ btn.onclick = async () => {
       const localPlan = await loadFirstExistingPlanilla(local.teamSlug || local.name);
       const visitantePlan = await loadFirstExistingPlanilla(visitante.teamSlug || visitante.name);
 
+      window.__CRUCE_EXPORT_DATA__ = {
+        category,
+        date: match.date || crucesRaw?.fechaFixture || window.__CRUCE_FECHA_ISO || '',
+        local,
+        visitante,
+        localPlan,
+        visitantePlan
+      };
+
       renderSide('planilla-root-left',  localPlan,     visitante.name, match.date, local.name);
       renderSide('planilla-root-right', visitantePlan, local.name,     match.date, visitante.name);
 
@@ -1777,6 +2121,7 @@ btn.onclick = async () => {
   // ---------------- INIT ----------------
 window.addEventListener('load', async () => {
   setupAdminTestMode();
+  wireExportButtons();
   const category = deriveCategory();
   const allowed = await checkCrucesEnabled(category);
 

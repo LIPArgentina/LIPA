@@ -977,3 +977,183 @@ header.lpi-top {
     font-size: 9px;
   }
 }
+
+
+/* ===== Export buttons + hidden A4 export ===== */
+.actions{
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+#btnDownloadPdf,
+#btnDownloadJpg{
+  min-width:140px;
+}
+
+.export-a4-sheet{
+  width:793.701px;
+  min-height:1122.52px;
+  background:#fff;
+  color:#000;
+  padding:28px 30px 36px;
+  border:1px solid #000;
+  position:fixed;
+  left:-10000px;
+  top:0;
+  z-index:-1;
+  box-shadow:none;
+  font-family:Arial, Helvetica, sans-serif;
+}
+
+.export-a4-sheet *{
+  box-sizing:border-box;
+}
+
+.export-meta{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
+  font-size:12px;
+  color:#333;
+}
+
+.export-league-title{
+  text-align:center;
+  font-size:22px;
+  font-weight:800;
+  text-transform:uppercase;
+  margin:0;
+}
+
+.export-bar{
+  height:12px;
+  background:#bdbdbd;
+  margin:8px 0 14px;
+}
+
+.export-header-grid{
+  display:grid;
+  grid-template-columns:1fr 110px 1fr;
+  gap:16px;
+  align-items:start;
+}
+
+.export-logo{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:66px;
+}
+.export-logo img{
+  max-width:100%;
+  max-height:66px;
+  object-fit:contain;
+}
+
+.export-a4-sheet table{
+  width:100%;
+  border-collapse:collapse;
+  table-layout:fixed;
+}
+.export-a4-sheet td,
+.export-a4-sheet th{
+  border:2px solid #000;
+  background:#fff;
+  color:#000;
+  font-size:13px;
+  padding:0 4px;
+  height:26px;
+}
+.export-form .label-cell{
+  width:90px;
+  text-align:center;
+  font-weight:800;
+  text-transform:uppercase;
+}
+.export-section{
+  margin-top:12px;
+}
+.export-section-title{
+  text-align:center;
+  font-weight:800;
+  text-transform:uppercase;
+  margin:0 0 4px;
+  font-size:14px;
+}
+.export-ind-head th{
+  text-transform:uppercase;
+  text-align:center;
+  font-weight:800;
+}
+.export-vs{
+  text-align:center;
+  font-weight:800;
+  vertical-align:middle;
+}
+.export-doubles-wrap{
+  margin-top:12px;
+}
+.export-doubles-label{
+  text-align:center;
+  font-weight:800;
+  text-transform:uppercase;
+  margin-bottom:4px;
+  font-size:14px;
+}
+.export-result th{
+  text-transform:uppercase;
+  text-align:center;
+  font-weight:800;
+}
+.export-tri-left{
+  text-align:right;
+  font-weight:800;
+  text-transform:uppercase;
+  font-size:12px;
+  padding-right:8px;
+}
+.export-tri-right{
+  text-align:left;
+  font-weight:800;
+  text-transform:uppercase;
+  font-size:12px;
+  padding-left:8px;
+}
+.export-subs-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+  margin-top:12px;
+}
+.export-subs-table th{
+  text-transform:uppercase;
+  font-weight:800;
+  text-align:center;
+}
+.export-signatures{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:80px;
+  margin-top:86px;
+}
+.export-signature{
+  text-align:center;
+}
+.export-signature-line{
+  border-top:1px dashed #000;
+  height:0;
+  margin-bottom:8px;
+}
+.export-signature-label{
+  font-size:14px;
+  font-weight:800;
+  text-transform:uppercase;
+}
+
+@media (max-width: 900px){
+  #btnDownloadPdf,
+  #btnDownloadJpg{
+    min-width:auto;
+  }
+}
