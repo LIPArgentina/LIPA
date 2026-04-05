@@ -38,8 +38,8 @@ function ensureManageTeamButton() {
   btn.classList.add("btn", "btn-outline", "btn-sm");
   btn.style.textDecoration = "none";
 
-  const slug = getSlug();
-  const admin = isAdmin();
+  const sess = readSession();
+  const admin = (sess?.role || "").toLowerCase() === "admin";
 
   if (admin) {
     btn.textContent = "Administrar equipos";
@@ -48,14 +48,16 @@ function ensureManageTeamButton() {
     return;
   }
 
-  if (slug) {
+  if (sess?.slug) {
+    const slug = String(sess.slug);
     btn.textContent = "Administrar equipo";
     btn.href = `/templates/plantilla.html?team=${encodeURIComponent(slug)}`;
     btn.classList.remove("hidden");
-  } else {
-    btn.classList.add("hidden");
-    btn.removeAttribute("href");
+    return;
   }
+
+  btn.classList.add("hidden");
+  btn.removeAttribute("href");
 }
 
 function redirectAfterLogin() {
