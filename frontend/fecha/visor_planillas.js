@@ -501,6 +501,11 @@ function resetCategoryHeaderIndicators(){
     segunda: '__categoria_segunda__'
   };
 
+  const statusCache = {
+    tercera: null,
+    segunda: null
+  };
+
   function fechaKeyActual(){
     return new Date().toISOString().slice(0,10);
   }
@@ -513,9 +518,83 @@ function resetCategoryHeaderIndicators(){
     return document.getElementById(category === 'tercera' ? 'crucesStatusLabelTercera' : 'crucesStatusLabelSegunda');
   }
 
+  function ensureAutomationLabel(category){
+    const label = getLabel(category);
+    if (!label) return {};
+
+    if (label.__parts) return label.__parts;
+
+    label.textContent = '';
+
+    const row = document.createElement('div');
+    row.className = 'automation-status-row';
+
+    const text = document.createElement('span');
+    text.className = 'automation-status-text';
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'automation-toggle automation-toggle-off';
+    toggle.setAttribute('aria-label', 'Alternar automatización de cruces');
+    toggle.title = 'Activar automatización';
+
+    row.appendChild(text);
+    row.appendChild(toggle);
+    label.appendChild(row);
+
+    label.__parts = { label, row, text, toggle };
+    return label.__parts;
+  }
+
+  function formatScheduledAt(value){
+    if (!value) return '';
+    try {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }) + ' hs';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function buildScheduleText(status){
+    if (!status || !status.scheduledAt) {
+      return 'sin próxima fecha en fixture para programar habilitación automática';
+    }
+
+    const formatted = formatScheduledAt(status.scheduledAt);
+    const base = 'cruces programados para habilitación automática el ' + formatted;
+
+    if (status.automationEnabled === false) {
+      return base + ' (automatización desactivada)';
+    }
+
+    return base;
+  }
+
+  function renderAutomationStatus(category, status){
+    const parts = ensureAutomationLabel(category);
+    if (!parts.label) return;
+
+    const isEnabled = !!status?.automationEnabled;
+    parts.text.textContent = buildScheduleText(status);
+    parts.toggle.classList.toggle('automation-toggle-on', isEnabled);
+    parts.toggle.classList.toggle('automation-toggle-off', !isEnabled);
+    parts.toggle.setAttribute('aria-pressed', isEnabled ? 'true' : 'false');
+    parts.toggle.title = isEnabled
+      ? 'Automatización activa. Hacé clic para desactivarla.'
+      : 'Automatización desactivada. Hacé clic para activarla.';
+  }
+
   function setLoading(category){
     const btn = getButton(category);
-    const label = getLabel(category);
     if (!btn) return;
 
     btn.disabled = true;
@@ -525,17 +604,18 @@ function resetCategoryHeaderIndicators(){
       : 'consultando segunda...';
     btn.title = 'Consultando estado actual...';
 
-    if (label){
-      label.textContent = category === 'tercera'
-        ? 'consultando estado de cruces tercera...'
-        : 'consultando estado de cruces segunda...';
-    }
+    renderAutomationStatus(category, {
+      automationEnabled: false,
+      scheduledAt: null
+    });
   }
 
-  function setUI(category, enabled, remainingMs){
+  function setUI(category, status){
     const btn = getButton(category);
-    const label = getLabel(category);
     if (!btn) return;
+
+    const enabled = !!status?.enabled;
+    const remainingMs = Number(status?.remainingMs || 0);
 
     btn.disabled = false;
 
@@ -544,17 +624,19 @@ function resetCategoryHeaderIndicators(){
         ? 'deshabilitar cruces tercera'
         : 'deshabilitar cruces segunda';
       btn.dataset.state = 'on';
-      const hrs = Math.max(1, Math.floor((remainingMs || 0) / 3600000));
-      btn.title = 'Habilitado. Expira en ~' + hrs + 'h';
-      if (label) label.textContent = 'los cruces de ' + category + ' están habilitados';
+      const hrs = Math.max(1, Math.floor(remainingMs / 3600000));
+      btn.title = remainingMs > 0
+        ? ('Habilitado. Expira en ~' + hrs + 'h')
+        : 'Habilitado';
     } else {
       btn.textContent = category === 'tercera'
         ? 'habilitar cruces tercera'
         : 'habilitar cruces segunda';
       btn.dataset.state = 'off';
-      btn.title = 'Al hacer clic se habilita por 48 horas';
-      if (label) label.textContent = 'los cruces de ' + category + ' están deshabilitados';
+      btn.title = 'Al hacer clic se habilita manualmente';
     }
+
+    renderAutomationStatus(category, status);
   }
 
   async function getStatus(category){
@@ -573,9 +655,11 @@ function resetCategoryHeaderIndicators(){
   async function refreshCategory(category){
     try {
       const j = await getStatus(category);
-      setUI(category, !!j.enabled, j.remainingMs);
+      statusCache[category] = j;
+      setUI(category, j);
     } catch (_) {
-      setUI(category, false, 0);
+      statusCache[category] = null;
+      setUI(category, { enabled: false, automationEnabled: false, scheduledAt: null, remainingMs: 0 });
     }
   }
 
@@ -584,6 +668,45 @@ function resetCategoryHeaderIndicators(){
       refreshCategory('tercera'),
       refreshCategory('segunda')
     ]);
+  }
+
+  async function toggleAutomation(category){
+    const current = statusCache[category];
+    const nextEnabled = !(current && current.automationEnabled);
+    const parts = ensureAutomationLabel(category);
+    if (parts.toggle) parts.toggle.disabled = true;
+
+    try {
+      const r = await fetch(`${API_BASE}/api/cruces/automation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          team: CATEGORY_KEYS[category],
+          enabled: nextEnabled
+        })
+      });
+
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      statusCache[category] = j;
+      setUI(category, j);
+    } catch (e) {
+      alert('No se pudo actualizar la automatización de ' + category + ': ' + ((e && e.message) || e));
+    } finally {
+      if (parts.toggle) parts.toggle.disabled = false;
+    }
+  }
+
+  function wireAutomationToggle(category){
+    const parts = ensureAutomationLabel(category);
+    if (!parts.toggle || parts.toggle.__wired) return;
+    parts.toggle.__wired = true;
+
+    parts.toggle.addEventListener('click', async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      await toggleAutomation(category);
+    });
   }
 
   function wireButton(category){
@@ -622,7 +745,9 @@ function resetCategoryHeaderIndicators(){
         });
 
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        await refreshCategory(category);
+        const j = await r.json();
+        statusCache[category] = j;
+        setUI(category, j);
       } catch (e) {
         btn.textContent = old;
         alert('No se pudo actualizar cruces de ' + category + ': ' + ((e && e.message) || e));
@@ -635,6 +760,8 @@ function resetCategoryHeaderIndicators(){
 
   wireButton('tercera');
   wireButton('segunda');
+  wireAutomationToggle('tercera');
+  wireAutomationToggle('segunda');
 
   setLoading('tercera');
   setLoading('segunda');

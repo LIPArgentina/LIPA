@@ -68,12 +68,33 @@
   .cruces-status-label{
     margin-top:5px;
     font-size:11px;
-    line-height:1.15;
+    line-height:1.25;
     color:var(--gold);
     text-align:center;
     display:block;
-    max-width:170px;
+    max-width:280px;
   }
+  .automation-status-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  .automation-status-text{
+    display:block;
+  }
+  .automation-toggle{
+    width:14px;
+    height:14px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.4);
+    cursor:pointer;
+    padding:0;
+    flex:0 0 auto;
+    box-shadow:0 0 0 1px rgba(0,0,0,.25), 0 1px 3px rgba(0,0,0,.4);
+  }
+  .automation-toggle-on{ background:#22c55e; }
+  .automation-toggle-off{ background:#ef4444; }
   .category-header-wrap{
     min-width:240px;
     gap:6px;

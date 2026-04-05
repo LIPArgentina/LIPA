@@ -1,53 +1,302 @@
-
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
 
-// ===== ADMIN CRUCES (sin fecha / compat legacy) =====
-const crucesEnabledByTeam = new Map();
+// ===== ADMIN CRUCES (persistido + automatización por fixture) =====
+
+const CATEGORY_KEYS = {
+  tercera: '__categoria_tercera__',
+  segunda: '__categoria_segunda__'
+};
+
+const ARG_TZ_OFFSET = '-03:00';
+let ensureCrucesAdminStoragePromise = null;
 
 function normalizeCrucesAdminKey(team) {
   return String(team || '').trim().toLowerCase();
 }
 
-function getCrucesEntry(team) {
-  const key = normalizeCrucesAdminKey(team);
-  const enabled = crucesEnabledByTeam.get(key);
-  return { enabled: enabled !== false };
+async function ensureCrucesAdminStorage() {
+  if (!ensureCrucesAdminStoragePromise) {
+    ensureCrucesAdminStoragePromise = (async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS cruces_admin_config (
+          team TEXT PRIMARY KEY,
+          manual_enabled BOOLEAN NOT NULL DEFAULT false,
+          automation_enabled BOOLEAN NOT NULL DEFAULT true,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    })().catch((err) => {
+      ensureCrucesAdminStoragePromise = null;
+      throw err;
+    });
+  }
+  return ensureCrucesAdminStoragePromise;
 }
 
-router.get('/status', (req, res) => {
-  const { team } = req.query;
-  if (!team) {
-    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+async function getOrCreateCrucesAdminConfig(team) {
+  await ensureCrucesAdminStorage();
+  const key = normalizeCrucesAdminKey(team);
+
+  await pool.query(
+    `
+      INSERT INTO cruces_admin_config (team)
+      VALUES ($1)
+      ON CONFLICT (team) DO NOTHING
+    `,
+    [key]
+  );
+
+  const { rows } = await pool.query(
+    `
+      SELECT team, manual_enabled, automation_enabled, updated_at
+      FROM cruces_admin_config
+      WHERE team = $1
+      LIMIT 1
+    `,
+    [key]
+  );
+
+  return rows[0] || {
+    team: key,
+    manual_enabled: false,
+    automation_enabled: true,
+    updated_at: null
+  };
+}
+
+async function updateCrucesAdminConfig(team, patch = {}) {
+  const current = await getOrCreateCrucesAdminConfig(team);
+  const manualEnabled = typeof patch.manual_enabled === 'boolean'
+    ? patch.manual_enabled
+    : !!current.manual_enabled;
+  const automationEnabled = typeof patch.automation_enabled === 'boolean'
+    ? patch.automation_enabled
+    : !!current.automation_enabled;
+
+  const { rows } = await pool.query(
+    `
+      INSERT INTO cruces_admin_config (team, manual_enabled, automation_enabled, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (team)
+      DO UPDATE SET
+        manual_enabled = EXCLUDED.manual_enabled,
+        automation_enabled = EXCLUDED.automation_enabled,
+        updated_at = NOW()
+      RETURNING team, manual_enabled, automation_enabled, updated_at
+    `,
+    [normalizeCrucesAdminKey(team), manualEnabled, automationEnabled]
+  );
+
+  return rows[0];
+}
+
+function isDateKey(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
+}
+
+function parseArgDateAt(dateKey, hour = 0, minute = 0, second = 0) {
+  return new Date(`${dateKey}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}${ARG_TZ_OFFSET}`);
+}
+
+function addDaysToDateKey(dateKey, days) {
+  const base = parseArgDateAt(dateKey, 12, 0, 0);
+  base.setUTCDate(base.getUTCDate() + Number(days || 0));
+  return base.toISOString().slice(0, 10);
+}
+
+function nowInArgentina() {
+  const now = new Date();
+  const local = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+  const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return new Date(now.getTime() + (local.getTime() - utc.getTime()));
+}
+
+function computeFixtureWindow(dateKey) {
+  const startKey = addDaysToDateKey(dateKey, -1);
+  return {
+    fixtureDate: dateKey,
+    scheduledAt: parseArgDateAt(startKey, 20, 0, 0),
+    closesAt: parseArgDateAt(dateKey, 23, 59, 59)
+  };
+}
+
+function computeNextAutomation(fixtures = []) {
+  const dateKeys = [...new Set(
+    fixtures
+      .map((item) => String(item?.date || '').slice(0, 10))
+      .filter(isDateKey)
+  )].sort();
+
+  if (!dateKeys.length) {
+    return {
+      nextFixtureDate: null,
+      scheduledAt: null,
+      closesAt: null,
+      scheduledEnabled: false,
+      remainingMs: 0,
+      reason: 'fixture_missing'
+    };
   }
 
-  const state = getCrucesEntry(team);
-  res.json({ ok: true, enabled: state.enabled });
+  const now = nowInArgentina();
+
+  for (const dateKey of dateKeys) {
+    const window = computeFixtureWindow(dateKey);
+    if (now < window.closesAt) {
+      const scheduledEnabled = now >= window.scheduledAt && now < window.closesAt;
+      return {
+        nextFixtureDate: dateKey,
+        scheduledAt: window.scheduledAt.toISOString(),
+        closesAt: window.closesAt.toISOString(),
+        scheduledEnabled,
+        remainingMs: scheduledEnabled ? Math.max(0, window.closesAt.getTime() - now.getTime()) : 0,
+        reason: scheduledEnabled ? 'scheduled_open' : 'scheduled_pending'
+      };
+    }
+  }
+
+  const lastWindow = computeFixtureWindow(dateKeys[dateKeys.length - 1]);
+  return {
+    nextFixtureDate: dateKeys[dateKeys.length - 1],
+    scheduledAt: lastWindow.scheduledAt.toISOString(),
+    closesAt: lastWindow.closesAt.toISOString(),
+    scheduledEnabled: false,
+    remainingMs: 0,
+    reason: 'fixture_past'
+  };
+}
+
+async function fetchAutomationFixtureInfo(team) {
+  const category = inferCategoryFromTeamMarker(team);
+  if (!category) {
+    return {
+      category: null,
+      fixtures: [],
+      nextFixtureDate: null,
+      scheduledAt: null,
+      closesAt: null,
+      scheduledEnabled: false,
+      remainingMs: 0,
+      reason: 'invalid_category'
+    };
+  }
+
+  const { rows } = await pool.query(
+    `
+      SELECT kind, data, updated_at, id
+      FROM fixtures
+      WHERE category = $1
+      ORDER BY
+        CASE kind WHEN 'ida' THEN 0 WHEN 'vuelta' THEN 1 ELSE 9 END,
+        updated_at DESC,
+        id DESC
+    `,
+    [category]
+  );
+
+  const fixtures = [];
+  for (const row of rows) {
+    const fechas = Array.isArray(row?.data?.fechas) ? row.data.fechas : [];
+    for (const fecha of fechas) {
+      const dateKey = String(fecha?.date || '').slice(0, 10);
+      if (!isDateKey(dateKey)) continue;
+      fixtures.push({ date: dateKey, kind: row.kind });
+    }
+  }
+
+  return {
+    category,
+    fixtures,
+    ...computeNextAutomation(fixtures)
+  };
+}
+
+async function buildCrucesAdminStatus(team) {
+  const config = await getOrCreateCrucesAdminConfig(team);
+  const automation = await fetchAutomationFixtureInfo(team);
+  const manualEnabled = !!config.manual_enabled;
+  const automationEnabled = !!config.automation_enabled;
+  const scheduledEnabled = automationEnabled && !!automation.scheduledEnabled;
+  const enabled = manualEnabled || scheduledEnabled;
+  const remainingMs = enabled
+    ? Math.max(Number(automation.remainingMs || 0), 0)
+    : 0;
+
+  return {
+    ok: true,
+    team: normalizeCrucesAdminKey(team),
+    enabled,
+    remainingMs,
+    manualEnabled,
+    automationEnabled,
+    automationReason: automation.reason,
+    nextFixtureDate: automation.nextFixtureDate,
+    scheduledAt: automation.scheduledAt,
+    closesAt: automation.closesAt,
+    category: automation.category
+  };
+}
+
+router.get('/status', async (req, res) => {
+  try {
+    const { team } = req.query;
+    if (!team) {
+      return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+    }
+
+    const state = await buildCrucesAdminStatus(team);
+    return res.json(state);
+  } catch (err) {
+    console.error('GET /api/cruces/status', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo obtener el estado de cruces.' });
+  }
 });
 
-router.post('/enable', (req, res) => {
-  const { team } = req.body || {};
-  if (!team) {
-    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+router.post('/enable', async (req, res) => {
+  try {
+    const { team } = req.body || {};
+    if (!team) {
+      return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+    }
+
+    await updateCrucesAdminConfig(team, { manual_enabled: true });
+    return res.json(await buildCrucesAdminStatus(team));
+  } catch (err) {
+    console.error('POST /api/cruces/enable', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo habilitar cruces.' });
   }
-
-  const key = normalizeCrucesAdminKey(team);
-  crucesEnabledByTeam.set(key, true);
-
-  res.json({ ok: true, enabled: true });
 });
 
-router.post('/disable', (req, res) => {
-  const { team } = req.body || {};
-  if (!team) {
-    return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+router.post('/disable', async (req, res) => {
+  try {
+    const { team } = req.body || {};
+    if (!team) {
+      return res.status(400).json({ ok: false, error: 'Falta parámetro team.' });
+    }
+
+    await updateCrucesAdminConfig(team, { manual_enabled: false });
+    return res.json(await buildCrucesAdminStatus(team));
+  } catch (err) {
+    console.error('POST /api/cruces/disable', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo deshabilitar cruces.' });
   }
+});
 
-  const key = normalizeCrucesAdminKey(team);
-  crucesEnabledByTeam.set(key, false);
+router.post('/automation', async (req, res) => {
+  try {
+    const { team, enabled } = req.body || {};
+    if (!team || typeof enabled !== 'boolean') {
+      return res.status(400).json({ ok: false, error: 'Faltan parámetros team/enabled.' });
+    }
 
-  res.json({ ok: true, enabled: false });
+    await updateCrucesAdminConfig(team, { automation_enabled: enabled });
+    return res.json(await buildCrucesAdminStatus(team));
+  } catch (err) {
+    console.error('POST /api/cruces/automation', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo actualizar la automatización.' });
+  }
 });
 
 router.get('/stream', (req, res) => {
@@ -60,6 +309,7 @@ router.get('/stream', (req, res) => {
   };
 
   const timer = setInterval(send, 10000);
+  send();
 
   req.on('close', () => {
     clearInterval(timer);
@@ -104,12 +354,6 @@ function normalizeText(value = '') {
     .toUpperCase();
 }
 
-function inferCategoryFromTeamMarker(team = '') {
-  const value = String(team || '').trim().toLowerCase();
-  if (value === '__categoria_segunda__') return 'segunda';
-  if (value === '__categoria_tercera__') return 'tercera';
-  return null;
-}
 
 function normalizeDateOnly(value) {
   return String(value || '').slice(0, 10);
