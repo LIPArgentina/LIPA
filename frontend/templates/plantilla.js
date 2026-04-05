@@ -1,3 +1,19 @@
+// --- AUTH REDIRECT PATCH ---
+function redirectToLogin() {
+  const next = encodeURIComponent(window.location.pathname + window.location.search);
+  window.location.href = `/auth/login.html?next=${next}&reason=auth`;
+}
+
+async function fetchWithAuth(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401 || res.status === 403) {
+    redirectToLogin();
+    throw new Error("No autenticado");
+  }
+  return res;
+}
+// --- END PATCH ---
+
 // === LPI Auth helper ===
   function LPI_getAuthHeaders() {
     let token = "";
