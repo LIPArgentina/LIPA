@@ -39,62 +39,6 @@
     return base + (p.startsWith('/') ? p : '/' + p);
   }
 
-function LPI_clearSessionStorage() {
-  const keys = [
-    "lpi.session",
-    "lpi_team_session",
-    "lpi_auth",
-    "role",
-    "teamSlug",
-    "lpi_cruces_team",
-    "crucesTeam"
-  ];
-  keys.forEach(function(key){
-    try { localStorage.removeItem(key); } catch(_) {}
-    try { sessionStorage.removeItem(key); } catch(_) {}
-  });
-}
-
-function LPI_redirectToLogin(reason){
-  try { LPI_clearSessionStorage(); } catch(_) {}
-  try {
-    const next = location.pathname + location.search + location.hash;
-    const loginUrl = new URL('/frontend/auth/login.html', window.location.origin);
-    loginUrl.searchParams.set('next', next);
-    if (reason) loginUrl.searchParams.set('reason', reason);
-    window.location.href = loginUrl.toString();
-    return true;
-  } catch(_) {
-    try {
-      window.location.href = '../auth/login.html';
-      return true;
-    } catch(__) {}
-  }
-  return false;
-}
-
-function LPI_isAuthFailure(status, msg) {
-  const code = Number(status || 0);
-  const text = String(msg || '').toLowerCase();
-  return code === 401 ||
-    code === 403 ||
-    text.includes('token invalido') ||
-    text.includes('token inválido') ||
-    text.includes('jwt expired') ||
-    text.includes('invalid token') ||
-    text.includes('unauthorized') ||
-    text.includes('unauthorised') ||
-    text.includes('no autorizado') ||
-    text.includes('no autenticado') ||
-    text.includes('sesion expirada') ||
-    text.includes('sesión expirada') ||
-    text.includes('debe iniciar sesion') ||
-    text.includes('debe iniciar sesión') ||
-    text.includes('inicie sesion') ||
-    text.includes('inicie sesión');
-}
-
-
 (function(){
   function localSlugify(s){
     return String(s||'').toLowerCase().normalize('NFD')
@@ -141,12 +85,7 @@ function LPI_isAuthFailure(status, msg) {
       credentials: 'include',
       headers: LPI_getAuthHeaders()
     }).then(function(r){
-      if (!r.ok) {
-        if (LPI_isAuthFailure(r.status, '')) {
-          LPI_redirectToLogin('auth');
-        }
-        throw new Error('HTTP ' + r.status + ' @ ' + url);
-      }
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' @ ' + url);
       return r.json();
     });
   }
@@ -744,18 +683,10 @@ trash.addEventListener('drop', e => {
     fetch(LPI_apiUrl('/api/team/change-password'), {
       credentials: 'include',
       method: 'POST',
-      headers: LPI_getAuthHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug: slug, oldPassword: oldPass, newPassword: newPass })
     })
-    .then(function(r){
-      if(!r.ok){
-        if (LPI_isAuthFailure(r.status, '')) {
-          setTimeout(function(){ LPI_redirectToLogin('auth'); }, 300);
-        }
-        throw new Error('HTTP '+r.status);
-      }
-      return r.json().catch(function(){return {};});
-    })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json().catch(function(){return {};}); })
     .then(function(){
       err.style.display = 'none';
       ok.style.display = 'block';
@@ -954,11 +885,6 @@ async function savePlanilla(){
         const t = await r.text().catch(()=> '');
         let msg = t || ('HTTP ' + r.status);
         try { const j = JSON.parse(t); if (j && (j.msg || j.error)) msg = j.msg || j.error; } catch(_) {}
-        if (LPI_isAuthFailure(r.status, msg)) {
-          if (typeof showAlert === 'function') showAlert('Sesión vencida. Redirigiendo al login...');
-          setTimeout(function(){ LPI_redirectToLogin('auth'); }, 600);
-          return { ok:false, auth:true };
-        }
         if (typeof showAlert === 'function') showAlert('No se pudo guardar la planilla: ' + msg);
         return { ok:false };
       }
@@ -1590,13 +1516,7 @@ document.addEventListener('DOMContentLoaded', function(){
           cache: 'no-store',
           headers: LPI_getAuthHeaders()
         });
-        if (!r.ok) {
-          if (LPI_isAuthFailure(r.status, '')) {
-            LPI_redirectToLogin('auth');
-            return;
-          }
-          continue;
-        }
+        if (!r.ok) continue;
         const j = await r.json().catch(() => ({}));
         const p = j && j.planilla;
         if (p) {
