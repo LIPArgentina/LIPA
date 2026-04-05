@@ -9,13 +9,7 @@ function readSession() {
 
 function isAdmin() {
   const sess = readSession();
-  if ((sess?.role || "").toLowerCase() === "admin") return true;
-
-  const role = (sessionStorage.getItem("role") || localStorage.getItem("role") || "").toLowerCase();
-  if (role === "admin") return true;
-
-  const adminFlags = ["lpi_admin_token", "admin_token", "isAdmin", "admin", "adminSession"];
-  return adminFlags.some((k) => localStorage.getItem(k) || sessionStorage.getItem(k));
+  return (sess?.role || "").toLowerCase() === "admin";
 }
 
 function getSlug() {
