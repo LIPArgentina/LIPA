@@ -115,7 +115,7 @@ function computeFixtureWindow(dateKey) {
   const nextDayKey = addDaysToDateKey(dateKey, 1);
   return {
     fixtureDate: dateKey,
-    scheduledAt: parseArgDateAt(startKey, 11, 20, 0),
+    scheduledAt: parseArgDateAt(startKey, 20, 0, 0),
     closesAt: parseArgDateAt(nextDayKey, 12, 0, 0)
   };
 }
