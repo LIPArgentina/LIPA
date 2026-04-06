@@ -107,17 +107,14 @@ function addDaysToDateKey(dateKey, days) {
 }
 
 function nowInArgentina() {
-  const now = new Date();
-  const local = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
-  const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
-  return new Date(now.getTime() + (local.getTime() - utc.getTime()));
+  return new Date();
 }
 
 function computeFixtureWindow(dateKey) {
   const startKey = addDaysToDateKey(dateKey, -1);
   return {
     fixtureDate: dateKey,
-    scheduledAt: parseArgDateAt(startKey, 20, 0, 0),
+    scheduledAt: parseArgDateAt(startKey, 11, 20, 0),
     closesAt: parseArgDateAt(dateKey, 23, 59, 59)
   };
 }
