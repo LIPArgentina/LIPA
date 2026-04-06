@@ -112,10 +112,11 @@ function nowInArgentina() {
 
 function computeFixtureWindow(dateKey) {
   const startKey = addDaysToDateKey(dateKey, -1);
+  const nextDayKey = addDaysToDateKey(dateKey, 1);
   return {
     fixtureDate: dateKey,
     scheduledAt: parseArgDateAt(startKey, 11, 20, 0),
-    closesAt: parseArgDateAt(dateKey, 23, 59, 59)
+    closesAt: parseArgDateAt(nextDayKey, 12, 0, 0)
   };
 }
 
