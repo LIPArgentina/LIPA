@@ -3,10 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
-let sharp = null;
-try {
-  sharp = require('sharp');
-} catch (_) {}
+const heicConvert = require('heic-convert');
 const pool = require('../../db');
 const { requireTeam, requireAdmin } = require('../middleware/auth');
 
@@ -28,8 +25,7 @@ module.exports = function createPicturesRouter(deps) {
       filename: file?.filename,
       mimetype: file?.mimetype,
       path: file?.path,
-      isHeicLike: isHeicLike(file),
-      sharpLoaded: !!sharp
+      isHeicLike: isHeicLike(file)
     });
 
     if (!file || !file.path || !isHeicLike(file)) {
@@ -42,17 +38,16 @@ module.exports = function createPicturesRouter(deps) {
       return file;
     }
 
-    if (!sharp) {
-      console.error('[pictures] convertHeicToJpeg:sharp_missing');
-      throw new Error('El servidor recibió una foto HEIC pero no tiene soporte de conversión instalado. Instalá sharp en el backend para convertir automáticamente a JPG.');
-    }
+    const inputBuffer = await fs.promises.readFile(file.path);
+    const outputBuffer = await heicConvert({
+      buffer: inputBuffer,
+      format: 'JPEG',
+      quality: 0.88
+    });
 
     const parsed = path.parse(file.path);
     const jpegPath = path.join(parsed.dir, parsed.name + '.jpg');
-    await sharp(file.path)
-      .rotate()
-      .jpeg({ quality: 88, mozjpeg: true })
-      .toFile(jpegPath);
+    await fs.promises.writeFile(jpegPath, outputBuffer);
 
     const stat = await fs.promises.stat(jpegPath);
     try { await fs.promises.unlink(file.path); } catch (_) {}
@@ -283,15 +278,9 @@ module.exports = function createPicturesRouter(deps) {
       files: 10
     },
     fileFilter: (_req, file, cb) => {
-      const mimetype = String(file.mimetype || '').toLowerCase();
-      const ext = path.extname(file.originalname || '').toLowerCase();
-      const allowedByMime = mimetype.startsWith('image/');
-      const allowedByExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif'].includes(ext);
-
-      if (!allowedByMime && !allowedByExt) {
+      if (!String(file.mimetype || '').startsWith('image/')) {
         return cb(new Error('Solo se permiten imágenes'));
       }
-
       cb(null, true);
     }
   });
