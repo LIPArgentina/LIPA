@@ -278,9 +278,15 @@ module.exports = function createPicturesRouter(deps) {
       files: 10
     },
     fileFilter: (_req, file, cb) => {
-      if (!String(file.mimetype || '').startsWith('image/')) {
+      const mimetype = String(file.mimetype || '').toLowerCase();
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      const allowedByMime = mimetype.startsWith('image/');
+      const allowedByExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif'].includes(ext);
+
+      if (!allowedByMime && !allowedByExt) {
         return cb(new Error('Solo se permiten imágenes'));
       }
+
       cb(null, true);
     }
   });
