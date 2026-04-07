@@ -822,6 +822,95 @@ function apiUrl(path){
         box-shadow:0 0 0 2px #d94b4b inset;
         color:#4a1010 !important;
       }
+
+      body.nice-confirm-open{
+        overflow:hidden;
+      }
+      .nice-confirm-modal[hidden]{
+        display:none !important;
+      }
+      .nice-confirm-modal{
+        position:fixed;
+        inset:0;
+        z-index:100000;
+      }
+      .nice-confirm-backdrop{
+        position:absolute;
+        inset:0;
+        background:rgba(0,0,0,.62);
+        backdrop-filter:blur(2px);
+      }
+      .nice-confirm-dialog{
+        position:absolute;
+        left:50%;
+        top:50%;
+        transform:translate(-50%, -50%);
+        width:min(92vw, 420px);
+        background:linear-gradient(180deg, #090d18 0%, #050811 100%);
+        color:#e9e9e9;
+        border:1px solid rgba(255,230,90,.18);
+        border-radius:22px;
+        box-shadow:0 28px 80px rgba(0,0,0,.55);
+        overflow:hidden;
+      }
+      .nice-confirm-header{
+        padding:18px 22px 12px;
+        border-bottom:1px solid rgba(255,255,255,.08);
+      }
+      .nice-confirm-header h3{
+        margin:0;
+        color:#ffe65a;
+        font-size:18px;
+        font-weight:900;
+      }
+      .nice-confirm-body{
+        padding:18px 22px 10px;
+      }
+      .nice-confirm-body p{
+        margin:0;
+        color:#f0f0f0;
+        font-size:15px;
+        line-height:1.55;
+      }
+      .nice-confirm-actions{
+        display:flex;
+        justify-content:flex-end;
+        gap:12px;
+        padding:16px 22px 22px;
+      }
+      .nice-confirm-btn{
+        min-width:96px;
+        border-radius:14px;
+        padding:12px 18px;
+        font-weight:900;
+        font-size:15px;
+        cursor:pointer;
+        transition:transform .16s ease, filter .16s ease;
+      }
+      .nice-confirm-btn:hover{
+        transform:translateY(-1px);
+        filter:brightness(1.04);
+      }
+      .nice-confirm-btn.secondary{
+        background:transparent;
+        color:#f4f4f4;
+        border:1px solid rgba(145,163,196,.30);
+      }
+      .nice-confirm-btn.primary{
+        background:linear-gradient(180deg, #f1d255 0%, #d7af2a 100%);
+        color:#111;
+        border:1px solid #b28900;
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
+      }
+      .nice-confirm-btn:focus-visible{
+        outline:2px solid #9ec5ff;
+        outline-offset:2px;
+      }
+      @media (max-width: 520px){
+        .nice-confirm-dialog{
+          width:min(94vw, 420px);
+        }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -868,6 +957,74 @@ function apiUrl(path){
     });
   }
 
+
+  function ensureNiceConfirmModal(){
+    if (document.getElementById('nice-confirm-modal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'nice-confirm-modal';
+    modal.className = 'nice-confirm-modal';
+    modal.hidden = true;
+    modal.innerHTML = `
+      <div class="nice-confirm-backdrop" data-answer="no"></div>
+      <div class="nice-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="niceConfirmTitle">
+        <div class="nice-confirm-header">
+          <h3 id="niceConfirmTitle">Jugador repetido</h3>
+        </div>
+        <div class="nice-confirm-body">
+          <p id="niceConfirmMessage"></p>
+        </div>
+        <div class="nice-confirm-actions">
+          <button type="button" class="nice-confirm-btn secondary" data-answer="no">No</button>
+          <button type="button" class="nice-confirm-btn primary" data-answer="yes">Sí</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  function niceConfirm(message, title = 'Jugador repetido'){
+    ensureNiceConfirmModal();
+
+    return new Promise(resolve => {
+      const modal = document.getElementById('nice-confirm-modal');
+      const titleNode = modal.querySelector('#niceConfirmTitle');
+      const messageNode = modal.querySelector('#niceConfirmMessage');
+      const yesBtn = modal.querySelector('[data-answer="yes"]');
+      const noBtn = modal.querySelector('[data-answer="no"]');
+      const backdrop = modal.querySelector('.nice-confirm-backdrop');
+
+      const cleanup = (answer) => {
+        modal.hidden = true;
+        document.body.classList.remove('nice-confirm-open');
+        yesBtn.removeEventListener('click', onYes);
+        noBtn.removeEventListener('click', onNo);
+        backdrop.removeEventListener('click', onNo);
+        document.removeEventListener('keydown', onKeyDown);
+        resolve(answer);
+      };
+
+      const onYes = () => cleanup(true);
+      const onNo = () => cleanup(false);
+      const onKeyDown = (ev) => {
+        if (ev.key === 'Escape') cleanup(false);
+        if (ev.key === 'Enter') cleanup(true);
+      };
+
+      titleNode.textContent = title;
+      messageNode.textContent = message;
+      modal.hidden = false;
+      document.body.classList.add('nice-confirm-open');
+
+      yesBtn.addEventListener('click', onYes);
+      noBtn.addEventListener('click', onNo);
+      backdrop.addEventListener('click', onNo);
+      document.addEventListener('keydown', onKeyDown);
+
+      setTimeout(() => yesBtn.focus(), 0);
+    });
+  }
+
   function setupSuplentesSwap(rootId){
     ensureSwapStyles();
     const root = document.getElementById(rootId);
@@ -910,7 +1067,7 @@ function apiUrl(path){
       slot.dataset.swapWired = '1';
       slot.style.cursor = 'pointer';
 
-      slot.addEventListener('click', () => {
+      slot.addEventListener('click', async () => {
         const slotValue = getSlotValue(slot);
         if (!slotValue) return;
 
@@ -942,8 +1099,9 @@ function apiUrl(path){
             return `${secName} ${badge}`;
           }).join(', ');
 
-          replaceAllOccurrences = window.confirm(
-            `"${currentFieldPlayer}" también figura en ${alsoPlaysIn}.\n\n¿Querés reemplazarlo también en ese/os lugar/es por "${selectedSub}"?`
+          replaceAllOccurrences = await niceConfirm(
+            `"${currentFieldPlayer}" también figura en ${alsoPlaysIn}. ¿Querés reemplazarlo también en ese/os lugar/es por "${selectedSub}"?`,
+            'Jugador repetido'
           );
         }
 
