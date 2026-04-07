@@ -966,7 +966,7 @@ function apiUrl(path){
     modal.className = 'nice-confirm-modal';
     modal.hidden = true;
     modal.innerHTML = `
-      <div class="nice-confirm-backdrop" data-answer="no"></div>
+      <div class="nice-confirm-backdrop" data-close="no"></div>
       <div class="nice-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="niceConfirmTitle">
         <div class="nice-confirm-header">
           <h3 id="niceConfirmTitle">Jugador repetido</h3>
@@ -991,7 +991,7 @@ function apiUrl(path){
       const titleNode = modal.querySelector('#niceConfirmTitle');
       const messageNode = modal.querySelector('#niceConfirmMessage');
       const yesBtn = modal.querySelector('[data-answer="yes"]');
-      const noBtn = modal.querySelector('[data-answer="no"]');
+      const noBtn = modal.querySelector('button[data-answer="no"]');
       const backdrop = modal.querySelector('.nice-confirm-backdrop');
 
       const cleanup = (answer) => {
