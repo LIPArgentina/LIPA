@@ -277,6 +277,73 @@
     return `${sectionMap[getSectionTitleFromSelect(select)] || getSectionTitleFromSelect(select)} ${badge}`;
   }
 
+  function ensureNiceConfirmModal(){
+    if (document.getElementById('nice-confirm-modal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'nice-confirm-modal';
+    modal.className = 'nice-confirm-modal';
+    modal.hidden = true;
+    modal.innerHTML = `
+      <div class="nice-confirm-backdrop" data-close="no"></div>
+      <div class="nice-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="niceConfirmTitle">
+        <div class="nice-confirm-header">
+          <h3 id="niceConfirmTitle">Confirmar cambio</h3>
+        </div>
+        <div class="nice-confirm-body">
+          <p id="niceConfirmMessage"></p>
+        </div>
+        <div class="nice-confirm-actions">
+          <button type="button" class="nice-confirm-btn secondary" data-answer="no">No</button>
+          <button type="button" class="nice-confirm-btn primary" data-answer="yes">Sí</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  function niceConfirm(message, title = 'Confirmar cambio'){
+    ensureNiceConfirmModal();
+
+    return new Promise(resolve => {
+      const modal = document.getElementById('nice-confirm-modal');
+      const titleNode = modal.querySelector('#niceConfirmTitle');
+      const messageNode = modal.querySelector('#niceConfirmMessage');
+      const yesBtn = modal.querySelector('[data-answer="yes"]');
+      const noBtn = modal.querySelector('[data-answer="no"]');
+      const backdrop = modal.querySelector('.nice-confirm-backdrop');
+
+      const cleanup = (answer) => {
+        modal.hidden = true;
+        document.body.classList.remove('nice-confirm-open');
+        yesBtn.removeEventListener('click', onYes);
+        noBtn.removeEventListener('click', onNo);
+        backdrop.removeEventListener('click', onNo);
+        document.removeEventListener('keydown', onKeyDown);
+        resolve(answer);
+      };
+
+      const onYes = () => cleanup(true);
+      const onNo = () => cleanup(false);
+      const onKeyDown = (ev) => {
+        if (ev.key === 'Escape') cleanup(false);
+        if (ev.key === 'Enter') cleanup(true);
+      };
+
+      titleNode.textContent = title;
+      messageNode.textContent = message;
+      modal.hidden = false;
+      document.body.classList.add('nice-confirm-open');
+
+      yesBtn.addEventListener('click', onYes);
+      noBtn.addEventListener('click', onNo);
+      backdrop.addEventListener('click', onNo);
+      document.addEventListener('keydown', onKeyDown);
+
+      setTimeout(() => yesBtn.focus(), 0);
+    });
+  }
+
   function wireReplacementRule(rootId){
     const root = document.getElementById(rootId);
     if (!root) return;
@@ -320,7 +387,7 @@
         }
       });
 
-      select.addEventListener('change', () => {
+      select.addEventListener('change', async () => {
         if (suppressRule) return;
 
         if (isBenchSelect(select)) {
@@ -636,6 +703,8 @@
 })();
 
 
+
+
 (function(){
   function injectManualReplacementStyles(){
     if (document.getElementById('manual-replacement-styles')) return;
@@ -646,6 +715,128 @@
         outline: 2px solid #31c45b !important;
         outline-offset: 1px;
         background: #c8ffb8 !important;
+      }
+
+      body.nice-confirm-open{
+        overflow: hidden;
+      }
+
+      .nice-confirm-modal[hidden]{
+        display:none !important;
+      }
+
+      .nice-confirm-modal{
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+      }
+
+      .nice-confirm-backdrop{
+        position:absolute;
+        inset:0;
+        background: rgba(0,0,0,.58);
+        backdrop-filter: blur(3px);
+      }
+
+      .nice-confirm-dialog{
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: min(92vw, 520px);
+        background: linear-gradient(180deg, #191b20 0%, #121418 100%);
+        color: #f4f4f4;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 20px;
+        box-shadow: 0 24px 80px rgba(0,0,0,.45);
+        overflow: hidden;
+      }
+
+      .nice-confirm-header{
+        padding: 18px 22px 10px;
+        border-bottom: 1px solid rgba(255,255,255,.07);
+      }
+
+      .nice-confirm-header h3{
+        margin: 0;
+        font-size: 22px;
+        font-weight: 900;
+        color: #ffe65a;
+        letter-spacing: .01em;
+      }
+
+      .nice-confirm-body{
+        padding: 18px 22px 8px;
+      }
+
+      .nice-confirm-body p{
+        margin: 0;
+        font-size: 17px;
+        line-height: 1.55;
+        color: #e9edf3;
+      }
+
+      .nice-confirm-actions{
+        display:flex;
+        justify-content:flex-end;
+        gap: 12px;
+        padding: 18px 22px 22px;
+      }
+
+      .nice-confirm-btn{
+        min-width: 108px;
+        border: 0;
+        border-radius: 12px;
+        padding: 12px 18px;
+        font-size: 15px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
+      }
+
+      .nice-confirm-btn:hover{
+        transform: translateY(-1px);
+        filter: brightness(1.05);
+      }
+
+      .nice-confirm-btn.primary{
+        background: #ffe65a;
+        color: #111;
+        box-shadow: 0 8px 24px rgba(255,230,90,.22);
+      }
+
+      .nice-confirm-btn.secondary{
+        background: #2a2f38;
+        color: #f5f7fb;
+        border: 1px solid rgba(255,255,255,.10);
+      }
+
+      .nice-confirm-btn:focus-visible{
+        outline: 2px solid #9ec5ff;
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 520px){
+        .nice-confirm-dialog{
+          width: min(94vw, 520px);
+          border-radius: 18px;
+        }
+
+        .nice-confirm-header h3{
+          font-size: 20px;
+        }
+
+        .nice-confirm-body p{
+          font-size: 15px;
+        }
+
+        .nice-confirm-actions{
+          flex-direction: column-reverse;
+        }
+
+        .nice-confirm-btn{
+          width: 100%;
+        }
       }
     `;
     document.head.appendChild(style);
