@@ -241,8 +241,146 @@
     if (rWin) rWin.textContent = rightPts;
   }
 
+
+  function normalizePlayerName(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+  }
+
+  function getSectionTitleFromSelect(select){
+    const sec = select.closest('.section');
+    return String(sec?.dataset.section || '').toUpperCase();
+  }
+
+  function isBenchSelect(select){
+    return getSectionTitleFromSelect(select) === 'SUPLENTES';
+  }
+
+  function isSwappableSelect(select){
+    const section = getSectionTitleFromSelect(select);
+    return section === 'INDIVIDUALES' || section === 'PAREJA1' || section === 'PAREJA2';
+  }
+
+  function describeManualSelect(select){
+    const sectionMap = {
+      'INDIVIDUALES': 'INDIVIDUALES',
+      'PAREJA1': 'PAREJA 1',
+      'PAREJA2': 'PAREJA 2',
+      'SUPLENTES': 'SUPLENTES'
+    };
+    const row = select.closest('.row');
+    const badge = row?.querySelector('.badge')?.textContent?.trim() || '?';
+    return `${sectionMap[getSectionTitleFromSelect(select)] || getSectionTitleFromSelect(select)} ${badge}`;
+  }
+
+  function wireReplacementRule(rootId){
+    const root = document.getElementById(rootId);
+    if (!root) return;
+
+    let selectedBenchSelect = null;
+    let suppressRule = false;
+
+    const getAllPlayerSelects = () => Array.from(root.querySelectorAll('.player-select'));
+
+    const clearBenchSelection = () => {
+      getAllPlayerSelects().forEach(sel => sel.classList.remove('bench-selected'));
+    };
+
+    const findDuplicateSwappableSelects = (playerName, exceptSelect) => {
+      const target = normalizePlayerName(playerName);
+      if (!target) return [];
+      return getAllPlayerSelects().filter(sel => {
+        if (sel === exceptSelect) return false;
+        if (!isSwappableSelect(sel)) return false;
+        return normalizePlayerName(sel.value) === target;
+      });
+    };
+
+    getAllPlayerSelects().forEach(select => {
+      if (select.dataset.replacementRuleWired === '1') return;
+      select.dataset.replacementRuleWired = '1';
+
+      select.addEventListener('focus', () => {
+        if (isBenchSelect(select) && select.value) {
+          clearBenchSelection();
+          select.classList.add('bench-selected');
+          selectedBenchSelect = select;
+        }
+      });
+
+      select.addEventListener('click', () => {
+        if (isBenchSelect(select) && select.value) {
+          clearBenchSelection();
+          select.classList.add('bench-selected');
+          selectedBenchSelect = select;
+        }
+      });
+
+      select.addEventListener('change', () => {
+        if (suppressRule) return;
+
+        if (isBenchSelect(select)) {
+          if (select.value) {
+            clearBenchSelection();
+            select.classList.add('bench-selected');
+            selectedBenchSelect = select;
+          } else if (selectedBenchSelect === select) {
+            clearBenchSelection();
+            selectedBenchSelect = null;
+          }
+          return;
+        }
+
+        if (!isSwappableSelect(select)) return;
+        if (!selectedBenchSelect) return;
+        if (!selectedBenchSelect.value) return;
+        if (!select.value) return;
+
+        const currentFieldPlayer = select.value;
+        const selectedSub = selectedBenchSelect.value;
+
+        if (normalizePlayerName(currentFieldPlayer) === normalizePlayerName(selectedSub)) return;
+
+        const duplicateSelects = findDuplicateSwappableSelects(currentFieldPlayer, select);
+        let replaceAllOccurrences = false;
+
+        if (duplicateSelects.length > 0) {
+          const alsoPlaysIn = duplicateSelects.map(describeManualSelect).join(', ');
+          replaceAllOccurrences = window.confirm(
+            `"${currentFieldPlayer}" también figura en ${alsoPlaysIn}.\n\n¿Querés reemplazarlo también en ese/os lugar/es por "${selectedSub}"?`
+          );
+        }
+
+        suppressRule = true;
+        try {
+          select.value = selectedSub;
+
+          if (replaceAllOccurrences) {
+            duplicateSelects.forEach(dup => {
+              dup.value = selectedSub;
+            });
+          }
+
+          selectedBenchSelect.value = currentFieldPlayer;
+        } finally {
+          suppressRule = false;
+        }
+
+        clearBenchSelection();
+        selectedBenchSelect.classList.add('bench-selected');
+        recalc();
+      });
+    });
+  }
+
   function bindFieldEvents(){
     document.querySelectorAll('.pts-select').forEach(sel => {
+      if (sel.dataset.boundPts === '1') return;
+      sel.dataset.boundPts = '1';
       sel.addEventListener('change', recalc);
     });
   }
@@ -280,6 +418,8 @@
     renderTeam('localRoot', 'LOCAL', localName, localRoster, false);
     renderTeam('visitanteRoot', 'VISITANTE', visitanteName, visitanteRoster, true);
     bindFieldEvents();
+    wireReplacementRule('localRoot');
+    wireReplacementRule('visitanteRoot');
     recalc();
   }
 
@@ -492,5 +632,28 @@
     document.addEventListener('DOMContentLoaded', wireDatePicker);
   } else {
     wireDatePicker();
+  }
+})();
+
+
+(function(){
+  function injectManualReplacementStyles(){
+    if (document.getElementById('manual-replacement-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'manual-replacement-styles';
+    style.textContent = `
+      .player-select.bench-selected{
+        outline: 2px solid #31c45b !important;
+        outline-offset: 1px;
+        background: #c8ffb8 !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectManualReplacementStyles);
+  } else {
+    injectManualReplacementStyles();
   }
 })();
