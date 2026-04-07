@@ -417,8 +417,9 @@
 
         if (duplicateSelects.length > 0) {
           const alsoPlaysIn = duplicateSelects.map(describeManualSelect).join(', ');
-          replaceAllOccurrences = window.confirm(
-            `"${currentFieldPlayer}" también figura en ${alsoPlaysIn}.\n\n¿Querés reemplazarlo también en ese/os lugar/es por "${selectedSub}"?`
+          replaceAllOccurrences = await niceConfirm(
+            `"${currentFieldPlayer}" también figura en ${alsoPlaysIn}. ¿Querés reemplazarlo también en ese/os lugar/es por "${selectedSub}"?`,
+            'Jugador repetido'
           );
         }
 
