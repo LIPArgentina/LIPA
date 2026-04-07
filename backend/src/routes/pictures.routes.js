@@ -3,12 +3,52 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
+let sharp = null;
+try {
+  sharp = require('sharp');
+} catch (_) {}
 const pool = require('../../db');
 const { requireTeam, requireAdmin } = require('../middleware/auth');
 
 module.exports = function createPicturesRouter(deps) {
   const router = express.Router();
   const picturesRoot = deps.PICTURES_DIR;
+  const REQUIRED_PICTURES = 9;
+  const HEIC_EXT_RE = /\.(heic|heif)$/i;
+
+  function isHeicLike(file = {}) {
+    const original = String(file.originalname || file.filename || '');
+    const mime = String(file.mimetype || '').toLowerCase();
+    return HEIC_EXT_RE.test(original) || mime === 'image/heic' || mime === 'image/heif' || mime === 'image/heic-sequence' || mime === 'image/heif-sequence';
+  }
+
+  async function convertHeicToJpeg(file) {
+    if (!file || !file.path || !isHeicLike(file)) return file;
+    if (!sharp) {
+      throw new Error('El servidor recibió una foto HEIC pero no tiene soporte de conversión instalado. Instalá sharp en el backend para convertir automáticamente a JPG.');
+    }
+
+    const parsed = path.parse(file.path);
+    const jpegPath = path.join(parsed.dir, parsed.name + '.jpg');
+    await sharp(file.path)
+      .rotate()
+      .jpeg({ quality: 88, mozjpeg: true })
+      .toFile(jpegPath);
+
+    const stat = await fs.promises.stat(jpegPath);
+    try { await fs.promises.unlink(file.path); } catch (_) {}
+
+    return {
+      ...file,
+      path: jpegPath,
+      filename: path.basename(jpegPath),
+      originalname: HEIC_EXT_RE.test(String(file.originalname || ''))
+        ? String(file.originalname).replace(HEIC_EXT_RE, '.jpg')
+        : (String(file.originalname || '') + '.jpg'),
+      mimetype: 'image/jpeg',
+      size: stat.size
+    };
+  }
 
   function normalizeSlug(value = '') {
     return String(value || '').trim().toLowerCase();
@@ -202,8 +242,9 @@ module.exports = function createPicturesRouter(deps) {
       }
     },
     filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
-      const base = path.basename(file.originalname || 'imagen', ext);
+      const originalExt = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+      const ext = HEIC_EXT_RE.test(originalExt) ? '.heic' : originalExt;
+      const base = path.basename(file.originalname || 'imagen', originalExt);
       const random = crypto.randomBytes(6).toString('hex');
       cb(null, `${Date.now()}__${random}__${safeName(base)}${ext}`);
     }
@@ -244,6 +285,24 @@ module.exports = function createPicturesRouter(deps) {
         return res.status(400).json({ ok: false, error: 'No se recibieron imágenes' });
       }
 
+      if (files.length !== REQUIRED_PICTURES) {
+        for (const file of files) {
+          try { await fs.promises.unlink(file.path); } catch (_) {}
+        }
+
+        if (files.length < REQUIRED_PICTURES) {
+          return res.status(400).json({
+            ok: false,
+            error: `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para completar las ${REQUIRED_PICTURES} requeridas`
+          });
+        }
+
+        return res.status(400).json({
+          ok: false,
+          error: `Solo se permiten ${REQUIRED_PICTURES} fotos por carga`
+        });
+      }
+
       const allowed = await isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug: teamSlug });
       if (!allowed) {
         for (const file of files) {
@@ -252,7 +311,12 @@ module.exports = function createPicturesRouter(deps) {
         return res.status(403).json({ ok: false, error: 'Solo podés subir fotos cuando el cruce ya esté validado por ambos equipos' });
       }
 
-      const result = files.map(file => ({
+      const normalizedFiles = [];
+      for (const file of files) {
+        normalizedFiles.push(await convertHeicToJpeg(file));
+      }
+
+      const result = normalizedFiles.map(file => ({
         teamSlug,
         fechaISO,
         filename: file.filename,
@@ -263,8 +327,16 @@ module.exports = function createPicturesRouter(deps) {
 
       return res.json({ ok: true, files: result });
     } catch (err) {
+      const files = Array.isArray(req.files) ? req.files : [];
+      for (const file of files) {
+        try { await fs.promises.unlink(file.path); } catch (_) {}
+        try {
+          const jpgCandidate = path.join(path.dirname(file.path), path.parse(file.path).name + '.jpg');
+          if (jpgCandidate !== file.path) await fs.promises.unlink(jpgCandidate);
+        } catch (_) {}
+      }
       console.error('POST /api/pictures/upload', err);
-      return res.status(500).json({ ok: false, error: 'No se pudieron guardar las fotos' });
+      return res.status(500).json({ ok: false, error: err?.message || 'No se pudieron guardar las fotos' });
     }
   });
 

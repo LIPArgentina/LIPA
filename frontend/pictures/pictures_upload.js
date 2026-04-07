@@ -14,6 +14,7 @@
   const previewContainer = document.getElementById('previewContainer');
   const btnUpload = document.getElementById('btnUpload');
   const btnVolver = document.getElementById('btnVolver');
+  const REQUIRED_PICTURES = 9;
 
   function getToken() {
     try {
@@ -46,7 +47,7 @@
       return;
     }
 
-    pickedFilesText.textContent = `${files.length} archivo${files.length === 1 ? '' : 's'} seleccionado${files.length === 1 ? '' : 's'}`;
+    pickedFilesText.textContent = `${files.length} / ${REQUIRED_PICTURES} fotos seleccionadas`;
 
     files.forEach(file => {
       if (!String(file.type || '').startsWith('image/')) return;
@@ -85,12 +86,40 @@
     if (!btnChoosePhotos.disabled) picturesInput.click();
   });
 
-  picturesInput?.addEventListener('change', updatePreview);
+  picturesInput?.addEventListener('change', () => {
+    const files = Array.from(picturesInput.files || []);
+    if (files.length > REQUIRED_PICTURES) {
+      picturesInput.value = '';
+      previewContainer.innerHTML = '';
+      pickedFilesText.textContent = 'No se eligió ningún archivo';
+      setStatus(`Solo podés seleccionar ${REQUIRED_PICTURES} fotos exactas.`, 'error');
+      return;
+    }
+
+    if (files.length > 0 && files.length < REQUIRED_PICTURES) {
+      setStatus(`Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para completar la carga.`, 'error');
+    } else if (files.length === REQUIRED_PICTURES) {
+      setStatus('Cantidad correcta de fotos lista para subir.', 'success');
+    } else {
+      setStatus('');
+    }
+
+    updatePreview();
+  });
 
   btnUpload?.addEventListener('click', async () => {
     const files = Array.from(picturesInput.files || []);
     if (!files.length) {
-      setStatus('Elegí al menos una foto.', 'error');
+      setStatus('Tenés que elegir 9 fotos.', 'error');
+      return;
+    }
+
+    if (files.length !== REQUIRED_PICTURES) {
+      if (files.length < REQUIRED_PICTURES) {
+        setStatus(`Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para poder enviar.`, 'error');
+      } else {
+        setStatus(`Solo se permiten ${REQUIRED_PICTURES} fotos por carga.`, 'error');
+      }
       return;
     }
 
@@ -115,7 +144,7 @@
       picturesInput.value = '';
       updatePreview();
       pickedFilesText.textContent = 'No se eligió ningún archivo';
-      setStatus('Fotos subidas correctamente.', 'success');
+      setStatus('Las 9 fotos se subieron correctamente.', 'success');
     } catch (err) {
       setStatus(err.message || 'No se pudieron subir las fotos.', 'error');
     } finally {
