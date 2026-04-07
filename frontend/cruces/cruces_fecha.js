@@ -886,6 +886,25 @@ function apiUrl(path){
       return name.includes('INDIVIDUALES') || name.includes('PAREJA 1') || name.includes('PAREJA 2');
     };
 
+    const normalizePlayerName = (value) => String(value || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+
+    const findDuplicateFieldSlots = (playerName, exceptSlot) => {
+      const normalizedTarget = normalizePlayerName(playerName);
+      if (!normalizedTarget) return [];
+
+      return Array.from(root.querySelectorAll('.slot')).filter(candidate => {
+        if (candidate === exceptSlot) return false;
+        if (!isSwappableField(candidate)) return false;
+        const candidateValue = getSlotValue(candidate);
+        return candidateValue && normalizePlayerName(candidateValue) === normalizedTarget;
+      });
+    };
+
     root.querySelectorAll('.slot').forEach(slot => {
       if (slot.dataset.swapWired === '1') return;
       slot.dataset.swapWired = '1';
@@ -912,19 +931,45 @@ function apiUrl(path){
         const selectedSub = getSlotValue(selectedBenchSlot);
         if (!currentFieldPlayer || !selectedSub) return;
 
+        const duplicateSlots = findDuplicateFieldSlots(currentFieldPlayer, slot);
+        let replaceAllOccurrences = false;
+
+        if (duplicateSlots.length > 0) {
+          const alsoPlaysIn = duplicateSlots.map(dupSlot => {
+            const secName = getSectionName(dupSlot);
+            const row = dupSlot.closest('.row');
+            const badge = row?.querySelector('.badge')?.textContent?.trim() || '?';
+            return `${secName} ${badge}`;
+          }).join(', ');
+
+          replaceAllOccurrences = window.confirm(
+            `"${currentFieldPlayer}" también figura en ${alsoPlaysIn}.\n\n¿Querés reemplazarlo también en ese/os lugar/es por "${selectedSub}"?`
+          );
+        }
+
         root.querySelectorAll('.slot.slot-sub-in, .slot.slot-sub-out').forEach(s => {
           s.classList.remove('slot-sub-in', 'slot-sub-out');
         });
 
-        setSlotValue(slot, selectedSub);
-        setSlotValue(selectedBenchSlot, currentFieldPlayer);
+        const benchSlotToKeepSelected = selectedBenchSlot;
 
+        setSlotValue(slot, selectedSub);
         slot.classList.remove('slot-selected-sub');
         slot.classList.add('slot-sub-in');
 
-        selectedBenchSlot.classList.remove('slot-selected-sub');
-        selectedBenchSlot.classList.add('slot-sub-out');
-        selectedBenchSlot.classList.add('slot-selected-sub');
+        if (replaceAllOccurrences) {
+          duplicateSlots.forEach(dupSlot => {
+            setSlotValue(dupSlot, selectedSub);
+            dupSlot.classList.remove('slot-selected-sub', 'slot-sub-out');
+            dupSlot.classList.add('slot-sub-in');
+          });
+        }
+
+        setSlotValue(benchSlotToKeepSelected, currentFieldPlayer);
+        benchSlotToKeepSelected.classList.remove('slot-selected-sub');
+        benchSlotToKeepSelected.classList.add('slot-sub-out');
+        benchSlotToKeepSelected.classList.add('slot-selected-sub');
+        selectedBenchSlot = benchSlotToKeepSelected;
 
         root.dispatchEvent(new Event('cruces:changed'));
       });
