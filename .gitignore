@@ -1,6 +1,8 @@
 node_modules/
 .env
 .env.*
+backup-lipa.dump
+lipa_backup_config.txt
 npm-debug.log
 .DS_Store
 backend/node_modules/

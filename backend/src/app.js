@@ -13,8 +13,15 @@ const rateLimit = require('express-rate-limit');
 
 const createApiRouter = require('./routes/index');
 const crucesDbRouter = require('./routes/cruces.routes.db');
+const { bootstrapSchema } = require('./bootstrap/schema');
 
 const app = express();
+
+bootstrapSchema().then(() => {
+  console.log('Esquema DB verificado');
+}).catch((err) => {
+  console.error('Error verificando esquema DB:', err);
+});
 
 app.set('trust proxy', 1);
 
@@ -171,53 +178,15 @@ app.get("/test-db", async (req, res) => {
 });
 
 /* =========================================================
-   INIT DB (TEMPORAL / LEGACY)
+   INIT DB / SCHEMA BOOTSTRAP
 ========================================================= */
 
 app.get("/init-db", async (req, res) => {
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS equipos (
-        id SERIAL PRIMARY KEY,
-        slug TEXT UNIQUE NOT NULL,
-        nombre TEXT NOT NULL,
-        password_hash TEXT,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS jugadores (
-        id SERIAL PRIMARY KEY,
-        equipo_id INTEGER REFERENCES equipos(id) ON DELETE CASCADE,
-        nombre TEXT NOT NULL,
-        dorsal TEXT,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS planillas (
-        id SERIAL PRIMARY KEY,
-        equipo_id INTEGER REFERENCES equipos(id) ON DELETE CASCADE,
-        datos JSONB NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS usuarios (
-        id SERIAL PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-
+    await bootstrapSchema();
     res.json({
       ok: true,
-      message: "Base de datos inicializada correctamente"
+      message: "Esquema de base de datos verificado correctamente"
     });
   } catch (err) {
     console.error("Error init-db:", err);

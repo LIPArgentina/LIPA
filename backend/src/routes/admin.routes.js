@@ -1,22 +1,26 @@
 // backend/src/routes/admin.routes.js
 const express = require('express');
-const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db');
-const { readJSON, writeJSON } = require('../utils/fileStorage');
 const { requireAdmin } = require('../middleware/auth');
 
 const DEFAULT_TEAM_PASSWORD = '1234';
 
 module.exports = function createAdminRouter(deps) {
-  const { DATA_DIR } = deps;
-
   const router = express.Router();
 
-  // ----- Admin password store -----
-  const ADMIN_STORE = path.join(DATA_DIR, 'admin_password.json');
-  let adminPassword = readJSON(ADMIN_STORE, { hash: bcrypt.hashSync('admin123', 10) });
+  async function getAdminCredential() {
+    const result = await pool.query(
+      `SELECT id, password_hash
+         FROM admin_credentials
+        WHERE credential_key = $1
+        LIMIT 1`,
+      ['primary_admin']
+    );
+
+    return result.rows[0] || null;
+  }
 
   async function findTeamBySlug(slug) {
     const safeSlug = String(slug || '').trim().toLowerCase();
@@ -74,7 +78,10 @@ module.exports = function createAdminRouter(deps) {
   router.post('/admin/login', async (req, res) => {
     const { password } = req.body || {};
     if (!password) return res.status(400).json({ ok: false, msg: 'faltan campos' });
-    const ok = await bcrypt.compare(password, adminPassword.hash);
+    const adminCredential = await getAdminCredential();
+    if (!adminCredential) return res.status(500).json({ ok: false, msg: 'Admin no configurado en DB' });
+
+    const ok = await bcrypt.compare(password, adminCredential.password_hash);
     if (!ok) return res.status(401).json({ ok: false });
 
     const secret = process.env.JWT_SECRET;
@@ -101,11 +108,22 @@ module.exports = function createAdminRouter(deps) {
     if (!oldPassword || !newPassword) {
       return res.status(400).json({ ok: false, msg: 'faltan campos' });
     }
-    const ok = await bcrypt.compare(oldPassword, adminPassword.hash);
+    const adminCredential = await getAdminCredential();
+    if (!adminCredential) return res.status(500).json({ ok: false, msg: 'Admin no configurado en DB' });
+
+    const ok = await bcrypt.compare(oldPassword, adminCredential.password_hash);
     if (!ok) return res.status(401).json({ ok: false, msg: 'actual incorrecta' });
-    adminPassword.hash = await bcrypt.hash(newPassword, 10);
-    writeJSON(ADMIN_STORE, adminPassword);
-    return res.json({ ok: true });
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      `UPDATE admin_credentials
+          SET password_hash = $1,
+              updated_at = NOW()
+        WHERE id = $2`,
+      [newHash, adminCredential.id]
+    );
+
+    return res.json({ ok: true, source: 'db' });
   });
 
   // ====== API: Team Login (DB + JWT) ======
