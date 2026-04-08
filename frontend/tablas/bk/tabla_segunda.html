@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SEGUNDA | Liga de Pool Independiente</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
+  <link href="tabla_segunda.css" rel="stylesheet"/>
+  <style>
+    .tables{
+      display:grid !important;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:18px;
+      align-items:start;
+      max-width:900px;
+      margin:0 auto;
+    }
+    @media (max-width: 640px){
+      .tables{ grid-template-columns:1fr; gap:12px; }
+    }
+
+    .poster, .table-wrap, .board{ min-width:0 !important; }
+
+    .poster .hero h1{
+      color:#fff !important;
+      letter-spacing:0 !important;
+      font-size:clamp(1.2rem, 1.65vw, 2.05rem) !important;
+      line-height:1.02 !important;
+      white-space:nowrap;
+      text-align:center;
+      margin:0;
+      font-weight:900 !important;
+    }
+    .hero h1 .group-letter{ color:#f3d13b !important; }
+    .hero .subtitle{ font-size:clamp(.62rem, .7vw, .8rem) !important; letter-spacing:.08em; }
+
+    .grid{
+      display:grid !important;
+      grid-template-columns:repeat(2,minmax(260px,1fr));
+      gap:18px;
+      margin-top:24px;
+      max-width:1200px;
+      margin-left:auto;
+      margin-right:auto;
+    }
+    @media (max-width: 900px){
+      .grid{ grid-template-columns:1fr; }
+    }
+    .pill-wrap{
+      display:flex;
+      justify-content:center;
+      gap:14px;
+      margin:30px 0 18px;
+      flex-wrap:wrap;
+    }
+
+    @media (max-width: 640px){
+      .container{ padding-left:10px !important; padding-right:10px !important; }
+      .title{ font-size:clamp(1.5rem, 6vw, 2rem) !important; text-align:center; }
+      .poster .hero h1{ font-size:clamp(.95rem, 4.3vw, 1.35rem) !important; letter-spacing:0 !important; }
+      .cols{ font-size:.62rem !important; }
+      .row .square,
+      .row .pill{ min-height:32px !important; font-size:.78rem !important; }
+      .row .pill{ padding:0 8px !important; }
+      .board{ padding:10px !important; }
+      .poster{ border-radius:18px !important; }
+    }
+
+    .hero{ padding:10px 12px 8px !important; }
+    .board{ padding:12px !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a class="logo-link" href="../index.html" aria-label="Ir al inicio">
+        <img class="liga-logo" src="../logo_liga.png" alt="Logo de la liga" width="60" height="60"/>
+      </a>
+      <div class="title">Super Liga de SEGUNDA</div>
+      <nav class="actions"><a class="btn" href="../index.html">VOLVER</a></nav>
+    </header>
+
+    <section id="posiciones" aria-label="Posiciones - Segunda">
+      <div class="tables" id="tables">
+        <div class="poster">
+          <div class="table-wrap">
+            <div class="hero">
+              <div class="subtitle">POSICIONES</div>
+              <h1 id="titulo-a">GRUPO <span class="group-letter">A</span></h1>
+            </div>
+            <div class="board" role="table" aria-labelledby="titulo-a" data-group-board="A">
+              <div class="cols" role="row" aria-hidden="true">
+                <div role="columnheader">N°</div><div role="columnheader">EQUIP.</div><div role="columnheader">JU</div><div role="columnheader">TR</div><div role="columnheader">Pts</div>
+              </div>
+              <div class="rows-holder" data-group-rows="A"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="poster">
+          <div class="table-wrap">
+            <div class="hero">
+              <div class="subtitle">POSICIONES</div>
+              <h1 id="titulo-b">GRUPO <span class="group-letter">B</span></h1>
+            </div>
+            <div class="board" role="table" aria-labelledby="titulo-b" data-group-board="B">
+              <div class="cols" role="row" aria-hidden="true">
+                <div role="columnheader">N°</div><div role="columnheader">EQUIP.</div><div role="columnheader">JU</div><div role="columnheader">TR</div><div role="columnheader">Pts</div>
+              </div>
+              <div class="rows-holder" data-group-rows="B"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="pill-wrap">
+      <button class="pill-btn active" data-fixture="ida" type="button">Encuentros de ida</button>
+      <button class="pill-btn" data-fixture="vuelta" type="button">Encuentros de vuelta</button>
+    </div>
+
+    <div class="grid">
+      <section class="card" data-group="A" aria-label="Fixture GRUPO A"><h1 class="h1">GRUPO A</h1></section>
+      <section class="card" data-group="B" aria-label="Fixture GRUPO B"><h1 class="h1">GRUPO B</h1></section>
+    </div>
+  </div>
+
+  <template id="tpl-fecha">
+    <div class="fecha-header">
+      <div class="h2"></div>
+      <div class="fecha-text" aria-label="Fecha"></div>
+    </div>
+    <div class="rule"></div>
+    <div class="rows" data-fecha=""></div>
+  </template>
+
+  <script type="module" src="tabla_segunda.js" defer></script>
+</body>
+</html>

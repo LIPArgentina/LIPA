@@ -95,9 +95,6 @@ const FRONTEND_DATA = path.join(FRONTEND_DIR, 'data');
 const FRONTEND_EQUIPOS = path.join(FRONTEND_DIR, 'equipos');
 const FRONTEND_TEMPLATES = path.join(FRONTEND_DIR, 'templates');
 const FRONTEND_FECHA = path.join(FRONTEND_DIR, 'fecha');
-const PICTURES_DIR = process.env.PICTURES_DIR
-  ? path.resolve(process.env.PICTURES_DIR)
-  : path.join(ROOT, 'backend', 'data', 'pictures');
 
 /* =========================================================
    ASEGURAR DIRECTORIOS
@@ -110,7 +107,6 @@ const PICTURES_DIR = process.env.PICTURES_DIR
   FRONTEND_EQUIPOS,
   FRONTEND_TEMPLATES,
   FRONTEND_FECHA,
-  PICTURES_DIR,
 ].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -125,8 +121,6 @@ app.get('/api/health-direct', (req, res) => {
   res.json({ ok: true, source: 'app.js-direct' });
 });
 
-app.use('/api/cruces', crucesDbRouter);
-
 app.use(
   '/api',
   createApiRouter({
@@ -137,9 +131,10 @@ app.use(
     FRONTEND_EQUIPOS,
     FRONTEND_TEMPLATES,
     FRONTEND_FECHA,
-    PICTURES_DIR,
   })
 );
+
+app.use('/api/cruces', crucesDbRouter);
 
 /* =========================================================
    FRONTEND ESTÁTICO (temporal, hasta separar del todo)

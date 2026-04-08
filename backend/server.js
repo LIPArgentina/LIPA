@@ -3,9 +3,21 @@ require("dotenv").config();
 const bcrypt = require('bcryptjs');
 const pool = require("./db");
 const app = require("./src/app");
-const { bootstrapSchema } = require('./src/bootstrap/schema');
 
 const PORT = process.env.PORT || 3000;
+
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE equipos
+      ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS password_updated_at TIMESTAMP;
+    `);
+    console.log("Campos de reset de contraseña verificados");
+  } catch (err) {
+    console.error("Error creando campos de reset:", err);
+  }
+})();
 
 app.get("/test-db", async (req, res) => {
   try {
@@ -64,14 +76,7 @@ app.post("/api/admin/reset-team-password/:id", async (req, res) => {
   }
 });
 
-bootstrapSchema()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`LPI listo en http://localhost:${PORT}`);
-      console.log("Static FRONTEND -> /frontend/**");
-    });
-  })
-  .catch((err) => {
-    console.error('No se pudo iniciar el servidor porque falló el bootstrap de esquema:', err);
-    process.exit(1);
-  });
+app.listen(PORT, () => {
+  console.log(`LPI listo en http://localhost:${PORT}`);
+  console.log("Static FRONTEND -> /frontend/**");
+});
