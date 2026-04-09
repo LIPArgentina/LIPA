@@ -6,7 +6,7 @@ const CATEGORY_LAYOUTS = {
 
 const KIND_KEY = 'fixture_kind';
 const CAT_KEY  = 'fixture_cat';
-const API_BASE = 'https://liga-backend-tt82.onrender.com/api';
+const API_BASE = 'https://liga-backend-staging.onrender.com/api';
 let PERSIST_WARNED = false;
 
 function getStored(key, fallback){

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-tt82.onrender.com').replace(/\/+$/, '');
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-staging.onrender.com').replace(/\/+$/, '');
   const dtf = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' });
 
   function apiUrl(path){

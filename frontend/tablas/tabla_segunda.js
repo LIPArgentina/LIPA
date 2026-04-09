@@ -64,7 +64,7 @@ function formatDateDMY(val){
   return s;
 }
 
-const API_BASE = 'https://liga-backend-tt82.onrender.com/api';
+const API_BASE = 'https://liga-backend-staging.onrender.com/api';
 
 async function fetchFixture(kind){
   const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=segunda`;

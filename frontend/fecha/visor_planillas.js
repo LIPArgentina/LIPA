@@ -1,5 +1,5 @@
 // base del backend
-const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
+const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-staging.onrender.com").replace(/\/+$/, "");
 
 (function(){
   const $ = s => document.querySelector(s);
@@ -13,7 +13,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
     }
   };
 
-  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-staging.onrender.com").replace(/\/+$/, "");
 
   function showAlert(msg){
     const a = $('#alert');

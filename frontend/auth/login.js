@@ -43,7 +43,7 @@ function normalizeUsers(list) {
     .filter((u) => u.role !== "admin" && u.username.toLowerCase() !== "admin" && u.slug.toLowerCase() !== "admin");
 }
 
-const BACKEND_URL = "https://liga-backend-tt82.onrender.com";
+const BACKEND_URL = "https://liga-backend-staging.onrender.com";
 
 async function loadUsers(categoria) {
   try {
