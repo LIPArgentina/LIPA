@@ -1,48 +1,146 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Inicio - LIPA</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      text-align: center;
-    }
-    header {
-      background: #222;
-      color: #fff;
-      padding: 20px;
-    }
-    main {
-      padding: 40px;
-    }
-    footer {
-      margin-top: 50px;
-      padding: 20px;
-      background: #f1f1f1;
-    }
-    a {
-      color: #007BFF;
-      text-decoration: none;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Liga Independiente de Pool</title>
+  <link rel="icon" href="./logo_liga.png" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/index.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="./logo_liga.png" alt="Liga Independiente de Pool" class="brand__logo">
+      <span class="brand__cta">INGRESÁ PARA GESTIONAR TUS JUGADORES Y PRÓXIMOS ENCUENTROS</span>
+    </div>
 
-<header>
-  <h1>Bienvenido a LIPA</h1>
-</header>
+    <div class="actions">
+      <button id="btnBanner" class="btn btn-outline btn-sm hidden">Banner</button>
+      <a id="btnAdminEquipos" class="btn btn-outline btn-sm hidden" href="#">Administrar equipos</a>
 
-<main>
-  <p>Gestión de equipos y organización de encuentros de pool.</p>
-</main>
+      <div id="sessionBox">
+        <button id="btnIngresar" class="btn btn-primary">Ingresar</button>
+      </div>
+    </div>
+  </header>
 
-<footer>
-  <a href="politica-privacidad.html">Política de Privacidad</a>
-</footer>
+  <main class="hero">
+    <div class="hero__logo-wrap">
+      <img src="./logo_liga.png" alt="Logo Liga" class="hero__logo">
+    </div>
 
+    <h1 class="title">LIGA INDEPENDIENTE DE POOL</h1>
+
+    <div class="well">
+      <p id="bannerMessage">Bienvenidos a la Liga de Pool Independiente</p>
+    </div>
+
+    <div id="bannerDots" class="banner-dots"></div>
+
+    <div class="cta-grid">
+      <a class="btn btn-lg btn-cta" href="./primera.html">Primera</a>
+      <a class="btn btn-lg btn-cta" href="./tablas/tabla_segunda.html">Segunda</a>
+      <a class="btn btn-lg btn-cta" href="./tablas/tabla_tercera.html">Tercera</a>
+    </div>
+  </main>
+
+  <div id="sessionBar" class="session hidden">
+    <span id="greeting" class="session__greeting">Hola, EQUIPO!</span>
+    <div class="session__actions">
+      <button id="btnLogout" class="btn btn-ghost">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <dialog id="bannerModal" class="modal">
+    <form method="dialog" class="modal__panel" id="bannerForm" autocomplete="off">
+      <div class="modal__header">
+        <h3>Banner de portada</h3>
+      </div>
+
+      <div class="modal__body">
+        <div class="field__label-row">
+          <label class="field__label" for="bannerText">Texto del banner</label>
+
+          <div class="banner-tabs" id="bannerTabs">
+            <button type="button" class="banner-tab is-active" data-index="0">1</button>
+            <button type="button" class="banner-tab" data-index="1">2</button>
+            <button type="button" class="banner-tab" data-index="2">3</button>
+            <button type="button" class="banner-tab" data-index="3">4</button>
+            <button type="button" class="banner-tab" data-index="4">5</button>
+          </div>
+        </div>
+
+        <textarea id="bannerText" class="field__control"></textarea>
+
+        <div class="field__grid">
+          <div>
+            <label class="field__label" for="bannerHref">Link (URL opcional)</label>
+            <input id="bannerHref" type="url" class="field__control" />
+          </div>
+
+          <div>
+            <label class="field__label" for="bannerLabel">Texto del botón (opcional)</label>
+            <input id="bannerLabel" type="text" class="field__control" />
+          </div>
+        </div>
+
+        <p id="bannerMsg" class="ok hidden">¡Guardado!</p>
+        <p id="bannerErr" class="error hidden">No se pudo guardar</p>
+      </div>
+
+      <div class="modal__footer">
+        <button id="cancelBanner" class="btn btn-ghost" value="cancel" formmethod="dialog">Cancelar</button>
+        <button id="submitBanner" class="btn btn-primary" value="confirm">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+  
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <p class="site-footer__text">LIGA INDEPENDIENTE DE POOL</p>
+      <a class="site-footer__link" href="./politica-privacidad.html">Política de Privacidad</a>
+    </div>
+  </footer>
+
+  <style>
+    .site-footer{
+      margin-top: 1.5rem;
+      padding: 24px 16px 34px;
+      border-top: 1px solid var(--line);
+      background: #0c0e12;
+    }
+    .site-footer__inner{
+      width: min(900px, 92%);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      text-align: center;
+    }
+    .site-footer__text{
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      letter-spacing: 0.04em;
+    }
+    .site-footer__link{
+      color: #ffd966;
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .site-footer__link:hover{
+      opacity: .9;
+    }
+  </style>
+
+  <script src="./config.js"></script>
+<script type="module" src="./templates/banner.js" defer></script>
+  <script type="module" src="./app.js" defer></script>
+  <script type="module" src="./index.js" defer></script>
 </body>
 </html>
