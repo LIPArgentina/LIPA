@@ -1,4 +1,4 @@
-const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-tt82.onrender.com').replace(/\/+$/, '');
+const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-staging.onrender.com').replace(/\/+$/, '');
 const CATEGORY_KEYS = {
   tercera: '__categoria_tercera__',
   segunda: '__categoria_segunda__'
@@ -303,7 +303,7 @@ function renderSheet(item, index){
           <span>Planilla ${index + 1}</span>
         </div>
 
-        <h1 class="league-title">LIGA DE POOL INDEPENDIENTE</h1>
+        <h1 class="league-title">L.I.P.A.</h1>
         <div class="bar"></div>
 
         <div class="header-grid">

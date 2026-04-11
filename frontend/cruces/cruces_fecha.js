@@ -39,7 +39,7 @@
     }
   };
 
-  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-tt82.onrender.com').replace(/\/+$/, '');
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-staging.onrender.com').replace(/\/+$/, '');
   const CATEGORY_KEYS = {
     tercera: '__categoria_tercera__',
     segunda: '__categoria_segunda__'
@@ -1956,7 +1956,7 @@ btn.onclick = async () => {
         <span>${formattedDate ? escapeHtml(formattedDate) : 'Planilla'}</span>
       </div>
 
-      <h1 class="export-league-title">LIGA DE POOL INDEPENDIENTE</h1>
+      <h1 class="export-league-title">L.I.P.A.</h1>
       <div class="export-bar"></div>
 
       <div class="export-header-grid">
