@@ -303,7 +303,7 @@ function renderSheet(item, index){
           <span>Planilla ${index + 1}</span>
         </div>
 
-        <h1 class="league-title">LIGA DE POOL INDEPENDIENTE</h1>
+        <h1 class="league-title">L.I.P.A.</h1>
         <div class="bar"></div>
 
         <div class="header-grid">

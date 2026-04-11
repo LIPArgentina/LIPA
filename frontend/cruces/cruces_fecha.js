@@ -1956,7 +1956,7 @@ btn.onclick = async () => {
         <span>${formattedDate ? escapeHtml(formattedDate) : 'Planilla'}</span>
       </div>
 
-      <h1 class="export-league-title">LIGA DE POOL INDEPENDIENTE</h1>
+      <h1 class="export-league-title">L.I.P.A.</h1>
       <div class="export-bar"></div>
 
       <div class="export-header-grid">
