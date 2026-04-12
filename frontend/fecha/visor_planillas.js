@@ -1,5 +1,16 @@
 // base del backend
-const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
+const API_BASE = (() => {
+  const configured = window.APP_CONFIG?.API_BASE_URL;
+  if (configured) return String(configured).replace(/\/+$/, "");
+
+  const host = String(window.location.hostname || "").toLowerCase();
+  const isStagingHost = host.includes("staging");
+
+  return (isStagingHost
+    ? "https://liga-backend-staging.onrender.com"
+    : "https://liga-backend-tt82.onrender.com"
+  ).replace(/\/+$/, "");
+})();
 
 (function(){
   const $ = s => document.querySelector(s);
@@ -15,7 +26,6 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.
     }
   };
 
-  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
 
   function showAlert(msg){
     const a = $('#alert');
