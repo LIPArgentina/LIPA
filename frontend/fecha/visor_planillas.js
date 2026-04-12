@@ -1,8 +1,10 @@
 // base del backend
-const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-staging.onrender.com").replace(/\/+$/, "");
+const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
 
 (function(){
   const $ = s => document.querySelector(s);
+
+  const CATEGORY_FILTER_STORAGE_KEY = 'visor_planillas_active_category';
 
   const state = {
     allFiles: [],
@@ -13,7 +15,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-stagi
     }
   };
 
-  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-staging.onrender.com").replace(/\/+$/, "");
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-tt82.onrender.com").replace(/\/+$/, "");
 
   function showAlert(msg){
     const a = $('#alert');
@@ -34,6 +36,25 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-stagi
       .replace(/\s+/g, ' ')
       .trim()
       .toUpperCase();
+  }
+
+  function getStoredCategoryFilter(){
+    try{
+      const stored = localStorage.getItem(CATEGORY_FILTER_STORAGE_KEY);
+      return (stored === 'tercera' || stored === 'segunda') ? stored : null;
+    }catch(_){
+      return null;
+    }
+  }
+
+  function persistCategoryFilter(category){
+    try{
+      if(category === 'tercera' || category === 'segunda'){
+        localStorage.setItem(CATEGORY_FILTER_STORAGE_KEY, category);
+      }else{
+        localStorage.removeItem(CATEGORY_FILTER_STORAGE_KEY);
+      }
+    }catch(_){}
   }
 
   function slot(idx, name){
@@ -346,6 +367,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-stagi
     buttons.forEach(btn => {
       const isActive = btn.dataset.categoryFilter === state.activeCategory;
       btn.classList.toggle('active', isActive);
+      btn.classList.toggle('inactive', !isActive);
       btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
   }
@@ -410,10 +432,16 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || "https://liga-backend-stagi
 
   function setupCategoryFilters(){
     const buttons = document.querySelectorAll('[data-category-filter]');
+    const storedCategory = getStoredCategoryFilter();
+    if(storedCategory){
+      state.activeCategory = storedCategory;
+    }
+
     buttons.forEach(btn => {
       btn.addEventListener('click', ()=>{
         const category = btn.dataset.categoryFilter;
-        state.activeCategory = (state.activeCategory === category) ? null : category;
+        state.activeCategory = category;
+        persistCategoryFilter(state.activeCategory);
         renderBoards();
       });
     });

@@ -247,13 +247,26 @@
     flex-wrap:wrap;
     padding:18px 0 14px;
   }
-  .btn-filter{ min-width:119px; text-align:center; }
+  .btn-filter{
+    min-width:119px;
+    text-align:center;
+    opacity:.5;
+    transition:opacity .15s ease, filter .15s ease, transform .05s ease, box-shadow .15s ease;
+  }
   .btn-filter.active{
+    opacity:1;
     filter:brightness(1.08);
     box-shadow:
       inset 0 2px 0 rgba(255,255,255,.6),
       0 0 0 2px rgba(255,217,102,.30),
       0 3px 8px rgba(0,0,0,.35);
+  }
+  .btn-filter.inactive{
+    opacity:.5;
+    filter:none;
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.35),
+      0 2px 6px rgba(0,0,0,.22);
   }
   .category-filter-status{ font-size:12px; color:var(--gold); opacity:.95; }
   .empty-state{
