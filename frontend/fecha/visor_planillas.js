@@ -443,9 +443,7 @@ const API_BASE = (() => {
   function setupCategoryFilters(){
     const buttons = document.querySelectorAll('[data-category-filter]');
     const storedCategory = getStoredCategoryFilter();
-    if(storedCategory){
-      state.activeCategory = storedCategory;
-    }
+    state.activeCategory = storedCategory || 'tercera';
 
     buttons.forEach(btn => {
       btn.addEventListener('click', ()=>{
