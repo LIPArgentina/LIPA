@@ -751,13 +751,27 @@ router.post('/validate', async (req, res) => {
       [lockUntil, fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]
     );
 
+    const mineUpdatedAt = mine?.updated_at ? new Date(mine.updated_at).getTime() : 0;
+    const rivalUpdatedAt = rival?.updated_at ? new Date(rival.updated_at).getTime() : 0;
+    const validatedSnapshot = mineUpdatedAt >= rivalUpdatedAt
+      ? (mine?.status_json || rival?.status_json || {})
+      : (rival?.status_json || mine?.status_json || {});
+
+    const fixtureSync = await syncValidatedMatchIntoFixture({
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      snapshot: validatedSnapshot
+    });
+
     return res.json({
       ok: true,
       tipo: 'validado',
       mensaje: 'Validación exitosa',
       locked: true,
       validated: true,
-      lockedUntil: lockUntil
+      lockedUntil: lockUntil,
+      fixtureSync
     });
   } catch (err) {
     console.error('POST /validate', err);
@@ -864,6 +878,138 @@ async function resolveEquipoInfoBySlug(slug, categoryHint = '') {
   );
 
   return rows[0] || null;
+}
+
+
+function buildTeamMatchCandidates(teamInfo = null, fallbackSlug = '') {
+  const values = [
+    teamInfo?.display_name,
+    teamInfo?.slug_base,
+    teamInfo?.slug_uid,
+    fallbackSlug
+  ];
+
+  return [...new Set(
+    values
+      .map((value) => normalizeText(value || ''))
+      .filter(Boolean)
+  )];
+}
+
+function fixtureTeamMatches(item = {}, candidates = []) {
+  const equipo = normalizeText(item?.equipo || '');
+  return !!equipo && candidates.includes(equipo);
+}
+
+async function inferCategoryFromMatch(localSlug, visitanteSlug) {
+  const [localInfo, visitanteInfo] = await Promise.all([
+    resolveEquipoInfoBySlug(localSlug),
+    resolveEquipoInfoBySlug(visitanteSlug)
+  ]);
+
+  const localDivision = String(localInfo?.division || '').trim().toLowerCase();
+  const visitanteDivision = String(visitanteInfo?.division || '').trim().toLowerCase();
+  const category = localDivision || visitanteDivision || null;
+
+  return { category, localInfo, visitanteInfo };
+}
+
+async function syncValidatedMatchIntoFixture({
+  fechaISO,
+  localSlug,
+  visitanteSlug,
+  snapshot
+}) {
+  const dateKey = normalizeDateOnly(fechaISO);
+  if (!dateKey || !snapshot) {
+    return { updated: false, reason: 'missing_data' };
+  }
+
+  const { category, localInfo, visitanteInfo } = await inferCategoryFromMatch(localSlug, visitanteSlug);
+  if (!category) {
+    return { updated: false, reason: 'category_not_found' };
+  }
+
+  const localCandidates = buildTeamMatchCandidates(localInfo, localSlug);
+  const visitanteCandidates = buildTeamMatchCandidates(visitanteInfo, visitanteSlug);
+
+  const localPuntos = Number(snapshot?.local?.puntosTotales ?? 0);
+  const localExtra = Number(snapshot?.local?.triangulosTotales ?? snapshot?.local?.triangulos ?? 0);
+  const visitantePuntos = Number(snapshot?.visitante?.puntosTotales ?? 0);
+  const visitanteExtra = Number(snapshot?.visitante?.triangulosTotales ?? snapshot?.visitante?.triangulos ?? 0);
+
+  const { rows } = await pool.query(
+    `
+    SELECT id, kind, category, data
+    FROM fixtures
+    WHERE category = $1
+    ORDER BY
+      CASE kind WHEN 'ida' THEN 0 WHEN 'vuelta' THEN 1 ELSE 9 END,
+      updated_at DESC,
+      id DESC
+    `,
+    [category]
+  );
+
+  for (const row of rows) {
+    const data = row?.data && typeof row.data === 'object' ? row.data : {};
+    const fechas = Array.isArray(data?.fechas) ? data.fechas : [];
+    let touched = false;
+    let updatedGroup = null;
+
+    for (const fecha of fechas) {
+      if (normalizeDateOnly(fecha?.date) !== dateKey) continue;
+
+      const tablas = Array.isArray(fecha?.tablas) ? fecha.tablas : [];
+      for (const tabla of tablas) {
+        const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+        for (let i = 0; i < equipos.length - 1; i++) {
+          const localItem = equipos[i];
+          const visitanteItem = equipos[i + 1];
+          const localCategoria = String(localItem?.categoria || '').trim().toLowerCase();
+          const visitanteCategoria = String(visitanteItem?.categoria || '').trim().toLowerCase();
+
+          if (localCategoria !== 'local' || visitanteCategoria !== 'visitante') continue;
+          if (!fixtureTeamMatches(localItem, localCandidates)) continue;
+          if (!fixtureTeamMatches(visitanteItem, visitanteCandidates)) continue;
+
+          localItem.puntos = localPuntos;
+          localItem.puntosExtra = localExtra;
+          visitanteItem.puntos = visitantePuntos;
+          visitanteItem.puntosExtra = visitanteExtra;
+
+          touched = true;
+          updatedGroup = tabla?.grupo || null;
+          break;
+        }
+        if (touched) break;
+      }
+      if (touched) break;
+    }
+
+    if (touched) {
+      await pool.query(
+        `
+        UPDATE fixtures
+        SET data = $1::jsonb,
+            updated_at = NOW()
+        WHERE id = $2
+        `,
+        [JSON.stringify(data), row.id]
+      );
+
+      return {
+        updated: true,
+        fixtureId: row.id,
+        kind: row.kind,
+        category,
+        group: updatedGroup,
+        date: dateKey
+      };
+    }
+  }
+
+  return { updated: false, reason: 'match_not_found', category, date: dateKey };
 }
 
 router.get('/results', async (req, res) => {
