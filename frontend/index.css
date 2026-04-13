@@ -1,4 +1,3 @@
-
 /* Tamaño proporcional del logo en todas las pantallas */
 .hero__logo{
   width: clamp(180px, 18vw, 260px);
@@ -108,7 +107,50 @@
   }
 }
 
+/* ====== Home – botones de categorías con look admin ====== */
+.cta-grid{
+  width:min(980px, 100%);
+  margin:1.5rem auto 0;
+  display:grid;
+  grid-template-columns:repeat(3, minmax(180px, 1fr));
+  gap:14px;
+}
 
+.cta-grid .btn-cta{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:58px;
+  padding:12px 22px;
+  border-radius:14px;
+  background:linear-gradient(180deg, #ffd86a 0%, #e8b127 100%);
+  border:1px solid #8e6a12;
+  color:#111;
+  font-weight:800;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  text-decoration:none;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.6),
+    0 3px 8px rgba(0,0,0,.35);
+  transition:filter .15s ease, transform .05s ease, box-shadow .15s ease;
+}
+
+.cta-grid .btn-cta:hover{
+  filter:brightness(1.05);
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.6),
+    0 6px 14px rgba(0,0,0,.35);
+}
+
+.cta-grid .btn-cta:active{
+  transform:translateY(1px);
+}
+
+.cta-grid .btn-cta:focus-visible{
+  outline:2px solid #ffd966;
+  outline-offset:3px;
+}
 
 /* ====== Home – header mobile fino ====== */
 @media (max-width: 768px) {
@@ -184,8 +226,6 @@
     padding: 1.3rem 1rem 2rem;
   }
 
-  
-
   .title {
     font-size: 1.15rem;
     text-align: center;
@@ -208,6 +248,12 @@
 
   .cta-grid .btn {
     width: 100%;
+  }
+
+  .cta-grid .btn-cta{
+    min-height:50px;
+    padding:10px 16px;
+    border-radius:12px;
   }
 }
 

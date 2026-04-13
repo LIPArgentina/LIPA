@@ -68,7 +68,20 @@ function buildDateKey(val){
   return s;
 }
 
-const API_BASE = 'https://liga-backend-tt82.onrender.com/api';
+const API_BASE = (() => {
+  const configured = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  if (configured) return configured + '/api';
+
+  const host = String(window.location.hostname || '').toLowerCase();
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  const isStaging = host.includes('staging');
+
+  return (isLocal
+    ? 'http://localhost:3000/api'
+    : (isStaging
+        ? 'https://liga-backend-staging.onrender.com/api'
+        : 'https://liga-backend-tt82.onrender.com/api'));
+})();
 
 async function fetchFixture(kind){
   const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=tercera`;
