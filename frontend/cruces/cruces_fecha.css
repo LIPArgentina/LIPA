@@ -1157,3 +1157,43 @@ header.lpi-top {
     min-width:auto;
   }
 }
+
+
+/* ===== Fix de alineación responsive entre ambas columnas ===== */
+.cruces-grid > section {
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+}
+
+.section h2,
+.title,
+.meta,
+.hint,
+.row {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .title,
+  #planilla-root-left .card .title,
+  #planilla-root-right .card .title {
+    width: 100%;
+    max-width: none;
+  }
+
+  .meta,
+  #planilla-root-left .card .meta,
+  #planilla-root-right .card .meta {
+    width: 100%;
+    max-width: none;
+  }
+}
