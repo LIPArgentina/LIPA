@@ -39,7 +39,7 @@
     }
   };
 
-  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || 'https://liga-backend-staging.onrender.com').replace(/\/+$/, '');
+  const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const CATEGORY_KEYS = {
     tercera: '__categoria_tercera__',
     segunda: '__categoria_segunda__'
@@ -2235,8 +2235,8 @@ btn.onclick = async () => {
 
     const max = Math.max(leftRows.length, rightRows.length);
 
-    leftRows.forEach(r => { r.style.height = ''; });
-    rightRows.forEach(r => { r.style.height = ''; });
+    leftRows.forEach(r => { r.style.height = ''; r.style.minHeight = ''; });
+    rightRows.forEach(r => { r.style.height = ''; r.style.minHeight = ''; });
 
     for (let i = 0; i < max; i++) {
       const l = leftRows[i];
@@ -2246,7 +2246,40 @@ btn.onclick = async () => {
       const h = Math.max(l.offsetHeight, r.offsetHeight);
       l.style.height = h + 'px';
       r.style.height = h + 'px';
+      l.style.minHeight = h + 'px';
+      r.style.minHeight = h + 'px';
     }
+  }
+
+  function syncSectionHeadingHeights() {
+    const leftHeadings = document.querySelectorAll('#planilla-root-left .section h2');
+    const rightHeadings = document.querySelectorAll('#planilla-root-right .section h2');
+    const max = Math.max(leftHeadings.length, rightHeadings.length);
+
+    leftHeadings.forEach(h => { h.style.minHeight = ''; });
+    rightHeadings.forEach(h => { h.style.minHeight = ''; });
+
+    for (let i = 0; i < max; i++) {
+      const l = leftHeadings[i];
+      const r = rightHeadings[i];
+      if (!l || !r) continue;
+      const h = Math.max(l.offsetHeight, r.offsetHeight);
+      l.style.minHeight = h + 'px';
+      r.style.minHeight = h + 'px';
+    }
+  }
+
+  function syncCardLayout() {
+    syncSlotWidths();
+    syncHeaderHeights();
+    syncSectionStarts();
+    syncSectionHeadingHeights();
+    syncRowHeights();
+  }
+
+  function scheduleSyncCardLayout() {
+    cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(syncCardLayout);
   }
 
 
@@ -2306,10 +2339,9 @@ btn.onclick = async () => {
       setupValidationButtons(local, visitante, match.date || new Date().toISOString().slice(0,10));
 
       requestAnimationFrame(() => {
-        syncSlotWidths();
-        syncHeaderHeights();
-        syncSectionStarts();
-        syncRowHeights();
+        syncCardLayout();
+        setTimeout(syncCardLayout, 60);
+        setTimeout(syncCardLayout, 180);
       });
     } catch (e) {
       console.error(e);
@@ -2343,13 +2375,24 @@ window.addEventListener('load', async () => {
 });
 
 let resizeRaf = 0;
-window.addEventListener('resize', () => {
-  cancelAnimationFrame(resizeRaf);
-  resizeRaf = requestAnimationFrame(() => {
-    syncSlotWidths();
-    syncHeaderHeights();
-    syncSectionStarts();
-    syncRowHeights();
-  });
+window.addEventListener('resize', scheduleSyncCardLayout);
+window.addEventListener('orientationchange', scheduleSyncCardLayout);
+
+if (document.fonts?.ready) {
+  document.fonts.ready.then(() => scheduleSyncCardLayout()).catch(() => {});
+}
+
+window.addEventListener('load', () => {
+  setTimeout(syncCardLayout, 120);
 });
+
+if ('ResizeObserver' in window) {
+  const observer = new ResizeObserver(() => scheduleSyncCardLayout());
+  window.addEventListener('load', () => {
+    const leftCard = document.querySelector('#planilla-root-left .card');
+    const rightCard = document.querySelector('#planilla-root-right .card');
+    if (leftCard) observer.observe(leftCard);
+    if (rightCard) observer.observe(rightCard);
+  });
+}
 })();
