@@ -824,7 +824,6 @@ header.lpi-top {
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
-  text-wrap: balance;
 }
 
 .row {
@@ -861,8 +860,7 @@ header.lpi-top {
 
   #planilla-root-left .card .title,
   #planilla-root-right .card .title {
-    text-wrap: balance;
-    line-height: 1.05;
+      line-height: 1.05;
   }
 
   #planilla-root-left .card .meta,
@@ -1195,5 +1193,57 @@ header.lpi-top {
   #planilla-root-right .card .meta {
     width: 100%;
     max-width: none;
+  }
+}
+
+
+/* ===== Fix final Chrome/WebView: alturas más rígidas arriba ===== */
+#planilla-root-left .card .title,
+#planilla-root-right .card .title {
+  min-height: 78px;
+  align-content: flex-start;
+}
+
+#planilla-root-left .card .meta,
+#planilla-root-right .card .meta {
+  min-height: 36px;
+}
+
+#planilla-root-left .section h2,
+#planilla-root-right .section h2 {
+  min-height: 24px;
+}
+
+@media (max-width: 900px) {
+  #planilla-root-left .card .title,
+  #planilla-root-right .card .title {
+    min-height: 64px;
+  }
+
+  #planilla-root-left .card .meta,
+  #planilla-root-right .card .meta {
+    min-height: 30px;
+  }
+
+  #planilla-root-left .section h2,
+  #planilla-root-right .section h2 {
+    min-height: 18px;
+  }
+}
+
+@media (max-width: 520px) {
+  #planilla-root-left .card .title,
+  #planilla-root-right .card .title {
+    min-height: 58px;
+  }
+
+  #planilla-root-left .card .meta,
+  #planilla-root-right .card .meta {
+    min-height: 26px;
+  }
+
+  #planilla-root-left .section h2,
+  #planilla-root-right .section h2 {
+    min-height: 16px;
   }
 }
