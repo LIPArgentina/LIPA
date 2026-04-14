@@ -385,18 +385,27 @@ function apiUrl(path){
   async function loadCrucesFromDb(category){
     if (!category) throw new Error('Categoría inválida para cruces');
 
-    const data = await fetchJson(apiUrl('/api/fixture?kind=ida&category=' + encodeURIComponent(category)), {
-      cache: 'no-store',
-      credentials: 'same-origin'
-    });
+    const fetchFixtureKind = async (kind) => {
+      const data = await fetchJson(apiUrl('/api/fixture?kind=' + encodeURIComponent(kind) + '&category=' + encodeURIComponent(category)), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+      const fechas = Array.isArray(data?.data?.fechas) ? data.data.fechas : [];
+      return fechas.map((fecha) => ({ ...fecha, __kind: kind }));
+    };
 
-    const fechas = Array.isArray(data?.data?.fechas) ? data.data.fechas : [];
+    const [idaFechas, vueltaFechas] = await Promise.all([
+      fetchFixtureKind('ida').catch(() => []),
+      fetchFixtureKind('vuelta').catch(() => [])
+    ]);
+
+    const fechas = [...idaFechas, ...vueltaFechas];
 
     const toDateKey = (raw) => {
-      const text = String(raw || '').trim();
-      const m = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const value = String(raw || '').trim();
+      const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-      const d = new Date(text);
+      const d = new Date(value);
       if (Number.isNaN(d.getTime())) return '';
       const y = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -423,7 +432,7 @@ function apiUrl(path){
     const tomorrowKey = makeKey(tomorrow);
 
     const normalized = fechas
-      .map((fecha) => ({ raw: fecha, key: toDateKey(fecha?.date) }))
+      .map((fecha) => ({ raw: fecha, key: toDateKey(fecha?.date), kind: fecha?.__kind || '' }))
       .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.key))
       .sort((a, b) => a.key.localeCompare(b.key));
 
@@ -435,12 +444,13 @@ function apiUrl(path){
       normalized[normalized.length - 1];
 
     if (!chosen) {
-      return { cruces: [], fechaFixture: null };
+      return { cruces: [], fechaFixture: null, fixtureKind: null };
     }
 
     return {
       cruces: extractCrucesFromFecha(chosen.raw),
-      fechaFixture: chosen.key
+      fechaFixture: chosen.key,
+      fixtureKind: chosen.kind || null
     };
   }
 
