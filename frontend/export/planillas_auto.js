@@ -196,18 +196,17 @@ function extractCrucesFromFechaNode(fechaNode){
     const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos.filter(Boolean) : [];
     if (!equipos.length) return;
 
-    const local = equipos.find((item) => String(item?.categoria || '').toLowerCase() === 'local');
-    const visitante = equipos.find((item) => String(item?.categoria || '').toLowerCase() === 'visitante');
-
-    if (local?.equipo && visitante?.equipo) {
-      pushCruce(result, local.equipo, visitante.equipo);
-      return;
-    }
-
+    // El fixture real guarda los encuentros por posición en el array:
+    // [local1, visitante1, local2, visitante2, ...]
+    // La categoría local/visitante puede existir, pero no es confiable como única fuente.
     for (let i = 0; i < equipos.length; i += 2) {
       const a = equipos[i];
       const b = equipos[i + 1];
-      if (a?.equipo && b?.equipo) pushCruce(result, a.equipo, b.equipo);
+      const local = String(a?.equipo || a?.team || '').trim();
+      const visitante = String(b?.equipo || b?.team || '').trim();
+      if (local && visitante) {
+        pushCruce(result, local, visitante);
+      }
     }
   });
 
