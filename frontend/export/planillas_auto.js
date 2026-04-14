@@ -110,6 +110,18 @@ async function checkCrucesEnabled(category){
   return !!data?.enabled;
 }
 
+
+async function loadCruces(category){
+  const team = CATEGORY_KEYS[category];
+
+  return await fetchJson(`${API_BASE}/api/cruces`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ team })
+  });
+}
+
+
 async function loadFixture(kind, category){
   return await fetchJson(`${API_BASE}/api/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}`, {
     cache: 'no-store'
@@ -219,6 +231,7 @@ async function loadBestFixtureCruces(category){
     cruces: selected ? extractCrucesFromFechaNode(selected.fechaNode) : []
   };
 }
+
 
 async function loadPlanillas(){
   const data = await fetchJson(`${API_BASE}/api/admin/planillas`, { cache: 'no-store' });
@@ -601,6 +614,7 @@ async function reload(){
     const planillas = await loadPlanillas();
 
     const cruces = fixtureInfo.cruces;
+
     const completeSheets = buildCompleteSheets(cruces, planillas, category);
 
     state.allPlanillas = planillas;
@@ -610,14 +624,19 @@ async function reload(){
 
     const totalCruces = cruces.length;
     const totalCompletos = completeSheets.length;
+
     const selectedDate = fixtureInfo?.selected?.dateKey || 'sin fecha';
     const selectedKind = fixtureInfo?.selected?.kind || 'sin tramo';
+
     setStatus(
       totalCompletos ? 'ok' : 'warn',
       totalCompletos
         ? ('Se encontraron ' + totalCompletos + ' planilla' + (totalCompletos === 1 ? '' : 's') + ' completa' + (totalCompletos === 1 ? '' : 's'))
         : 'No hay cruces completos todavía',
-      'Fixture usado: ' + selectedKind.toUpperCase() + ' · Fecha: ' + selectedDate + ' · Cruces detectados: ' + totalCruces + ' · Completos: ' + totalCompletos
+      'Fixture usado: ' + selectedKind.toUpperCase() +
+      ' · Fecha: ' + selectedDate +
+      ' · Cruces detectados: ' + totalCruces +
+      ' · Completos: ' + totalCompletos
     );
   } catch (error) {
     console.error(error);
