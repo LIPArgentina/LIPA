@@ -110,6 +110,7 @@ async function checkCrucesEnabled(category){
   return !!data?.enabled;
 }
 
+
 async function loadCruces(category){
   const team = CATEGORY_KEYS[category];
 
@@ -119,6 +120,118 @@ async function loadCruces(category){
     body: JSON.stringify({ team })
   });
 }
+
+
+async function loadFixture(kind, category){
+  return await fetchJson(`${API_BASE}/api/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}`, {
+    cache: 'no-store'
+  });
+}
+
+function parseISOAsLocal(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0);
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function dateKeyFromRaw(raw){
+  const d = parseISOAsLocal(raw);
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function collectFixtureCandidates(raw, kind){
+  const fechas = Array.isArray(raw?.data?.fechas) ? raw.data.fechas : [];
+  return fechas
+    .map((fechaNode) => ({
+      kind,
+      rawDate: fechaNode?.date || fechaNode?.fecha || fechaNode?.fechaISO || fechaNode?.fechaKey || '',
+      dateKey: dateKeyFromRaw(fechaNode?.date || fechaNode?.fecha || fechaNode?.fechaISO || fechaNode?.fechaKey || ''),
+      fechaNode
+    }))
+    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey));
+}
+
+function selectBestFixtureCandidate(candidates){
+  if (!Array.isArray(candidates) || !candidates.length) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const makeKey = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const todayKey = makeKey(today);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = makeKey(yesterday);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = makeKey(tomorrow);
+
+  const sorted = candidates.slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+
+  return (
+    sorted.find((item) => item.dateKey === todayKey) ||
+    sorted.find((item) => item.dateKey === yesterdayKey) ||
+    sorted.find((item) => item.dateKey === tomorrowKey) ||
+    sorted.find((item) => item.dateKey > tomorrowKey) ||
+    sorted[sorted.length - 1] ||
+    null
+  );
+}
+
+function extractCrucesFromFechaNode(fechaNode){
+  const result = [];
+  const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
+
+  tablas.forEach((tabla) => {
+    const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos.filter(Boolean) : [];
+    if (!equipos.length) return;
+
+    const local = equipos.find((item) => String(item?.categoria || '').toLowerCase() === 'local');
+    const visitante = equipos.find((item) => String(item?.categoria || '').toLowerCase() === 'visitante');
+
+    if (local?.equipo && visitante?.equipo) {
+      pushCruce(result, local.equipo, visitante.equipo);
+      return;
+    }
+
+    for (let i = 0; i < equipos.length; i += 2) {
+      const a = equipos[i];
+      const b = equipos[i + 1];
+      if (a?.equipo && b?.equipo) pushCruce(result, a.equipo, b.equipo);
+    }
+  });
+
+  return result;
+}
+
+async function loadBestFixtureCruces(category){
+  const [idaRaw, vueltaRaw] = await Promise.all([
+    loadFixture('ida', category),
+    loadFixture('vuelta', category).catch(() => null)
+  ]);
+
+  const candidates = [
+    ...collectFixtureCandidates(idaRaw, 'ida'),
+    ...collectFixtureCandidates(vueltaRaw, 'vuelta')
+  ];
+
+  const selected = selectBestFixtureCandidate(candidates);
+  return {
+    selected,
+    cruces: selected ? extractCrucesFromFechaNode(selected.fechaNode) : []
+  };
+}
+
 
 async function loadPlanillas(){
   const data = await fetchJson(`${API_BASE}/api/admin/planillas`, { cache: 'no-store' });
@@ -495,12 +608,13 @@ async function reload(){
     }
 
     await sleep(150);
-    const crucesRaw = await loadCruces(category);
+    const fixtureInfo = await loadBestFixtureCruces(category);
 
     await sleep(150);
     const planillas = await loadPlanillas();
 
-    const cruces = extractCruces(crucesRaw);
+    const cruces = fixtureInfo.cruces;
+
     const completeSheets = buildCompleteSheets(cruces, planillas, category);
 
     state.allPlanillas = planillas;
@@ -510,12 +624,19 @@ async function reload(){
 
     const totalCruces = cruces.length;
     const totalCompletos = completeSheets.length;
+
+    const selectedDate = fixtureInfo?.selected?.dateKey || 'sin fecha';
+    const selectedKind = fixtureInfo?.selected?.kind || 'sin tramo';
+
     setStatus(
       totalCompletos ? 'ok' : 'warn',
       totalCompletos
         ? ('Se encontraron ' + totalCompletos + ' planilla' + (totalCompletos === 1 ? '' : 's') + ' completa' + (totalCompletos === 1 ? '' : 's'))
         : 'No hay cruces completos todavía',
-      'Cruces detectados: ' + totalCruces + ' · Completos: ' + totalCompletos
+      'Fixture usado: ' + selectedKind.toUpperCase() +
+      ' · Fecha: ' + selectedDate +
+      ' · Cruces detectados: ' + totalCruces +
+      ' · Completos: ' + totalCompletos
     );
   } catch (error) {
     console.error(error);
