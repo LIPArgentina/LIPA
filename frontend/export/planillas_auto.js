@@ -18,8 +18,7 @@ const TEAM_ALIASES = {
 const state = {
   category: 'tercera',
   allPlanillas: [],
-  completeSheets: [],
-  fixtureDate: null
+  completeSheets: []
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -111,6 +110,11 @@ async function checkCrucesEnabled(category){
   return !!data?.enabled;
 }
 
+async function loadFixture(kind, category){
+  return await fetchJson(`${API_BASE}/api/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}`, {
+    cache: 'no-store'
+  });
+}
 
 function parseISOAsLocal(iso){
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
@@ -119,72 +123,37 @@ function parseISOAsLocal(iso){
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function toDateKey(raw){
-  const text = String(raw || '').trim();
-  const m = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  const d = new Date(text);
-  if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${mm}-${dd}`;
-}
-
-function formatFixtureDate(iso){
-  const d = parseISOAsLocal(iso);
+function dateKeyFromRaw(raw){
+  const d = parseISOAsLocal(raw);
   if (!d) return '';
-  try {
-    return new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' }).format(d);
-  } catch (_) {
-    return iso;
-  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
-function extractCrucesFromFecha(fechaNode){
-  const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
-  const cruces = [];
-
-  for (const tabla of tablas) {
-    const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
-    if (!equipos.length) continue;
-
-    let pendienteLocal = null;
-
-    for (const item of equipos) {
-      const categoria = String(item?.categoria || '').toLowerCase();
-      const nombre = String(item?.equipo || '').trim();
-      if (!nombre) continue;
-
-      if (categoria === 'local') {
-        pendienteLocal = item;
-        continue;
-      }
-
-      if (categoria === 'visitante') {
-        if (pendienteLocal && nombre.toUpperCase() !== 'WO' && String(pendienteLocal?.equipo || '').toUpperCase() !== 'WO') {
-          pushCruce(cruces, pendienteLocal.equipo, nombre);
-        }
-        pendienteLocal = null;
-      }
-    }
-  }
-
-  return cruces;
+function collectFixtureCandidates(raw, kind){
+  const fechas = Array.isArray(raw?.data?.fechas) ? raw.data.fechas : [];
+  return fechas
+    .map((fechaNode) => ({
+      kind,
+      rawDate: fechaNode?.date || fechaNode?.fecha || fechaNode?.fechaISO || fechaNode?.fechaKey || '',
+      dateKey: dateKeyFromRaw(fechaNode?.date || fechaNode?.fecha || fechaNode?.fechaISO || fechaNode?.fechaKey || ''),
+      fechaNode
+    }))
+    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey));
 }
 
-async function loadCruces(category){
-  const data = await fetchJson(`${API_BASE}/api/fixture?kind=ida&category=${encodeURIComponent(category)}`, { cache: 'no-store' });
-  const fechas = Array.isArray(data?.data?.fechas) ? data.data.fechas : [];
+function selectBestFixtureCandidate(candidates){
+  if (!Array.isArray(candidates) || !candidates.length) return null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const makeKey = (date) => {
     const y = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    return `${y}-${mm}-${dd}`;
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
 
   const todayKey = makeKey(today);
@@ -195,29 +164,61 @@ async function loadCruces(category){
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowKey = makeKey(tomorrow);
 
-  const normalized = fechas
-    .map((fecha) => ({ raw: fecha, key: toDateKey(fecha?.date || fecha?.fecha || fecha?.fechaISO || fecha?.fechaKey) }))
-    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.key))
-    .sort((a, b) => a.key.localeCompare(b.key));
+  const sorted = candidates.slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
-  const chosen =
-    normalized.find((item) => item.key === todayKey) ||
-    normalized.find((item) => item.key === yesterdayKey) ||
-    normalized.find((item) => item.key === tomorrowKey) ||
-    normalized.find((item) => item.key > tomorrowKey) ||
-    normalized[normalized.length - 1] ||
-    null;
-
-  if (!chosen) {
-    return { cruces: [], fixtureDate: null };
-  }
-
-  return {
-    cruces: extractCrucesFromFecha(chosen.raw),
-    fixtureDate: chosen.key
-  };
+  return (
+    sorted.find((item) => item.dateKey === todayKey) ||
+    sorted.find((item) => item.dateKey === yesterdayKey) ||
+    sorted.find((item) => item.dateKey === tomorrowKey) ||
+    sorted.find((item) => item.dateKey > tomorrowKey) ||
+    sorted[sorted.length - 1] ||
+    null
+  );
 }
 
+function extractCrucesFromFechaNode(fechaNode){
+  const result = [];
+  const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
+
+  tablas.forEach((tabla) => {
+    const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos.filter(Boolean) : [];
+    if (!equipos.length) return;
+
+    const local = equipos.find((item) => String(item?.categoria || '').toLowerCase() === 'local');
+    const visitante = equipos.find((item) => String(item?.categoria || '').toLowerCase() === 'visitante');
+
+    if (local?.equipo && visitante?.equipo) {
+      pushCruce(result, local.equipo, visitante.equipo);
+      return;
+    }
+
+    for (let i = 0; i < equipos.length; i += 2) {
+      const a = equipos[i];
+      const b = equipos[i + 1];
+      if (a?.equipo && b?.equipo) pushCruce(result, a.equipo, b.equipo);
+    }
+  });
+
+  return result;
+}
+
+async function loadBestFixtureCruces(category){
+  const [idaRaw, vueltaRaw] = await Promise.all([
+    loadFixture('ida', category),
+    loadFixture('vuelta', category).catch(() => null)
+  ]);
+
+  const candidates = [
+    ...collectFixtureCandidates(idaRaw, 'ida'),
+    ...collectFixtureCandidates(vueltaRaw, 'vuelta')
+  ];
+
+  const selected = selectBestFixtureCandidate(candidates);
+  return {
+    selected,
+    cruces: selected ? extractCrucesFromFechaNode(selected.fechaNode) : []
+  };
+}
 
 async function loadPlanillas(){
   const data = await fetchJson(`${API_BASE}/api/admin/planillas`, { cache: 'no-store' });
@@ -594,30 +595,29 @@ async function reload(){
     }
 
     await sleep(150);
-    const crucesData = await loadCruces(category);
+    const fixtureInfo = await loadBestFixtureCruces(category);
 
     await sleep(150);
     const planillas = await loadPlanillas();
 
-    const cruces = Array.isArray(crucesData?.cruces) ? crucesData.cruces : [];
-    const fixtureDate = crucesData?.fixtureDate || null;
+    const cruces = fixtureInfo.cruces;
     const completeSheets = buildCompleteSheets(cruces, planillas, category);
 
     state.allPlanillas = planillas;
     state.completeSheets = completeSheets;
-    state.fixtureDate = fixtureDate;
 
     renderSheets(completeSheets);
 
     const totalCruces = cruces.length;
     const totalCompletos = completeSheets.length;
-    const fechaLabel = fixtureDate ? formatFixtureDate(fixtureDate) : 'sin fecha detectada';
+    const selectedDate = fixtureInfo?.selected?.dateKey || 'sin fecha';
+    const selectedKind = fixtureInfo?.selected?.kind || 'sin tramo';
     setStatus(
       totalCompletos ? 'ok' : 'warn',
       totalCompletos
         ? ('Se encontraron ' + totalCompletos + ' planilla' + (totalCompletos === 1 ? '' : 's') + ' completa' + (totalCompletos === 1 ? '' : 's'))
         : 'No hay cruces completos todavía',
-      'Fecha tomada del fixture: ' + fechaLabel + ' · Cruces detectados: ' + totalCruces + ' · Completos: ' + totalCompletos
+      'Fixture usado: ' + selectedKind.toUpperCase() + ' · Fecha: ' + selectedDate + ' · Cruces detectados: ' + totalCruces + ' · Completos: ' + totalCompletos
     );
   } catch (error) {
     console.error(error);
