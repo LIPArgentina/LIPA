@@ -1,9 +1,27 @@
-
 (function(){
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const adminList = document.getElementById('adminList');
+  const adminStatus = document.getElementById('adminStatus');
   const btnReload = document.getElementById('btnReload');
+  const btnManualUpload = document.getElementById('btnManualUpload');
+  const fechaFilter = document.getElementById('fechaFilter');
+  const modal = document.getElementById('manualUploadModal');
+  const btnCloseManualUpload = document.getElementById('btnCloseManualUpload');
+  const btnCancelManualUpload = document.getElementById('btnCancelManualUpload');
+  const btnChooseManualPhotos = document.getElementById('btnChooseManualPhotos');
+  const btnSubmitManualUpload = document.getElementById('btnSubmitManualUpload');
+  const manualPicturesInput = document.getElementById('manualPicturesInput');
+  const manualPickedFilesText = document.getElementById('manualPickedFilesText');
+  const manualPreviewContainer = document.getElementById('manualPreviewContainer');
+  const manualStatusBox = document.getElementById('manualStatusBox');
+  const manualFechaISO = document.getElementById('manualFechaISO');
+  const manualTeamSlug = document.getElementById('manualTeamSlug');
+  const manualLocalSlug = document.getElementById('manualLocalSlug');
+  const manualVisitanteSlug = document.getElementById('manualVisitanteSlug');
   const blobUrlCache = new Map();
+  const REQUIRED_PICTURES = 9;
+  let allGroups = [];
+  let availableDates = [];
 
   function getToken() {
     try {
@@ -29,6 +47,23 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function slugify(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function setStatus(node, text, type = '') {
+    if (!node) return;
+    node.textContent = text || '';
+    node.className = 'status' + (type ? ' ' + type : '');
   }
 
   function revokeBlobCache() {
@@ -63,6 +98,10 @@
       out.push(v);
     });
     return out;
+  }
+
+  function compareDateDesc(a, b) {
+    return String(b || '').localeCompare(String(a || ''));
   }
 
   function buildImageCandidates(item, card) {
@@ -139,6 +178,20 @@
     throw lastError || new Error('No se pudo cargar la imagen.');
   }
 
+  async function fetchJson(url, options = {}) {
+    const res = await fetch(url, {
+      credentials: 'include',
+      cache: 'no-store',
+      headers: authHeaders(options.headers || {}),
+      ...options
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || data?.msg || ('HTTP ' + res.status));
+    }
+    return data;
+  }
+
   async function downloadGroupZip(fechaISO, teamSlug, zipFilename) {
     const url = new URL(API_BASE + '/api/pictures/admin/group-download');
     url.searchParams.set('fechaISO', fechaISO);
@@ -171,9 +224,30 @@
     setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
 
+  async function fetchFixtureDates() {
+    const categories = ['segunda', 'tercera'];
+    const kinds = ['ida', 'vuelta'];
+    const dates = new Set();
+
+    await Promise.all(categories.flatMap(category => kinds.map(async (kind) => {
+      try {
+        const url = API_BASE + '/api/fixture?kind=' + encodeURIComponent(kind) + '&category=' + encodeURIComponent(category);
+        const data = await fetchJson(url);
+        const fechas = Array.isArray(data?.data?.fechas) ? data.data.fechas : [];
+        fechas.forEach((fecha) => {
+          const raw = String(fecha?.date || fecha?.fecha || fecha?.fechaISO || '').trim();
+          const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+          if (match) dates.add(match[1]);
+        });
+      } catch {}
+    })));
+
+    return [...dates].sort(compareDateDesc);
+  }
+
   function renderGroups(groups) {
     if (!groups.length) {
-      adminList.innerHTML = '<p class="muted">No hay fotos cargadas.</p>';
+      adminList.innerHTML = '<p class="muted">No hay fotos cargadas para el filtro seleccionado.</p>';
       return;
     }
 
@@ -209,6 +283,7 @@
               <div class="muted">${itemCount} foto${itemCount === 1 ? '' : 's'}</div>
             </div>
             <div class="group-actions">
+              <button class="btn btn-gold" type="button" data-prefill-manual="1">REPETIR CARGA</button>
               <button class="btn" type="button" data-download-zip="1">DESCARGAR ZIP</button>
               <button class="btn btn-danger" type="button" data-empty-folder="1">VACIAR CONTENIDO</button>
             </div>
@@ -237,28 +312,204 @@
     }));
   }
 
-  async function load() {
+  function getFilteredGroups() {
+    const selectedDate = String(fechaFilter?.value || '').trim();
+    if (!selectedDate) return allGroups.slice();
+    return allGroups.filter(group => String(group?.fechaISO || '').slice(0, 10) === selectedDate);
+  }
+
+  async function renderCurrentGroups() {
     revokeBlobCache();
-    adminList.innerHTML = '<p class="muted">Cargando…</p>';
-    const res = await fetch(API_BASE + '/api/pictures/admin/list', {
-      headers: authHeaders(),
-      credentials: 'include',
-      cache: 'no-store'
+    renderGroups(getFilteredGroups());
+    await hydrateThumbs();
+  }
+
+  function fillSelectOptions(selectNode, dates, placeholderLabel, includeEmpty) {
+    if (!selectNode) return;
+    const currentValue = String(selectNode.value || '').trim();
+    const optionHtml = [];
+    if (includeEmpty) {
+      optionHtml.push(`<option value="">${escapeHtml(placeholderLabel)}</option>`);
+    }
+    dates.forEach((date) => {
+      optionHtml.push(`<option value="${escapeHtml(date)}">${escapeHtml(date)}</option>`);
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data?.ok) {
-      adminList.innerHTML = `<p class="muted">${data?.error || 'No se pudieron cargar las fotos.'}</p>`;
+    selectNode.innerHTML = optionHtml.join('');
+    if (currentValue && dates.includes(currentValue)) {
+      selectNode.value = currentValue;
+    } else if (includeEmpty) {
+      selectNode.value = '';
+    } else if (dates.length) {
+      selectNode.value = dates[0];
+    }
+  }
+
+  async function refreshAvailableDates(groups) {
+    const groupDates = unique((groups || []).map(group => String(group?.fechaISO || '').slice(0, 10))).sort(compareDateDesc);
+    const fixtureDates = await fetchFixtureDates();
+    availableDates = unique([...fixtureDates, ...groupDates]).sort(compareDateDesc);
+    fillSelectOptions(fechaFilter, availableDates, 'TODAS', true);
+    fillSelectOptions(manualFechaISO, availableDates, 'Elegí una fecha', true);
+  }
+
+  async function load() {
+    setStatus(adminStatus, 'Cargando…', 'info');
+
+    try {
+      const data = await fetchJson(API_BASE + '/api/pictures/admin/list');
+      allGroups = Array.isArray(data.groups)
+        ? data.groups
+        : Array.isArray(data.items)
+          ? []
+          : [];
+
+      await refreshAvailableDates(allGroups);
+      await renderCurrentGroups();
+      setStatus(adminStatus, allGroups.length ? '' : 'No hay fotos cargadas.', allGroups.length ? '' : 'info');
+    } catch (err) {
+      adminList.innerHTML = `<p class="muted">${escapeHtml(err?.message || 'No se pudieron cargar las fotos.')}</p>`;
+      setStatus(adminStatus, err?.message || 'No se pudieron cargar las fotos.', 'error');
+    }
+  }
+
+  function openManualModal(prefill = {}) {
+    if (prefill.fechaISO && availableDates.includes(String(prefill.fechaISO).slice(0, 10))) {
+      manualFechaISO.value = String(prefill.fechaISO).slice(0, 10);
+    }
+    if (prefill.teamSlug) manualTeamSlug.value = String(prefill.teamSlug).trim();
+    if (prefill.localSlug) manualLocalSlug.value = String(prefill.localSlug).trim();
+    if (prefill.visitanteSlug) manualVisitanteSlug.value = String(prefill.visitanteSlug).trim();
+
+    modal.hidden = false;
+    document.body.classList.add('modal-open');
+    setStatus(manualStatusBox, 'Completá los datos del cruce y elegí exactamente 9 fotos.', 'info');
+    setTimeout(() => manualFechaISO?.focus(), 0);
+  }
+
+  function closeManualModal() {
+    modal.hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+
+  function resetManualForm(options = {}) {
+    if (!options.keepPrefill) {
+      manualFechaISO.value = '';
+      manualTeamSlug.value = '';
+      manualLocalSlug.value = '';
+      manualVisitanteSlug.value = '';
+    }
+    manualPicturesInput.value = '';
+    manualPreviewContainer.innerHTML = '';
+    manualPickedFilesText.textContent = 'No se eligió ningún archivo';
+    setStatus(manualStatusBox, '');
+  }
+
+  function syncTeamFromMatch() {
+    const local = slugify(manualLocalSlug.value);
+    const visitante = slugify(manualVisitanteSlug.value);
+    const team = slugify(manualTeamSlug.value);
+
+    if (!team && local && !visitante) manualTeamSlug.value = local;
+    if (!team && visitante && !local) manualTeamSlug.value = visitante;
+  }
+
+  function updateManualPreview() {
+    const files = Array.from(manualPicturesInput.files || []);
+    manualPreviewContainer.innerHTML = '';
+
+    if (!files.length) {
+      manualPickedFilesText.textContent = 'No se eligió ningún archivo';
       return;
     }
 
-    const groups = Array.isArray(data.groups)
-      ? data.groups
-      : Array.isArray(data.items)
-        ? []
-        : [];
+    manualPickedFilesText.textContent = `${files.length} / ${REQUIRED_PICTURES} fotos seleccionadas`;
 
-    renderGroups(groups);
-    await hydrateThumbs();
+    files.forEach(file => {
+      if (!String(file.type || '').startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = document.createElement('img');
+        img.className = 'preview-img';
+        img.src = event.target?.result || '';
+        img.alt = file.name;
+        manualPreviewContainer.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function validateManualFields() {
+    const fechaISO = String(manualFechaISO.value || '').slice(0, 10);
+    const teamSlug = slugify(manualTeamSlug.value);
+    const localSlug = slugify(manualLocalSlug.value);
+    const visitanteSlug = slugify(manualVisitanteSlug.value);
+    const files = Array.from(manualPicturesInput.files || []);
+
+    if (!fechaISO) return { ok: false, message: 'Elegí la fecha de carga.', type: 'error' };
+    if (!teamSlug) return { ok: false, message: 'Indicá qué equipo está subiendo las fotos.', type: 'error' };
+    if (!localSlug) return { ok: false, message: 'Completá el slug del equipo local.', type: 'error' };
+    if (!visitanteSlug) return { ok: false, message: 'Completá el slug del equipo visitante.', type: 'error' };
+    if (localSlug === visitanteSlug) return { ok: false, message: 'Local y visitante no pueden ser el mismo equipo.', type: 'error' };
+    if (teamSlug !== localSlug && teamSlug !== visitanteSlug) {
+      return { ok: false, message: 'El equipo que sube tiene que coincidir con local o visitante para mantener el mismo formato de guardado.', type: 'error' };
+    }
+    if (files.length !== REQUIRED_PICTURES) {
+      return {
+        ok: false,
+        message: files.length < REQUIRED_PICTURES
+          ? `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para poder enviar.`
+          : `Solo se permiten ${REQUIRED_PICTURES} fotos por carga.`,
+        type: 'error'
+      };
+    }
+
+    return { ok: true, data: { fechaISO, teamSlug, localSlug, visitanteSlug, files } };
+  }
+
+  async function submitManualUpload() {
+    const validation = validateManualFields();
+    if (!validation.ok) {
+      setStatus(manualStatusBox, validation.message, validation.type);
+      return;
+    }
+
+    const { fechaISO, teamSlug, localSlug, visitanteSlug, files } = validation.data;
+    const body = new FormData();
+    body.append('fechaISO', fechaISO);
+    body.append('localSlug', localSlug);
+    body.append('visitanteSlug', visitanteSlug);
+    body.append('teamSlug', teamSlug);
+    body.append('team', teamSlug);
+    body.append('manualUpload', '1');
+    body.append('adminUpload', '1');
+    for (const file of files) body.append('pictures', file);
+
+    btnSubmitManualUpload.disabled = true;
+    btnChooseManualPhotos.disabled = true;
+    setStatus(manualStatusBox, 'Subiendo fotos…', 'info');
+
+    try {
+      const res = await fetch(API_BASE + '/api/pictures/upload', {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+        body
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || 'No se pudieron subir las fotos.');
+      }
+
+      setStatus(manualStatusBox, 'Las 9 fotos se subieron correctamente.', 'success');
+      setStatus(adminStatus, `Carga manual completada para ${teamSlug} · ${fechaISO}.`, 'success');
+      resetManualForm({ keepPrefill: true });
+      await load();
+    } catch (err) {
+      setStatus(manualStatusBox, err?.message || 'No se pudieron subir las fotos.', 'error');
+    } finally {
+      btnSubmitManualUpload.disabled = false;
+      btnChooseManualPhotos.disabled = false;
+    }
   }
 
   adminList?.addEventListener('click', async (ev) => {
@@ -278,6 +529,16 @@
       } catch (err) {
         alert(err?.message || 'No se pudo abrir la imagen.');
       }
+      return;
+    }
+
+    const prefillBtn = ev.target.closest('[data-prefill-manual]');
+    if (prefillBtn) {
+      resetManualForm();
+      openManualModal({
+        fechaISO: card.dataset.fecha || '',
+        teamSlug: card.dataset.team || ''
+      });
       return;
     }
 
@@ -306,11 +567,61 @@
         alert(data?.error || 'No se pudo vaciar la carpeta.');
         return;
       }
-      load();
+      await load();
     }
   });
 
+  fechaFilter?.addEventListener('change', async () => {
+    await renderCurrentGroups();
+  });
+
   btnReload?.addEventListener('click', load);
+  btnManualUpload?.addEventListener('click', () => {
+    resetManualForm();
+    openManualModal();
+  });
+  btnCloseManualUpload?.addEventListener('click', closeManualModal);
+  btnCancelManualUpload?.addEventListener('click', closeManualModal);
+  modal?.addEventListener('click', (ev) => {
+    if (ev.target?.matches('[data-close-modal]')) closeManualModal();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && modal && !modal.hidden) closeManualModal();
+  });
+
+  btnChooseManualPhotos?.addEventListener('click', () => {
+    if (!btnChooseManualPhotos.disabled) manualPicturesInput.click();
+  });
+
+  manualPicturesInput?.addEventListener('change', () => {
+    const files = Array.from(manualPicturesInput.files || []);
+    if (files.length > REQUIRED_PICTURES) {
+      manualPicturesInput.value = '';
+      manualPreviewContainer.innerHTML = '';
+      manualPickedFilesText.textContent = 'No se eligió ningún archivo';
+      setStatus(manualStatusBox, `Solo podés seleccionar ${REQUIRED_PICTURES} fotos exactas.`, 'error');
+      return;
+    }
+
+    if (files.length > 0 && files.length < REQUIRED_PICTURES) {
+      setStatus(manualStatusBox, `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para completar la carga.`, 'error');
+    } else if (files.length === REQUIRED_PICTURES) {
+      setStatus(manualStatusBox, 'Cantidad correcta de fotos lista para subir.', 'success');
+    } else {
+      setStatus(manualStatusBox, '');
+    }
+
+    updateManualPreview();
+  });
+
+  [manualTeamSlug, manualLocalSlug, manualVisitanteSlug].forEach((input) => {
+    input?.addEventListener('blur', () => {
+      input.value = slugify(input.value);
+      syncTeamFromMatch();
+    });
+  });
+
+  btnSubmitManualUpload?.addEventListener('click', submitManualUpload);
   window.addEventListener('beforeunload', revokeBlobCache);
   load();
 })();
