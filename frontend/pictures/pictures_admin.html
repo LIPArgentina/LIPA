@@ -42,7 +42,7 @@
         <p class="hint">La carga manual mantiene la misma estructura de visualización del admin. Elegí la fecha, el equipo y exactamente 9 fotos.</p>
         <p id="manualStatusBox" class="status"></p>
 
-        <div class="form-grid">
+        <div class="form-grid form-grid-2">
           <label class="field">
             <span>Fecha de carga</span>
             <select id="manualFechaISO" aria-label="Fecha de carga manual">
@@ -51,15 +51,9 @@
           </label>
           <label class="field">
             <span>Equipo que sube</span>
-            <input id="manualTeamSlug" type="text" placeholder="ej: takos_tercera" autocomplete="off" />
-          </label>
-          <label class="field">
-            <span>Local</span>
-            <input id="manualLocalSlug" type="text" placeholder="slug equipo local" autocomplete="off" />
-          </label>
-          <label class="field">
-            <span>Visitante</span>
-            <input id="manualVisitanteSlug" type="text" placeholder="slug equipo visitante" autocomplete="off" />
+            <select id="manualTeamSlug" aria-label="Equipo que sube">
+              <option value="">Elegí un equipo</option>
+            </select>
           </label>
         </div>
 
