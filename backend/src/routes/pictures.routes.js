@@ -101,53 +101,6 @@ module.exports = function createPicturesRouter(deps) {
     return null;
   }
 
-  function isTruthyFlag(value) {
-    const v = String(value || '').trim().toLowerCase();
-    return v === '1' || v === 'true' || v === 'yes' || v === 'si' || v === 'sí';
-  }
-
-  function pickUserSlug(user) {
-    return normalizeSlug(user?.slug || user?.team || user?.teamSlug || '');
-  }
-
-  function isAdminUser(user) {
-    const values = [
-      user?.role,
-      user?.tipo,
-      user?.type,
-      user?.userType,
-      user?.kind,
-      ...(Array.isArray(user?.roles) ? user.roles : []),
-      ...(Array.isArray(user?.permissions) ? user.permissions : []),
-    ];
-
-    return values.some((value) => {
-      const v = String(value || '').trim().toLowerCase();
-      return v === 'admin' || v === 'administrator' || v === 'superadmin';
-    });
-  }
-
-  function resolveRequestedTeamSlug(req) {
-    return normalizeSlug(
-      req.body?.teamSlug ||
-      req.body?.team ||
-      req.query?.teamSlug ||
-      req.query?.team ||
-      ''
-    );
-  }
-
-  function isManualAdminUpload(req) {
-    return isAdminUser(req.user) && (isTruthyFlag(req.body?.adminUpload) || isTruthyFlag(req.body?.manualUpload));
-  }
-
-  function resolveUploadTeamSlug(req) {
-    if (isManualAdminUpload(req)) {
-      return resolveRequestedTeamSlug(req);
-    }
-    return pickUserSlug(req.user);
-  }
-
   async function ensureDir(dir) {
     await fs.promises.mkdir(dir, { recursive: true });
   }
@@ -158,34 +111,6 @@ module.exports = function createPicturesRouter(deps) {
       [normalizeSlug(slug)]
     );
     return result.rows[0]?.display_name || slug;
-  }
-
-
-  async function getTeamOptions() {
-    const { rows } = await pool.query(
-      `
-      SELECT display_name, slug_uid, slug_base
-      FROM equipos
-      WHERE COALESCE(display_name, '') <> ''
-        AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '')
-      ORDER BY display_name ASC, id ASC
-      `
-    );
-
-    const seen = new Set();
-    const options = [];
-
-    for (const row of rows) {
-      const teamSlug = normalizeSlug(row.slug_uid || row.slug_base || '');
-      if (!teamSlug || seen.has(teamSlug)) continue;
-      seen.add(teamSlug);
-      options.push({
-        teamSlug,
-        teamName: String(row.display_name || teamSlug).trim()
-      });
-    }
-
-    return options;
   }
 
   async function isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug }) {
@@ -329,7 +254,7 @@ module.exports = function createPicturesRouter(deps) {
     destination: async (req, file, cb) => {
       try {
         const fechaISO = String(req.body?.fechaISO || '').slice(0, 10);
-        const teamSlug = resolveUploadTeamSlug(req) || 'equipo';
+        const teamSlug = normalizeSlug(req.user?.slug || req.body?.teamSlug || 'equipo');
         const teamDir = path.join(picturesRoot, fechaISO || 'sin-fecha', teamSlug);
         await ensureDir(teamDir);
         cb(null, teamDir);
@@ -366,28 +291,24 @@ module.exports = function createPicturesRouter(deps) {
     }
   });
 
-  function runUpload(req, res, next) {
+  router.post('/upload', requireTeam, (req, res, next) => {
     upload.array('pictures', 10)(req, res, (err) => {
       if (err) return res.status(400).json({ ok: false, error: err.message || 'No se pudo subir el archivo' });
       next();
     });
-  }
-
-  async function handleUpload(req, res, { adminMode = false } = {}) {
+  }, async (req, res) => {
     try {
       const fechaISO = String(req.body?.fechaISO || '').slice(0, 10);
       const localSlug = normalizeSlug(req.body?.localSlug || '');
       const visitanteSlug = normalizeSlug(req.body?.visitanteSlug || '');
-      const teamSlug = resolveUploadTeamSlug(req);
+      const teamSlug = normalizeSlug(req.user?.slug || '');
       const files = Array.isArray(req.files) ? req.files : [];
-      const manualAdminUpload = adminMode || isManualAdminUpload(req);
 
       console.log('[pictures] upload:start', {
         fechaISO,
         localSlug,
         visitanteSlug,
         teamSlug,
-        manualAdminUpload,
         filesCount: files.length,
         files: files.map(file => ({
           originalname: file?.originalname,
@@ -398,15 +319,7 @@ module.exports = function createPicturesRouter(deps) {
         }))
       });
 
-      if (!fechaISO) {
-        return res.status(400).json({ ok: false, error: 'Falta la fecha de carga' });
-      }
-
-      if (!teamSlug) {
-        return res.status(400).json({ ok: false, error: manualAdminUpload ? 'Falta el teamSlug para la carga manual' : 'No se pudo identificar el equipo' });
-      }
-
-      if (!manualAdminUpload && (!localSlug || !visitanteSlug)) {
+      if (!fechaISO || !localSlug || !visitanteSlug) {
         return res.status(400).json({ ok: false, error: 'Faltan datos del cruce' });
       }
 
@@ -432,14 +345,12 @@ module.exports = function createPicturesRouter(deps) {
         });
       }
 
-      if (!manualAdminUpload) {
-        const allowed = await isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug: teamSlug });
-        if (!allowed) {
-          for (const file of files) {
-            try { await fs.promises.unlink(file.path); } catch (_) {}
-          }
-          return res.status(403).json({ ok: false, error: 'Solo podés subir fotos cuando el cruce ya esté validado por ambos equipos' });
+      const allowed = await isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug: teamSlug });
+      if (!allowed) {
+        for (const file of files) {
+          try { await fs.promises.unlink(file.path); } catch (_) {}
         }
+        return res.status(403).json({ ok: false, error: 'Solo podés subir fotos cuando el cruce ya esté validado por ambos equipos' });
       }
 
       const normalizedFiles = [];
@@ -477,14 +388,6 @@ module.exports = function createPicturesRouter(deps) {
       console.error('POST /api/pictures/upload', err);
       return res.status(500).json({ ok: false, error: err?.message || 'No se pudieron guardar las fotos' });
     }
-  }
-
-  router.post('/upload', requireTeam, runUpload, async (req, res) => {
-    return handleUpload(req, res, { adminMode: false });
-  });
-
-  router.post('/admin/upload', requireAdmin, runUpload, async (req, res) => {
-    return handleUpload(req, res, { adminMode: true });
   });
 
   router.get('/my', requireTeam, async (req, res) => {
@@ -523,16 +426,6 @@ module.exports = function createPicturesRouter(deps) {
       return res.download(fullPath, filename);
     } catch {
       return res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
-    }
-  });
-
-  router.get('/admin/teams', requireAdmin, async (_req, res) => {
-    try {
-      const teams = await getTeamOptions();
-      return res.json({ ok: true, teams });
-    } catch (err) {
-      console.error('GET /api/pictures/admin/teams', err);
-      return res.status(500).json({ ok: false, error: 'No se pudo listar los equipos' });
     }
   });
 

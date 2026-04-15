@@ -11,68 +11,14 @@
     <div class="topbar">
       <a class="btn" href="../admin.html">VOLVER</a>
       <h1>Pictures</h1>
-      <div class="topbar-actions">
-        <label class="filter-chip" for="fechaFilter">
-          <span>FECHA</span>
-          <select id="fechaFilter" aria-label="Filtrar por fecha">
-            <option value="">TODAS</option>
-          </select>
-        </label>
-        <button class="btn btn-gold" id="btnManualUpload" type="button">CARGA MANUAL</button>
-        <button class="btn" id="btnReload" type="button">RECARGAR</button>
-      </div>
+      <button class="btn" id="btnReload" type="button">RECARGAR</button>
     </div>
 
     <section class="card">
-      <p class="hint">Desde acá podés ver miniaturas por fecha y equipo, filtrar por fecha, descargar todo en un ZIP, vaciar la carpeta cuando ya la bajaste y hacer una carga manual si un equipo tuvo problemas.</p>
-      <div id="adminStatus" class="status"></div>
+      <p class="hint">Desde acá podés ver miniaturas por fecha y equipo, descargar todo en un ZIP y vaciar la carpeta cuando ya la bajaste.</p>
       <div id="adminList" class="list"></div>
     </section>
   </main>
-
-  <div class="modal" id="manualUploadModal" hidden>
-    <div class="modal-backdrop" data-close-modal="1"></div>
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="manualUploadTitle">
-      <div class="modal-header">
-        <h2 id="manualUploadTitle">Carga manual de fotos</h2>
-        <button class="icon-btn" id="btnCloseManualUpload" type="button" aria-label="Cerrar">×</button>
-      </div>
-
-      <div class="modal-body">
-        <p class="hint">La carga manual mantiene la misma estructura de visualización del admin. Elegí la fecha, el equipo y exactamente 9 fotos.</p>
-        <p id="manualStatusBox" class="status"></p>
-
-        <div class="form-grid form-grid-2">
-          <label class="field">
-            <span>Fecha de carga</span>
-            <select id="manualFechaISO" aria-label="Fecha de carga manual">
-              <option value="">Elegí una fecha</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Equipo que sube</span>
-            <select id="manualTeamSlug" aria-label="Equipo que sube">
-              <option value="">Elegí un equipo</option>
-            </select>
-          </label>
-        </div>
-
-        <label class="file-label" for="manualPicturesInput">Elegí exactamente 9 fotos</label>
-        <input id="manualPicturesInput" type="file" accept="image/*" multiple hidden />
-        <div class="picker-row">
-          <button class="btn btn-gold" id="btnChooseManualPhotos" type="button">ELEGIR FOTOS</button>
-          <span id="manualPickedFilesText" class="muted">No se eligió ningún archivo</span>
-        </div>
-
-        <div id="manualPreviewContainer" class="preview-grid"></div>
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn" id="btnCancelManualUpload" type="button">CANCELAR</button>
-        <button class="btn btn-gold" id="btnSubmitManualUpload" type="button">SUBIR FOTOS</button>
-      </div>
-    </div>
-  </div>
 
   <script src="../config.js"></script>
   <script src="./pictures_admin.js"></script>

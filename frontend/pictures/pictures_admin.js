@@ -1,30 +1,9 @@
+
 (function(){
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const adminList = document.getElementById('adminList');
-  const adminStatus = document.getElementById('adminStatus');
   const btnReload = document.getElementById('btnReload');
-  const btnManualUpload = document.getElementById('btnManualUpload');
-  const fechaFilter = document.getElementById('fechaFilter');
-
-  const modal = document.getElementById('manualUploadModal');
-  const btnCloseManualUpload = document.getElementById('btnCloseManualUpload');
-  const btnCancelManualUpload = document.getElementById('btnCancelManualUpload');
-  const btnChooseManualPhotos = document.getElementById('btnChooseManualPhotos');
-  const btnSubmitManualUpload = document.getElementById('btnSubmitManualUpload');
-
-  const manualPicturesInput = document.getElementById('manualPicturesInput');
-  const manualPickedFilesText = document.getElementById('manualPickedFilesText');
-  const manualPreviewContainer = document.getElementById('manualPreviewContainer');
-  const manualStatusBox = document.getElementById('manualStatusBox');
-  const manualFechaISO = document.getElementById('manualFechaISO');
-  const manualTeamSlug = document.getElementById('manualTeamSlug');
-
   const blobUrlCache = new Map();
-  const REQUIRED_PICTURES = 9;
-
-  let allGroups = [];
-  let availableDates = [];
-  let availableTeams = [];
 
   function getToken() {
     try {
@@ -48,30 +27,13 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/\"/g, '&quot;')
+      .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-  }
-
-  function slugify(value) {
-    return String(value || '')
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/-{2,}/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
-
-  function setStatus(node, text, type = '') {
-    if (!node) return;
-    node.textContent = text || '';
-    node.className = 'status' + (type ? ' ' + type : '');
   }
 
   function revokeBlobCache() {
     for (const url of blobUrlCache.values()) {
-      try { URL.revokeObjectURL(url); } catch (_) {}
+      try { URL.revokeObjectURL(url); } catch {}
     }
     blobUrlCache.clear();
   }
@@ -101,18 +63,6 @@
       out.push(v);
     });
     return out;
-  }
-
-  function compareDateDesc(a, b) {
-    return String(b || '').localeCompare(String(a || ''));
-  }
-
-  function compareTeams(a, b) {
-    return String(a?.teamName || a?.label || a?.teamSlug || '').localeCompare(
-      String(b?.teamName || b?.label || b?.teamSlug || ''),
-      'es',
-      { sensitivity: 'base' }
-    );
   }
 
   function buildImageCandidates(item, card) {
@@ -146,7 +96,10 @@
       );
     }
 
-    return unique([...directCandidates, ...fileParamCandidates]);
+    return unique([
+      ...directCandidates,
+      ...fileParamCandidates
+    ]);
   }
 
   async function fetchBlobUrl(resourceUrl) {
@@ -164,7 +117,7 @@
       try {
         const data = await res.json();
         msg = data?.error || data?.msg || msg;
-      } catch (_) {}
+      } catch {}
       throw new Error(msg);
     }
 
@@ -186,34 +139,6 @@
     throw lastError || new Error('No se pudo cargar la imagen.');
   }
 
-  async function fetchJson(url, options = {}) {
-    const res = await fetch(url, {
-      credentials: 'include',
-      cache: 'no-store',
-      headers: authHeaders(options.headers || {}),
-      ...options
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || data?.msg || ('HTTP ' + res.status));
-    }
-    return data;
-  }
-
-  async function readErrorMessage(response, fallbackMessage) {
-    try {
-      const data = await response.json();
-      return data?.error || data?.message || fallbackMessage;
-    } catch (_) {
-      try {
-        const text = await response.text();
-        return text || fallbackMessage;
-      } catch (_) {
-        return fallbackMessage;
-      }
-    }
-  }
-
   async function downloadGroupZip(fechaISO, teamSlug, zipFilename) {
     const url = new URL(API_BASE + '/api/pictures/admin/group-download');
     url.searchParams.set('fechaISO', fechaISO);
@@ -230,7 +155,7 @@
       try {
         const data = await res.json();
         msg = data?.error || data?.msg || msg;
-      } catch (_) {}
+      } catch {}
       alert(msg);
       return;
     }
@@ -246,89 +171,9 @@
     setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
 
-  async function fetchFixtureDates() {
-    const categories = ['segunda', 'tercera'];
-    const kinds = ['ida', 'vuelta'];
-    const dates = new Set();
-    let hadSuccess = false;
-
-    await Promise.all(categories.flatMap(category => kinds.map(async (kind) => {
-      try {
-        const url = API_BASE + '/api/fixture?kind=' + encodeURIComponent(kind) + '&category=' + encodeURIComponent(category);
-        const data = await fetchJson(url);
-        const fechas = Array.isArray(data?.data?.fechas) ? data.data.fechas : [];
-        if (fechas.length) hadSuccess = true;
-        fechas.forEach((fecha) => {
-          const raw = String(fecha?.date || fecha?.fecha || fecha?.fechaISO || '').trim();
-          const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-          if (match) dates.add(match[1]);
-        });
-      } catch (_) {}
-    })));
-
-    return {
-      dates: [...dates].sort(compareDateDesc),
-      hadSuccess
-    };
-  }
-
-  async function fetchAvailableTeamsFromBackend() {
-    try {
-      const data = await fetchJson(API_BASE + '/api/pictures/admin/teams');
-      const teams = Array.isArray(data?.teams) ? data.teams : [];
-      return teams.map((team) => ({
-        teamSlug: slugify(team?.teamSlug || team?.slug || team?.value || ''),
-        teamName: String(team?.teamName || team?.displayName || team?.label || team?.name || team?.teamSlug || team?.slug || '').trim()
-      })).filter(team => team.teamSlug);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  async function refreshAvailableTeams(groups) {
-    const backendTeams = await fetchAvailableTeamsFromBackend();
-
-    const groupedTeams = unique((groups || []).map(group => String(group?.teamSlug || '').trim()))
-      .map((teamSlug) => {
-        const group = (groups || []).find(item => String(item?.teamSlug || '').trim() === teamSlug);
-        return {
-          teamSlug,
-          teamName: String(group?.teamName || teamSlug).trim()
-        };
-      });
-
-    const mergedMap = new Map();
-    [...backendTeams, ...groupedTeams].forEach((team) => {
-      const key = slugify(team?.teamSlug);
-      if (!key) return;
-      const current = mergedMap.get(key);
-      if (!current || (!current.teamName && team.teamName) || current.teamName === current.teamSlug) {
-        mergedMap.set(key, {
-          teamSlug: key,
-          teamName: String(team?.teamName || key).trim()
-        });
-      }
-    });
-
-    availableTeams = [...mergedMap.values()].sort(compareTeams);
-
-    if (!manualTeamSlug) return;
-    const currentValue = String(manualTeamSlug.value || '').trim();
-    const options = ['<option value="">Elegí un equipo</option>']
-      .concat(
-        availableTeams.map((team) => (
-          `<option value="${escapeHtml(team.teamSlug)}">${escapeHtml(team.teamName)} - ${escapeHtml(team.teamSlug)}</option>`
-        ))
-      );
-    manualTeamSlug.innerHTML = options.join('');
-    if (currentValue && availableTeams.some(team => team.teamSlug === currentValue)) {
-      manualTeamSlug.value = currentValue;
-    }
-  }
-
   function renderGroups(groups) {
     if (!groups.length) {
-      adminList.innerHTML = '<p class="muted">No hay fotos cargadas para el filtro seleccionado.</p>';
+      adminList.innerHTML = '<p class="muted">No hay fotos cargadas.</p>';
       return;
     }
 
@@ -364,7 +209,6 @@
               <div class="muted">${itemCount} foto${itemCount === 1 ? '' : 's'}</div>
             </div>
             <div class="group-actions">
-              <button class="btn btn-gold" type="button" data-prefill-manual="1">REPETIR CARGA</button>
               <button class="btn" type="button" data-download-zip="1">DESCARGAR ZIP</button>
               <button class="btn btn-danger" type="button" data-empty-folder="1">VACIAR CONTENIDO</button>
             </div>
@@ -381,222 +225,40 @@
       let candidates = [];
       try {
         candidates = JSON.parse(img.dataset.thumbCandidates || '[]');
-      } catch (_) {}
+      } catch {}
       if (!Array.isArray(candidates) || !candidates.length) return;
 
       try {
         img.src = await fetchFirstAvailableBlobUrl(candidates);
-      } catch (_) {
+      } catch {
         img.alt = 'No se pudo cargar la miniatura';
         img.closest('.thumb-btn')?.classList.add('thumb-failed');
       }
     }));
   }
 
-  function getFilteredGroups() {
-    const selectedDate = String(fechaFilter?.value || '').trim();
-    if (!selectedDate) return allGroups.slice();
-    return allGroups.filter(group => String(group?.fechaISO || '').slice(0, 10) === selectedDate);
-  }
-
-  async function renderCurrentGroups() {
-    revokeBlobCache();
-    renderGroups(getFilteredGroups());
-    await hydrateThumbs();
-  }
-
-  function fillSelectOptions(selectNode, dates, placeholderLabel, includeEmpty) {
-    if (!selectNode) return;
-    const currentValue = String(selectNode.value || '').trim();
-    const optionHtml = [];
-    if (includeEmpty) optionHtml.push(`<option value="">${escapeHtml(placeholderLabel)}</option>`);
-    dates.forEach((date) => {
-      optionHtml.push(`<option value="${escapeHtml(date)}">${escapeHtml(date)}</option>`);
-    });
-    selectNode.innerHTML = optionHtml.join('');
-    if (currentValue && dates.includes(currentValue)) {
-      selectNode.value = currentValue;
-    } else if (includeEmpty) {
-      selectNode.value = '';
-    } else if (dates.length) {
-      selectNode.value = dates[0];
-    }
-  }
-
-  async function refreshAvailableDates(groups) {
-    const groupDates = unique((groups || []).map(group => String(group?.fechaISO || '').slice(0, 10))).sort(compareDateDesc);
-    const fixtureResult = await fetchFixtureDates().catch(() => ({ dates: [], hadSuccess: false }));
-    const fixtureDates = Array.isArray(fixtureResult?.dates) ? fixtureResult.dates : [];
-
-    const today = new Date();
-    const todayISO = [
-      today.getFullYear(),
-      String(today.getMonth() + 1).padStart(2, '0'),
-      String(today.getDate()).padStart(2, '0')
-    ].join('-');
-
-    availableDates = unique([...fixtureDates, ...groupDates, todayISO]).sort(compareDateDesc);
-
-    fillSelectOptions(fechaFilter, availableDates, 'TODAS', true);
-    fillSelectOptions(manualFechaISO, availableDates, 'Elegí una fecha', true);
-
-    if (!manualFechaISO.value) {
-      manualFechaISO.value = groupDates[0] || todayISO;
-    }
-
-    if (!fixtureResult?.hadSuccess && !groupDates.length) {
-      setStatus(
-        manualStatusBox,
-        'No se pudieron traer las fechas del fixture en staging. Podés seguir usando la fecha de hoy como carga manual.',
-        'info'
-      );
-    }
-  }
-
   async function load() {
-    setStatus(adminStatus, 'Cargando…', 'info');
-
-    try {
-      const data = await fetchJson(API_BASE + '/api/pictures/admin/list');
-      allGroups = Array.isArray(data.groups) ? data.groups : [];
-      await refreshAvailableDates(allGroups);
-      await refreshAvailableTeams(allGroups);
-      await renderCurrentGroups();
-      setStatus(adminStatus, allGroups.length ? '' : 'No hay fotos cargadas.', allGroups.length ? '' : 'info');
-    } catch (err) {
-      adminList.innerHTML = `<p class="muted">${escapeHtml(err?.message || 'No se pudieron cargar las fotos.')}</p>`;
-      setStatus(adminStatus, err?.message || 'No se pudieron cargar las fotos.', 'error');
-    }
-  }
-
-  function openManualModal(prefill = {}) {
-    if (prefill.fechaISO && availableDates.includes(String(prefill.fechaISO).slice(0, 10))) {
-      manualFechaISO.value = String(prefill.fechaISO).slice(0, 10);
-    }
-    if (prefill.teamSlug) {
-      const normalized = slugify(prefill.teamSlug);
-      if (availableTeams.some(team => team.teamSlug === normalized)) {
-        manualTeamSlug.value = normalized;
-      }
-    }
-
-    modal.hidden = false;
-    document.body.classList.add('modal-open');
-    setStatus(manualStatusBox, 'Completá los datos y elegí exactamente 9 fotos.', 'info');
-    setTimeout(() => manualFechaISO?.focus(), 0);
-  }
-
-  function closeManualModal() {
-    modal.hidden = true;
-    document.body.classList.remove('modal-open');
-  }
-
-  function resetManualForm(options = {}) {
-    if (!options.keepPrefill) {
-      manualFechaISO.value = '';
-      manualTeamSlug.value = '';
-    }
-    manualPicturesInput.value = '';
-    manualPreviewContainer.innerHTML = '';
-    manualPickedFilesText.textContent = 'No se eligió ningún archivo';
-    setStatus(manualStatusBox, '');
-  }
-
-  function updateManualPreview() {
-    const files = Array.from(manualPicturesInput.files || []);
-    manualPreviewContainer.innerHTML = '';
-
-    if (!files.length) {
-      manualPickedFilesText.textContent = 'No se eligió ningún archivo';
-      return;
-    }
-
-    manualPickedFilesText.textContent = `${files.length} / ${REQUIRED_PICTURES} fotos seleccionadas`;
-
-    files.forEach(file => {
-      if (!String(file.type || '').startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = document.createElement('img');
-        img.className = 'preview-img';
-        img.src = event.target?.result || '';
-        img.alt = file.name;
-        manualPreviewContainer.appendChild(img);
-      };
-      reader.readAsDataURL(file);
+    revokeBlobCache();
+    adminList.innerHTML = '<p class="muted">Cargando…</p>';
+    const res = await fetch(API_BASE + '/api/pictures/admin/list', {
+      headers: authHeaders(),
+      credentials: 'include',
+      cache: 'no-store'
     });
-  }
-
-  function validateManualFields() {
-    const fechaISO = String(manualFechaISO.value || '').slice(0, 10);
-    const teamSlug = slugify(manualTeamSlug.value);
-    const files = Array.from(manualPicturesInput.files || []);
-
-    if (!fechaISO) return { ok: false, message: 'Elegí la fecha de carga.', type: 'error' };
-    if (!teamSlug) return { ok: false, message: 'Elegí el equipo que sube las fotos.', type: 'error' };
-    if (files.length !== REQUIRED_PICTURES) {
-      return {
-        ok: false,
-        message: files.length < REQUIRED_PICTURES
-          ? `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para poder enviar.`
-          : `Solo se permiten ${REQUIRED_PICTURES} fotos por carga.`,
-        type: 'error'
-      };
-    }
-
-    return { ok: true, data: { fechaISO, teamSlug, files } };
-  }
-
-  async function submitManualUpload() {
-    const validation = validateManualFields();
-    if (!validation.ok) {
-      setStatus(manualStatusBox, validation.message, validation.type);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.ok) {
+      adminList.innerHTML = `<p class="muted">${data?.error || 'No se pudieron cargar las fotos.'}</p>`;
       return;
     }
 
-    const { fechaISO, teamSlug, files } = validation.data;
-    const body = new FormData();
-    body.append('fechaISO', fechaISO);
-    body.append('teamSlug', teamSlug);
-    body.append('team', teamSlug);
-    body.append('manualUpload', '1');
-    body.append('adminUpload', '1');
-    for (const file of files) body.append('pictures', file);
+    const groups = Array.isArray(data.groups)
+      ? data.groups
+      : Array.isArray(data.items)
+        ? []
+        : [];
 
-    btnSubmitManualUpload.disabled = true;
-    btnChooseManualPhotos.disabled = true;
-    setStatus(manualStatusBox, 'Subiendo fotos…', 'info');
-
-    try {
-      const res = await fetch(API_BASE + '/api/pictures/admin/upload', {
-        method: 'POST',
-        headers: authHeaders(),
-        credentials: 'include',
-        body
-      });
-
-      if (!res.ok) {
-        const fallback = res.status === 502
-          ? 'El backend devolvió 502 al subir las fotos. Revisá el deploy/logs del backend en staging.'
-          : 'No se pudieron subir las fotos.';
-        throw new Error(await readErrorMessage(res, fallback));
-      }
-
-      const data = await res.json().catch(() => ({}));
-      if (!data?.ok) {
-        throw new Error(data?.error || 'No se pudieron subir las fotos.');
-      }
-
-      setStatus(manualStatusBox, 'Las 9 fotos se subieron correctamente.', 'success');
-      setStatus(adminStatus, `Carga manual completada para ${teamSlug} · ${fechaISO}.`, 'success');
-      resetManualForm({ keepPrefill: true });
-      await load();
-    } catch (err) {
-      setStatus(manualStatusBox, err?.message || 'No se pudieron subir las fotos.', 'error');
-    } finally {
-      btnSubmitManualUpload.disabled = false;
-      btnChooseManualPhotos.disabled = false;
-    }
+    renderGroups(groups);
+    await hydrateThumbs();
   }
 
   adminList?.addEventListener('click', async (ev) => {
@@ -608,7 +270,7 @@
       let candidates = [];
       try {
         candidates = JSON.parse(openBtn.dataset.openImgCandidates || '[]');
-      } catch (_) {}
+      } catch {}
       if (!Array.isArray(candidates) || !candidates.length) return;
       try {
         const blobUrl = await fetchFirstAvailableBlobUrl(candidates);
@@ -616,16 +278,6 @@
       } catch (err) {
         alert(err?.message || 'No se pudo abrir la imagen.');
       }
-      return;
-    }
-
-    const prefillBtn = ev.target.closest('[data-prefill-manual]');
-    if (prefillBtn) {
-      resetManualForm();
-      openManualModal({
-        fechaISO: card.dataset.fecha || '',
-        teamSlug: card.dataset.team || ''
-      });
       return;
     }
 
@@ -654,62 +306,11 @@
         alert(data?.error || 'No se pudo vaciar la carpeta.');
         return;
       }
-      await load();
+      load();
     }
-  });
-
-  fechaFilter?.addEventListener('change', async () => {
-    await renderCurrentGroups();
   });
 
   btnReload?.addEventListener('click', load);
-
-  btnManualUpload?.addEventListener('click', () => {
-    resetManualForm();
-    openManualModal();
-  });
-
-  btnCloseManualUpload?.addEventListener('click', closeManualModal);
-  btnCancelManualUpload?.addEventListener('click', closeManualModal);
-
-  modal?.addEventListener('click', (ev) => {
-    if (ev.target?.matches('[data-close-modal]')) closeManualModal();
-  });
-
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && modal && !modal.hidden) closeManualModal();
-  });
-
-  btnChooseManualPhotos?.addEventListener('click', () => {
-    if (!btnChooseManualPhotos.disabled) manualPicturesInput.click();
-  });
-
-  manualPicturesInput?.addEventListener('change', () => {
-    const files = Array.from(manualPicturesInput.files || []);
-    if (files.length > REQUIRED_PICTURES) {
-      manualPicturesInput.value = '';
-      manualPreviewContainer.innerHTML = '';
-      manualPickedFilesText.textContent = 'No se eligió ningún archivo';
-      setStatus(manualStatusBox, `Solo podés seleccionar ${REQUIRED_PICTURES} fotos exactas.`, 'error');
-      return;
-    }
-
-    if (files.length > 0 && files.length < REQUIRED_PICTURES) {
-      setStatus(manualStatusBox, `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para completar la carga.`, 'error');
-    } else if (files.length === REQUIRED_PICTURES) {
-      setStatus(manualStatusBox, 'Cantidad correcta de fotos lista para subir.', 'success');
-    } else {
-      setStatus(manualStatusBox, '');
-    }
-
-    updateManualPreview();
-  });
-
-  manualTeamSlug?.addEventListener('change', () => {
-    manualTeamSlug.value = slugify(manualTeamSlug.value);
-  });
-
-  btnSubmitManualUpload?.addEventListener('click', submitManualUpload);
   window.addEventListener('beforeunload', revokeBlobCache);
   load();
 })();
