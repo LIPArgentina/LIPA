@@ -160,6 +160,34 @@ module.exports = function createPicturesRouter(deps) {
     return result.rows[0]?.display_name || slug;
   }
 
+
+  async function getTeamOptions() {
+    const { rows } = await pool.query(
+      `
+      SELECT display_name, slug_uid, slug_base
+      FROM equipos
+      WHERE COALESCE(display_name, '') <> ''
+        AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '')
+      ORDER BY display_name ASC, id ASC
+      `
+    );
+
+    const seen = new Set();
+    const options = [];
+
+    for (const row of rows) {
+      const teamSlug = normalizeSlug(row.slug_uid || row.slug_base || '');
+      if (!teamSlug || seen.has(teamSlug)) continue;
+      seen.add(teamSlug);
+      options.push({
+        teamSlug,
+        teamName: String(row.display_name || teamSlug).trim()
+      });
+    }
+
+    return options;
+  }
+
   async function isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug }) {
     const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
     if (!teamKey) return false;
@@ -498,6 +526,16 @@ module.exports = function createPicturesRouter(deps) {
     }
   });
 
+  router.get('/admin/teams', requireAdmin, async (_req, res) => {
+    try {
+      const teams = await getTeamOptions();
+      return res.json({ ok: true, teams });
+    } catch (err) {
+      console.error('GET /api/pictures/admin/teams', err);
+      return res.status(500).json({ ok: false, error: 'No se pudo listar los equipos' });
+    }
+  });
+
   router.get('/admin/list', requireAdmin, async (_req, res) => {
     try {
       await ensureDir(picturesRoot);
@@ -550,31 +588,6 @@ module.exports = function createPicturesRouter(deps) {
     } catch (err) {
       console.error('GET /api/pictures/admin/list', err);
       return res.status(500).json({ ok: false, error: 'No se pudieron listar las fotos' });
-    }
-  });
-
-  router.get('/admin/teams', requireAdmin, async (_req, res) => {
-    try {
-      const result = await pool.query(`
-        SELECT DISTINCT
-          LOWER(COALESCE(NULLIF(slug_uid, ''), NULLIF(slug_base, ''))) AS slug,
-          COALESCE(NULLIF(display_name, ''), NULLIF(slug_uid, ''), NULLIF(slug_base, '')) AS display_name
-        FROM equipos
-        WHERE COALESCE(NULLIF(slug_uid, ''), NULLIF(slug_base, '')) IS NOT NULL
-        ORDER BY display_name ASC
-      `);
-
-      const teams = result.rows
-        .map((row) => ({
-          slug: normalizeSlug(row.slug),
-          displayName: String(row.display_name || row.slug || '').trim()
-        }))
-        .filter((row) => row.slug);
-
-      return res.json({ ok: true, teams });
-    } catch (err) {
-      console.error('GET /api/pictures/admin/teams', err);
-      return res.status(500).json({ ok: false, error: 'No se pudieron listar los equipos' });
     }
   });
 

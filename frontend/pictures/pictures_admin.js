@@ -12,10 +12,14 @@
   const btnSubmitManualUpload = document.getElementById('btnSubmitManualUpload');
   const manualPicturesInput = document.getElementById('manualPicturesInput');
   const manualPickedFilesText = document.getElementById('manualPickedFilesText');
+  const manualLocalSlug = document.getElementById('manualLocalSlug');
+  const manualVisitanteSlug = document.getElementById('manualVisitanteSlug');
   const manualPreviewContainer = document.getElementById('manualPreviewContainer');
   const manualStatusBox = document.getElementById('manualStatusBox');
   const manualFechaISO = document.getElementById('manualFechaISO');
   const manualTeamSlug = document.getElementById('manualTeamSlug');
+  const manualLocalSlug = document.getElementById('manualLocalSlug');
+  const manualVisitanteSlug = document.getElementById('manualVisitanteSlug');
   const blobUrlCache = new Map();
   const REQUIRED_PICTURES = 9;
   let allGroups = [];
@@ -46,6 +50,17 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function slugify(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
   function setStatus(node, text, type = '') {
@@ -96,6 +111,7 @@
     const fechaISO = card?.dataset?.fecha || '';
     const teamSlug = card?.dataset?.team || '';
     const filename = item?.filename || item?.name || item?.basename || '';
+
     const filePath = item?.filePath || item?.relativePath || item?.path || buildFilePath(fechaISO, teamSlug, filename);
 
     const directCandidates = [
@@ -122,7 +138,10 @@
       );
     }
 
-    return unique([...directCandidates, ...fileParamCandidates]);
+    return unique([
+      ...directCandidates,
+      ...fileParamCandidates
+    ]);
   }
 
   async function fetchBlobUrl(resourceUrl) {
@@ -174,6 +193,20 @@
       throw new Error(data?.error || data?.msg || ('HTTP ' + res.status));
     }
     return data;
+  }
+
+  async function readErrorMessage(response, fallbackMessage) {
+    try {
+      const data = await response.json();
+      return data?.error || data?.message || fallbackMessage;
+    } catch (_) {
+      try {
+        const text = await response.text();
+        return text || fallbackMessage;
+      } catch (_) {
+        return fallbackMessage;
+      }
+    }
   }
 
   async function downloadGroupZip(fechaISO, teamSlug, zipFilename) {
@@ -229,45 +262,6 @@
     return [...dates].sort(compareDateDesc);
   }
 
-  async function fetchTeams() {
-    try {
-      const data = await fetchJson(API_BASE + '/api/pictures/admin/teams');
-      return Array.isArray(data?.teams) ? data.teams : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function fillSelectOptions(selectNode, values, placeholderLabel, includeEmpty) {
-    if (!selectNode) return;
-    const currentValue = String(selectNode.value || '').trim();
-    const optionHtml = [];
-    if (includeEmpty) optionHtml.push(`<option value="">${escapeHtml(placeholderLabel)}</option>`);
-    values.forEach((value) => {
-      optionHtml.push(`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
-    });
-    selectNode.innerHTML = optionHtml.join('');
-    if (currentValue && values.includes(currentValue)) selectNode.value = currentValue;
-    else if (includeEmpty) selectNode.value = '';
-    else if (values.length) selectNode.value = values[0];
-  }
-
-  function fillTeamOptions(selectNode, teams, placeholderLabel) {
-    if (!selectNode) return;
-    const currentValue = String(selectNode.value || '').trim();
-    const options = [`<option value="">${escapeHtml(placeholderLabel)}</option>`];
-    teams.forEach((team) => {
-      const slug = String(team?.slug || '').trim();
-      if (!slug) return;
-      const displayName = String(team?.displayName || slug).trim();
-      const label = displayName === slug ? slug : `${displayName} · ${slug}`;
-      options.push(`<option value="${escapeHtml(slug)}">${escapeHtml(label)}</option>`);
-    });
-    selectNode.innerHTML = options.join('');
-    if (currentValue && teams.some((team) => String(team?.slug || '') === currentValue)) selectNode.value = currentValue;
-    else selectNode.value = '';
-  }
-
   function renderGroups(groups) {
     if (!groups.length) {
       adminList.innerHTML = '<p class="muted">No hay fotos cargadas para el filtro seleccionado.</p>';
@@ -285,7 +279,7 @@
         });
 
         return `
-          <button class="thumb-btn" type="button" data-open-img-candidates="${escapeHtml(JSON.stringify(candidates))}">
+          <button class="thumb-btn" type="button" data-open-img-candidates="${escapeHtml(JSON.stringify(candidates))}" data-open-title="${escapeHtml(item.filename || item.name || '')}">
             <img
               class="thumb-img"
               src=""
@@ -321,12 +315,16 @@
     const imgs = Array.from(adminList.querySelectorAll('img[data-thumb-candidates]'));
     await Promise.all(imgs.map(async (img) => {
       let candidates = [];
-      try { candidates = JSON.parse(img.dataset.thumbCandidates || '[]'); } catch {}
+      try {
+        candidates = JSON.parse(img.dataset.thumbCandidates || '[]');
+      } catch {}
       if (!Array.isArray(candidates) || !candidates.length) return;
+
       try {
         img.src = await fetchFirstAvailableBlobUrl(candidates);
       } catch {
         img.alt = 'No se pudo cargar la miniatura';
+        img.closest('.thumb-btn')?.classList.add('thumb-failed');
       }
     }));
   }
@@ -343,6 +341,26 @@
     await hydrateThumbs();
   }
 
+  function fillSelectOptions(selectNode, dates, placeholderLabel, includeEmpty) {
+    if (!selectNode) return;
+    const currentValue = String(selectNode.value || '').trim();
+    const optionHtml = [];
+    if (includeEmpty) {
+      optionHtml.push(`<option value="">${escapeHtml(placeholderLabel)}</option>`);
+    }
+    dates.forEach((date) => {
+      optionHtml.push(`<option value="${escapeHtml(date)}">${escapeHtml(date)}</option>`);
+    });
+    selectNode.innerHTML = optionHtml.join('');
+    if (currentValue && dates.includes(currentValue)) {
+      selectNode.value = currentValue;
+    } else if (includeEmpty) {
+      selectNode.value = '';
+    } else if (dates.length) {
+      selectNode.value = dates[0];
+    }
+  }
+
   async function refreshAvailableDates(groups) {
     const groupDates = unique((groups || []).map(group => String(group?.fechaISO || '').slice(0, 10))).sort(compareDateDesc);
     const fixtureDates = await fetchFixtureDates();
@@ -351,21 +369,19 @@
     fillSelectOptions(manualFechaISO, availableDates, 'Elegí una fecha', true);
   }
 
-  async function refreshTeamOptions() {
-    availableTeams = await fetchTeams();
-    fillTeamOptions(manualTeamSlug, availableTeams, 'Elegí un equipo');
-  }
-
   async function load() {
     setStatus(adminStatus, 'Cargando…', 'info');
-    try {
-      const [listData] = await Promise.all([
-        fetchJson(API_BASE + '/api/pictures/admin/list'),
-        refreshTeamOptions()
-      ]);
 
-      allGroups = Array.isArray(listData.groups) ? listData.groups : [];
+    try {
+      const data = await fetchJson(API_BASE + '/api/pictures/admin/list');
+      allGroups = Array.isArray(data.groups)
+        ? data.groups
+        : Array.isArray(data.items)
+          ? []
+          : [];
+
       await refreshAvailableDates(allGroups);
+      await refreshAvailableTeams(allGroups);
       await renderCurrentGroups();
       setStatus(adminStatus, allGroups.length ? '' : 'No hay fotos cargadas.', allGroups.length ? '' : 'info');
     } catch (err) {
@@ -379,6 +395,7 @@
       manualFechaISO.value = String(prefill.fechaISO).slice(0, 10);
     }
     if (prefill.teamSlug) manualTeamSlug.value = String(prefill.teamSlug).trim();
+
     modal.hidden = false;
     document.body.classList.add('modal-open');
     setStatus(manualStatusBox, 'Completá los datos y elegí exactamente 9 fotos.', 'info');
@@ -394,6 +411,8 @@
     if (!options.keepPrefill) {
       manualFechaISO.value = '';
       manualTeamSlug.value = '';
+      if (manualLocalSlug) manualLocalSlug.value = '';
+      if (manualVisitanteSlug) manualVisitanteSlug.value = '';
     }
     manualPicturesInput.value = '';
     manualPreviewContainer.innerHTML = '';
@@ -428,7 +447,7 @@
 
   function validateManualFields() {
     const fechaISO = String(manualFechaISO.value || '').slice(0, 10);
-    const teamSlug = String(manualTeamSlug.value || '').trim();
+    const teamSlug = slugify(manualTeamSlug.value);
     const files = Array.from(manualPicturesInput.files || []);
 
     if (!fechaISO) return { ok: false, message: 'Elegí la fecha de carga.', type: 'error' };
@@ -473,8 +492,18 @@
         credentials: 'include',
         body
       });
+
+      if (!res.ok) {
+        const fallback = res.status === 502
+          ? 'El backend devolvió 502 al subir las fotos. Revisá el deploy/logs del backend en staging.'
+          : 'No se pudieron subir las fotos.';
+        throw new Error(await readErrorMessage(res, fallback));
+      }
+
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) throw new Error(data?.error || 'No se pudieron subir las fotos.');
+      if (!data?.ok) {
+        throw new Error(data?.error || 'No se pudieron subir las fotos.');
+      }
 
       setStatus(manualStatusBox, 'Las 9 fotos se subieron correctamente.', 'success');
       setStatus(adminStatus, `Carga manual completada para ${teamSlug} · ${fechaISO}.`, 'success');
@@ -495,7 +524,9 @@
     const openBtn = ev.target.closest('[data-open-img-candidates]');
     if (openBtn) {
       let candidates = [];
-      try { candidates = JSON.parse(openBtn.dataset.openImgCandidates || '[]'); } catch {}
+      try {
+        candidates = JSON.parse(openBtn.dataset.openImgCandidates || '[]');
+      } catch {}
       if (!Array.isArray(candidates) || !candidates.length) return;
       try {
         const blobUrl = await fetchFirstAvailableBlobUrl(candidates);
@@ -509,7 +540,10 @@
     const prefillBtn = ev.target.closest('[data-prefill-manual]');
     if (prefillBtn) {
       resetManualForm();
-      openManualModal({ fechaISO: card.dataset.fecha || '', teamSlug: card.dataset.team || '' });
+      openManualModal({
+        fechaISO: card.dataset.fecha || '',
+        teamSlug: card.dataset.team || ''
+      });
       return;
     }
 
@@ -583,6 +617,13 @@
     }
 
     updateManualPreview();
+  });
+
+  [manualTeamSlug, manualLocalSlug, manualVisitanteSlug].forEach((input) => {
+    input?.addEventListener('blur', () => {
+      input.value = slugify(input.value);
+      syncTeamFromMatch();
+    });
   });
 
   btnSubmitManualUpload?.addEventListener('click', submitManualUpload);
