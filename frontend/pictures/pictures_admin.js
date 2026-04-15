@@ -5,23 +5,23 @@
   const btnReload = document.getElementById('btnReload');
   const btnManualUpload = document.getElementById('btnManualUpload');
   const fechaFilter = document.getElementById('fechaFilter');
+
   const modal = document.getElementById('manualUploadModal');
   const btnCloseManualUpload = document.getElementById('btnCloseManualUpload');
   const btnCancelManualUpload = document.getElementById('btnCancelManualUpload');
   const btnChooseManualPhotos = document.getElementById('btnChooseManualPhotos');
   const btnSubmitManualUpload = document.getElementById('btnSubmitManualUpload');
+
   const manualPicturesInput = document.getElementById('manualPicturesInput');
   const manualPickedFilesText = document.getElementById('manualPickedFilesText');
-  const manualLocalSlug = document.getElementById('manualLocalSlug');
-  const manualVisitanteSlug = document.getElementById('manualVisitanteSlug');
   const manualPreviewContainer = document.getElementById('manualPreviewContainer');
   const manualStatusBox = document.getElementById('manualStatusBox');
   const manualFechaISO = document.getElementById('manualFechaISO');
   const manualTeamSlug = document.getElementById('manualTeamSlug');
-  const manualLocalSlug = document.getElementById('manualLocalSlug');
-  const manualVisitanteSlug = document.getElementById('manualVisitanteSlug');
+
   const blobUrlCache = new Map();
   const REQUIRED_PICTURES = 9;
+
   let allGroups = [];
   let availableDates = [];
   let availableTeams = [];
@@ -48,7 +48,7 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
+      .replace(/\"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
 
@@ -71,7 +71,7 @@
 
   function revokeBlobCache() {
     for (const url of blobUrlCache.values()) {
-      try { URL.revokeObjectURL(url); } catch {}
+      try { URL.revokeObjectURL(url); } catch (_) {}
     }
     blobUrlCache.clear();
   }
@@ -107,6 +107,14 @@
     return String(b || '').localeCompare(String(a || ''));
   }
 
+  function compareTeams(a, b) {
+    return String(a?.teamName || a?.label || a?.teamSlug || '').localeCompare(
+      String(b?.teamName || b?.label || b?.teamSlug || ''),
+      'es',
+      { sensitivity: 'base' }
+    );
+  }
+
   function buildImageCandidates(item, card) {
     const fechaISO = card?.dataset?.fecha || '';
     const teamSlug = card?.dataset?.team || '';
@@ -138,10 +146,7 @@
       );
     }
 
-    return unique([
-      ...directCandidates,
-      ...fileParamCandidates
-    ]);
+    return unique([...directCandidates, ...fileParamCandidates]);
   }
 
   async function fetchBlobUrl(resourceUrl) {
@@ -159,7 +164,7 @@
       try {
         const data = await res.json();
         msg = data?.error || data?.msg || msg;
-      } catch {}
+      } catch (_) {}
       throw new Error(msg);
     }
 
@@ -225,7 +230,7 @@
       try {
         const data = await res.json();
         msg = data?.error || data?.msg || msg;
-      } catch {}
+      } catch (_) {}
       alert(msg);
       return;
     }
@@ -256,10 +261,64 @@
           const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
           if (match) dates.add(match[1]);
         });
-      } catch {}
+      } catch (_) {}
     })));
 
     return [...dates].sort(compareDateDesc);
+  }
+
+  async function fetchAvailableTeamsFromBackend() {
+    try {
+      const data = await fetchJson(API_BASE + '/api/pictures/admin/teams');
+      const teams = Array.isArray(data?.teams) ? data.teams : [];
+      return teams.map((team) => ({
+        teamSlug: slugify(team?.teamSlug || team?.slug || team?.value || ''),
+        teamName: String(team?.teamName || team?.displayName || team?.label || team?.name || team?.teamSlug || team?.slug || '').trim()
+      })).filter(team => team.teamSlug);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function refreshAvailableTeams(groups) {
+    const backendTeams = await fetchAvailableTeamsFromBackend();
+
+    const groupedTeams = unique((groups || []).map(group => String(group?.teamSlug || '').trim()))
+      .map((teamSlug) => {
+        const group = (groups || []).find(item => String(item?.teamSlug || '').trim() === teamSlug);
+        return {
+          teamSlug,
+          teamName: String(group?.teamName || teamSlug).trim()
+        };
+      });
+
+    const mergedMap = new Map();
+    [...backendTeams, ...groupedTeams].forEach((team) => {
+      const key = slugify(team?.teamSlug);
+      if (!key) return;
+      const current = mergedMap.get(key);
+      if (!current || (!current.teamName && team.teamName) || current.teamName === current.teamSlug) {
+        mergedMap.set(key, {
+          teamSlug: key,
+          teamName: String(team?.teamName || key).trim()
+        });
+      }
+    });
+
+    availableTeams = [...mergedMap.values()].sort(compareTeams);
+
+    if (!manualTeamSlug) return;
+    const currentValue = String(manualTeamSlug.value || '').trim();
+    const options = ['<option value="">Elegí un equipo</option>']
+      .concat(
+        availableTeams.map((team) => (
+          `<option value="${escapeHtml(team.teamSlug)}">${escapeHtml(team.teamName)} - ${escapeHtml(team.teamSlug)}</option>`
+        ))
+      );
+    manualTeamSlug.innerHTML = options.join('');
+    if (currentValue && availableTeams.some(team => team.teamSlug === currentValue)) {
+      manualTeamSlug.value = currentValue;
+    }
   }
 
   function renderGroups(groups) {
@@ -317,12 +376,12 @@
       let candidates = [];
       try {
         candidates = JSON.parse(img.dataset.thumbCandidates || '[]');
-      } catch {}
+      } catch (_) {}
       if (!Array.isArray(candidates) || !candidates.length) return;
 
       try {
         img.src = await fetchFirstAvailableBlobUrl(candidates);
-      } catch {
+      } catch (_) {
         img.alt = 'No se pudo cargar la miniatura';
         img.closest('.thumb-btn')?.classList.add('thumb-failed');
       }
@@ -345,9 +404,7 @@
     if (!selectNode) return;
     const currentValue = String(selectNode.value || '').trim();
     const optionHtml = [];
-    if (includeEmpty) {
-      optionHtml.push(`<option value="">${escapeHtml(placeholderLabel)}</option>`);
-    }
+    if (includeEmpty) optionHtml.push(`<option value="">${escapeHtml(placeholderLabel)}</option>`);
     dates.forEach((date) => {
       optionHtml.push(`<option value="${escapeHtml(date)}">${escapeHtml(date)}</option>`);
     });
@@ -374,12 +431,7 @@
 
     try {
       const data = await fetchJson(API_BASE + '/api/pictures/admin/list');
-      allGroups = Array.isArray(data.groups)
-        ? data.groups
-        : Array.isArray(data.items)
-          ? []
-          : [];
-
+      allGroups = Array.isArray(data.groups) ? data.groups : [];
       await refreshAvailableDates(allGroups);
       await refreshAvailableTeams(allGroups);
       await renderCurrentGroups();
@@ -394,7 +446,12 @@
     if (prefill.fechaISO && availableDates.includes(String(prefill.fechaISO).slice(0, 10))) {
       manualFechaISO.value = String(prefill.fechaISO).slice(0, 10);
     }
-    if (prefill.teamSlug) manualTeamSlug.value = String(prefill.teamSlug).trim();
+    if (prefill.teamSlug) {
+      const normalized = slugify(prefill.teamSlug);
+      if (availableTeams.some(team => team.teamSlug === normalized)) {
+        manualTeamSlug.value = normalized;
+      }
+    }
 
     modal.hidden = false;
     document.body.classList.add('modal-open');
@@ -411,8 +468,6 @@
     if (!options.keepPrefill) {
       manualFechaISO.value = '';
       manualTeamSlug.value = '';
-      if (manualLocalSlug) manualLocalSlug.value = '';
-      if (manualVisitanteSlug) manualVisitanteSlug.value = '';
     }
     manualPicturesInput.value = '';
     manualPreviewContainer.innerHTML = '';
@@ -526,7 +581,7 @@
       let candidates = [];
       try {
         candidates = JSON.parse(openBtn.dataset.openImgCandidates || '[]');
-      } catch {}
+      } catch (_) {}
       if (!Array.isArray(candidates) || !candidates.length) return;
       try {
         const blobUrl = await fetchFirstAvailableBlobUrl(candidates);
@@ -581,15 +636,19 @@
   });
 
   btnReload?.addEventListener('click', load);
+
   btnManualUpload?.addEventListener('click', () => {
     resetManualForm();
     openManualModal();
   });
+
   btnCloseManualUpload?.addEventListener('click', closeManualModal);
   btnCancelManualUpload?.addEventListener('click', closeManualModal);
+
   modal?.addEventListener('click', (ev) => {
     if (ev.target?.matches('[data-close-modal]')) closeManualModal();
   });
+
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape' && modal && !modal.hidden) closeManualModal();
   });
@@ -619,11 +678,8 @@
     updateManualPreview();
   });
 
-  [manualTeamSlug, manualLocalSlug, manualVisitanteSlug].forEach((input) => {
-    input?.addEventListener('blur', () => {
-      input.value = slugify(input.value);
-      syncTeamFromMatch();
-    });
+  manualTeamSlug?.addEventListener('change', () => {
+    manualTeamSlug.value = slugify(manualTeamSlug.value);
   });
 
   btnSubmitManualUpload?.addEventListener('click', submitManualUpload);
