@@ -250,12 +250,14 @@
     const categories = ['segunda', 'tercera'];
     const kinds = ['ida', 'vuelta'];
     const dates = new Set();
+    let hadSuccess = false;
 
     await Promise.all(categories.flatMap(category => kinds.map(async (kind) => {
       try {
         const url = API_BASE + '/api/fixture?kind=' + encodeURIComponent(kind) + '&category=' + encodeURIComponent(category);
         const data = await fetchJson(url);
         const fechas = Array.isArray(data?.data?.fechas) ? data.data.fechas : [];
+        if (fechas.length) hadSuccess = true;
         fechas.forEach((fecha) => {
           const raw = String(fecha?.date || fecha?.fecha || fecha?.fechaISO || '').trim();
           const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
@@ -264,7 +266,10 @@
       } catch (_) {}
     })));
 
-    return [...dates].sort(compareDateDesc);
+    return {
+      dates: [...dates].sort(compareDateDesc),
+      hadSuccess
+    };
   }
 
   async function fetchAvailableTeamsFromBackend() {
@@ -420,10 +425,32 @@
 
   async function refreshAvailableDates(groups) {
     const groupDates = unique((groups || []).map(group => String(group?.fechaISO || '').slice(0, 10))).sort(compareDateDesc);
-    const fixtureDates = await fetchFixtureDates();
-    availableDates = unique([...fixtureDates, ...groupDates]).sort(compareDateDesc);
+    const fixtureResult = await fetchFixtureDates().catch(() => ({ dates: [], hadSuccess: false }));
+    const fixtureDates = Array.isArray(fixtureResult?.dates) ? fixtureResult.dates : [];
+
+    const today = new Date();
+    const todayISO = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0')
+    ].join('-');
+
+    availableDates = unique([...fixtureDates, ...groupDates, todayISO]).sort(compareDateDesc);
+
     fillSelectOptions(fechaFilter, availableDates, 'TODAS', true);
     fillSelectOptions(manualFechaISO, availableDates, 'Elegí una fecha', true);
+
+    if (!manualFechaISO.value) {
+      manualFechaISO.value = groupDates[0] || todayISO;
+    }
+
+    if (!fixtureResult?.hadSuccess && !groupDates.length) {
+      setStatus(
+        manualStatusBox,
+        'No se pudieron traer las fechas del fixture en staging. Podés seguir usando la fecha de hoy como carga manual.',
+        'info'
+      );
+    }
   }
 
   async function load() {
