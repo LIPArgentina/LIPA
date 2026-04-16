@@ -54,7 +54,6 @@
   margin-bottom:18px;
 }
 
-/* Layout general de encuentros */
 .results-list{
   display:grid;
   grid-template-columns:repeat(3, minmax(0, 1fr));
@@ -73,7 +72,8 @@
 .encounter-head{
   display:flex;
   align-items:center;
-  justify-content:flex-start;
+  justify-content:space-between;
+  gap:12px;
   margin-bottom:10px;
 }
 
@@ -86,7 +86,23 @@
   text-transform:uppercase;
 }
 
-/* IMPORTANTE: los dos equipos siempre lado a lado */
+.photos-btn{
+  appearance:none;
+  border:1px solid #d6a446;
+  background:rgba(214,164,70,.14);
+  color:#ffe65a;
+  font-weight:800;
+  font-size:12px;
+  letter-spacing:.04em;
+  min-height:36px;
+  padding:0 14px;
+  border-radius:10px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.photos-btn:hover{ opacity:.94; }
+.photos-btn:disabled{ opacity:.55; cursor:not-allowed; }
+
 .encounter-grid{
   align-items:start;
   display:grid;
@@ -221,6 +237,122 @@
   text-align:right;
 }
 
+body.photos-open{ overflow:hidden; }
+
+.photos-modal[hidden]{ display:none !important; }
+.photos-modal{
+  position:fixed;
+  inset:0;
+  z-index:1200;
+}
+.photos-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.72);
+}
+.photos-dialog{
+  position:relative;
+  width:min(980px, calc(100vw - 28px));
+  max-height:calc(100vh - 28px);
+  margin:14px auto;
+  display:flex;
+  flex-direction:column;
+  background:#121418;
+  border:1px solid #ffffff20;
+  border-radius:20px;
+  box-shadow:0 24px 60px rgba(0,0,0,.45);
+  overflow:hidden;
+}
+.photos-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding:16px 18px;
+  border-bottom:1px solid #ffffff12;
+}
+.photos-header h2{
+  margin:0;
+  color:#ffe65a;
+  font-size:24px;
+}
+.photos-subtitle{
+  margin-top:6px;
+  color:#b8c0cf;
+  font-size:14px;
+}
+.photos-close{
+  width:40px;
+  height:40px;
+  border-radius:999px;
+  border:1px solid #ffffff20;
+  background:transparent;
+  color:#fff;
+  font-size:26px;
+  line-height:1;
+  cursor:pointer;
+}
+.photos-body{
+  padding:18px;
+  overflow:auto;
+}
+.photos-status{
+  min-height:24px;
+  margin-bottom:12px;
+  color:#b8c0cf;
+  font-weight:700;
+}
+.photos-status.error{ color:#ff8d8d; }
+.photos-status.info{ color:#8eb7ff; }
+.photos-stage{
+  background:#0b0d11;
+  border:1px solid #ffffff12;
+  border-radius:18px;
+  min-height:460px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.photos-main-image{
+  display:block;
+  width:100%;
+  height:min(72vh, 620px);
+  object-fit:contain;
+  background:#0b0d11;
+}
+.photos-counter{
+  margin-top:14px;
+  text-align:center;
+  color:#d9dfea;
+  font-weight:800;
+}
+.photos-pager{
+  margin-top:14px;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:10px;
+}
+.photos-page-btn{
+  min-width:40px;
+  min-height:40px;
+  border-radius:10px;
+  border:1px solid #d6a446;
+  background:transparent;
+  color:#fff;
+  font-weight:800;
+  cursor:pointer;
+}
+.photos-page-btn.active{
+  background:#d6a446;
+  color:#0b0d11;
+}
+.photos-page-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
 @media (max-width: 1500px){
   .results-list{
     grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -246,8 +378,17 @@
     border-radius:16px;
   }
 
+  .encounter-head{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
   .encounter-title{
     font-size:clamp(14px, 3.8vw, 18px);
+  }
+
+  .photos-btn{
+    width:100%;
   }
 
   .encounter-grid{
@@ -303,6 +444,29 @@
 
   .pts-static{
     font-size:11px;
+  }
+
+  .photos-dialog{
+    width:calc(100vw - 16px);
+    max-height:calc(100vh - 16px);
+    margin:8px auto;
+  }
+
+  .photos-header,
+  .photos-body{
+    padding:14px;
+  }
+
+  .photos-header h2{
+    font-size:20px;
+  }
+
+  .photos-stage{
+    min-height:260px;
+  }
+
+  .photos-main-image{
+    height:min(52vh, 380px);
   }
 }
 
@@ -371,5 +535,14 @@
 
   .pts-static{
     font-size:10px;
+  }
+
+  .photos-pager{
+    gap:8px;
+  }
+
+  .photos-page-btn{
+    min-width:34px;
+    min-height:34px;
   }
 }

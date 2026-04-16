@@ -4,6 +4,18 @@
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const dtf = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' });
 
+  const photosModal = document.getElementById('photosModal');
+  const photosStatus = document.getElementById('photosStatus');
+  const photosMainImage = document.getElementById('photosMainImage');
+  const photosPager = document.getElementById('photosPager');
+  const photosCounter = document.getElementById('photosCounter');
+  const photosModalSubtitle = document.getElementById('photosModalSubtitle');
+  const btnClosePhotos = document.getElementById('btnClosePhotos');
+
+  let currentPhotos = [];
+  let currentPhotoIndex = 0;
+  let currentObjectUrl = '';
+
   function apiUrl(path){
     return API_BASE + path;
   }
@@ -51,6 +63,128 @@
     if (!hasContent) return [];
     while (arr.length < expected) arr.push('');
     return arr.slice(0, expected);
+  }
+
+  function setPhotosStatus(text, type = ''){
+    if (!photosStatus) return;
+    photosStatus.textContent = text || '';
+    photosStatus.className = 'photos-status' + (type ? ' ' + type : '');
+  }
+
+  function revokeCurrentObjectUrl(){
+    if (!currentObjectUrl) return;
+    try { URL.revokeObjectURL(currentObjectUrl); } catch (_) {}
+    currentObjectUrl = '';
+  }
+
+  function resetPhotosViewer(){
+    currentPhotos = [];
+    currentPhotoIndex = 0;
+    revokeCurrentObjectUrl();
+    if (photosMainImage) {
+      photosMainImage.removeAttribute('src');
+      photosMainImage.alt = 'Foto del encuentro';
+    }
+    if (photosPager) photosPager.innerHTML = '';
+    if (photosCounter) photosCounter.textContent = '';
+    setPhotosStatus('', '');
+  }
+
+  async function fetchPhotoBlobUrl(item){
+    const url = apiUrl(item.imageUrl || item.url || '');
+    const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok) {
+      throw new Error('No se pudo cargar la foto.');
+    }
+    const blob = await response.blob();
+    revokeCurrentObjectUrl();
+    currentObjectUrl = URL.createObjectURL(blob);
+    return currentObjectUrl;
+  }
+
+  async function showPhotoAt(index){
+    if (!currentPhotos.length) return;
+    const safeIndex = Math.max(0, Math.min(index, currentPhotos.length - 1));
+    currentPhotoIndex = safeIndex;
+
+    Array.from(photosPager.querySelectorAll('.photos-page-btn')).forEach((btn, idx) => {
+      btn.classList.toggle('active', idx === safeIndex);
+    });
+
+    const item = currentPhotos[safeIndex];
+    photosCounter.textContent = `Foto ${safeIndex + 1} de ${currentPhotos.length}`;
+    setPhotosStatus('Cargando foto…', 'info');
+
+    try {
+      const blobUrl = await fetchPhotoBlobUrl(item);
+      photosMainImage.src = blobUrl;
+      photosMainImage.alt = item.filename || `Foto ${safeIndex + 1}`;
+      setPhotosStatus('', '');
+    } catch (err) {
+      photosMainImage.removeAttribute('src');
+      setPhotosStatus(err?.message || 'No se pudo cargar la foto.', 'error');
+    }
+  }
+
+  function renderPhotosPager(){
+    photosPager.innerHTML = '';
+    currentPhotos.forEach((_item, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'photos-page-btn' + (idx === currentPhotoIndex ? ' active' : '');
+      btn.textContent = String(idx + 1);
+      btn.addEventListener('click', () => {
+        showPhotoAt(idx).catch(console.error);
+      });
+      photosPager.appendChild(btn);
+    });
+  }
+
+  function openPhotosModal(){
+    photosModal.hidden = false;
+    document.body.classList.add('photos-open');
+  }
+
+  function closePhotosModal(){
+    photosModal.hidden = true;
+    document.body.classList.remove('photos-open');
+    resetPhotosViewer();
+  }
+
+  async function openEncounterPhotos(item){
+    resetPhotosViewer();
+    openPhotosModal();
+
+    const subtitle = [
+      String(item.localName || '').toUpperCase(),
+      'vs',
+      String(item.visitanteName || '').toUpperCase(),
+      '·',
+      formatDate(item.fechaISO)
+    ].join(' ');
+    photosModalSubtitle.textContent = subtitle;
+    setPhotosStatus('Buscando fotos del encuentro…', 'info');
+
+    const url = apiUrl(
+      '/api/pictures/match?fechaISO=' + encodeURIComponent(item.fechaISO || '') +
+      '&localSlug=' + encodeURIComponent(item.localSlug || '') +
+      '&visitanteSlug=' + encodeURIComponent(item.visitanteSlug || '')
+    );
+
+    try {
+      const data = await fetchJson(url, { cache: 'no-store', credentials: 'same-origin' });
+      const items = Array.isArray(data?.items) ? data.items : [];
+      if (!items.length) {
+        setPhotosStatus('Todavía no hay fotos cargadas para este encuentro.', 'info');
+        return;
+      }
+
+      currentPhotos = items;
+      renderPhotosPager();
+      await showPhotoAt(0);
+    } catch (err) {
+      setPhotosStatus(err?.message || 'No se pudieron cargar las fotos.', 'error');
+    }
   }
 
   function createPtsBox(value){
@@ -168,6 +302,13 @@
     node.querySelector('.encounter-title').textContent =
       `${String(item.localName || '').toUpperCase()} VS ${String(item.visitanteName || '').toUpperCase()}`;
 
+    const photosBtn = node.querySelector('[data-open-photos]');
+    if (photosBtn) {
+      photosBtn.addEventListener('click', () => {
+        openEncounterPhotos(item).catch(console.error);
+      });
+    }
+
     const leftRoot = node.querySelector('.encounter-left');
     const rightRoot = node.querySelector('.encounter-right');
 
@@ -212,6 +353,14 @@
     document.getElementById('btnVolver').addEventListener('click', (ev) => {
       ev.preventDefault();
       history.back();
+    });
+
+    btnClosePhotos?.addEventListener('click', closePhotosModal);
+    photosModal?.addEventListener('click', (ev) => {
+      if (ev.target?.matches('[data-close-photos]')) closePhotosModal();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && photosModal && !photosModal.hidden) closePhotosModal();
     });
 
     const data = await fetchJson(
