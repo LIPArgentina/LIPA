@@ -160,7 +160,7 @@ module.exports = function createPicturesRouter(deps) {
       const fullPath = path.join(dir, file.name);
       const stat = await fs.promises.stat(fullPath);
       const relFile = `${fechaISO}/${teamSlug}/${file.name}`;
-      items.push({ filename: file.name, size: stat.size, modifiedAt: stat.mtime.toISOString(), imageUrl: buildPublicImageUrl(relFile) });
+      items.push({ filename: file.name, size: stat.size, modifiedAt: stat.mtime.toISOString(), imageUrl: buildPublicImageUrl(relFile), sourceTeamSlug: teamSlug });
     }
     items.sort((a, b) => a.filename.localeCompare(b.filename, 'es', { numeric: true, sensitivity: 'base' }));
     return items.slice(0, REQUIRED_PICTURES);
@@ -336,11 +336,34 @@ module.exports = function createPicturesRouter(deps) {
       const fechaISO = String(req.query?.fechaISO || '').slice(0, 10);
       const localSlug = normalizeSlug(req.query?.localSlug || '');
       const visitanteSlug = normalizeSlug(req.query?.visitanteSlug || '');
-      if (!fechaISO || !localSlug || !visitanteSlug) return res.status(400).json({ ok: false, error: 'Faltan datos del encuentro' });
+
+      if (!fechaISO || !localSlug || !visitanteSlug) {
+        return res.status(400).json({ ok: false, error: 'Faltan datos del encuentro' });
+      }
+
       const localItems = await listTeamPictures(fechaISO, localSlug);
       const visitanteItems = await listTeamPictures(fechaISO, visitanteSlug);
-      const chosen = localItems.length ? { teamSlug: localSlug, items: localItems } : { teamSlug: visitanteSlug, items: visitanteItems };
-      return res.json({ ok: true, fechaISO, teamSlug: chosen.teamSlug, items: chosen.items });
+
+      const seen = new Set();
+      const items = [];
+
+      for (const item of [...localItems, ...visitanteItems]) {
+        const key = String(item?.filename || '').trim().toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        items.push(item);
+        if (items.length >= REQUIRED_PICTURES) break;
+      }
+
+      return res.json({
+        ok: true,
+        fechaISO,
+        localSlug,
+        visitanteSlug,
+        localCount: localItems.length,
+        visitanteCount: visitanteItems.length,
+        items
+      });
     } catch (err) {
       return res.status(500).json({ ok: false, error: 'No se pudieron cargar las fotos del encuentro' });
     }
