@@ -20,52 +20,19 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   async function convertHeicToJpeg(file) {
-    console.log('[pictures] convertHeicToJpeg:start', {
-      originalname: file?.originalname,
-      filename: file?.filename,
-      mimetype: file?.mimetype,
-      path: file?.path,
-      isHeicLike: isHeicLike(file)
-    });
-
-    if (!file || !file.path || !isHeicLike(file)) {
-      console.log('[pictures] convertHeicToJpeg:skip', {
-        reason: !file || !file.path ? 'missing_file_or_path' : 'not_heic_like',
-        originalname: file?.originalname,
-        filename: file?.filename,
-        mimetype: file?.mimetype
-      });
-      return file;
-    }
-
+    if (!file || !file.path || !isHeicLike(file)) return file;
     const inputBuffer = await fs.promises.readFile(file.path);
-    const outputBuffer = await heicConvert({
-      buffer: inputBuffer,
-      format: 'JPEG',
-      quality: 0.88
-    });
-
+    const outputBuffer = await heicConvert({ buffer: inputBuffer, format: 'JPEG', quality: 0.88 });
     const parsed = path.parse(file.path);
     const jpegPath = path.join(parsed.dir, parsed.name + '.jpg');
     await fs.promises.writeFile(jpegPath, outputBuffer);
-
     const stat = await fs.promises.stat(jpegPath);
     try { await fs.promises.unlink(file.path); } catch (_) {}
-
-    console.log('[pictures] convertHeicToJpeg:done', {
-      from: file.path,
-      to: jpegPath,
-      outputFilename: path.basename(jpegPath),
-      outputSize: stat.size
-    });
-
     return {
       ...file,
       path: jpegPath,
       filename: path.basename(jpegPath),
-      originalname: HEIC_EXT_RE.test(String(file.originalname || ''))
-        ? String(file.originalname).replace(HEIC_EXT_RE, '.jpg')
-        : (String(file.originalname || '') + '.jpg'),
+      originalname: HEIC_EXT_RE.test(String(file.originalname || '')) ? String(file.originalname).replace(HEIC_EXT_RE, '.jpg') : (String(file.originalname || '') + '.jpg'),
       mimetype: 'image/jpeg',
       size: stat.size
     };
@@ -76,12 +43,7 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   function safeName(value = '') {
-    return String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9._-]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .slice(0, 120) || 'archivo';
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 120) || 'archivo';
   }
 
   function buildFechaKey(fechaISO, localSlug, visitanteSlug) {
@@ -111,16 +73,7 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   function isAdminUser(user) {
-    const values = [
-      user?.role,
-      user?.tipo,
-      user?.type,
-      user?.userType,
-      user?.kind,
-      ...(Array.isArray(user?.roles) ? user.roles : []),
-      ...(Array.isArray(user?.permissions) ? user.permissions : []),
-    ];
-
+    const values = [user?.role, user?.tipo, user?.type, user?.userType, user?.kind, ...(Array.isArray(user?.roles) ? user.roles : []), ...(Array.isArray(user?.permissions) ? user.permissions : [])];
     return values.some((value) => {
       const v = String(value || '').trim().toLowerCase();
       return v === 'admin' || v === 'administrator' || v === 'superadmin';
@@ -128,13 +81,7 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   function resolveRequestedTeamSlug(req) {
-    return normalizeSlug(
-      req.body?.teamSlug ||
-      req.body?.team ||
-      req.query?.teamSlug ||
-      req.query?.team ||
-      ''
-    );
+    return normalizeSlug(req.body?.teamSlug || req.body?.team || req.query?.teamSlug || req.query?.team || '');
   }
 
   function isManualAdminUpload(req) {
@@ -142,9 +89,7 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   function resolveUploadTeamSlug(req) {
-    if (isManualAdminUpload(req)) {
-      return resolveRequestedTeamSlug(req);
-    }
+    if (isManualAdminUpload(req)) return resolveRequestedTeamSlug(req);
     return pickUserSlug(req.user);
   }
 
@@ -153,64 +98,33 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   async function getDisplayNameBySlug(slug) {
-    const result = await pool.query(
-      `SELECT display_name FROM equipos WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1 ORDER BY id ASC LIMIT 1`,
-      [normalizeSlug(slug)]
-    );
+    const result = await pool.query(`SELECT display_name FROM equipos WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1 ORDER BY id ASC LIMIT 1`, [normalizeSlug(slug)]);
     return result.rows[0]?.display_name || slug;
   }
 
   async function getTeamOptions() {
-    const { rows } = await pool.query(
-      `
-      SELECT display_name, slug_uid, slug_base
-      FROM equipos
-      WHERE COALESCE(display_name, '') <> ''
-        AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '')
-      ORDER BY display_name ASC, id ASC
-      `
-    );
-
+    const { rows } = await pool.query(`SELECT display_name, slug_uid, slug_base FROM equipos WHERE COALESCE(display_name, '') <> '' AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '') ORDER BY display_name ASC, id ASC`);
     const seen = new Set();
     const options = [];
-
     for (const row of rows) {
       const slug = normalizeSlug(row.slug_uid || row.slug_base || '');
       if (!slug || seen.has(slug)) continue;
       seen.add(slug);
-      options.push({
-        slug,
-        displayName: String(row.display_name || slug).trim()
-      });
+      options.push({ slug, displayName: String(row.display_name || slug).trim() });
     }
-
     return options;
   }
 
   async function isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug }) {
     const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
     if (!teamKey) return false;
-
-    const rivalKey = teamKey === normalizeSlug(localSlug)
-      ? normalizeSlug(visitanteSlug)
-      : normalizeSlug(localSlug);
-
+    const rivalKey = teamKey === normalizeSlug(localSlug) ? normalizeSlug(visitanteSlug) : normalizeSlug(localSlug);
     const fechaKey = buildFechaKey(fechaISO, localSlug, visitanteSlug);
-
-    const { rows } = await pool.query(
-      `
-      SELECT team, validated, status_json, locked_until
-      FROM cruces_validations
-      WHERE fecha_key = $1 AND team IN ($2, $3)
-      `,
-      [fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]
-    );
-
+    const { rows } = await pool.query(`SELECT team, validated, status_json, locked_until FROM cruces_validations WHERE fecha_key = $1 AND team IN ($2, $3)`, [fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]);
     const mine = rows.find(r => r.team === teamKey) || null;
     const rival = rows.find(r => r.team === rivalKey) || null;
     const lockedUntil = mine?.locked_until || rival?.locked_until || null;
     const locked = !!(lockedUntil && new Date(lockedUntil).getTime() > Date.now());
-
     return Boolean(mine?.validated && rival?.validated && mine?.status_json && rival?.status_json && locked);
   }
 
@@ -218,9 +132,7 @@ module.exports = function createPicturesRouter(deps) {
     const root = path.resolve(picturesRoot);
     const normalized = path.normalize(String(relativePath || '')).replace(/^([.][./\\])+/, '');
     const fullPath = path.resolve(path.join(root, normalized));
-    if (!fullPath.startsWith(root + path.sep) && fullPath !== root) {
-      return null;
-    }
+    if (!fullPath.startsWith(root + path.sep) && fullPath !== root) return null;
     return fullPath;
   }
 
@@ -232,19 +144,37 @@ module.exports = function createPicturesRouter(deps) {
     return `/api/pictures/admin/thumb?file=${encodeURIComponent(filePath)}`;
   }
 
+  function buildPublicImageUrl(filePath) {
+    return `/api/pictures/public/file?file=${encodeURIComponent(filePath)}`;
+  }
+
+  async function listTeamPictures(fechaISO, teamSlug) {
+    if (!fechaISO || !teamSlug) return [];
+    const dir = path.join(picturesRoot, fechaISO, teamSlug);
+    try { await fs.promises.access(dir, fs.constants.R_OK); } catch (_) { return []; }
+    const files = await fs.promises.readdir(dir, { withFileTypes: true });
+    const items = [];
+    for (const file of files) {
+      if (!file.isFile()) continue;
+      if (!/\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name)) continue;
+      const fullPath = path.join(dir, file.name);
+      const stat = await fs.promises.stat(fullPath);
+      const relFile = `${fechaISO}/${teamSlug}/${file.name}`;
+      items.push({ filename: file.name, size: stat.size, modifiedAt: stat.mtime.toISOString(), imageUrl: buildPublicImageUrl(relFile) });
+    }
+    items.sort((a, b) => a.filename.localeCompare(b.filename, 'es', { numeric: true, sensitivity: 'base' }));
+    return items.slice(0, REQUIRED_PICTURES);
+  }
+
   const crcTable = new Uint32Array(256).map((_, index) => {
     let c = index;
-    for (let k = 0; k < 8; k += 1) {
-      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-    }
+    for (let k = 0; k < 8; k += 1) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
     return c >>> 0;
   });
 
   function crc32(buffer) {
     let crc = 0xFFFFFFFF;
-    for (let i = 0; i < buffer.length; i += 1) {
-      crc = crcTable[(crc ^ buffer[i]) & 0xFF] ^ (crc >>> 8);
-    }
+    for (let i = 0; i < buffer.length; i += 1) crc = crcTable[(crc ^ buffer[i]) & 0xFF] ^ (crc >>> 8);
     return (crc ^ 0xFFFFFFFF) >>> 0;
   }
 
@@ -256,22 +186,18 @@ module.exports = function createPicturesRouter(deps) {
     const hours = date.getHours();
     const minutes = date.getMinutes();
     const seconds = Math.floor(date.getSeconds() / 2);
-    const dosTime = (hours << 11) | (minutes << 5) | seconds;
-    const dosDate = ((year - 1980) << 9) | (month << 5) | day;
-    return { dosDate, dosTime };
+    return { dosDate: ((year - 1980) << 9) | (month << 5) | day, dosTime: (hours << 11) | (minutes << 5) | seconds };
   }
 
   function makeZipStore(entries) {
     const localParts = [];
     const centralParts = [];
     let offset = 0;
-
     for (const entry of entries) {
       const nameBuf = Buffer.from(String(entry.name || 'archivo'), 'utf8');
       const dataBuf = Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(entry.data || '');
       const crc = crc32(dataBuf);
       const { dosDate, dosTime } = dosDateTime(entry.modifiedAt);
-
       const localHeader = Buffer.alloc(30);
       localHeader.writeUInt32LE(0x04034b50, 0);
       localHeader.writeUInt16LE(20, 4);
@@ -285,7 +211,6 @@ module.exports = function createPicturesRouter(deps) {
       localHeader.writeUInt16LE(nameBuf.length, 26);
       localHeader.writeUInt16LE(0, 28);
       localParts.push(localHeader, nameBuf, dataBuf);
-
       const centralHeader = Buffer.alloc(46);
       centralHeader.writeUInt32LE(0x02014b50, 0);
       centralHeader.writeUInt16LE(20, 4);
@@ -305,22 +230,16 @@ module.exports = function createPicturesRouter(deps) {
       centralHeader.writeUInt32LE(0, 38);
       centralHeader.writeUInt32LE(offset, 42);
       centralParts.push(centralHeader, nameBuf);
-
       offset += localHeader.length + nameBuf.length + dataBuf.length;
     }
-
     const centralDir = Buffer.concat(centralParts);
     const localDir = Buffer.concat(localParts);
     const end = Buffer.alloc(22);
     end.writeUInt32LE(0x06054b50, 0);
-    end.writeUInt16LE(0, 4);
-    end.writeUInt16LE(0, 6);
     end.writeUInt16LE(entries.length, 8);
     end.writeUInt16LE(entries.length, 10);
     end.writeUInt32LE(centralDir.length, 12);
     end.writeUInt32LE(localDir.length, 16);
-    end.writeUInt16LE(0, 20);
-
     return Buffer.concat([localDir, centralDir, end]);
   }
 
@@ -332,9 +251,7 @@ module.exports = function createPicturesRouter(deps) {
         const teamDir = path.join(picturesRoot, fechaISO || 'sin-fecha', teamSlug);
         await ensureDir(teamDir);
         cb(null, teamDir);
-      } catch (err) {
-        cb(err);
-      }
+      } catch (err) { cb(err); }
     },
     filename: (_req, file, cb) => {
       const originalExt = path.extname(file.originalname || '').toLowerCase() || '.jpg';
@@ -347,20 +264,13 @@ module.exports = function createPicturesRouter(deps) {
 
   const upload = multer({
     storage,
-    limits: {
-      fileSize: 10 * 1024 * 1024,
-      files: 10
-    },
+    limits: { fileSize: 10 * 1024 * 1024, files: 10 },
     fileFilter: (_req, file, cb) => {
       const mimetype = String(file.mimetype || '').toLowerCase();
       const ext = path.extname(file.originalname || '').toLowerCase();
       const allowedByMime = mimetype.startsWith('image/');
       const allowedByExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif'].includes(ext);
-
-      if (!allowedByMime && !allowedByExt) {
-        return cb(new Error('Solo se permiten imágenes'));
-      }
-
+      if (!allowedByMime && !allowedByExt) return cb(new Error('Solo se permiten imágenes'));
       cb(null, true);
     }
   });
@@ -380,89 +290,25 @@ module.exports = function createPicturesRouter(deps) {
       const teamSlug = resolveUploadTeamSlug(req);
       const files = Array.isArray(req.files) ? req.files : [];
       const manualAdminUpload = adminMode || isManualAdminUpload(req);
-
-      console.log('[pictures] upload:start', {
-        fechaISO,
-        localSlug,
-        visitanteSlug,
-        teamSlug,
-        manualAdminUpload,
-        filesCount: files.length,
-        files: files.map(file => ({
-          originalname: file?.originalname,
-          filename: file?.filename,
-          mimetype: file?.mimetype,
-          size: file?.size,
-          isHeicLike: isHeicLike(file)
-        }))
-      });
-
-      if (!fechaISO) {
-        return res.status(400).json({ ok: false, error: 'Falta la fecha de carga' });
-      }
-
-      if (!teamSlug) {
-        return res.status(400).json({ ok: false, error: manualAdminUpload ? 'Falta el teamSlug para la carga manual' : 'No se pudo identificar el equipo' });
-      }
-
-      if (!manualAdminUpload && (!localSlug || !visitanteSlug)) {
-        return res.status(400).json({ ok: false, error: 'Faltan datos del cruce' });
-      }
-
-      if (!files.length) {
-        return res.status(400).json({ ok: false, error: 'No se recibieron imágenes' });
-      }
-
+      if (!fechaISO) return res.status(400).json({ ok: false, error: 'Falta la fecha de carga' });
+      if (!teamSlug) return res.status(400).json({ ok: false, error: manualAdminUpload ? 'Falta el teamSlug para la carga manual' : 'No se pudo identificar el equipo' });
+      if (!manualAdminUpload && (!localSlug || !visitanteSlug)) return res.status(400).json({ ok: false, error: 'Faltan datos del cruce' });
+      if (!files.length) return res.status(400).json({ ok: false, error: 'No se recibieron imágenes' });
       if (files.length !== REQUIRED_PICTURES) {
-        for (const file of files) {
-          try { await fs.promises.unlink(file.path); } catch (_) {}
-        }
-
-        if (files.length < REQUIRED_PICTURES) {
-          return res.status(400).json({
-            ok: false,
-            error: `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para completar las ${REQUIRED_PICTURES} requeridas`
-          });
-        }
-
-        return res.status(400).json({
-          ok: false,
-          error: `Solo se permiten ${REQUIRED_PICTURES} fotos por carga`
-        });
+        for (const file of files) { try { await fs.promises.unlink(file.path); } catch (_) {} }
+        if (files.length < REQUIRED_PICTURES) return res.status(400).json({ ok: false, error: `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para completar las ${REQUIRED_PICTURES} requeridas` });
+        return res.status(400).json({ ok: false, error: `Solo se permiten ${REQUIRED_PICTURES} fotos por carga` });
       }
-
       if (!manualAdminUpload) {
         const allowed = await isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug: teamSlug });
         if (!allowed) {
-          for (const file of files) {
-            try { await fs.promises.unlink(file.path); } catch (_) {}
-          }
+          for (const file of files) { try { await fs.promises.unlink(file.path); } catch (_) {} }
           return res.status(403).json({ ok: false, error: 'Solo podés subir fotos cuando el cruce ya esté validado por ambos equipos' });
         }
       }
-
       const normalizedFiles = [];
-      for (const file of files) {
-        normalizedFiles.push(await convertHeicToJpeg(file));
-      }
-
-      console.log('[pictures] upload:normalized_files', normalizedFiles.map(file => ({
-        originalname: file?.originalname,
-        filename: file?.filename,
-        mimetype: file?.mimetype,
-        size: file?.size,
-        path: file?.path
-      })));
-
-      const result = normalizedFiles.map(file => ({
-        teamSlug,
-        fechaISO,
-        filename: file.filename,
-        originalName: file.originalname,
-        size: file.size,
-        uploadedAt: new Date().toISOString(),
-      }));
-
+      for (const file of files) normalizedFiles.push(await convertHeicToJpeg(file));
+      const result = normalizedFiles.map(file => ({ teamSlug, fechaISO, filename: file.filename, originalName: file.originalname, size: file.size, uploadedAt: new Date().toISOString() }));
       return res.json({ ok: true, files: result });
     } catch (err) {
       const files = Array.isArray(req.files) ? req.files : [];
@@ -473,65 +319,41 @@ module.exports = function createPicturesRouter(deps) {
           if (jpgCandidate !== file.path) await fs.promises.unlink(jpgCandidate);
         } catch (_) {}
       }
-      console.error('POST /api/pictures/upload', err);
       return res.status(500).json({ ok: false, error: err?.message || 'No se pudieron guardar las fotos' });
     }
   }
 
-  router.post('/upload', requireTeam, runUpload, async (req, res) => {
-    return handleUpload(req, res, { adminMode: false });
-  });
-
-  router.post('/admin/upload', requireAdmin, runUpload, async (req, res) => {
-    return handleUpload(req, res, { adminMode: true });
-  });
-
-  router.get('/my', requireTeam, async (req, res) => {
-    try {
-      const fechaISO = String(req.query?.fechaISO || '').slice(0, 10);
-      const teamSlug = normalizeSlug(req.user?.slug || '');
-      const dir = path.join(picturesRoot, fechaISO || 'sin-fecha', teamSlug);
-      await ensureDir(dir);
-      const names = (await fs.promises.readdir(dir, { withFileTypes: true }))
-        .filter(d => d.isFile())
-        .map(d => d.name)
-        .filter(name => /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(name))
-        .sort((a, b) => b.localeCompare(a));
-
-      return res.json({
-        ok: true,
-        files: names.map(name => ({
-          filename: name,
-          teamSlug,
-          fechaISO,
-        }))
-      });
-    } catch (err) {
-      console.error('GET /api/pictures/my', err);
-      return res.status(500).json({ ok: false, error: 'No se pudieron listar tus fotos' });
-    }
-  });
-
-  router.get('/team/download', requireTeam, async (req, res) => {
-    try {
-      const fechaISO = String(req.query?.fechaISO || '').slice(0, 10);
-      const filename = path.basename(String(req.query?.filename || ''));
-      const teamSlug = normalizeSlug(req.user?.slug || '');
-      const fullPath = path.join(picturesRoot, fechaISO || 'sin-fecha', teamSlug, filename);
-      await fs.promises.access(fullPath, fs.constants.R_OK);
-      return res.download(fullPath, filename);
-    } catch {
-      return res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
-    }
-  });
+  router.post('/upload', requireTeam, runUpload, async (req, res) => handleUpload(req, res, { adminMode: false }));
+  router.post('/admin/upload', requireAdmin, runUpload, async (req, res) => handleUpload(req, res, { adminMode: true }));
 
   router.get('/admin/teams', requireAdmin, async (_req, res) => {
+    try { return res.json({ ok: true, teams: await getTeamOptions() }); }
+    catch (err) { return res.status(500).json({ ok: false, error: 'No se pudo listar los equipos' }); }
+  });
+
+  router.get('/match', async (req, res) => {
     try {
-      const teams = await getTeamOptions();
-      return res.json({ ok: true, teams });
+      const fechaISO = String(req.query?.fechaISO || '').slice(0, 10);
+      const localSlug = normalizeSlug(req.query?.localSlug || '');
+      const visitanteSlug = normalizeSlug(req.query?.visitanteSlug || '');
+      if (!fechaISO || !localSlug || !visitanteSlug) return res.status(400).json({ ok: false, error: 'Faltan datos del encuentro' });
+      const localItems = await listTeamPictures(fechaISO, localSlug);
+      const visitanteItems = await listTeamPictures(fechaISO, visitanteSlug);
+      const chosen = localItems.length ? { teamSlug: localSlug, items: localItems } : { teamSlug: visitanteSlug, items: visitanteItems };
+      return res.json({ ok: true, fechaISO, teamSlug: chosen.teamSlug, items: chosen.items });
     } catch (err) {
-      console.error('GET /api/pictures/admin/teams', err);
-      return res.status(500).json({ ok: false, error: 'No se pudo listar los equipos' });
+      return res.status(500).json({ ok: false, error: 'No se pudieron cargar las fotos del encuentro' });
+    }
+  });
+
+  router.get('/public/file', async (req, res) => {
+    try {
+      const fullPath = resolveSafeFullPath(req.query?.file || '');
+      if (!fullPath) return res.status(400).json({ ok: false, error: 'Ruta inválida' });
+      await fs.promises.access(fullPath, fs.constants.R_OK);
+      return res.sendFile(fullPath);
+    } catch {
+      return res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
     }
   });
 
@@ -540,13 +362,11 @@ module.exports = function createPicturesRouter(deps) {
       await ensureDir(picturesRoot);
       const fechas = await fs.promises.readdir(picturesRoot, { withFileTypes: true });
       const groups = [];
-
       for (const fechaDir of fechas) {
         if (!fechaDir.isDirectory()) continue;
         const fechaISO = fechaDir.name;
         const fechaPath = path.join(picturesRoot, fechaISO);
         const teams = await fs.promises.readdir(fechaPath, { withFileTypes: true });
-
         for (const teamDir of teams) {
           if (!teamDir.isDirectory()) continue;
           const teamSlug = teamDir.name;
@@ -554,38 +374,22 @@ module.exports = function createPicturesRouter(deps) {
           const teamDisplayName = await getDisplayNameBySlug(teamSlug);
           const files = await fs.promises.readdir(teamPath, { withFileTypes: true });
           const items = [];
-
           for (const file of files) {
             if (!file.isFile()) continue;
             if (!/\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name)) continue;
             const fullPath = path.join(teamPath, file.name);
             const stat = await fs.promises.stat(fullPath);
             const relFile = `${fechaISO}/${teamSlug}/${file.name}`;
-            items.push({
-              filename: file.name,
-              size: stat.size,
-              modifiedAt: stat.mtime.toISOString(),
-              thumbUrl: buildAdminThumbUrl(relFile)
-            });
+            items.push({ filename: file.name, size: stat.size, modifiedAt: stat.mtime.toISOString(), thumbUrl: buildAdminThumbUrl(relFile) });
           }
-
           items.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
           if (!items.length) continue;
-
-          groups.push({
-            fechaISO,
-            teamSlug,
-            teamName: teamDisplayName,
-            zipFilename: getZipName(fechaISO, teamSlug),
-            items
-          });
+          groups.push({ fechaISO, teamSlug, teamName: teamDisplayName, zipFilename: getZipName(fechaISO, teamSlug), items });
         }
       }
-
       groups.sort((a, b) => `${b.fechaISO} ${b.items[0]?.modifiedAt || ''}`.localeCompare(`${a.fechaISO} ${a.items[0]?.modifiedAt || ''}`));
       return res.json({ ok: true, groups });
     } catch (err) {
-      console.error('GET /api/pictures/admin/list', err);
       return res.status(500).json({ ok: false, error: 'No se pudieron listar las fotos' });
     }
   });
@@ -593,9 +397,7 @@ module.exports = function createPicturesRouter(deps) {
   router.get('/admin/thumb', requireAdmin, async (req, res) => {
     try {
       const fullPath = resolveSafeFullPath(req.query?.file || '');
-      if (!fullPath) {
-        return res.status(400).json({ ok: false, error: 'Ruta inválida' });
-      }
+      if (!fullPath) return res.status(400).json({ ok: false, error: 'Ruta inválida' });
       await fs.promises.access(fullPath, fs.constants.R_OK);
       return res.sendFile(fullPath);
     } catch {
@@ -607,9 +409,7 @@ module.exports = function createPicturesRouter(deps) {
     try {
       const fechaISO = String(req.query?.fechaISO || '').slice(0, 10);
       const teamSlug = normalizeSlug(req.query?.teamSlug || '');
-      if (!fechaISO || !teamSlug) {
-        return res.status(400).json({ ok: false, error: 'Faltan datos' });
-      }
+      if (!fechaISO || !teamSlug) return res.status(400).json({ ok: false, error: 'Faltan datos' });
       const dir = path.join(picturesRoot, fechaISO, teamSlug);
       await fs.promises.access(dir, fs.constants.R_OK);
       const entries = [];
@@ -618,15 +418,10 @@ module.exports = function createPicturesRouter(deps) {
         if (!file.isFile()) continue;
         if (!/\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name)) continue;
         const fullPath = path.join(dir, file.name);
-        const [data, stat] = await Promise.all([
-          fs.promises.readFile(fullPath),
-          fs.promises.stat(fullPath)
-        ]);
+        const [data, stat] = await Promise.all([fs.promises.readFile(fullPath), fs.promises.stat(fullPath)]);
         entries.push({ name: file.name, data, modifiedAt: stat.mtime });
       }
-      if (!entries.length) {
-        return res.status(404).json({ ok: false, error: 'No hay fotos para descargar' });
-      }
+      if (!entries.length) return res.status(404).json({ ok: false, error: 'No hay fotos para descargar' });
       const zipBuffer = makeZipStore(entries);
       const zipFilename = getZipName(fechaISO, teamSlug);
       res.setHeader('Content-Type', 'application/zip');
@@ -634,7 +429,6 @@ module.exports = function createPicturesRouter(deps) {
       res.setHeader('Content-Length', zipBuffer.length);
       return res.end(zipBuffer);
     } catch (err) {
-      console.error('GET /api/pictures/admin/group-download', err);
       return res.status(500).json({ ok: false, error: 'No se pudo generar el ZIP' });
     }
   });
@@ -643,9 +437,7 @@ module.exports = function createPicturesRouter(deps) {
     try {
       const fechaISO = String(req.body?.fechaISO || '').slice(0, 10);
       const teamSlug = normalizeSlug(req.body?.teamSlug || '');
-      if (!fechaISO || !teamSlug) {
-        return res.status(400).json({ ok: false, error: 'Faltan datos' });
-      }
+      if (!fechaISO || !teamSlug) return res.status(400).json({ ok: false, error: 'Faltan datos' });
       const dir = path.join(picturesRoot, fechaISO, teamSlug);
       await fs.promises.rm(dir, { recursive: true, force: true });
       return res.json({ ok: true });

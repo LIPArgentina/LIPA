@@ -42,6 +42,7 @@
       <article class="encounter-shell">
         <div class="encounter-head">
           <div class="encounter-title"></div>
+          <button class="photos-btn" type="button" data-open-photos>VER FOTOS</button>
         </div>
         <div class="cruces-grid encounter-grid">
           <section class="encounter-left"></section>
@@ -76,6 +77,28 @@
         </div>
       </div>
     </template>
+
+    <div class="photos-modal" id="photosModal" hidden>
+      <div class="photos-backdrop" data-close-photos="1"></div>
+      <div class="photos-dialog" role="dialog" aria-modal="true" aria-labelledby="photosModalTitle">
+        <div class="photos-header">
+          <div>
+            <h2 id="photosModalTitle">Fotos del encuentro</h2>
+            <div class="photos-subtitle" id="photosModalSubtitle"></div>
+          </div>
+          <button class="photos-close" id="btnClosePhotos" type="button" aria-label="Cerrar">×</button>
+        </div>
+
+        <div class="photos-body">
+          <div id="photosStatus" class="photos-status"></div>
+          <div class="photos-stage">
+            <img id="photosMainImage" class="photos-main-image" alt="Foto del encuentro" />
+          </div>
+          <div id="photosCounter" class="photos-counter"></div>
+          <div id="photosPager" class="photos-pager"></div>
+        </div>
+      </div>
+    </div>
 
     <script src="../config.js"></script>
     <script src="./encuentros.js" defer></script>
