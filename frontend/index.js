@@ -446,4 +446,26 @@ document.addEventListener("DOMContentLoaded", () => {
   setupAuthBridge();
   setupBannerAdmin();
   loadBannerForHome();
+  loadPublicStats();
+  setInterval(loadPublicStats, 30000);
 });
+
+
+async function loadPublicStats() {
+  try {
+    const res = await fetch(apiUrl("/api/public-stats"), { cache: "no-store" });
+    if (!res.ok) throw new Error("GET /api/public-stats failed");
+    const data = await res.json();
+
+    const el = document.getElementById("statsBar");
+    if (!el) return;
+
+    const online = Number.isFinite(Number(data?.online)) ? Number(data.online) : 0;
+    const today = Number.isFinite(Number(data?.today)) ? Number(data.today) : 0;
+    const week = Number.isFinite(Number(data?.week)) ? Number(data.week) : 0;
+
+    el.textContent = `Online: ${online} · Hoy: ${today} · Semana: ${week}`;
+  } catch (err) {
+    console.error("Stats load error:", err);
+  }
+}
