@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Liga Independiente de Pool</title>
   <link rel="icon" href="./logo_liga.png" />
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-MS31S9P5K7"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-MS31S9P5K7');
+  </script>
+
   <link rel="stylesheet" href="/styles.css" />
   <link rel="stylesheet" href="/index.css" />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
@@ -53,60 +63,15 @@
     </div>
   </div>
 
-  <dialog id="bannerModal" class="modal">
-    <form method="dialog" class="modal__panel" id="bannerForm" autocomplete="off">
-      <div class="modal__header">
-        <h3>Banner de portada</h3>
-      </div>
-
-      <div class="modal__body">
-        <div class="field__label-row">
-          <label class="field__label" for="bannerText">Texto del banner</label>
-
-          <div class="banner-tabs" id="bannerTabs">
-            <button type="button" class="banner-tab is-active" data-index="0">1</button>
-            <button type="button" class="banner-tab" data-index="1">2</button>
-            <button type="button" class="banner-tab" data-index="2">3</button>
-            <button type="button" class="banner-tab" data-index="3">4</button>
-            <button type="button" class="banner-tab" data-index="4">5</button>
-          </div>
-        </div>
-
-        <textarea id="bannerText" class="field__control"></textarea>
-
-        <div class="field__grid">
-          <div>
-            <label class="field__label" for="bannerHref">Link (URL opcional)</label>
-            <input id="bannerHref" type="url" class="field__control" />
-          </div>
-
-          <div>
-            <label class="field__label" for="bannerLabel">Texto del botón (opcional)</label>
-            <input id="bannerLabel" type="text" class="field__control" />
-          </div>
-        </div>
-
-        <p id="bannerMsg" class="ok hidden">¡Guardado!</p>
-        <p id="bannerErr" class="error hidden">No se pudo guardar</p>
-      </div>
-
-      <div class="modal__footer">
-        <button id="cancelBanner" class="btn btn-ghost" value="cancel" formmethod="dialog">Cancelar</button>
-        <button id="submitBanner" class="btn btn-primary" value="confirm">Guardar</button>
-      </div>
-    </form>
-  </dialog>
-  
-
   <footer class="site-footer">
     <div class="site-footer__inner">
       <a class="site-footer__link" href="./politica-privacidad.html">Política de Privacidad</a>
-      <span class="site-footer__stats" id="statsBar" aria-live="polite">Online: — | Hoy: — | Semana: —</span>
+      <span class="site-footer__stats" id="statsBar">Online: — | Hoy: — | Semana: —</span>
     </div>
   </footer>
 
   <script src="./config.js"></script>
-<script type="module" src="./templates/banner.js" defer></script>
+  <script type="module" src="./templates/banner.js" defer></script>
   <script type="module" src="./app.js" defer></script>
   <script type="module" src="./index.js" defer></script>
 </body>
