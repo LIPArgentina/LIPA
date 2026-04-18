@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../../db");
 
 const ONLINE_WINDOW_MINUTES = 5;
+const LOCAL_TIMEZONE = "America/Argentina/Buenos_Aires";
 
 function getClientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
@@ -9,16 +10,6 @@ function getClientIp(req) {
     return forwarded.split(",")[0].trim();
   }
   return String(req.ip || req.socket?.remoteAddress || "");
-}
-
-function getWeekStartIso() {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(now.getDate() + diff);
-  return monday.toISOString();
 }
 
 async function ensureSiteStatsTable() {
@@ -84,16 +75,27 @@ module.exports = function createStatsRouter() {
 
   router.get("/public-stats", async (req, res) => {
     try {
-      const weekStartIso = getWeekStartIso();
       const { rows } = await pool.query(
         `
           SELECT
-            COUNT(*) FILTER (WHERE last_seen >= NOW() - ($1 || ' minutes')::INTERVAL) AS online,
-            COUNT(*) FILTER (WHERE last_seen >= DATE_TRUNC('day', NOW())) AS today,
-            COUNT(*) FILTER (WHERE last_seen >= $2::timestamptz) AS week
+            COUNT(*) FILTER (
+              WHERE last_seen >= NOW() - ($1 || ' minutes')::INTERVAL
+            ) AS online,
+
+            COUNT(*) FILTER (
+              WHERE last_seen >= (
+                DATE_TRUNC('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2
+              )
+            ) AS today,
+
+            COUNT(*) FILTER (
+              WHERE last_seen >= (
+                DATE_TRUNC('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2
+              )
+            ) AS week
           FROM site_visitors
         `,
-        [String(ONLINE_WINDOW_MINUTES), weekStartIso]
+        [String(ONLINE_WINDOW_MINUTES), LOCAL_TIMEZONE]
       );
 
       const row = rows[0] || {};
