@@ -1552,12 +1552,9 @@ async function tryApplyStatusIfExists(){
     if (!res.ok || !result?.ok || !result?.data) return false;
 
     const data = result.data;
-    if (planillaTieneContenido(data.localPlanilla)) {
-      applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
-    }
-    if (planillaTieneContenido(data.visitantePlanilla)) {
-      applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
-    }
+    // Importante: el match-status puede quedar viejo respecto de /api/admin/planillas.
+    // Para no pisar la planilla vigente, acá solo restauramos puntajes/estado del cruce.
+    // Los nombres/jugadores se siguen tomando siempre de la planilla base renderizada.
 
     const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
     const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
