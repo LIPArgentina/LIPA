@@ -13,84 +13,41 @@ const API_BASE = (() => {
         : 'https://liga-backend-tt82.onrender.com/api'));
 })();
 
-const STORAGE_KEY = 'llaves_tercera_local';
+const STORAGE_PREFIX = 'llaves_local_';
 const SAVE_KIND = 'llaves';
-const SAVE_CATEGORY = 'tercera';
 
-const BRACKET_CONFIG = [
-  {
-    id: 'q1',
-    slot: 'slot-q1',
-    title: 'Q1',
-    subtitle: 'Cuartos de final',
-    legs: 2,
-    helper: 'Serie ida y vuelta'
+const CATEGORY_CONFIG = {
+  tercera: {
+    subtitle: 'TERCERA',
+    layoutClass: 'bracket-tercera',
+    teamSource: 'tercera',
+    rounds: [
+      { id: 'q1', slot: 'slot-q1', title: 'Q1', subtitle: 'Cuartos de final', legs: 2, helper: 'Serie ida y vuelta' },
+      { id: 'q2', slot: 'slot-q2', title: 'Q2', subtitle: 'Cuartos de final', legs: 2, helper: 'Serie ida y vuelta' },
+      { id: 's1', slot: 'slot-s1', title: 'S1', subtitle: 'Semifinal', legs: 2, helper: 'Serie ida y vuelta' },
+      { id: 'final', slot: 'slot-final', title: 'Final', subtitle: 'Final única', legs: 1, helper: 'Partido único' },
+      { id: 'third', slot: 'slot-third', title: '3er y 4to puesto', subtitle: 'Partido por el podio', legs: 1, helper: 'Partido único' },
+      { id: 's2', slot: 'slot-s2', title: 'S2', subtitle: 'Semifinal', legs: 2, helper: 'Serie ida y vuelta' },
+      { id: 'q3', slot: 'slot-q3', title: 'Q3', subtitle: 'Cuartos de final', legs: 2, helper: 'Serie ida y vuelta' },
+      { id: 'q4', slot: 'slot-q4', title: 'Q4', subtitle: 'Cuartos de final', legs: 2, helper: 'Serie ida y vuelta' }
+    ],
+    slots: ['slot-q1','slot-q2','slot-s1','slot-final','slot-third','slot-s2','slot-q3','slot-q4']
   },
-  {
-    id: 'q2',
-    slot: 'slot-q2',
-    title: 'Q2',
-    subtitle: 'Cuartos de final',
-    legs: 2,
-    helper: 'Serie ida y vuelta'
-  },
-  {
-    id: 's1',
-    slot: 'slot-s1',
-    title: 'S1',
-    subtitle: 'Semifinal',
-    legs: 2,
-    helper: 'Serie ida y vuelta · sugerido: ganadores de Q1 y Q2'
-  },
-  {
-    id: 'final',
-    slot: 'slot-final',
-    title: 'Final',
-    subtitle: 'Final única',
-    legs: 1,
-    helper: 'Partido único'
-  },
-  {
-    id: 'third',
-    slot: 'slot-third',
-    title: '3er y 4to puesto',
-    subtitle: 'Partido por el podio',
-    legs: 1,
-    helper: 'Partido único entre les no ganadores de las semifinales'
-  },
-  {
-    id: 's2',
-    slot: 'slot-s2',
-    title: 'S2',
-    subtitle: 'Semifinal',
-    legs: 2,
-    helper: 'Serie ida y vuelta · sugerido: ganadores de Q3 y Q4'
-  },
-  {
-    id: 'q3',
-    slot: 'slot-q3',
-    title: 'Q3',
-    subtitle: 'Cuartos de final',
-    legs: 2,
-    helper: 'Serie ida y vuelta'
-  },
-  {
-    id: 'q4',
-    slot: 'slot-q4',
-    title: 'Q4',
-    subtitle: 'Cuartos de final',
-    legs: 2,
-    helper: 'Serie ida y vuelta'
+  segunda: {
+    subtitle: 'SEGUNDA',
+    layoutClass: 'bracket-segunda',
+    teamSource: 'segunda',
+    rounds: [
+      { id: 's1', slot: 'slot-s1', title: 'S1', subtitle: 'Semifinal', legs: 2, helper: 'Serie ida y vuelta' },
+      { id: 'final', slot: 'slot-final', title: 'Final', subtitle: 'Final única', legs: 1, helper: 'Partido único' },
+      { id: 'third', slot: 'slot-third', title: '3er y 4to puesto', subtitle: 'Partido por el podio', legs: 1, helper: 'Partido único' },
+      { id: 's2', slot: 'slot-s2', title: 'S2', subtitle: 'Semifinal', legs: 2, helper: 'Serie ida y vuelta' }
+    ],
+    slots: ['slot-s1','slot-final','slot-third','slot-s2']
   }
-];
+};
 
-const PLACEHOLDER_TEAMS = [
-  'WO',
-  'GANADOR Q1', 'GANADOR Q2', 'GANADOR Q3', 'GANADOR Q4',
-  'GANADOR S1', 'GANADOR S2',
-  'PERDEDOR S1', 'PERDEDOR S2'
-];
-
+let currentCategory = 'tercera';
 let TEAM_OPTIONS = ['WO'];
 
 function normalizeTeamName(name){
@@ -109,11 +66,19 @@ function unique(list){
   return Array.from(new Set(list.filter(Boolean)));
 }
 
-function getTeamOptions(){
-  return unique(['WO', ...TEAM_OPTIONS.filter(t => t !== 'WO'), ...PLACEHOLDER_TEAMS.filter(t => t !== 'WO')]);
+function getStorageKey(category){
+  return `${STORAGE_PREFIX}${category}`;
 }
 
-async function loadUsersJS(cat = 'tercera'){
+function getCategoryConfig(category = currentCategory){
+  return CATEGORY_CONFIG[category] || CATEGORY_CONFIG.tercera;
+}
+
+function getTeamOptions(){
+  return unique(['WO', ...TEAM_OPTIONS.filter(Boolean).map(normalizeTeamName)]);
+}
+
+async function loadUsersJS(cat){
   return new Promise((resolve, reject) => {
     const ID = 'users-script';
     const old = document.getElementById(ID);
@@ -146,9 +111,10 @@ function getEmptyLeg(){
   };
 }
 
-function getDefaultData(){
+function getDefaultData(category = currentCategory){
+  const cfg = getCategoryConfig(category);
   return {
-    rounds: BRACKET_CONFIG.map(item => ({
+    rounds: cfg.rounds.map(item => ({
       id: item.id,
       title: item.title,
       legs: Array.from({ length: item.legs }, () => getEmptyLeg())
@@ -156,8 +122,8 @@ function getDefaultData(){
   };
 }
 
-function mergeWithDefaults(raw){
-  const base = getDefaultData();
+function mergeWithDefaults(raw, category = currentCategory){
+  const base = getDefaultData(category);
   if (!raw || !Array.isArray(raw.rounds)) return base;
 
   base.rounds.forEach(round => {
@@ -185,42 +151,36 @@ function mergeWithDefaults(raw){
   return base;
 }
 
-async function loadFromServer(){
+async function loadFromServer(category = currentCategory){
   try {
-    const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(SAVE_KIND)}&category=${encodeURIComponent(SAVE_CATEGORY)}`, {
+    const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(SAVE_KIND)}&category=${encodeURIComponent(category)}`, {
       cache: 'no-store'
     });
     const data = await resp.json().catch(() => null);
     if (!resp.ok || !data?.ok || !data?.data) throw new Error('Sin datos guardados');
-    return mergeWithDefaults(data.data);
+    return mergeWithDefaults(data.data, category);
   } catch (_) {
     return null;
   }
 }
 
-function loadFromLocal(){
+function loadFromLocal(category = currentCategory){
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey(category));
     if (!raw) return null;
-    return mergeWithDefaults(JSON.parse(raw));
+    return mergeWithDefaults(JSON.parse(raw), category);
   } catch (_) {
     return null;
   }
 }
 
-function saveLocal(data){
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function saveLocal(data, category = currentCategory){
+  try { localStorage.setItem(getStorageKey(category), JSON.stringify(data)); }
   catch (_) {}
 }
 
 function makeScoreOptions(max, selected){
   return Array.from({ length: max + 1 }, (_, n) => `<option value="${n}" ${Number(selected) === n ? 'selected' : ''}>${n}</option>`).join('');
-}
-
-function makeTeamOptions(selected){
-  const safe = normalizeTeamName(selected) || 'WO';
-  const options = unique([...getTeamOptions(), safe]);
-  return options.map(name => `<option value="${escapeHtml(name)}" ${name === safe ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
 }
 
 function escapeHtml(value){
@@ -230,6 +190,12 @@ function escapeHtml(value){
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function makeTeamOptions(selected){
+  const safe = normalizeTeamName(selected) || 'WO';
+  const options = unique([...getTeamOptions(), safe]);
+  return options.map(name => `<option value="${escapeHtml(name)}" ${name === safe ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
 }
 
 function createLegMarkup(roundId, legIndex, legData, totalLegs){
@@ -252,37 +218,19 @@ function createLegMarkup(roundId, legIndex, legData, totalLegs){
   `;
 }
 
-function aggregateRound(round){
-  const totals = { home: 0, away: 0, homeExtra: 0, awayExtra: 0 };
-  (round.legs || []).forEach(leg => {
-    totals.home += Number(leg?.home?.puntos || 0);
-    totals.away += Number(leg?.away?.puntos || 0);
-    totals.homeExtra += Number(leg?.home?.puntosExtra || 0);
-    totals.awayExtra += Number(leg?.away?.puntosExtra || 0);
-  });
-  return totals;
-}
-
-function getLeaderLabel(round){
-  const { home, away, homeExtra, awayExtra } = aggregateRound(round);
-  if (home > away) return 'Local arriba';
-  if (away > home) return 'Visitante arriba';
-  if (homeExtra > awayExtra) return 'Desempata local';
-  if (awayExtra > homeExtra) return 'Desempata visitante';
-  return 'Serie igualada';
-}
-
 function renderBracket(data){
-  BRACKET_CONFIG.forEach(config => {
+  const cfg = getCategoryConfig();
+  clearUnusedSlots(cfg);
+
+  cfg.rounds.forEach(config => {
     const round = data.rounds.find(r => r.id === config.id) || { legs: [] };
     const slot = document.getElementById(config.slot);
     if (!slot) return;
 
     const legsMarkup = round.legs.map((leg, index) => createLegMarkup(config.id, index, leg, config.legs)).join('');
-    const totals = aggregateRound(round);
 
     slot.innerHTML = `
-      <article class="tie-card card ${config.legs === 1 ? 'single-match' : ''}" data-round-card="${config.id}">
+      <article class="tie-card" data-round-card="${config.id}">
         <div class="tie-header">
           <div>
             <div class="tie-subtitle">${escapeHtml(config.subtitle)}</div>
@@ -291,18 +239,37 @@ function renderBracket(data){
         </div>
         <p class="tie-helper">${escapeHtml(config.helper)}</p>
         <div class="round-group">${legsMarkup}</div>
-        <div class="agg-row">
-          <div class="agg-chip">Serie <strong>${totals.home} - ${totals.away}</strong></div>
-          <div class="agg-chip">Extra <strong>${totals.homeExtra} - ${totals.awayExtra}</strong></div>
-          <div class="agg-chip">${escapeHtml(getLeaderLabel(round))}</div>
-        </div>
       </article>
     `;
   });
 }
 
+function clearUnusedSlots(cfg){
+  const allSlots = unique(Object.values(CATEGORY_CONFIG).flatMap(item => item.slots));
+  allSlots.forEach(slotId => {
+    const slot = document.getElementById(slotId);
+    if (slot && !cfg.slots.includes(slotId)) slot.innerHTML = '';
+  });
+
+  const root = document.getElementById('bracketRoot');
+  root.classList.remove('bracket-tercera', 'bracket-segunda');
+  root.classList.add(cfg.layoutClass);
+
+  const qfLeft = document.querySelector('.qf-left');
+  const qfRight = document.querySelector('.qf-right');
+
+  if (cfg.layoutClass === 'bracket-segunda'){
+    if (qfLeft) qfLeft.style.display = 'none';
+    if (qfRight) qfRight.style.display = 'none';
+  } else {
+    if (qfLeft) qfLeft.style.display = '';
+    if (qfRight) qfRight.style.display = '';
+  }
+}
+
 function readBracketFromUI(){
-  const rounds = BRACKET_CONFIG.map(config => {
+  const cfg = getCategoryConfig();
+  const rounds = cfg.rounds.map(config => {
     const card = document.querySelector(`[data-round-card="${config.id}"]`);
     const legEls = Array.from(card?.querySelectorAll('.match-block') || []);
 
@@ -328,16 +295,11 @@ function readBracketFromUI(){
   return { rounds };
 }
 
-function refreshTotals(){
-  const data = readBracketFromUI();
-  saveLocal(data);
-  renderBracket(data);
-  wireInputs();
-}
-
 function wireInputs(){
   document.querySelectorAll('#bracketRoot select, #bracketRoot input[type="date"]').forEach(el => {
-    el.addEventListener('change', refreshTotals);
+    el.addEventListener('change', () => {
+      saveLocal(readBracketFromUI(), currentCategory);
+    });
   });
 }
 
@@ -350,16 +312,24 @@ function showToast(message, ms = 2500){
   showToast._t = setTimeout(() => el.classList.remove('show'), ms);
 }
 
+function setActiveCategoryButton(category){
+  document.querySelectorAll('.cat-btn[data-category]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.category === category);
+  });
+  const subtitle = document.getElementById('categorySubtitle');
+  if (subtitle) subtitle.textContent = getCategoryConfig(category).subtitle;
+}
+
 async function saveOnServer(){
   const data = readBracketFromUI();
-  saveLocal(data);
+  saveLocal(data, currentCategory);
 
   const resp = await fetch(`${API_BASE}/fixture`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       kind: SAVE_KIND,
-      category: SAVE_CATEGORY,
+      category: currentCategory,
       data
     })
   });
@@ -372,13 +342,31 @@ async function saveOnServer(){
   showToast('Llaves guardadas correctamente');
 }
 
-async function bootstrap(){
-  TEAM_OPTIONS = await loadUsersJS('tercera');
-  const serverData = await loadFromServer();
-  const localData = loadFromLocal();
-  const data = serverData || localData || getDefaultData();
+async function renderCategory(category){
+  currentCategory = category;
+  setActiveCategoryButton(category);
+  TEAM_OPTIONS = await loadUsersJS(getCategoryConfig(category).teamSource);
+  const serverData = await loadFromServer(category);
+  const localData = loadFromLocal(category);
+  const data = serverData || localData || getDefaultData(category);
   renderBracket(data);
   wireInputs();
+}
+
+async function bootstrap(){
+  await renderCategory(currentCategory);
+
+  document.querySelectorAll('.cat-btn[data-category]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const nextCategory = btn.dataset.category || 'tercera';
+      try {
+        await renderCategory(nextCategory);
+      } catch (err) {
+        console.error(err);
+        alert(err?.message || 'No se pudieron cargar las llaves');
+      }
+    });
+  });
 
   document.getElementById('saveBracket')?.addEventListener('click', async () => {
     try {
@@ -390,8 +378,8 @@ async function bootstrap(){
   });
 
   document.getElementById('resetBracket')?.addEventListener('click', () => {
-    const clean = getDefaultData();
-    saveLocal(clean);
+    const clean = getDefaultData(currentCategory);
+    saveLocal(clean, currentCategory);
     renderBracket(clean);
     wireInputs();
     showToast('Llaves reiniciadas');

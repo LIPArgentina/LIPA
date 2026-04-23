@@ -14,54 +14,50 @@
     <header>
       <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png" /></a>
       <div class="header-center">
-        <div class="title">LLAVES <span class="subtitle">TERCERA</span></div>
+        <div class="title">LLAVES <span id="categorySubtitle" class="subtitle">TERCERA</span></div>
       </div>
       <nav class="actions">
         <a class="btn" href="../admin.html">VOLVER</a>
       </nav>
     </header>
 
-    <section class="toolbar card toolbar-card">
-      <div class="toolbar-left">
-        <div class="pill-static active">TERCERA</div>
-        <div class="pill-static">CUARTOS · IDA Y VUELTA</div>
-        <div class="pill-static">SEMI · IDA Y VUELTA</div>
-        <div class="pill-static">FINAL ÚNICA</div>
-      </div>
-      <div class="toolbar-right">
-        <button id="resetBracket" class="btn btn-secondary" type="button">Reiniciar</button>
-      </div>
+    <section class="category-bar">
+      <button class="cat-btn" data-category="segunda" type="button">SEGUNDA</button>
+      <button class="cat-btn active" data-category="tercera" type="button">TERCERA</button>
+      <button id="resetBracket" class="btn btn-secondary reset-btn" type="button">Reiniciar</button>
     </section>
 
-    <main class="bracket" id="bracketRoot">
-      <section class="bracket-col qf-left" aria-label="Cuartos de final izquierda">
-        <div id="slot-q1"></div>
-        <div id="slot-q2"></div>
-      </section>
+    <div class="bracket-scroll">
+      <main class="bracket bracket-tercera" id="bracketRoot" aria-label="Llaves eliminatorias">
+        <section class="bracket-col qf-left" aria-label="Cuartos de final izquierda">
+          <div id="slot-q1"></div>
+          <div id="slot-q2"></div>
+        </section>
 
-      <section class="bracket-col sf-left" aria-label="Semifinal izquierda">
-        <div id="slot-s1"></div>
-      </section>
+        <section class="bracket-col sf-left" aria-label="Semifinal izquierda">
+          <div id="slot-s1"></div>
+        </section>
 
-      <section class="bracket-col center-col" aria-label="Final y tercer puesto">
-        <div id="slot-final"></div>
-        <div id="slot-third"></div>
-      </section>
+        <section class="bracket-col center-col" aria-label="Final y tercer puesto">
+          <div id="slot-final"></div>
+          <div id="slot-third"></div>
+        </section>
 
-      <section class="bracket-col sf-right" aria-label="Semifinal derecha">
-        <div id="slot-s2"></div>
-      </section>
+        <section class="bracket-col sf-right" aria-label="Semifinal derecha">
+          <div id="slot-s2"></div>
+        </section>
 
-      <section class="bracket-col qf-right" aria-label="Cuartos de final derecha">
-        <div id="slot-q3"></div>
-        <div id="slot-q4"></div>
-      </section>
-    </main>
+        <section class="bracket-col qf-right" aria-label="Cuartos de final derecha">
+          <div id="slot-q3"></div>
+          <div id="slot-q4"></div>
+        </section>
+      </main>
+    </div>
+
+    <div class="save-wrap">
+      <button id="saveBracket" class="save-btn" type="button">Guardar llaves</button>
+    </div>
   </div>
-
-  <footer>
-    <button id="saveBracket" class="save-btn" type="button">Guardar llaves</button>
-  </footer>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
