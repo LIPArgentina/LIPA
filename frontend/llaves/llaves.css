@@ -1,27 +1,15 @@
-/* AGREGA ESTO */
+/* llaves.css */
 .bracket{
   display:flex;
   gap:40px;
-  justify-content:center;
-  min-width:1200px;
+  overflow-x:auto;
+  padding:20px;
 }
-
-.side{
+.col{
   display:flex;
   flex-direction:column;
   gap:20px;
 }
-
-.center{
-  display:flex;
-  flex-direction:column;
-  gap:20px;
+.center-col{
   align-items:center;
-}
-
-.series-card{
-  background:#111;
-  color:#fff;
-  padding:12px;
-  border-radius:12px;
 }
