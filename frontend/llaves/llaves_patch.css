@@ -1,0 +1,28 @@
+
+.bracket{
+  display:flex;
+  gap:40px;
+  justify-content:center;
+  min-width:1200px;
+}
+
+.side{
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+
+.center{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:20px;
+}
+
+.center .series-card{
+  width:320px;
+}
+
+.side .series-card{
+  width:280px;
+}
