@@ -1,15 +1,17 @@
-/* llaves.css */
+
 .bracket{
   display:flex;
   gap:40px;
   overflow-x:auto;
   padding:20px;
 }
+
 .col{
   display:flex;
   flex-direction:column;
   gap:20px;
 }
-.center-col{
+
+.center{
   align-items:center;
 }
