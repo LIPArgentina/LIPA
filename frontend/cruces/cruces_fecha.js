@@ -1854,34 +1854,33 @@ btn.onclick = async () => {
   }
 
   
-  function sheetFileNameForMatch(ext){
-    const exportData = window.__CRUCE_EXPORT_DATA__ || {};
-    const localRaw = exportData.local?.name || exportData.local?.team || 'local';
-    const visitanteRaw = exportData.visitante?.name || exportData.visitante?.team || 'visitante';
-    const categoryRaw = exportData.category || deriveCategory() || 'categoria';
+  
+function sheetFileNameForMatch(ext){
+  const exportData = window.__CRUCE_EXPORT_DATA__ || {};
 
-    const slugify = (value) => String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .toLowerCase();
+  const localRaw = exportData.local?.name || exportData.local?.team || 'local';
+  const visitanteRaw = exportData.visitante?.name || exportData.visitante?.team || 'visitante';
 
-    const fechaRaw = String(exportData.date || exportData.fecha || window.__CRUCE_FECHA_ISO || '').trim();
-    let fecha = '';
+  const slugify = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+
+  const fechaRaw = String(exportData.date || exportData.fecha || window.__CRUCE_FECHA_ISO || '').trim();
+  let fecha = '';
+  if (fechaRaw) {
     const m = fechaRaw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) {
-      fecha = `${m[1]}-${m[2]}-${m[3]}`;
-    } else {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      fecha = `${yyyy}-${mm}-${dd}`;
-    }
-
-    return `planilla-${slugify(categoryRaw)}-${slugify(localRaw)}-vs-${slugify(visitanteRaw)}-${fecha}.${ext}`;
+    if (m) fecha = `${m[1]}-${m[2]}-${m[3]}`;
   }
+
+  const local = slugify(localRaw);
+  const visitante = slugify(visitanteRaw);
+
+  return `${local}-vs-${visitante}${fecha ? '-' + fecha : ''}.${ext}`;
+}
+
 
 
 function isAndroidAppWebView(){
