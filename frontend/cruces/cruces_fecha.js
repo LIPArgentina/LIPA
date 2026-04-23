@@ -444,6 +444,26 @@ function apiUrl(path){
       normalized[normalized.length - 1];
 
     if (!chosen) {
+      const ctx = getCrucesTeamContext();
+      const team = ctx.primaryTeam || '';
+      if (team) {
+        try {
+          const llavesData = await fetchJson(apiUrl('/api/llaves/proximo-cruce?category=' + encodeURIComponent(category) + '&team=' + encodeURIComponent(team)), { cache: 'no-store', credentials: 'same-origin' });
+          if (llavesData?.match) {
+            return {
+              cruces: [{
+                local: llavesData.match.local,
+                visitante: llavesData.match.visitante,
+                localSlug: teamSlugFromRef(llavesData.match.local),
+                visitanteSlug: teamSlugFromRef(llavesData.match.visitante),
+                date: llavesData.match.date
+              }],
+              fechaFixture: llavesData.match.date,
+              fixtureKind: 'llaves'
+            };
+          }
+        } catch (_) {}
+      }
       return { cruces: [], fechaFixture: null, fixtureKind: null };
     }
 
@@ -2365,7 +2385,21 @@ btn.onclick = async () => {
       const cruces = Array.isArray(crucesRaw?.cruces) ? crucesRaw.cruces : [];
       if (!cruces.length) throw new Error('No se encontraron cruces en la base de datos para esta categoría.');
 
-      const match = findCruceForTeam(cruces, teamCandidates);
+      let match = findCruceForTeam(cruces, teamCandidates);
+      if (!match) {
+        try {
+          const llavesData = await fetchJson(apiUrl('/api/llaves/proximo-cruce?category=' + encodeURIComponent(category) + '&team=' + encodeURIComponent(teamSlug)), { cache: 'no-store', credentials: 'same-origin' });
+          if (llavesData?.match) {
+            match = {
+              local: llavesData.match.local,
+              visitante: llavesData.match.visitante,
+              localSlug: teamSlugFromRef(llavesData.match.local),
+              visitanteSlug: teamSlugFromRef(llavesData.match.visitante),
+              date: llavesData.match.date
+            };
+          }
+        } catch (_) {}
+      }
       if (!match) throw new Error('No se encontró un cruce para el equipo logueado.');
 
       window.__CRUCE_FECHA_ISO = match.date || crucesRaw?.fechaFixture || new Date().toISOString().slice(0,10);

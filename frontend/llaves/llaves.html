@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Llaves</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="llaves.css">
+</head>
+<body class="llaves-body admin-mode">
+  <header class="llaves-header">
+    <a class="logo-link" href="../index.html"><img src="../logo_liga.png" alt="LIPA"></a>
+    <div>
+      <h1>LLAVES</h1>
+      <p>Editor admin de eliminatoria directa</p>
+    </div>
+    <div class="header-actions">
+      <a class="btn-gold" href="../admin.html?admin=1">ADMIN</a>
+      <a class="btn-gold" href="../index.html">VOLVER</a>
+    </div>
+  </header>
+
+  <main class="llaves-page">
+    <section class="toolbar-card">
+      <div class="switches" role="tablist" aria-label="Categoría">
+        <button class="sw active" data-category="tercera">tercera</button>
+        <button class="sw" data-category="segunda">segunda</button>
+      </div>
+      <div id="saveStatus" class="save-status">Cargando…</div>
+    </section>
+
+    <section class="standings-card">
+      <h2>Clasificados automáticos desde tabla de posiciones</h2>
+      <div id="standingsSummary" class="standings-summary"></div>
+    </section>
+
+    <section class="diagram-shell">
+      <div id="llavesDiagram" class="llaves-diagram is-admin"></div>
+    </section>
+  </main>
+
+  <script src="../config.js"></script>
+  <script src="../llaves/llaves_shared.js"></script>
+  <script src="../llaves/llaves.js"></script>
+</body>
+</html>
