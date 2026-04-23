@@ -1868,7 +1868,54 @@ btn.onclick = async () => {
     return `planilla-${slugify(category)}-${slugify(localName)}-vs-${slugify(visitanteName)}.${ext}`;
   }
 
-  function downloadBlob(blob, filename){
+  function isAndroidAppWebView(){
+    return !!(window.AndroidBridge && typeof window.AndroidBridge.saveBase64File === 'function');
+  }
+
+  function saveBlobThroughAndroid(blob, fileName, mimeType){
+    return new Promise((resolve, reject) => {
+      try {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          try {
+            const dataUrl = reader.result;
+            if (!dataUrl) {
+              reject(new Error('No se pudo convertir el archivo a base64.'));
+              return;
+            }
+
+            window.AndroidBridge.saveBase64File(
+              String(dataUrl),
+              String(fileName || 'archivo'),
+              String(mimeType || blob?.type || 'application/octet-stream')
+            );
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Error leyendo el archivo.'));
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  function notifyAndroidToast(message){
+    try {
+      if (window.AndroidBridge && typeof window.AndroidBridge.showToast === 'function') {
+        window.AndroidBridge.showToast(String(message || ''));
+      }
+    } catch (_) {}
+  }
+
+  async function downloadBlob(blob, filename, mimeType){
+    if (isAndroidAppWebView()) {
+      await saveBlobThroughAndroid(blob, filename, mimeType || blob?.type || 'application/octet-stream');
+      return;
+    }
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -2135,14 +2182,22 @@ btn.onclick = async () => {
       compress: true
     });
     pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
-    pdf.save(sheetFileNameForMatch('pdf'));
+
+    const filename = sheetFileNameForMatch('pdf');
+    if (isAndroidAppWebView()) {
+      const pdfBlob = pdf.output('blob');
+      await downloadBlob(pdfBlob, filename, 'application/pdf');
+      return;
+    }
+
+    pdf.save(filename);
   }
 
   async function exportCurrentSheetAsJpg(){
     const canvas = await renderExportCanvas();
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.96));
     if (!blob) throw new Error('No se pudo generar la imagen JPG.');
-    downloadBlob(blob, sheetFileNameForMatch('jpg'));
+    await downloadBlob(blob, sheetFileNameForMatch('jpg'), 'image/jpeg');
   }
 
   function wireExportButtons(){
@@ -2163,7 +2218,8 @@ btn.onclick = async () => {
       try {
         btnPdf.disabled = true;
         await exportCurrentSheetAsPdf();
-        showToast('PDF generado correctamente.', 'success');
+        showToast(isAndroidAppWebView() ? 'PDF guardado correctamente.' : 'PDF generado correctamente.', 'success');
+        notifyAndroidToast(isAndroidAppWebView() ? 'PDF guardado correctamente.' : 'PDF generado correctamente.');
       } catch (e) {
         console.error(e);
         showToast(e?.message || 'No se pudo generar el PDF.', 'error');
@@ -2177,7 +2233,8 @@ btn.onclick = async () => {
       try {
         btnJpg.disabled = true;
         await exportCurrentSheetAsJpg();
-        showToast('JPG generado correctamente.', 'success');
+        showToast(isAndroidAppWebView() ? 'JPG guardado correctamente.' : 'JPG generado correctamente.', 'success');
+        notifyAndroidToast(isAndroidAppWebView() ? 'JPG guardado correctamente.' : 'JPG generado correctamente.');
       } catch (e) {
         console.error(e);
         showToast(e?.message || 'No se pudo generar el JPG.', 'error');
