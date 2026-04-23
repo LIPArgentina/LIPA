@@ -3,46 +3,68 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Llaves</title>
-  <link rel="stylesheet" href="../styles.css">
-  <link rel="stylesheet" href="llaves.css">
-  <link rel="stylesheet" href="llaves_patch.css">
+  <title>LLAVES | Liga de Pool Independiente</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="llaves.css" />
 </head>
-<body class="llaves-body admin-mode">
-  <header class="llaves-header">
-    <a class="logo-link" href="../index.html"><img src="../logo_liga.png" alt="LIPA"></a>
-    <div>
-      <h1>LLAVES</h1>
-      <p>Editor admin de eliminatoria directa</p>
-    </div>
-    <div class="header-actions">
-      <a class="btn-gold" href="../admin.html?admin=1">ADMIN</a>
-      <a class="btn-gold" href="../index.html">VOLVER</a>
-    </div>
-  </header>
-
-  <main class="llaves-page">
-    <section class="toolbar-card">
-      <div class="switches" role="tablist" aria-label="Categoría">
-        <button class="sw active" data-category="tercera">tercera</button>
-        <button class="sw" data-category="segunda">segunda</button>
+<body>
+  <div class="container">
+    <header>
+      <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png" /></a>
+      <div class="header-center">
+        <div class="title">LLAVES <span class="subtitle">TERCERA</span></div>
       </div>
-      <div id="saveStatus" class="save-status">Cargando…</div>
+      <nav class="actions">
+        <a class="btn" href="../admin.html">VOLVER</a>
+      </nav>
+    </header>
+
+    <section class="toolbar card toolbar-card">
+      <div class="toolbar-left">
+        <div class="pill-static active">TERCERA</div>
+        <div class="pill-static">CUARTOS · IDA Y VUELTA</div>
+        <div class="pill-static">SEMI · IDA Y VUELTA</div>
+        <div class="pill-static">FINAL ÚNICA</div>
+      </div>
+      <div class="toolbar-right">
+        <button id="resetBracket" class="btn btn-secondary" type="button">Reiniciar</button>
+      </div>
     </section>
 
-    <section class="standings-card">
-      <h2>Clasificados automáticos desde tabla de posiciones</h2>
-      <div id="standingsSummary" class="standings-summary"></div>
-    </section>
+    <main class="bracket" id="bracketRoot">
+      <section class="bracket-col qf-left" aria-label="Cuartos de final izquierda">
+        <div id="slot-q1"></div>
+        <div id="slot-q2"></div>
+      </section>
 
-    <section class="diagram-shell">
-      <div id="llavesDiagram" class="llaves-diagram is-admin"></div>
-    </section>
-  </main>
+      <section class="bracket-col sf-left" aria-label="Semifinal izquierda">
+        <div id="slot-s1"></div>
+      </section>
 
-  <script src="../config.js"></script>
-  <script src="../llaves/llaves_shared.js"></script>
-  <script src="../llaves/llaves.js"></script>
-  <script src="llaves_override.js"></script>
+      <section class="bracket-col center-col" aria-label="Final y tercer puesto">
+        <div id="slot-final"></div>
+        <div id="slot-third"></div>
+      </section>
+
+      <section class="bracket-col sf-right" aria-label="Semifinal derecha">
+        <div id="slot-s2"></div>
+      </section>
+
+      <section class="bracket-col qf-right" aria-label="Cuartos de final derecha">
+        <div id="slot-q3"></div>
+        <div id="slot-q4"></div>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <button id="saveBracket" class="save-btn" type="button">Guardar llaves</button>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="llaves.js"></script>
 </body>
 </html>
