@@ -101,14 +101,14 @@ header img{ height:60px; width:auto; display:block; }
   display:grid;
   gap:28px;
   align-items:start;
-  min-width:1840px;
+  min-width:2240px;
 }
 .bracket-tercera{
-  grid-template-columns:420px 320px 360px 320px 420px;
+  grid-template-columns:520px 390px 430px 390px 520px;
 }
 .bracket-segunda{
-  grid-template-columns:320px 360px 320px;
-  min-width:1080px;
+  grid-template-columns:390px 430px 390px;
+  min-width:1280px;
 }
 .bracket-col{ display:flex; flex-direction:column; gap:22px; min-width:0; }
 .qf-left,.qf-right{ padding-top:8px; }
@@ -165,7 +165,7 @@ header img{ height:60px; width:auto; display:block; }
   border-radius:16px;
   padding:10px 10px 8px;
   background:#101114;
-  overflow:hidden;
+  overflow:visible;
 }
 .match-top{
   display:flex;
@@ -195,7 +195,7 @@ header img{ height:60px; width:auto; display:block; }
 
 .team-row{
   display:grid;
-  grid-template-columns:34px 44px minmax(140px,1fr) minmax(140px,1fr) 44px 34px;
+  grid-template-columns:34px 44px minmax(180px,1fr) minmax(180px,1fr) 44px 34px;
   gap:10px;
   align-items:center;
 }
@@ -215,7 +215,7 @@ header img{ height:60px; width:auto; display:block; }
   color:#fff;
   border:1px solid #444;
   padding:6px 8px;
-  font-size:14px;
+  font-size:15px;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
