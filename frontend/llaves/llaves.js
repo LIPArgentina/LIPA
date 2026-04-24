@@ -180,6 +180,274 @@ function saveLocal(data, category = currentCategory){
   catch (_) {}
 }
 
+function getGroupsForCategory(category){
+  return category === 'segunda' ? ['A','B'] : ['A','B','C','D'];
+}
+
+function normalizeForCompare(name){
+  return normalizeTeamName(name)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+function parseScore(value){
+  const n = parseInt(value ?? 0, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function fetchFixtureData(kind, category){
+  const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}`, {
+    cache: 'no-store'
+  });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok || !data?.ok || !data?.data) {
+    throw new Error(data?.error || `No se pudo cargar fixture ${kind} de ${category}`);
+  }
+  return data.data;
+}
+
+function collectFixtureEntries(ida, vuelta){
+  const entries = [];
+  [
+    { kind:'ida', data: ida },
+    { kind:'vuelta', data: vuelta }
+  ].forEach(feed => {
+    (feed.data?.fechas || []).forEach((fecha, idx) => {
+      entries.push({ kind: feed.kind, fechaIndex: idx + 1, fecha });
+    });
+  });
+  return entries;
+}
+
+function iterateGroupMatches(entries, callback){
+  (entries || []).forEach(entry => {
+    (entry.fecha?.tablas || []).forEach(tabla => {
+      const group = String(tabla?.grupo || '').toUpperCase();
+      const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+
+      for (let i = 0; i < equipos.length; i += 2) {
+        const home = equipos[i];
+        const away = equipos[i + 1];
+        if (!home || !away) continue;
+
+        const homeName = normalizeTeamName(home.equipo);
+        const awayName = normalizeTeamName(away.equipo);
+        if (!homeName || !awayName) continue;
+        if (normalizeForCompare(homeName) === 'WO' || normalizeForCompare(awayName) === 'WO') continue;
+
+        callback({
+          group,
+          home: {
+            team: homeName,
+            key: normalizeForCompare(homeName),
+            puntos: parseScore(home.puntos),
+            puntosExtra: parseScore(home.puntosExtra)
+          },
+          away: {
+            team: awayName,
+            key: normalizeForCompare(awayName),
+            puntos: parseScore(away.puntos),
+            puntosExtra: parseScore(away.puntosExtra)
+          }
+        });
+      }
+    });
+  });
+}
+
+function computeHeadToHead(group, tiedKeys, entries){
+  const tied = new Set(tiedKeys);
+  const table = Object.create(null);
+
+  tiedKeys.forEach(key => {
+    table[key] = { pts: 0, tr: 0 };
+  });
+
+  iterateGroupMatches(entries, match => {
+    if (match.group !== group) return;
+    if (!tied.has(match.home.key) || !tied.has(match.away.key)) return;
+
+    table[match.home.key].pts += match.home.puntos;
+    table[match.home.key].tr += match.home.puntosExtra;
+    table[match.away.key].pts += match.away.puntos;
+    table[match.away.key].tr += match.away.puntosExtra;
+  });
+
+  return table;
+}
+
+function computeStandings(category, ida, vuelta){
+  const groups = getGroupsForCategory(category);
+  const entries = collectFixtureEntries(ida, vuelta);
+
+  const stats = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
+
+  iterateGroupMatches(entries, match => {
+    if (!groups.includes(match.group)) return;
+
+    [match.home, match.away].forEach(team => {
+      if (!stats[match.group][team.key]) {
+        stats[match.group][team.key] = {
+          key: team.key,
+          equipo: team.team,
+          pts: 0,
+          tr: 0,
+          ju: 0
+        };
+      }
+    });
+
+    // Si todo está en cero, lo consideramos no jugado para JU,
+    // pero no afecta puntos/triángulos.
+    const played = (
+      match.home.puntos > 0 ||
+      match.away.puntos > 0 ||
+      match.home.puntosExtra > 0 ||
+      match.away.puntosExtra > 0
+    );
+
+    stats[match.group][match.home.key].pts += match.home.puntos;
+    stats[match.group][match.home.key].tr += match.home.puntosExtra;
+    stats[match.group][match.away.key].pts += match.away.puntos;
+    stats[match.group][match.away.key].tr += match.away.puntosExtra;
+
+    if (played) {
+      stats[match.group][match.home.key].ju += 1;
+      stats[match.group][match.away.key].ju += 1;
+    }
+  });
+
+  const result = {};
+
+  groups.forEach(group => {
+    const rows = Object.values(stats[group]);
+    const buckets = new Map();
+
+    rows.forEach(row => {
+      const bucketKey = `${row.pts}|${row.tr}`;
+      if (!buckets.has(bucketKey)) buckets.set(bucketKey, []);
+      buckets.get(bucketKey).push(row);
+    });
+
+    const bucketKeys = Array.from(buckets.keys()).sort((a,b) => {
+      const [ap, at] = a.split('|').map(Number);
+      const [bp, bt] = b.split('|').map(Number);
+      return (bp - ap) || (bt - at);
+    });
+
+    const ordered = [];
+
+    bucketKeys.forEach(bucketKey => {
+      const bucket = buckets.get(bucketKey);
+      if (bucket.length <= 1) {
+        ordered.push(...bucket);
+        return;
+      }
+
+      const tiedKeys = bucket.map(row => row.key);
+      const h2h = computeHeadToHead(group, tiedKeys, entries);
+
+      bucket.sort((a,b) => {
+        const hA = h2h[a.key] || { pts: 0, tr: 0 };
+        const hB = h2h[b.key] || { pts: 0, tr: 0 };
+        return (hB.pts - hA.pts) ||
+               (hB.tr - hA.tr) ||
+               String(a.equipo).localeCompare(String(b.equipo), 'es', { sensitivity:'base' });
+      });
+
+      ordered.push(...bucket);
+    });
+
+    result[group] = ordered.map((row, idx) => ({
+      ...row,
+      pos: idx + 1
+    }));
+  });
+
+  return result;
+}
+
+function getRound(data, id){
+  return data.rounds.find(round => round.id === id);
+}
+
+function setTwoLegTie(data, roundId, firstPlaceTeam, secondPlaceTeam){
+  const round = getRound(data, roundId);
+  if (!round || round.legs.length < 2) return;
+
+  const first = normalizeTeamName(firstPlaceTeam) || 'WO';
+  const second = normalizeTeamName(secondPlaceTeam) || 'WO';
+
+  // Regla LIPA: el 1ro de grupo arranca visitante/derecha y define local/izquierda.
+  round.legs[0].home.team = second;
+  round.legs[0].away.team = first;
+  round.legs[1].home.team = first;
+  round.legs[1].away.team = second;
+}
+
+async function applyAutomaticEntrants(data, category){
+  const [ida, vuelta] = await Promise.all([
+    fetchFixtureData('ida', category),
+    fetchFixtureData('vuelta', category)
+  ]);
+
+  const standings = computeStandings(category, ida, vuelta);
+  const team = (group, pos) => standings[group]?.find(row => row.pos === pos)?.equipo || 'WO';
+
+  if (category === 'tercera') {
+    setTwoLegTie(data, 'q1', team('A', 1), team('B', 2));
+    setTwoLegTie(data, 'q2', team('C', 1), team('D', 2));
+    setTwoLegTie(data, 'q3', team('B', 1), team('A', 2));
+    setTwoLegTie(data, 'q4', team('D', 1), team('C', 2));
+  } else {
+    setTwoLegTie(data, 's1', team('A', 1), team('B', 2));
+    setTwoLegTie(data, 's2', team('B', 1), team('A', 2));
+  }
+
+  return standings;
+}
+
+function getAutoEntrantRoundIds(category){
+  return category === 'tercera'
+    ? new Set(['q1','q2','q3','q4'])
+    : new Set(['s1','s2']);
+}
+
+function mergeSavedDbData(baseData, savedData, category){
+  if (!savedData || !Array.isArray(savedData.rounds)) return baseData;
+
+  const autoRounds = getAutoEntrantRoundIds(category);
+
+  baseData.rounds.forEach(round => {
+    const savedRound = savedData.rounds.find(r => r?.id === round.id);
+    if (!savedRound || !Array.isArray(savedRound.legs)) return;
+
+    round.legs.forEach((leg, index) => {
+      const savedLeg = savedRound.legs[index];
+      if (!savedLeg) return;
+
+      // Siempre preservamos fecha y resultados guardados.
+      leg.date = typeof savedLeg.date === 'string' ? savedLeg.date : leg.date;
+      leg.home.puntos = Number(savedLeg?.home?.puntos || 0);
+      leg.home.puntosExtra = Number(savedLeg?.home?.puntosExtra || 0);
+      leg.away.puntos = Number(savedLeg?.away?.puntos || 0);
+      leg.away.puntosExtra = Number(savedLeg?.away?.puntosExtra || 0);
+
+      // En Q iniciales de tercera y semis iniciales de segunda,
+      // los equipos siempre vienen de la tabla/fixture actual.
+      // En el resto, se respetan equipos guardados hasta automatizar avances.
+      if (!autoRounds.has(round.id)) {
+        leg.home.team = normalizeTeamName(savedLeg?.home?.team) || leg.home.team;
+        leg.away.team = normalizeTeamName(savedLeg?.away?.team) || leg.away.team;
+      }
+    });
+  });
+
+  return baseData;
+}
+
+
 function makeScoreOptions(max, selected){
   return Array.from({ length: max + 1 }, (_, n) => `<option value="${n}" ${Number(selected) === n ? 'selected' : ''}>${n}</option>`).join('');
 }
@@ -347,8 +615,19 @@ async function renderCategory(category){
   currentCategory = category;
   setActiveCategoryButton(category);
   TEAM_OPTIONS = await loadUsersJS(getCategoryConfig(category).teamSource);
-  const serverData = await loadFromServer(category);
-  const data = serverData || getDefaultData(category);
+
+  const data = getDefaultData(category);
+  try {
+    await applyAutomaticEntrants(data, category);
+  } catch (err) {
+    console.error(err);
+    showToast(err?.message || 'No se pudieron calcular los clasificados', 3500);
+  }
+
+  const savedDbData = await loadFromServer(category);
+  mergeSavedDbData(data, savedDbData, category);
+
+  saveLocal(data, category);
   renderBracket(data);
   wireInputs();
 }
