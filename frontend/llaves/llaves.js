@@ -342,6 +342,173 @@ async function saveOnServer(){
   showToast('Llaves guardadas correctamente');
 }
 
+
+const GROUPS_BY_CATEGORY = {
+  tercera: ['A', 'B', 'C', 'D'],
+  segunda: ['A', 'B']
+};
+
+function fixtureJsonFallbackPath(kind, category){
+  return category === 'tercera'
+    ? (kind === 'vuelta' ? '../fixture/fixture.vuelta.tercera.json' : '../fixture/fixture.ida.tercera.json')
+    : null;
+}
+
+async function fetchFixtureData(kind, category){
+  const url = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}`;
+  try {
+    const resp = await fetch(url, { cache: 'no-store' });
+    const data = await resp.json().catch(() => null);
+    if (resp.ok && data?.ok && data?.data) return data.data;
+  } catch (_) {}
+
+  const fallback = fixtureJsonFallbackPath(kind, category);
+  if (!fallback) return null;
+
+  try {
+    const resp = await fetch(fallback, { cache: 'no-store' });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch (_) {
+    return null;
+  }
+}
+
+function collectStandingsEntriesFromFixtures(feeds){
+  const entries = [];
+  (feeds || []).forEach(feed => {
+    if (!feed) return;
+    const kind = String(feed.kind || '').toLowerCase();
+    (feed?.fechas || []).forEach((fecha, idx) => {
+      entries.push({ kind, fechaIndex: idx + 1, fecha });
+    });
+  });
+  return entries;
+}
+
+function calcStandingsFromFixtures(category, ida, vuelta){
+  const groups = GROUPS_BY_CATEGORY[category] || [];
+  const entries = collectStandingsEntriesFromFixtures([
+    ida ? { ...ida, kind: 'ida' } : null,
+    vuelta ? { ...vuelta, kind: 'vuelta' } : null
+  ]);
+
+  const puntos = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
+  const triangulos = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
+  const jugados = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
+  const seen = Object.fromEntries(groups.map(g => [g, new Map()]));
+
+  entries.forEach(entry => {
+    (entry?.fecha?.tablas || []).forEach(tabla => {
+      const g = String(tabla?.grupo || '').trim().toUpperCase();
+      if (!groups.includes(g)) return;
+
+      const equipos = (tabla?.equipos || []).map(e => ({
+        equipo: e?.equipo || '',
+        puntos: parseInt(e?.puntos ?? 0, 10) || 0,
+        puntosExtra: parseInt(e?.puntosExtra ?? 0, 10) || 0
+      }));
+
+      equipos.forEach(item => {
+        const key = normalizeTeamName(item.equipo);
+        if (!key || key === 'WO') return;
+
+        if (!puntos[g][key]) puntos[g][key] = { equipo: key, pts: 0 };
+        puntos[g][key].pts += item.puntos;
+        triangulos[g][key] = (triangulos[g][key] || 0) + item.puntosExtra;
+        if (!seen[g].has(key)) seen[g].set(key, item.equipo);
+      });
+
+      for (let i = 0; i < equipos.length; i += 2){
+        const A = equipos[i];
+        const B = equipos[i + 1];
+        if (!A || !B) continue;
+
+        const aK = normalizeTeamName(A.equipo);
+        const bK = normalizeTeamName(B.equipo);
+        if (!aK || !bK || aK === 'WO' || bK === 'WO') continue;
+        if (A.puntos === 0 && B.puntos === 0 && A.puntosExtra === 0 && B.puntosExtra === 0) continue;
+
+        jugados[g][aK] = (jugados[g][aK] || 0) + 1;
+        jugados[g][bK] = (jugados[g][bK] || 0) + 1;
+      }
+    });
+  });
+
+  const result = {};
+  groups.forEach(g => {
+    result[g] = Object.values(puntos[g])
+      .sort((a, b) =>
+        (b.pts - a.pts) ||
+        ((triangulos[g][normalizeTeamName(b.equipo)] || 0) - (triangulos[g][normalizeTeamName(a.equipo)] || 0)) ||
+        String(a.equipo).localeCompare(String(b.equipo), 'es', { sensitivity: 'base' })
+      )
+      .map((row, index) => ({
+        pos: index + 1,
+        equipo: row.equipo,
+        pts: row.pts,
+        tr: triangulos[g][normalizeTeamName(row.equipo)] || 0,
+        ju: jugados[g][normalizeTeamName(row.equipo)] || 0
+      }));
+  });
+
+  return result;
+}
+
+async function loadFinalStandings(category){
+  const [ida, vuelta] = await Promise.all([
+    fetchFixtureData('ida', category),
+    fetchFixtureData('vuelta', category)
+  ]);
+  return calcStandingsFromFixtures(category, ida, vuelta);
+}
+
+function standingTeam(standings, group, pos){
+  return standings?.[group]?.find(row => Number(row.pos) === Number(pos))?.equipo || '';
+}
+
+function isAutoFillableTeam(name){
+  const value = normalizeTeamName(name);
+  return !value || value === 'WO';
+}
+
+function setLegTeamIfEmpty(leg, side, team){
+  if (!leg || !team) return;
+  if (isAutoFillableTeam(leg?.[side]?.team)) {
+    leg[side].team = normalizeTeamName(team);
+  }
+}
+
+function fillTwoLegTie(round, groupWinnerTeam, groupSecondTeam){
+  if (!round || !Array.isArray(round.legs) || round.legs.length < 2) return;
+
+  // Regla LIPA:
+  // El equipo que salió 1ro juega la ida de visitante/derecha
+  // y la vuelta de local/izquierda.
+  setLegTeamIfEmpty(round.legs[0], 'home', groupSecondTeam);
+  setLegTeamIfEmpty(round.legs[0], 'away', groupWinnerTeam);
+  setLegTeamIfEmpty(round.legs[1], 'home', groupWinnerTeam);
+  setLegTeamIfEmpty(round.legs[1], 'away', groupSecondTeam);
+}
+
+async function applyAutomaticEntrants(data, category){
+  const standings = await loadFinalStandings(category);
+  const findRound = id => data.rounds.find(round => round.id === id);
+
+  if (category === 'tercera') {
+    fillTwoLegTie(findRound('q1'), standingTeam(standings, 'A', 1), standingTeam(standings, 'B', 2));
+    fillTwoLegTie(findRound('q2'), standingTeam(standings, 'C', 1), standingTeam(standings, 'D', 2));
+    fillTwoLegTie(findRound('q3'), standingTeam(standings, 'B', 1), standingTeam(standings, 'A', 2));
+    fillTwoLegTie(findRound('q4'), standingTeam(standings, 'D', 1), standingTeam(standings, 'C', 2));
+  } else if (category === 'segunda') {
+    fillTwoLegTie(findRound('s1'), standingTeam(standings, 'A', 1), standingTeam(standings, 'B', 2));
+    fillTwoLegTie(findRound('s2'), standingTeam(standings, 'B', 1), standingTeam(standings, 'A', 2));
+  }
+
+  return data;
+}
+
+
 async function renderCategory(category){
   currentCategory = category;
   setActiveCategoryButton(category);
@@ -349,6 +516,8 @@ async function renderCategory(category){
   const serverData = await loadFromServer(category);
   const localData = loadFromLocal(category);
   const data = serverData || localData || getDefaultData(category);
+  await applyAutomaticEntrants(data, category);
+  saveLocal(data, category);
   renderBracket(data);
   wireInputs();
 }
