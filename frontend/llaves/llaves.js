@@ -567,7 +567,11 @@ function readBracketFromUI(){
 function wireInputs(){
   document.querySelectorAll('#bracketRoot select, #bracketRoot input[type="date"]').forEach(el => {
     el.addEventListener('change', () => {
-      saveLocal(readBracketFromUI(), currentCategory);
+      const data = readBracketFromUI();
+      applyAutomaticAdvance(data);
+      saveLocal(data, currentCategory);
+      renderBracket(data);
+      wireInputs();
     });
   });
 }
@@ -591,6 +595,7 @@ function setActiveCategoryButton(category){
 
 async function saveOnServer(){
   const data = readBracketFromUI();
+  applyAutomaticAdvance(data);
   saveLocal(data, currentCategory);
 
   const resp = await fetch(`${API_BASE}/llaves`, {
@@ -611,26 +616,222 @@ async function saveOnServer(){
   showToast('Llaves guardadas correctamente');
 }
 
+
+function llGetRound(data, id){
+  return (data?.rounds || []).find(r => r.id === id);
+}
+
+function llCloneTeam(team){
+  return {
+    team: normalizeTeamName(team?.team) || 'WO',
+    puntos: Number(team?.puntos || 0),
+    puntosExtra: Number(team?.puntosExtra || 0)
+  };
+}
+
+function llSetLegTeams(round, legIndex, homeTeam, awayTeam){
+  if (!round || !round.legs || !round.legs[legIndex]) return;
+  round.legs[legIndex].home.team = normalizeTeamName(homeTeam) || 'WO';
+  round.legs[legIndex].away.team = normalizeTeamName(awayTeam) || 'WO';
+}
+
+function llIsRealTeam(name){
+  const n = normalizeTeamName(name);
+  return !!n && n !== 'WO';
+}
+
+function llLegPlayed(leg){
+  if (!leg) return false;
+  return [
+    leg?.home?.puntos,
+    leg?.away?.puntos,
+    leg?.home?.puntosExtra,
+    leg?.away?.puntosExtra
+  ].some(v => Number(v || 0) > 0);
+}
+
+function llSingleWinner(round){
+  const leg = round?.legs?.[0];
+  if (!leg || !llIsRealTeam(leg.home.team) || !llIsRealTeam(leg.away.team) || !llLegPlayed(leg)) {
+    return { winner:'WO', loser:'WO', decided:false };
+  }
+
+  const hp = Number(leg.home.puntos || 0);
+  const ap = Number(leg.away.puntos || 0);
+  const ht = Number(leg.home.puntosExtra || 0);
+  const at = Number(leg.away.puntosExtra || 0);
+
+  if (hp > ap) return { winner: leg.home.team, loser: leg.away.team, decided:true };
+  if (ap > hp) return { winner: leg.away.team, loser: leg.home.team, decided:true };
+  if (ht > at) return { winner: leg.home.team, loser: leg.away.team, decided:true };
+  if (at > ht) return { winner: leg.away.team, loser: leg.home.team, decided:true };
+
+  return { winner:'WO', loser:'WO', decided:false };
+}
+
+function llSeriesWinner(round){
+  if (!round || !Array.isArray(round.legs) || round.legs.length === 0) {
+    return { winner:'WO', loser:'WO', decided:false, needsExtra:false };
+  }
+
+  if (round.legs.length === 1) return llSingleWinner(round);
+
+  const ida = round.legs[0];
+  const vuelta = round.legs[1];
+
+  if (!ida || !vuelta || !llLegPlayed(ida) || !llLegPlayed(vuelta)) {
+    return { winner:'WO', loser:'WO', decided:false, needsExtra:false };
+  }
+
+  const firstTeam = normalizeTeamName(vuelta.home.team || ida.away.team);
+  const secondTeam = normalizeTeamName(ida.home.team || vuelta.away.team);
+
+  if (!llIsRealTeam(firstTeam) || !llIsRealTeam(secondTeam)) {
+    return { winner:'WO', loser:'WO', decided:false, needsExtra:false };
+  }
+
+  // Regla visual: el primero de grupo juega ida de visitante y vuelta de local.
+  // Por eso acumulamos por nombre de equipo y no por lado fijo.
+  const acc = {};
+  [firstTeam, secondTeam].forEach(t => acc[t] = { pts:0, tri:0 });
+
+  [ida, vuelta].forEach(leg => {
+    const h = normalizeTeamName(leg.home.team);
+    const a = normalizeTeamName(leg.away.team);
+    if (acc[h]) {
+      acc[h].pts += Number(leg.home.puntos || 0);
+      acc[h].tri += Number(leg.home.puntosExtra || 0);
+    }
+    if (acc[a]) {
+      acc[a].pts += Number(leg.away.puntos || 0);
+      acc[a].tri += Number(leg.away.puntosExtra || 0);
+    }
+  });
+
+  const a = acc[firstTeam];
+  const b = acc[secondTeam];
+
+  if (a.pts > b.pts) return { winner:firstTeam, loser:secondTeam, decided:true, needsExtra:false };
+  if (b.pts > a.pts) return { winner:secondTeam, loser:firstTeam, decided:true, needsExtra:false };
+  if (a.tri > b.tri) return { winner:firstTeam, loser:secondTeam, decided:true, needsExtra:false };
+  if (b.tri > a.tri) return { winner:secondTeam, loser:firstTeam, decided:true, needsExtra:false };
+
+  const extra = round.legs[2];
+  if (extra && llLegPlayed(extra)) {
+    const hp = Number(extra.home.puntos || 0);
+    const ap = Number(extra.away.puntos || 0);
+    const ht = Number(extra.home.puntosExtra || 0);
+    const at = Number(extra.away.puntosExtra || 0);
+    if (hp > ap) return { winner: extra.home.team, loser: extra.away.team, decided:true, needsExtra:false };
+    if (ap > hp) return { winner: extra.away.team, loser: extra.home.team, decided:true, needsExtra:false };
+    if (ht > at) return { winner: extra.home.team, loser: extra.away.team, decided:true, needsExtra:false };
+    if (at > ht) return { winner: extra.away.team, loser: extra.home.team, decided:true, needsExtra:false };
+  }
+
+  return { winner:'WO', loser:'WO', decided:false, needsExtra:true };
+}
+
+function llEnsureExtraIfNeeded(data){
+  const target = currentCategory === 'segunda' ? 6 : 5;
+  (data.rounds || []).forEach(round => {
+    if (!['q1','q2','q3','q4','s1','s2'].includes(round.id)) return;
+    const outcome = llSeriesWinner(round);
+    if (outcome.needsExtra && round.legs.length < 3) {
+      const extra = getEmptyLeg();
+      extra.date = round.legs?.[1]?.date || '';
+      extra.home.team = normalizeTeamName(round.legs?.[1]?.home?.team || round.legs?.[0]?.away?.team) || 'WO';
+      extra.away.team = normalizeTeamName(round.legs?.[1]?.away?.team || round.legs?.[0]?.home?.team) || 'WO';
+      round.legs.push(extra);
+      round.helper = `Desempate a ${target} triángulos`;
+    }
+  });
+}
+
+function llSetSeriesTeams(round, teamA, teamB){
+  if (!round || !Array.isArray(round.legs)) return;
+
+  if (round.legs.length === 1) {
+    llSetLegTeams(round, 0, teamA, teamB);
+    return;
+  }
+
+  // ida: equipo A visitante/derecha, equipo B local/izquierda
+  llSetLegTeams(round, 0, teamB, teamA);
+  // vuelta: equipo A local/izquierda, equipo B visitante/derecha
+  llSetLegTeams(round, 1, teamA, teamB);
+
+  if (round.legs[2]) {
+    llSetLegTeams(round, 2, teamA, teamB);
+  }
+}
+
+function applyAutomaticAdvance(data){
+  llEnsureExtraIfNeeded(data);
+
+  if (currentCategory === 'tercera') {
+    const q1 = llSeriesWinner(llGetRound(data, 'q1'));
+    const q2 = llSeriesWinner(llGetRound(data, 'q2'));
+    const q3 = llSeriesWinner(llGetRound(data, 'q3'));
+    const q4 = llSeriesWinner(llGetRound(data, 'q4'));
+
+    llSetSeriesTeams(llGetRound(data, 's1'), q1.winner, q2.winner);
+    llSetSeriesTeams(llGetRound(data, 's2'), q3.winner, q4.winner);
+  }
+
+  const s1 = llSeriesWinner(llGetRound(data, 's1'));
+  const s2 = llSeriesWinner(llGetRound(data, 's2'));
+
+  llSetSeriesTeams(llGetRound(data, 'final'), s1.winner, s2.winner);
+  llSetSeriesTeams(llGetRound(data, 'third'), s1.loser, s2.loser);
+
+  llEnsureExtraIfNeeded(data);
+  return data;
+}
+
+function mergeSavedEditableData(baseData, savedData){
+  if (!savedData || !Array.isArray(savedData.rounds)) return baseData;
+
+  baseData.rounds.forEach(round => {
+    const savedRound = savedData.rounds.find(r => r?.id === round.id);
+    if (!savedRound || !Array.isArray(savedRound.legs)) return;
+
+    round.legs.forEach((leg, index) => {
+      const savedLeg = savedRound.legs[index];
+      if (!savedLeg) return;
+
+      leg.date = typeof savedLeg.date === 'string' ? savedLeg.date : leg.date;
+      leg.home.puntos = Number(savedLeg?.home?.puntos || 0);
+      leg.home.puntosExtra = Number(savedLeg?.home?.puntosExtra || 0);
+      leg.away.puntos = Number(savedLeg?.away?.puntos || 0);
+      leg.away.puntosExtra = Number(savedLeg?.away?.puntosExtra || 0);
+    });
+  });
+
+  return baseData;
+}
+
 async function renderCategory(category){
   currentCategory = category;
   setActiveCategoryButton(category);
   TEAM_OPTIONS = await loadUsersJS(getCategoryConfig(category).teamSource);
 
   const data = getDefaultData(category);
-  try {
-    await applyAutomaticEntrants(data, category);
-  } catch (err) {
-    console.error(err);
-    showToast(err?.message || 'No se pudieron calcular los clasificados', 3500);
-  }
 
+  // 1) clasificados iniciales siempre desde fixture/tablas
+  await applyAutomaticEntrants(data, category);
+
+  // 2) recuperar resultados/fechas guardadas
   const savedDbData = await loadFromServer(category);
-  mergeSavedDbData(data, savedDbData, category);
+  mergeSavedEditableData(data, savedDbData);
+
+  // 3) avanzar automáticamente semis/final/tercer puesto
+  applyAutomaticAdvance(data);
 
   saveLocal(data, category);
   renderBracket(data);
   wireInputs();
 }
+
 
 async function bootstrap(){
   await renderCategory(currentCategory);
