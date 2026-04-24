@@ -584,9 +584,9 @@ async function renderCategory(category){
   currentCategory = category;
   setActiveCategoryButton(category);
   TEAM_OPTIONS = await loadUsersJS(getCategoryConfig(category).teamSource);
-  const serverData = await loadFromServer(category);
-  const localData = loadFromLocal(category);
-  const data = serverData || localData || getDefaultData(category);
+  // Siempre recalcula la llave desde los datos reales de fixtures/tablas.
+  // No usamos localStorage ni datos guardados como fuente inicial, porque congelaban los clasificados.
+  const data = getDefaultData(category);
   await applyAutomaticEntrants(data, category);
   saveLocal(data, category);
   renderBracket(data);
