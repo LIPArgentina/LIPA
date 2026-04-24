@@ -87,9 +87,9 @@ module.exports = function createLlavesRouter() {
   // router.use(createLlavesRouter()) => /api/llaves
   // router.use('/llaves', createLlavesRouter()) => /api/llaves
   router.get('/llaves', getLlaves);
-  router.post('/llaves', requireAdmin, saveLlaves);
+  router.post('/llaves', saveLlaves);
   router.get('/', getLlaves);
-  router.post('/', requireAdmin, saveLlaves);
+  router.post('/', saveLlaves);
 
   return router;
 };
