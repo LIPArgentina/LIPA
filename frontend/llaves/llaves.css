@@ -318,3 +318,34 @@ header img{ height:60px; width:auto; display:block; }
 [data-round-card="s2"] .tie-title{
   font-size:20px;
 }
+
+/* Escala general responsive de llaves */
+.bracket-scroll{
+  --bracket-scale: .8;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding-bottom:24px;
+}
+
+.bracket{
+  transform:scale(var(--bracket-scale));
+  transform-origin:top left;
+  margin-bottom:calc((var(--bracket-scale) - 1) * 100%);
+}
+
+/* Responsive: se achica un poco más en pantallas medianas y chicas */
+@media (max-width: 1400px){
+  .bracket-scroll{ --bracket-scale: .78; }
+}
+
+@media (max-width: 1100px){
+  .bracket-scroll{ --bracket-scale: .72; }
+}
+
+@media (max-width: 840px){
+  .bracket-scroll{ --bracket-scale: .64; }
+}
+
+@media (max-width: 620px){
+  .bracket-scroll{ --bracket-scale: .56; }
+}
