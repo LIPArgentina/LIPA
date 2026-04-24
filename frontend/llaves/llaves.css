@@ -1,10 +1,9 @@
+/* SCALE LIMPIO */
 
-/* FIX ESCALA CORRECTA */
-
-/* PC: escala 80% SIN romper altura */
 .bracket-scroll{
   overflow-x:auto;
   overflow-y:hidden;
+  padding-bottom:40px;
 }
 
 .bracket{
@@ -12,13 +11,8 @@
   transform-origin: top left;
 }
 
-/* compensar altura para evitar corte */
-.bracket-wrapper{
-  height: calc(100% / 0.8);
-}
-
-/* RESPONSIVE solo 10% más chico */
-@media (max-width: 1200px){
+/* responsive */
+@media (max-width:1200px){
   .bracket{
     transform: scale(0.72);
   }
