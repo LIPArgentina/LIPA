@@ -397,6 +397,7 @@ function calcStandingsFromFixtures(category, ida, vuelta){
   const triangulos = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
   const jugados = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
   const seen = Object.fromEntries(groups.map(g => [g, new Map()]));
+  const directMatches = Object.fromEntries(groups.map(g => [g, []]));
 
   entries.forEach(entry => {
     (entry?.fecha?.tablas || []).forEach(tabla => {
@@ -405,18 +406,18 @@ function calcStandingsFromFixtures(category, ida, vuelta){
 
       const equipos = (tabla?.equipos || []).map(e => ({
         equipo: e?.equipo || '',
+        key: normalizeTeamName(e?.equipo || ''),
         puntos: parseInt(e?.puntos ?? 0, 10) || 0,
         puntosExtra: parseInt(e?.puntosExtra ?? 0, 10) || 0
       }));
 
       equipos.forEach(item => {
-        const key = normalizeTeamName(item.equipo);
-        if (!key || key === 'WO') return;
+        if (!item.key || item.key === 'WO') return;
 
-        if (!puntos[g][key]) puntos[g][key] = { equipo: key, pts: 0 };
-        puntos[g][key].pts += item.puntos;
-        triangulos[g][key] = (triangulos[g][key] || 0) + item.puntosExtra;
-        if (!seen[g].has(key)) seen[g].set(key, item.equipo);
+        if (!puntos[g][item.key]) puntos[g][item.key] = { equipo: item.key, pts: 0 };
+        puntos[g][item.key].pts += item.puntos;
+        triangulos[g][item.key] = (triangulos[g][item.key] || 0) + item.puntosExtra;
+        if (!seen[g].has(item.key)) seen[g].set(item.key, item.equipo);
       });
 
       for (let i = 0; i < equipos.length; i += 2){
@@ -424,31 +425,101 @@ function calcStandingsFromFixtures(category, ida, vuelta){
         const B = equipos[i + 1];
         if (!A || !B) continue;
 
-        const aK = normalizeTeamName(A.equipo);
-        const bK = normalizeTeamName(B.equipo);
+        const aK = A.key;
+        const bK = B.key;
         if (!aK || !bK || aK === 'WO' || bK === 'WO') continue;
         if (A.puntos === 0 && B.puntos === 0 && A.puntosExtra === 0 && B.puntosExtra === 0) continue;
 
         jugados[g][aK] = (jugados[g][aK] || 0) + 1;
         jugados[g][bK] = (jugados[g][bK] || 0) + 1;
+        directMatches[g].push({
+          a: aK,
+          b: bK,
+          aPts: A.puntos,
+          bPts: B.puntos,
+          aTr: A.puntosExtra,
+          bTr: B.puntosExtra
+        });
       }
     });
   });
 
+  function resolveTiedGroup(group, rows){
+    if (rows.length <= 1) return rows;
+
+    const tiedKeys = new Set(rows.map(row => row.key));
+    const mini = Object.create(null);
+    rows.forEach(row => {
+      mini[row.key] = {
+        key: row.key,
+        equipo: row.equipo,
+        pts: 0,
+        tr: 0,
+        ju: 0,
+        globalPts: row.pts,
+        globalTr: row.tr,
+        globalJu: row.ju
+      };
+    });
+
+    (directMatches[group] || []).forEach(match => {
+      if (!tiedKeys.has(match.a) || !tiedKeys.has(match.b)) return;
+      mini[match.a].pts += match.aPts;
+      mini[match.a].tr += match.aTr;
+      mini[match.a].ju += 1;
+      mini[match.b].pts += match.bPts;
+      mini[match.b].tr += match.bTr;
+      mini[match.b].ju += 1;
+    });
+
+    return rows.slice().sort((a, b) => {
+      const ma = mini[a.key];
+      const mb = mini[b.key];
+      return (mb.pts - ma.pts) ||
+        (mb.tr - ma.tr) ||
+        String(a.equipo).localeCompare(String(b.equipo), 'es', { sensitivity: 'base' });
+    });
+  }
+
+  function sortGroupWithDirectTiebreak(group, rows){
+    const globalSorted = rows.slice().sort((a, b) =>
+      (b.pts - a.pts) ||
+      (b.tr - a.tr) ||
+      String(a.equipo).localeCompare(String(b.equipo), 'es', { sensitivity: 'base' })
+    );
+
+    const out = [];
+    for (let i = 0; i < globalSorted.length; ){
+      const current = globalSorted[i];
+      const tied = [current];
+      let j = i + 1;
+      while (j < globalSorted.length && globalSorted[j].pts === current.pts && globalSorted[j].tr === current.tr){
+        tied.push(globalSorted[j]);
+        j += 1;
+      }
+      out.push(...resolveTiedGroup(group, tied));
+      i = j;
+    }
+    return out;
+  }
+
   const result = {};
   groups.forEach(g => {
-    result[g] = Object.values(puntos[g])
-      .sort((a, b) =>
-        (b.pts - a.pts) ||
-        ((triangulos[g][normalizeTeamName(b.equipo)] || 0) - (triangulos[g][normalizeTeamName(a.equipo)] || 0)) ||
-        String(a.equipo).localeCompare(String(b.equipo), 'es', { sensitivity: 'base' })
-      )
+    const rows = Object.entries(puntos[g]).map(([key, row]) => ({
+      key,
+      equipo: row.equipo,
+      pts: row.pts,
+      tr: triangulos[g][key] || 0,
+      ju: jugados[g][key] || 0
+    }));
+
+    result[g] = sortGroupWithDirectTiebreak(g, rows)
       .map((row, index) => ({
         pos: index + 1,
         equipo: row.equipo,
         pts: row.pts,
-        tr: triangulos[g][normalizeTeamName(row.equipo)] || 0,
-        ju: jugados[g][normalizeTeamName(row.equipo)] || 0
+        tr: row.tr,
+        ju: row.ju
       }));
   });
 
