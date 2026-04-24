@@ -27,30 +27,32 @@
     </section>
 
     <div class="bracket-scroll">
-      <main class="bracket bracket-tercera" id="bracketRoot" aria-label="Llaves eliminatorias">
-        <section class="bracket-col qf-left" aria-label="Cuartos de final izquierda">
-          <div id="slot-q1"></div>
-          <div id="slot-q2"></div>
-        </section>
+      <div class="bracket-wrapper">
+        <main class="bracket bracket-tercera" id="bracketRoot" aria-label="Llaves eliminatorias">
+          <section class="bracket-col qf-left">
+            <div id="slot-q1"></div>
+            <div id="slot-q2"></div>
+          </section>
 
-        <section class="bracket-col sf-left" aria-label="Semifinal izquierda">
-          <div id="slot-s1"></div>
-        </section>
+          <section class="bracket-col sf-left">
+            <div id="slot-s1"></div>
+          </section>
 
-        <section class="bracket-col center-col" aria-label="Final y tercer puesto">
-          <div id="slot-final"></div>
-          <div id="slot-third"></div>
-        </section>
+          <section class="bracket-col center-col">
+            <div id="slot-final"></div>
+            <div id="slot-third"></div>
+          </section>
 
-        <section class="bracket-col sf-right" aria-label="Semifinal derecha">
-          <div id="slot-s2"></div>
-        </section>
+          <section class="bracket-col sf-right">
+            <div id="slot-s2"></div>
+          </section>
 
-        <section class="bracket-col qf-right" aria-label="Cuartos de final derecha">
-          <div id="slot-q3"></div>
-          <div id="slot-q4"></div>
-        </section>
-      </main>
+          <section class="bracket-col qf-right">
+            <div id="slot-q3"></div>
+            <div id="slot-q4"></div>
+          </section>
+        </main>
+      </div>
     </div>
 
     <div class="save-wrap">
@@ -58,7 +60,7 @@
     </div>
   </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast"></div>
 
   <script type="module" src="llaves.js"></script>
 </body>
