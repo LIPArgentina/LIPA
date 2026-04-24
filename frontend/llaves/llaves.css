@@ -105,10 +105,10 @@ header img{ height:60px; width:auto; display:block; }
   min-width:max-content;
 }
 .bracket-tercera{
-  grid-template-columns:650px 650px 650px 650px 650px;
+  grid-template-columns:700px 700px 700px 700px 700px;
 }
 .bracket-segunda{
-  grid-template-columns:650px 650px 650px;
+  grid-template-columns:700px 700px 700px;
 }
 .bracket-col{ display:flex; flex-direction:column; gap:22px; min-width:0; }
 .qf-left,.qf-right{ padding-top:8px; }
@@ -118,7 +118,7 @@ header img{ height:60px; width:auto; display:block; }
 .tie-card{
   position:relative;
   width:100%;
-  max-width:650px;
+  max-width:700px;
   padding:14px 12px 12px;
   overflow:visible;
   background:var(--card);
@@ -306,4 +306,15 @@ header img{ height:60px; width:auto; display:block; }
 
 [data-round-card="final"] .tie-title{
   font-size:30px;
+}
+
+
+/* bajar jerarquía cuartos y semis */
+[data-round-card="q1"] .tie-title,
+[data-round-card="q2"] .tie-title,
+[data-round-card="q3"] .tie-title,
+[data-round-card="q4"] .tie-title,
+[data-round-card="s1"] .tie-title,
+[data-round-card="s2"] .tie-title{
+  font-size:20px;
 }
