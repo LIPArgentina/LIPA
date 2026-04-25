@@ -496,7 +496,18 @@ function renderBracket(data){
     const slot = document.getElementById(config.slot);
     if (!slot) return;
 
-    const legsMarkup = round.legs.map((leg, index) => createLegMarkup(config.id, index, leg, round.legs.length || config.legs)).join('');
+    const legsMarkup = round.legs
+  .filter((leg, index) => {
+    if (index < 2) return true;
+    const isEmpty =
+      Number(leg.home?.puntos || 0) === 0 &&
+      Number(leg.home?.puntosExtra || 0) === 0 &&
+      Number(leg.away?.puntos || 0) === 0 &&
+      Number(leg.away?.puntosExtra || 0) === 0;
+    return !isEmpty;
+  })
+  .map((leg, index) => createLegMarkup(config.id, index, leg, round.legs.length || config.legs))
+  .join('');
 
     slot.innerHTML = `
       <article class="tie-card" data-round-card="${config.id}">
