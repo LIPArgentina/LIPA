@@ -468,7 +468,7 @@ function makeTeamOptions(selected){
 }
 
 function createLegMarkup(roundId, legIndex, legData, totalLegs){
-  const label = totalLegs === 1 ? 'Partido' : (legIndex === 0 ? 'Ida' : 'Vuelta');
+  const label = legIndex === 2 ? 'Desempate' : (totalLegs === 1 ? 'Partido' : (legIndex === 0 ? 'Ida' : 'Vuelta'));
   return `
     <div class="match-block" data-round="${roundId}" data-leg="${legIndex}">
       <div class="match-top">
@@ -496,7 +496,7 @@ function renderBracket(data){
     const slot = document.getElementById(config.slot);
     if (!slot) return;
 
-    const legsMarkup = round.legs.map((leg, index) => createLegMarkup(config.id, index, leg, config.legs)).join('');
+    const legsMarkup = round.legs.map((leg, index) => createLegMarkup(config.id, index, leg, round.legs.length || config.legs)).join('');
 
     slot.innerHTML = `
       <article class="tie-card" data-round-card="${config.id}">
@@ -736,12 +736,19 @@ function llEnsureExtraIfNeeded(data){
   (data.rounds || []).forEach(round => {
     if (!['q1','q2','q3','q4','s1','s2'].includes(round.id)) return;
     const outcome = llSeriesWinner(round);
-    if (outcome.needsExtra && round.legs.length < 3) {
-      const extra = getEmptyLeg();
-      extra.date = round.legs?.[1]?.date || '';
-      extra.home.team = normalizeTeamName(round.legs?.[1]?.home?.team || round.legs?.[0]?.away?.team) || 'WO';
-      extra.away.team = normalizeTeamName(round.legs?.[1]?.away?.team || round.legs?.[0]?.home?.team) || 'WO';
-      round.legs.push(extra);
+
+    if (outcome.needsExtra) {
+      if (round.legs.length < 3) {
+        const extra = getEmptyLeg();
+        extra.date = round.legs?.[1]?.date || '';
+        extra.home.team = normalizeTeamName(round.legs?.[1]?.home?.team || round.legs?.[0]?.away?.team) || 'WO';
+        extra.away.team = normalizeTeamName(round.legs?.[1]?.away?.team || round.legs?.[0]?.home?.team) || 'WO';
+        round.legs.push(extra);
+      } else {
+        round.legs[2].date = round.legs[2].date || round.legs?.[1]?.date || '';
+        round.legs[2].home.team = normalizeTeamName(round.legs[2].home.team || round.legs?.[1]?.home?.team || round.legs?.[0]?.away?.team) || 'WO';
+        round.legs[2].away.team = normalizeTeamName(round.legs[2].away.team || round.legs?.[1]?.away?.team || round.legs?.[0]?.home?.team) || 'WO';
+      }
       round.helper = `Desempate a ${target} triángulos`;
     }
   });
@@ -795,11 +802,28 @@ function mergeSavedEditableData(baseData, savedData){
     const savedRound = savedData.rounds.find(r => r?.id === round.id);
     if (!savedRound || !Array.isArray(savedRound.legs)) return;
 
+    // Si la DB tenía partido extra guardado, recrearlo antes de copiar datos.
+    while (round.legs.length < savedRound.legs.length) {
+      const savedLeg = savedRound.legs[round.legs.length] || {};
+      const extra = getEmptyLeg();
+      extra.date = typeof savedLeg.date === 'string' ? savedLeg.date : (round.legs?.[1]?.date || '');
+      extra.home.team = normalizeTeamName(savedLeg?.home?.team) || normalizeTeamName(round.legs?.[1]?.home?.team) || 'WO';
+      extra.away.team = normalizeTeamName(savedLeg?.away?.team) || normalizeTeamName(round.legs?.[1]?.away?.team) || 'WO';
+      round.legs.push(extra);
+    }
+
     round.legs.forEach((leg, index) => {
       const savedLeg = savedRound.legs[index];
       if (!savedLeg) return;
 
       leg.date = typeof savedLeg.date === 'string' ? savedLeg.date : leg.date;
+
+      // Los equipos del extra nacen dinámicamente, por eso también se persisten.
+      if (index >= 2) {
+        leg.home.team = normalizeTeamName(savedLeg?.home?.team) || leg.home.team;
+        leg.away.team = normalizeTeamName(savedLeg?.away?.team) || leg.away.team;
+      }
+
       leg.home.puntos = Number(savedLeg?.home?.puntos || 0);
       leg.home.puntosExtra = Number(savedLeg?.home?.puntosExtra || 0);
       leg.away.puntos = Number(savedLeg?.away?.puntos || 0);
