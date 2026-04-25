@@ -1,12 +1,6 @@
 const express = require('express');
 const pool = require('../../db');
 
-let requireAdmin = (req, res, next) => next();
-try {
-  const auth = require('../middleware/auth');
-  if (typeof auth.requireAdmin === 'function') requireAdmin = auth.requireAdmin;
-} catch (_) {}
-
 module.exports = function createLlavesRouter() {
   const router = express.Router();
 
@@ -30,6 +24,7 @@ module.exports = function createLlavesRouter() {
   async function getLlaves(req, res) {
     try {
       const category = cleanCategory(req.query.category);
+
       if (!VALID_CATEGORIES.has(category)) {
         return res.status(400).json({ ok: false, error: 'category inválida' });
       }
@@ -83,7 +78,6 @@ module.exports = function createLlavesRouter() {
     }
   }
 
-
   async function deleteDesempate(req, res) {
     try {
       const category = cleanCategory(req.body?.category || req.query.category);
@@ -108,8 +102,15 @@ module.exports = function createLlavesRouter() {
       if (!Array.isArray(data.rounds)) data.rounds = [];
 
       const round = data.rounds.find(r => r?.id === roundId);
-      if (round && Array.isArray(round.legs)) {
-        round.legs = round.legs.slice(0, 2);
+      if (round) {
+        if (Array.isArray(round.legs)) {
+          round.legs = round.legs.slice(0, 2);
+        } else {
+          round.legs = [];
+        }
+
+        // Marca para que el frontend no lo regenere automáticamente
+        // hasta que vuelvan a guardar valores distintos en ida/vuelta.
         round.extraDeleted = true;
       }
 
@@ -132,11 +133,12 @@ module.exports = function createLlavesRouter() {
   // router.use(createLlavesRouter()) => /api/llaves
   // router.use('/llaves', createLlavesRouter()) => /api/llaves
   router.get('/llaves', getLlaves);
+  router.post('/llaves', saveLlaves);
   router.delete('/llaves/desempate', deleteDesempate);
-  router.post('/llaves', requireAdmin, saveLlaves);
+
   router.get('/', getLlaves);
+  router.post('/', saveLlaves);
   router.delete('/desempate', deleteDesempate);
-  router.post('/', requireAdmin, saveLlaves);
 
   return router;
 };
