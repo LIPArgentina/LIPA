@@ -13,8 +13,6 @@ const API_BASE = (() => {
         : 'https://liga-backend-tt82.onrender.com/api'));
 })();
 
-const STORAGE_PREFIX = 'llaves_local_';
-const SAVE_KIND = 'llaves';
 
 const CATEGORY_CONFIG = {
   tercera: {
@@ -66,9 +64,6 @@ function unique(list){
   return Array.from(new Set(list.filter(Boolean)));
 }
 
-function getStorageKey(category){
-  return `${STORAGE_PREFIX}${category}`;
-}
 
 function getCategoryConfig(category = currentCategory){
   return CATEGORY_CONFIG[category] || CATEGORY_CONFIG.tercera;
@@ -122,35 +117,6 @@ function getDefaultData(category = currentCategory){
   };
 }
 
-function mergeWithDefaults(raw, category = currentCategory){
-  const base = getDefaultData(category);
-  if (!raw || !Array.isArray(raw.rounds)) return base;
-
-  base.rounds.forEach(round => {
-    const found = raw.rounds.find(r => r?.id === round.id);
-    if (!found || !Array.isArray(found.legs)) return;
-
-    round.legs = round.legs.map((leg, index) => {
-      const src = found.legs[index] || {};
-      return {
-        date: typeof src.date === 'string' ? src.date : '',
-        home: {
-          team: normalizeTeamName(src?.home?.team) || 'WO',
-          puntos: Number(src?.home?.puntos || 0),
-          puntosExtra: Number(src?.home?.puntosExtra || 0)
-        },
-        away: {
-          team: normalizeTeamName(src?.away?.team) || 'WO',
-          puntos: Number(src?.away?.puntos || 0),
-          puntosExtra: Number(src?.away?.puntosExtra || 0)
-        }
-      };
-    });
-  });
-
-  return base;
-}
-
 async function loadFromServer(category = currentCategory){
   try {
     const resp = await fetch(`${API_BASE}/llaves?category=${encodeURIComponent(category)}`, {
@@ -163,21 +129,6 @@ async function loadFromServer(category = currentCategory){
   } catch (_) {
     return null;
   }
-}
-
-function loadFromLocal(category = currentCategory){
-  try {
-    const raw = localStorage.getItem(getStorageKey(category));
-    if (!raw) return null;
-    return mergeWithDefaults(JSON.parse(raw), category);
-  } catch (_) {
-    return null;
-  }
-}
-
-function saveLocal(data, category = currentCategory){
-  try { localStorage.setItem(getStorageKey(category), JSON.stringify(data)); }
-  catch (_) {}
 }
 
 function getGroupsForCategory(category){
@@ -414,42 +365,6 @@ function getAutoEntrantRoundIds(category){
     : new Set(['s1','s2']);
 }
 
-function mergeSavedDbData(baseData, savedData, category){
-  if (!savedData || !Array.isArray(savedData.rounds)) return baseData;
-
-  const autoRounds = getAutoEntrantRoundIds(category);
-
-  baseData.rounds.forEach(round => {
-    const savedRound = savedData.rounds.find(r => r?.id === round.id);
-    if (!savedRound || !Array.isArray(savedRound.legs)) return;
-
-    if (savedRound.extraDeleted) round.extraDeleted = true;
-
-    round.legs.forEach((leg, index) => {
-      const savedLeg = savedRound.legs[index];
-      if (!savedLeg) return;
-
-      // Siempre preservamos fecha y resultados guardados.
-      leg.date = typeof savedLeg.date === 'string' ? savedLeg.date : leg.date;
-      leg.home.puntos = Number(savedLeg?.home?.puntos || 0);
-      leg.home.puntosExtra = Number(savedLeg?.home?.puntosExtra || 0);
-      leg.away.puntos = Number(savedLeg?.away?.puntos || 0);
-      leg.away.puntosExtra = Number(savedLeg?.away?.puntosExtra || 0);
-
-      // En Q iniciales de tercera y semis iniciales de segunda,
-      // los equipos siempre vienen de la tabla/fixture actual.
-      // En el resto, se respetan equipos guardados hasta automatizar avances.
-      if (!autoRounds.has(round.id)) {
-        leg.home.team = normalizeTeamName(savedLeg?.home?.team) || leg.home.team;
-        leg.away.team = normalizeTeamName(savedLeg?.away?.team) || leg.away.team;
-      }
-    });
-  });
-
-  return baseData;
-}
-
-
 function makeScoreOptions(max, selected){
   return Array.from({ length: max + 1 }, (_, n) => `<option value="${n}" ${Number(selected) === n ? 'selected' : ''}>${n}</option>`).join('');
 }
@@ -631,7 +546,6 @@ function wireInputs(){
     el.addEventListener('change', () => {
       const data = readBracketFromUI();
       applyAutomaticAdvance(data);
-      saveLocal(data, currentCategory);
       renderBracket(data);
       wireInputs();
     });
@@ -658,8 +572,6 @@ function setActiveCategoryButton(category){
 async function saveOnServer(){
   const data = readBracketFromUI();
   applyAutomaticAdvance(data);
-  saveLocal(data, currentCategory);
-
   const resp = await fetch(`${API_BASE}/llaves`, {
     method: 'POST',
     credentials: 'include',
@@ -681,14 +593,6 @@ async function saveOnServer(){
 
 function llGetRound(data, id){
   return (data?.rounds || []).find(r => r.id === id);
-}
-
-function llCloneTeam(team){
-  return {
-    team: normalizeTeamName(team?.team) || 'WO',
-    puntos: Number(team?.puntos || 0),
-    puntosExtra: Number(team?.puntosExtra || 0)
-  };
 }
 
 function llSetLegTeams(round, legIndex, homeTeam, awayTeam){
@@ -920,7 +824,6 @@ async function renderCategory(category){
   // 5) recalcular avance con los valores reales del desempate
   applyAutomaticAdvance(data);
 
-  saveLocal(data, category);
   renderBracket(data);
   wireInputs();
 }
@@ -948,14 +851,6 @@ async function bootstrap(){
       console.error(err);
       alert(err?.message || 'No se pudo guardar');
     }
-  });
-
-  document.getElementById('resetBracket')?.addEventListener('click', () => {
-    const clean = getDefaultData(currentCategory);
-    saveLocal(clean, currentCategory);
-    renderBracket(clean);
-    wireInputs();
-    showToast('Llaves reiniciadas');
   });
 }
 

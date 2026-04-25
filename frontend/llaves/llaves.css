@@ -64,8 +64,6 @@ header img{ height:60px; width:auto; display:block; }
   justify-content:center;
   cursor:pointer;
 }
-.btn-secondary{ color:#fff; border-color:#666; }
-
 .category-bar{
   display:flex;
   align-items:center;
@@ -89,8 +87,6 @@ header img{ height:60px; width:auto; display:block; }
   opacity:.65;
 }
 .cat-btn.active{ opacity:1; }
-.reset-btn{ margin-left:auto; }
-
 .bracket-scroll{
   overflow-x:auto;
   overflow-y:hidden;
@@ -287,7 +283,6 @@ header img{ height:60px; width:auto; display:block; }
 
 
 /* Ajustes finales solicitados */
-#resetBracket{ display:none !important; }
 
 [data-round-card="q1"] .tie-subtitle,
 [data-round-card="q2"] .tie-subtitle,
