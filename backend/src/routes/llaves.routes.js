@@ -83,13 +83,60 @@ module.exports = function createLlavesRouter() {
     }
   }
 
+
+  async function deleteDesempate(req, res) {
+    try {
+      const category = cleanCategory(req.body?.category || req.query.category);
+      const roundId = String(req.body?.roundId || req.query.roundId || '').trim();
+
+      if (!VALID_CATEGORIES.has(category)) {
+        return res.status(400).json({ ok: false, error: 'category inválida' });
+      }
+
+      if (!roundId) {
+        return res.status(400).json({ ok: false, error: 'roundId inválido' });
+      }
+
+      await ensureTables();
+
+      const result = await pool.query(
+        `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
+        [category]
+      );
+
+      const data = result.rows[0]?.data || { rounds: [] };
+      if (!Array.isArray(data.rounds)) data.rounds = [];
+
+      const round = data.rounds.find(r => r?.id === roundId);
+      if (round && Array.isArray(round.legs)) {
+        round.legs = round.legs.slice(0, 2);
+        round.extraDeleted = true;
+      }
+
+      await pool.query(
+        `INSERT INTO llaves_data (category, data, created_at, updated_at)
+         VALUES ($1, $2::jsonb, NOW(), NOW())
+         ON CONFLICT (category)
+         DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+        [category, JSON.stringify(data)]
+      );
+
+      res.json({ ok: true, category, roundId });
+    } catch (err) {
+      console.error('DELETE /api/llaves/desempate', err);
+      res.status(500).json({ ok: false, error: 'No se pudo borrar el desempate' });
+    }
+  }
+
   // Soporta ambos montajes:
   // router.use(createLlavesRouter()) => /api/llaves
   // router.use('/llaves', createLlavesRouter()) => /api/llaves
   router.get('/llaves', getLlaves);
-  router.post('/llaves', saveLlaves);
+  router.delete('/llaves/desempate', deleteDesempate);
+  router.post('/llaves', requireAdmin, saveLlaves);
   router.get('/', getLlaves);
-  router.post('/', saveLlaves);
+  router.delete('/desempate', deleteDesempate);
+  router.post('/', requireAdmin, saveLlaves);
 
   return router;
 };

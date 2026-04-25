@@ -318,3 +318,26 @@ header img{ height:60px; width:auto; display:block; }
 [data-round-card="s2"] .tie-title{
   font-size:20px;
 }
+
+
+.match-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.btn-delete-desempate{
+  border:1px solid #7a1d1d;
+  background:#220b0b;
+  color:#ffdddd;
+  font-weight:900;
+  letter-spacing:.06em;
+  border-radius:10px;
+  padding:6px 10px;
+  cursor:pointer;
+  text-transform:uppercase;
+}
+
+.btn-delete-desempate:hover{
+  background:#3a1010;
+}

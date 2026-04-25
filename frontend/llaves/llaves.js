@@ -423,6 +423,8 @@ function mergeSavedDbData(baseData, savedData, category){
     const savedRound = savedData.rounds.find(r => r?.id === round.id);
     if (!savedRound || !Array.isArray(savedRound.legs)) return;
 
+    if (savedRound.extraDeleted) round.extraDeleted = true;
+
     round.legs.forEach((leg, index) => {
       const savedLeg = savedRound.legs[index];
       if (!savedLeg) return;
@@ -468,12 +470,20 @@ function makeTeamOptions(selected){
 }
 
 function createLegMarkup(roundId, legIndex, legData, totalLegs){
-  const label = legIndex === 2 ? 'Desempate' : (totalLegs === 1 ? 'Partido' : (legIndex === 0 ? 'Ida' : 'Vuelta'));
+  const isExtra = legIndex === 2;
+  const label = isExtra ? 'Desempate' : (totalLegs === 1 ? 'Partido' : (legIndex === 0 ? 'Ida' : 'Vuelta'));
+  const deleteButton = isExtra
+    ? `<button class="btn-delete-desempate" type="button" data-action="delete-desempate" data-round="${escapeHtml(roundId)}">BORRAR</button>`
+    : '';
+
   return `
-    <div class="match-block" data-round="${roundId}" data-leg="${legIndex}">
+    <div class="match-block ${isExtra ? 'match-block-extra' : ''}" data-round="${roundId}" data-leg="${legIndex}">
       <div class="match-top">
         <div class="match-label">${label}</div>
-        <input type="date" class="fecha-input" data-field="date" value="${escapeHtml(legData.date || '')}" />
+        <div class="match-actions">
+          ${deleteButton}
+          <input type="date" class="fecha-input" data-field="date" value="${escapeHtml(legData.date || '')}" />
+        </div>
       </div>
       <div class="team-row">
         <select class="score-badge" data-side="home" data-field="puntos">${makeScoreOptions(9, legData.home.puntos)}</select>
@@ -500,6 +510,7 @@ function renderBracket(data){
     const legsMarkup = round.legs
       .filter((leg, index) => {
         if (index < 2) return true;
+        if (round.extraDeleted) return false;
         if (needsExtra) return true;
 
         const isEmpty =
@@ -514,7 +525,7 @@ function renderBracket(data){
       .join('');
 
     slot.innerHTML = `
-      <article class="tie-card" data-round-card="${config.id}">
+      <article class="tie-card" data-round-card="${config.id}" data-extra-deleted="${round.extraDeleted ? '1' : '0'}">
         <div class="tie-header">
           <div>
             <div class="tie-subtitle">${escapeHtml(config.subtitle)}</div>
@@ -560,6 +571,7 @@ function readBracketFromUI(){
     return {
       id: config.id,
       title: config.title,
+      extraDeleted: card?.dataset.extraDeleted === '1',
       legs: legEls.map(legEl => ({
         date: legEl.querySelector('[data-field="date"]')?.value || '',
         home: {
@@ -579,7 +591,42 @@ function readBracketFromUI(){
   return { rounds };
 }
 
+
+async function deleteDesempate(roundId){
+  if (!roundId) return;
+  if (!confirm('¿Borrar el partido de desempate?')) return;
+
+  try {
+    const resp = await fetch(`${API_BASE}/llaves/desempate`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: currentCategory,
+        roundId
+      })
+    });
+
+    const result = await resp.json().catch(() => null);
+    if (!resp.ok || !result?.ok) {
+      throw new Error(result?.error || 'No se pudo borrar el desempate');
+    }
+
+    showToast('Desempate borrado');
+    await renderCategory(currentCategory);
+  } catch (err) {
+    console.error(err);
+    alert(err?.message || 'No se pudo borrar el desempate');
+  }
+}
+
 function wireInputs(){
+  document.querySelectorAll('#bracketRoot [data-action="delete-desempate"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      deleteDesempate(btn.dataset.round);
+    });
+  });
+
   document.querySelectorAll('#bracketRoot select, #bracketRoot input[type="date"]').forEach(el => {
     el.addEventListener('change', () => {
       const data = readBracketFromUI();
@@ -752,7 +799,7 @@ function llEnsureExtraIfNeeded(data){
     if (!['q1','q2','q3','q4','s1','s2'].includes(round.id)) return;
     const outcome = llSeriesWinner(round);
 
-    if (outcome.needsExtra) {
+    if (outcome.needsExtra && !round.extraDeleted) {
       if (round.legs.length < 3) {
         const extra = getEmptyLeg();
         extra.date = round.legs?.[1]?.date || '';
