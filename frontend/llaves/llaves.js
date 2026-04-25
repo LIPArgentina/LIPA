@@ -74,28 +74,35 @@ function getTeamOptions(){
 }
 
 async function loadUsersJS(cat){
-  return new Promise((resolve, reject) => {
-    const ID = 'users-script';
-    const old = document.getElementById(ID);
-    if (old) old.remove();
+  try {
+    const resp = await fetch(`${API_BASE}/teams?division=${encodeURIComponent(cat)}`, {
+      credentials: 'include',
+      cache: 'no-store'
+    });
 
-    try { delete window.LPI_USERS; } catch(_) { window.LPI_USERS = undefined; }
+    const data = await resp.json().catch(() => null);
 
-    const s = document.createElement('script');
-    s.id = ID;
-    s.src = `../data/usuarios.${cat}.js`;
-    s.onload = () => {
-      const arr = (window.LPI_USERS || [])
-        .filter(u => u.role === 'team')
-        .map(u => normalizeTeamName(u.username));
-      const uniq = unique(arr.filter(Boolean));
-      const resto = uniq.filter(n => n !== 'WO')
-        .sort((a,b) => a.localeCompare(b, 'es', { sensitivity:'base' }));
-      resolve(['WO', ...resto]);
-    };
-    s.onerror = () => reject(new Error(`No se pudo cargar usuarios.${cat}.js`));
-    document.head.appendChild(s);
-  });
+    if (!resp.ok || !Array.isArray(data?.teams)) {
+      throw new Error(data?.error || 'No se pudieron cargar equipos');
+    }
+
+    const names = data.teams.map(item => {
+      if (typeof item === 'string') return item;
+      return item?.username || item?.display_name || item?.displayName || item?.name || '';
+    });
+
+    const uniq = unique(
+      names
+        .map(normalizeTeamName)
+        .filter(Boolean)
+        .filter(n => n !== 'WO')
+    ).sort((a,b) => a.localeCompare(b, 'es', { sensitivity:'base' }));
+
+    return ['WO', ...uniq];
+  } catch (err) {
+    console.error('Error cargando equipos desde DB:', err);
+    return ['WO'];
+  }
 }
 
 function getEmptyLeg(){
