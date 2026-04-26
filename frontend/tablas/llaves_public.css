@@ -1,41 +1,6 @@
-#llavesPublicMount{
-  --ll-bg:#0a0a0a;
-  --ll-card:#16171a;
-  --ll-ink:#ffffff;
-  --ll-muted:#cfcfcf;
-  --ll-gold:#ffcc00;
-  --ll-gold-dark:#b28900;
-  --ll-line:#ffffff22;
-  --ll-whitebox:#f4f4f4;
-  --ll-shadow:0 10px 24px rgba(0,0,0,.38);
-  width:100%;
-  margin:18px 0 26px;
-  color:var(--ll-ink);
-  font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-}
+/* PATCH SEGURO - SOLO AJUSTE TERCERA */
+/* No reemplaza estilos existentes */
 
-#llavesPublicMount *{ box-sizing:border-box; }
-
-#llavesPublicMount .bracket{
-  display:grid;
-  gap:20px;
-  align-items:start;
-  width:100%;
-  min-width:max-content;
-  margin:0;
-}
-
-/* 🔥 AJUSTE CLAVE SOLO PARA TERCERA */
 #llavesPublicMount .bracket-tercera{
-  grid-template-columns:420px 420px 420px 420px 420px;
-}
-
-/* Segunda queda igual */
-#llavesPublicMount .bracket-segunda{
-  grid-template-columns:360px 360px 360px;
-}
-
-/* Mantener tarjetas adaptativas */
-#llavesPublicMount .tie-card{
-  width:100%;
+  grid-template-columns:420px 420px 420px 420px 420px !important;
 }
