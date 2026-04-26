@@ -10,6 +10,53 @@ module.exports = function createLlavesRouter() {
     return String(value || '').trim().toLowerCase();
   }
 
+  function normalizeTeam(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/&/g, ' Y ')
+      .replace(/[^A-Z0-9]/gi, '')
+      .toUpperCase();
+  }
+
+  function cleanTeamName(value) {
+    return String(value || '').trim().replace(/\s+/g, ' ');
+  }
+
+  function isRealTeam(value) {
+    const team = cleanTeamName(value);
+    return team && normalizeTeam(team) !== 'WO';
+  }
+
+  function legHasScores(leg) {
+    return [
+      leg?.home?.puntos,
+      leg?.away?.puntos,
+      leg?.home?.puntosExtra,
+      leg?.away?.puntosExtra
+    ].some(value => Number(value || 0) > 0);
+  }
+
+  function legContainsTeam(leg, teamKey) {
+    return normalizeTeam(leg?.home?.team) === teamKey ||
+           normalizeTeam(leg?.away?.team) === teamKey;
+  }
+
+  function buildMatchFromLeg(leg, roundId, legIndex) {
+    const local = cleanTeamName(leg?.home?.team);
+    const visitante = cleanTeamName(leg?.away?.team);
+
+    if (!isRealTeam(local) || !isRealTeam(visitante)) return null;
+
+    return {
+      roundId,
+      legIndex,
+      date: String(leg?.date || '').trim() || null,
+      local,
+      visitante
+    };
+  }
+
   async function ensureTables() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS llaves_data (
@@ -78,6 +125,74 @@ module.exports = function createLlavesRouter() {
     }
   }
 
+  async function getProximoCruce(req, res) {
+    try {
+      const category = cleanCategory(req.query.category);
+      const team = cleanTeamName(req.query.team);
+      const teamKey = normalizeTeam(team);
+
+      if (!VALID_CATEGORIES.has(category)) {
+        return res.status(400).json({ ok: false, error: 'category inválida' });
+      }
+
+      if (!teamKey) {
+        return res.status(400).json({ ok: false, error: 'team inválido' });
+      }
+
+      await ensureTables();
+
+      const result = await pool.query(
+        `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
+        [category]
+      );
+
+      const data = result.rows[0]?.data || null;
+      const rounds = Array.isArray(data?.rounds) ? data.rounds : [];
+
+      const candidates = [];
+
+      rounds.forEach((round, roundIndex) => {
+        const legs = Array.isArray(round?.legs) ? round.legs : [];
+
+        legs.forEach((leg, legIndex) => {
+          if (!legContainsTeam(leg, teamKey)) return;
+
+          const match = buildMatchFromLeg(leg, round?.id || '', legIndex);
+          if (!match) return;
+
+          candidates.push({
+            ...match,
+            roundIndex,
+            played: legHasScores(leg)
+          });
+        });
+      });
+
+      const pending = candidates
+        .filter(item => !item.played)
+        .sort((a, b) => {
+          const ad = a.date || '9999-12-31';
+          const bd = b.date || '9999-12-31';
+          return ad.localeCompare(bd) || (a.roundIndex - b.roundIndex) || (a.legIndex - b.legIndex);
+        });
+
+      const match = pending[0] || candidates
+        .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.roundIndex - a.roundIndex) || (b.legIndex - a.legIndex))[0] || null;
+
+      res.set('Cache-Control', 'no-store');
+      res.json({
+        ok: true,
+        category,
+        team,
+        match
+      });
+    } catch (err) {
+      console.error('GET /api/llaves/proximo-cruce', err);
+      res.status(500).json({ ok: false, error: 'No se pudo cargar el próximo cruce de llaves' });
+    }
+  }
+
+
   async function deleteDesempate(req, res) {
     try {
       const category = cleanCategory(req.body?.category || req.query.category);
@@ -132,6 +247,9 @@ module.exports = function createLlavesRouter() {
   // Soporta ambos montajes:
   // router.use(createLlavesRouter()) => /api/llaves
   // router.use('/llaves', createLlavesRouter()) => /api/llaves
+  router.get('/llaves/proximo-cruce', getProximoCruce);
+  router.get('/proximo-cruce', getProximoCruce);
+
   router.get('/llaves', getLlaves);
   router.post('/llaves', saveLlaves);
   router.delete('/llaves/desempate', deleteDesempate);
