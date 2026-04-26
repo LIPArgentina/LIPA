@@ -42,8 +42,8 @@
   min-width:max-content;
   margin:0 auto;
 }
-#llavesPublicMount .bracket-tercera{ grid-template-columns:486px 486px 486px 486px 486px; }
-#llavesPublicMount .bracket-segunda{ grid-template-columns:486px 486px 486px; }
+#llavesPublicMount .bracket-tercera{ grid-template-columns:460px 460px 460px 460px 460px; }
+#llavesPublicMount .bracket-segunda{ grid-template-columns:460px 460px 460px; }
 #llavesPublicMount .bracket-col{ display:flex; flex-direction:column; gap:14px; min-width:0; }
 #llavesPublicMount .qf-left,
 #llavesPublicMount .qf-right{ padding-top:4px; }
@@ -98,7 +98,7 @@
 #llavesPublicMount .llaves-public-error{ color:#ffdddd; border:1px solid #7a1d1d; background:#220b0b; border-radius:12px; padding:10px; font-weight:800; text-align:center; }
 
 @media (max-width: 900px){
-  #llavesPublicMount .bracket-tercera{ grid-template-columns:486px 486px 486px 486px 486px; }
-  #llavesPublicMount .bracket-segunda{ grid-template-columns:486px 486px 486px; }
-  #llavesPublicMount .tie-card{ max-width:486px; }
+  #llavesPublicMount .bracket-tercera{ grid-template-columns:460px 460px 460px 460px 460px; }
+  #llavesPublicMount .bracket-segunda{ grid-template-columns:460px 460px 460px; }
+  #llavesPublicMount .tie-card{ max-width:460px; }
 }
