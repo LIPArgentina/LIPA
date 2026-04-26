@@ -53,7 +53,7 @@
 #llavesPublicMount .tie-card{
   position:relative;
   width:100%;
-  max-width:486px;
+  max-width:466px;
   padding:10px 9px 9px;
   overflow:visible;
   background:var(--ll-card);
