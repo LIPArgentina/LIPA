@@ -42,8 +42,8 @@
   min-width:max-content;
   margin:0 auto;
 }
-#llavesPublicMount .bracket-tercera{ grid-template-columns:340px 340px 340px 340px 340px; }
-#llavesPublicMount .bracket-segunda{ grid-template-columns:340px 340px 340px; }
+#llavesPublicMount .bracket-tercera{ grid-template-columns:486px 486px 486px 486px 486px; }
+#llavesPublicMount .bracket-segunda{ grid-template-columns:486px 486px 486px; }
 #llavesPublicMount .bracket-col{ display:flex; flex-direction:column; gap:14px; min-width:0; }
 #llavesPublicMount .qf-left,
 #llavesPublicMount .qf-right{ padding-top:4px; }
@@ -53,7 +53,7 @@
 #llavesPublicMount .tie-card{
   position:relative;
   width:100%;
-  max-width:340px;
+  max-width:486px;
   padding:10px 9px 9px;
   overflow:visible;
   background:var(--ll-card);
@@ -80,7 +80,7 @@
 #llavesPublicMount .match-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
 #llavesPublicMount .match-label{ font-size:10px; font-weight:900; letter-spacing:.12em; color:var(--ll-gold); text-transform:uppercase; }
 #llavesPublicMount .fecha-view{ color:#fff; font-weight:800; font-size:10px; opacity:.9; white-space:nowrap; }
-#llavesPublicMount .team-row{ display:grid; grid-template-columns:22px 28px minmax(0,1fr) minmax(0,1fr) 28px 22px; gap:6px; align-items:center; }
+#llavesPublicMount .team-row{ display:grid; grid-template-columns:22px 28px 140px 140px 28px 22px; gap:6px; align-items:center; }
 #llavesPublicMount .team-view,
 #llavesPublicMount .score-view{ border-radius:7px; font-weight:900; min-width:0; }
 #llavesPublicMount .team-view{ width:100%; display:block; background:#000; color:#fff; border:1px solid #444; padding:5px 6px; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:26px; line-height:14px; }
@@ -88,7 +88,7 @@
 #llavesPublicMount .score-view-white{ border:1px solid #cfcfcf; color:#111; background:var(--ll-whitebox); box-shadow:0 3px 0 #cfcfcf; }
 #llavesPublicMount .llaves-public-error{ color:#ffdddd; border:1px solid #7a1d1d; background:#220b0b; border-radius:12px; padding:10px; font-weight:800; text-align:center; }
 @media (max-width: 900px){
-  #llavesPublicMount .bracket-tercera{ grid-template-columns:300px 300px 300px 300px 300px; }
-  #llavesPublicMount .bracket-segunda{ grid-template-columns:300px 300px 300px; }
-  #llavesPublicMount .tie-card{ max-width:300px; }
+  #llavesPublicMount .bracket-tercera{ grid-template-columns:486px 486px 486px 486px 486px; }
+  #llavesPublicMount .bracket-segunda{ grid-template-columns:486px 486px 486px; }
+  #llavesPublicMount .tie-card{ max-width:486px; }
 }
