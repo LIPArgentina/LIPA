@@ -98,7 +98,16 @@
 #llavesPublicMount .llaves-public-error{ color:#ffdddd; border:1px solid #7a1d1d; background:#220b0b; border-radius:12px; padding:10px; font-weight:800; text-align:center; }
 
 @media (max-width: 900px){
-  #llavesPublicMount .bracket-tercera{ grid-template-columns:440px 440px 440px 440px 440px; }
+  #llavesPublicMount .bracket-tercera{ grid-template-columns:374px 374px 374px 374px 374px; }
+  #llavesPublicMount .bracket-segunda{ grid-template-columns:374px 374px 374px; }
+  #llavesPublicMount .tie-card{ width:374px; max-width:374px; }
+  #llavesPublicMount .team-row{
+    grid-template-columns:18px 24px 120px 120px 24px 18px;
+    gap:5px;
+  }
+  #llavesPublicMount .team-view{ font-size:9px; min-height:22px; }
+  #llavesPublicMount .score-view{ height:20px; font-size:9px; }
+}
   #llavesPublicMount .bracket-segunda{ grid-template-columns:440px 440px 440px; }
   #llavesPublicMount .tie-card{ max-width:460px; }
 }
