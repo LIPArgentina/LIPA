@@ -98,16 +98,101 @@
 #llavesPublicMount .llaves-public-error{ color:#ffdddd; border:1px solid #7a1d1d; background:#220b0b; border-radius:12px; padding:10px; font-weight:800; text-align:center; }
 
 @media (max-width: 900px){
-  #llavesPublicMount .bracket-tercera{ grid-template-columns:374px 374px 374px 374px 374px; }
-  #llavesPublicMount .bracket-segunda{ grid-template-columns:374px 374px 374px; }
-  #llavesPublicMount .tie-card{ width:374px; max-width:374px; }
-  #llavesPublicMount .team-row{
-    grid-template-columns:18px 24px 120px 120px 24px 18px;
-    gap:5px;
+  #llavesPublicMount .llaves-public-box{
+    padding:10px 8px 12px;
   }
-  #llavesPublicMount .team-view{ font-size:9px; min-height:22px; }
-  #llavesPublicMount .score-view{ height:20px; font-size:9px; }
-}
-  #llavesPublicMount .bracket-segunda{ grid-template-columns:440px 440px 440px; }
-  #llavesPublicMount .tie-card{ max-width:460px; }
+
+  #llavesPublicMount .bracket{
+    gap:6px;
+    margin:0;
+    justify-content:start;
+  }
+
+  #llavesPublicMount .bracket-tercera{
+    grid-template-columns:318px 318px 318px 318px 318px;
+  }
+
+  #llavesPublicMount .bracket-segunda{
+    grid-template-columns:318px 318px 318px;
+  }
+
+  #llavesPublicMount .bracket-col{
+    gap:10px;
+  }
+
+  #llavesPublicMount .sf-left,
+  #llavesPublicMount .sf-right{
+    padding-top:36px;
+  }
+
+  #llavesPublicMount .center-col{
+    padding-top:14px;
+    gap:12px;
+  }
+
+  #llavesPublicMount .tie-card{
+    width:318px;
+    max-width:318px;
+    padding:8px 7px 8px;
+    border-radius:14px;
+  }
+
+  #llavesPublicMount .tie-title{
+    font-size:12px;
+  }
+
+  #llavesPublicMount [data-round-card="final"] .tie-title{
+    font-size:15px;
+  }
+
+  #llavesPublicMount [data-round-card="third"] .tie-title{
+    font-size:11px;
+  }
+
+  #llavesPublicMount .tie-helper{
+    font-size:9px;
+  }
+
+  #llavesPublicMount .round-group{
+    gap:6px;
+  }
+
+  #llavesPublicMount .match-block{
+    padding:6px;
+    border-radius:10px;
+  }
+
+  #llavesPublicMount .match-top{
+    gap:6px;
+    margin-bottom:5px;
+  }
+
+  #llavesPublicMount .match-label,
+  #llavesPublicMount .fecha-view{
+    font-size:9px;
+  }
+
+  #llavesPublicMount .team-row{
+    grid-template-columns:16px 20px 102px 102px 20px 16px;
+    gap:4px;
+    justify-content:start;
+  }
+
+  #llavesPublicMount .team-view{
+    padding:4px 5px;
+    font-size:8.5px;
+    min-height:20px;
+    line-height:12px;
+  }
+
+  #llavesPublicMount .score-view{
+    height:20px;
+    font-size:8.5px;
+    border-radius:6px;
+    box-shadow:0 2px 0 var(--ll-gold-dark);
+  }
+
+  #llavesPublicMount .score-view-white{
+    box-shadow:0 2px 0 #cfcfcf;
+  }
 }
