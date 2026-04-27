@@ -1375,4 +1375,102 @@ router.get('/player-query', async (req, res) => {
 });
 
 
+function ensureRankingRow(map, playerName, teamSlug, teamName) {
+  const key = `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`;
+  if (!map.has(key)) {
+    map.set(key, {
+      name: String(playerName || '').trim(),
+      teamSlug,
+      teamName,
+      played: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      triangulosFavor: 0,
+      triangulosContra: 0,
+      diff: 0,
+      effectiveness: 0
+    });
+  }
+  return map.get(key);
+}
+
+router.get('/player-ranking', async (req, res) => {
+  setNoCache(res);
+  try {
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const rawLimit = Number(req.query.limit || 10);
+    const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
+
+    if (!category) {
+      return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
+    }
+
+    const results = await buildAllValidatedCrucesForPlayerQuery(category);
+    const rankingMap = new Map();
+
+    for (const item of results) {
+      const localPlayers = getIndividualPlayers(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+      const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
+
+      for (let idx = 0; idx < max; idx++) {
+        const localPlayer = String(localPlayers[idx] || '').trim();
+        const visitantePlayer = String(visitantePlayers[idx] || '').trim();
+        const localScore = Number(localScores[idx] ?? 0) || 0;
+        const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
+
+        if (localPlayer) {
+          const row = ensureRankingRow(rankingMap, localPlayer, item.localSlug, item.localName);
+          row.played += 1;
+          row.triangulosFavor += localScore;
+          row.triangulosContra += visitanteScore;
+          if (localScore > visitanteScore) row.wins += 1;
+          else if (localScore < visitanteScore) row.losses += 1;
+          else row.draws += 1;
+        }
+
+        if (visitantePlayer) {
+          const row = ensureRankingRow(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
+          row.played += 1;
+          row.triangulosFavor += visitanteScore;
+          row.triangulosContra += localScore;
+          if (visitanteScore > localScore) row.wins += 1;
+          else if (visitanteScore < localScore) row.losses += 1;
+          else row.draws += 1;
+        }
+      }
+    }
+
+    const ranking = Array.from(rankingMap.values())
+      .map((item) => ({
+        ...item,
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
+        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
+      }))
+      .sort((a, b) => {
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.diff !== a.diff) return b.diff - a.diff;
+        if (a.losses !== b.losses) return a.losses - b.losses;
+        if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+      })
+      .slice(0, limit);
+
+    return res.json({
+      ok: true,
+      category,
+      limit,
+      total: ranking.length,
+      ranking
+    });
+  } catch (err) {
+    console.error('GET /player-ranking', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo armar el ranking.' });
+  }
+});
+
+
 module.exports = router;

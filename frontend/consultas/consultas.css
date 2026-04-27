@@ -67,3 +67,33 @@ header img{ height:34px; width:auto; display:block; }
 .stat.win strong{ color:var(--ok); }
 .stat.loss strong{ color:var(--err); }
 @media (max-width:760px){ .container{ padding:8px 6px; } header{ grid-template-columns:auto 1fr auto; gap:6px; } header img{ height:32px; } .btn{ padding:5px 8px; font-size:11px; } .consultas-page{ padding:12px 0 24px; } .search-form{ grid-template-columns:1fr; } .summary-box{ grid-template-columns:1fr; } .summary-stats{ justify-content:stretch; } .summary-count{ flex:1 1 82px; text-align:center; } .match-head{ display:block; } .match-date{ display:block; margin-top:5px; } .match-stats{ grid-template-columns:1fr; } }
+
+
+.consultas-hero{ display:grid; grid-template-columns:1fr auto; gap:12px; align-items:start; }
+.hero-copy{ min-width:0; }
+.ranking-actions{ display:flex; gap:7px; align-items:center; justify-content:flex-end; padding-top:18px; flex-wrap:wrap; }
+.ranking-btn{ min-width:70px; }
+.ranking-btn.active{ background:linear-gradient(180deg,#ffd966 0%, #ffcc00 60%, #e5b300 100%); color:#1b1600; box-shadow:inset 0 -1px 0 #b28900, 0 1px 5px rgba(0,0,0,.4); }
+
+.ranking-box{ background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 5px 12px #0006; margin:12px 0; padding:10px 12px; }
+.ranking-head{ display:flex; justify-content:space-between; gap:10px; align-items:end; margin-bottom:8px; }
+.ranking-title{ margin:0; color:var(--gold); font-size:16px; font-weight:900; text-transform:uppercase; }
+.ranking-meta{ margin:2px 0 0; color:var(--muted); font-size:11px; }
+.ranking-table-wrap{ overflow-x:auto; }
+.ranking-table{ width:100%; border-collapse:collapse; font-size:11px; min-width:720px; }
+.ranking-table th,.ranking-table td{ border-bottom:1px solid var(--line); padding:6px 7px; text-align:left; white-space:nowrap; }
+.ranking-table th{ color:var(--gold); text-transform:uppercase; font-size:10px; letter-spacing:.05em; background:#101113; position:sticky; top:0; }
+.ranking-table td.num,.ranking-table th.num{ text-align:right; }
+.ranking-table .rank-pos{ color:var(--gold-soft); font-weight:900; }
+.ranking-table .player-name{ color:#fff; font-weight:900; text-transform:uppercase; }
+.ranking-table .team-name{ color:var(--muted); font-weight:700; text-transform:uppercase; }
+.ranking-table .ok{ color:var(--ok); font-weight:900; }
+.ranking-table .bad{ color:var(--err); font-weight:900; }
+.ranking-empty{ color:var(--muted); font-size:12px; padding:8px 0; }
+
+@media (max-width:760px){
+  .consultas-hero{ grid-template-columns:1fr; }
+  .ranking-actions{ justify-content:stretch; padding-top:0; }
+  .ranking-btn{ flex:1; }
+  .ranking-head{ display:block; }
+}

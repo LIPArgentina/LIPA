@@ -11,6 +11,8 @@
   const $status = document.getElementById('statusBox');
   const $summary = document.getElementById('summaryBox');
   const $results = document.getElementById('resultsBox');
+  const $ranking = document.getElementById('rankingBox');
+  const $rankingButtons = Array.from(document.querySelectorAll('[data-ranking-limit]'));
 
   let debounceTimer = null;
   let lastSuggestions = [];
@@ -55,6 +57,14 @@
       $summary.innerHTML = '';
     }
     if ($results) $results.innerHTML = '';
+  }
+
+  function clearRanking() {
+    if ($ranking) {
+      $ranking.hidden = true;
+      $ranking.innerHTML = '';
+    }
+    $rankingButtons.forEach((btn) => btn.classList.remove('active'));
   }
 
   function renderSuggestions(items = []) {
@@ -170,9 +180,93 @@
     });
   }
 
+  function renderRanking(data, limit) {
+    const items = Array.isArray(data?.ranking) ? data.ranking : [];
+    if (!$ranking) return;
+
+    $ranking.hidden = false;
+    if (!items.length) {
+      $ranking.innerHTML = '<div class="ranking-empty">No hay datos suficientes para armar el ranking.</div>';
+      return;
+    }
+
+    const rows = items.map((item, idx) => {
+      const diff = Number(item.diff || 0);
+      const diffClass = diff >= 0 ? 'ok' : 'bad';
+      return `
+        <tr>
+          <td class="rank-pos">#${idx + 1}</td>
+          <td class="player-name">${item.name || ''}</td>
+          <td class="team-name">${item.teamName || ''}</td>
+          <td class="num">${Number(item.played || 0)}</td>
+          <td class="num ok">${Number(item.wins || 0)}</td>
+          <td class="num bad">${Number(item.losses || 0)}</td>
+          <td class="num">${Number(item.triangulosFavor || 0)}</td>
+          <td class="num">${Number(item.triangulosContra || 0)}</td>
+          <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
+          <td class="num">${Number(item.effectiveness || 0)}%</td>
+        </tr>
+      `;
+    }).join('');
+
+    $ranking.innerHTML = `
+      <div class="ranking-head">
+        <div>
+          <h2 class="ranking-title">Ranking Top ${limit}</h2>
+          <p class="ranking-meta">Ordenado por partidos ganados. Desempate: diferencia de triángulos.</p>
+        </div>
+      </div>
+      <div class="ranking-table-wrap">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Jugador</th>
+              <th>Equipo</th>
+              <th class="num">PJ</th>
+              <th class="num">PG</th>
+              <th class="num">PP</th>
+              <th class="num">TF</th>
+              <th class="num">TC</th>
+              <th class="num">DIF</th>
+              <th class="num">EFEC</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  async function loadRanking(limit) {
+    clearResults();
+    setStatus('Armando ranking…', 'info');
+
+    const category = String($category?.value || '').trim();
+    if (!category) {
+      setStatus('Seleccioná una categoría.', 'error');
+      return;
+    }
+
+    $rankingButtons.forEach((btn) => {
+      btn.classList.toggle('active', String(btn.dataset.rankingLimit || '') === String(limit));
+    });
+
+    try {
+      const data = await fetchJson(apiUrl('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(limit)));
+      setStatus('', 'info');
+      renderRanking(data, limit);
+    } catch (err) {
+      console.error(err);
+      clearRanking();
+      setStatus(err?.message || 'No se pudo cargar el ranking.', 'error');
+    }
+  }
+
   async function searchPlayer(ev) {
     ev?.preventDefault();
     clearResults();
+    clearRanking();
     setStatus('Buscando jugador…', 'info');
 
     const q = String($player?.value || '').trim();
@@ -205,7 +299,11 @@
   $player?.addEventListener('input', scheduleSuggestions);
   $category?.addEventListener('change', () => {
     renderSuggestions([]);
+    clearRanking();
     scheduleSuggestions();
+  });
+  $rankingButtons.forEach((btn) => {
+    btn.addEventListener('click', () => loadRanking(Number(btn.dataset.rankingLimit || 10)));
   });
   $form?.addEventListener('submit', searchPlayer);
 })();

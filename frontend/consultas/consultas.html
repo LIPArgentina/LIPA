@@ -21,9 +21,16 @@
 
   <main class="consultas-page">
     <section class="consultas-hero">
-      <p class="eyebrow">Cruces validados</p>
-      <h1>Consulta por jugador</h1>
-      <p class="lead">Buscá un jugador individual por nombre o apellido para ver partidos jugados y triángulos a favor/en contra.</p>
+      <div class="hero-copy">
+        <p class="eyebrow">Cruces validados</p>
+        <h1>Consulta por jugador</h1>
+        <p class="lead">Buscá un jugador individual por nombre o apellido para ver partidos jugados y triángulos a favor/en contra.</p>
+      </div>
+      <div class="ranking-actions" aria-label="Ranking por categoría">
+        <button class="btn ranking-btn" type="button" data-ranking-limit="10">Top 10</button>
+        <button class="btn ranking-btn" type="button" data-ranking-limit="20">Top 20</button>
+        <button class="btn ranking-btn" type="button" data-ranking-limit="50">Top 50</button>
+      </div>
     </section>
 
     <section class="search-card" aria-label="Buscar jugador">
@@ -46,6 +53,7 @@
       </form>
     </section>
 
+    <section id="rankingBox" class="ranking-box" hidden></section>
     <section id="statusBox" class="status-box" hidden></section>
     <section id="summaryBox" class="summary-box" hidden></section>
     <section id="resultsBox" class="results-list" aria-live="polite"></section>
