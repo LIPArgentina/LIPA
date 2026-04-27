@@ -13,9 +13,13 @@
   const $results = document.getElementById('resultsBox');
   const $ranking = document.getElementById('rankingBox');
   const $rankingButtons = Array.from(document.querySelectorAll('[data-ranking-limit]'));
+  const $rankingTabs = Array.from(document.querySelectorAll('[data-ranking-tab]'));
 
   let debounceTimer = null;
   let lastSuggestions = [];
+  let currentRankingTab = 'players';
+  let lastRankingData = null;
+  let lastRankingLimit = 10;
 
   function apiUrl(path) {
     return API_BASE + path;
@@ -65,6 +69,7 @@
       $ranking.innerHTML = '';
     }
     $rankingButtons.forEach((btn) => btn.classList.remove('active'));
+    lastRankingData = null;
   }
 
   function renderSuggestions(items = []) {
@@ -238,6 +243,110 @@
     `;
   }
 
+
+  function renderRankingSwitch() {
+    if (!lastRankingData) return;
+    if (currentRankingTab === 'teams') {
+      renderTeamsRanking(lastRankingData, lastRankingLimit);
+      return;
+    }
+    renderRanking(lastRankingData, lastRankingLimit);
+  }
+
+  function renderTeamsRanking(data, limit) {
+    const players = Array.isArray(data?.ranking) ? data.ranking : [];
+    if (!$ranking) return;
+
+    $ranking.hidden = false;
+    if (!players.length) {
+      $ranking.innerHTML = '<div class="ranking-empty">No hay datos suficientes para armar el ranking por equipos.</div>';
+      return;
+    }
+
+    const teams = new Map();
+    players.forEach((player, idx) => {
+      const teamName = String(player.teamName || 'Sin equipo').trim() || 'Sin equipo';
+      const key = teamName.toUpperCase();
+      if (!teams.has(key)) {
+        teams.set(key, {
+          teamName,
+          count: 0,
+          bestPos: idx + 1,
+          wins: 0,
+          diff: 0,
+          players: []
+        });
+      }
+
+      const row = teams.get(key);
+      const pos = idx + 1;
+      row.count += 1;
+      row.bestPos = Math.min(row.bestPos, pos);
+      row.wins += Number(player.wins || 0);
+      row.diff += Number(player.diff || 0);
+      row.players.push({
+        name: player.name || '',
+        pos,
+        wins: Number(player.wins || 0),
+        diff: Number(player.diff || 0)
+      });
+    });
+
+    const items = Array.from(teams.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      if (a.bestPos !== b.bestPos) return a.bestPos - b.bestPos;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      if (b.diff !== a.diff) return b.diff - a.diff;
+      return a.teamName.localeCompare(b.teamName, 'es');
+    });
+
+    const rows = items.map((team, idx) => {
+      const diff = Number(team.diff || 0);
+      const diffClass = diff >= 0 ? 'ok' : 'bad';
+      const playersText = team.players
+        .sort((a, b) => a.pos - b.pos)
+        .map((player) => `${player.name} (#${player.pos})`)
+        .join(', ');
+
+      return `
+        <tr>
+          <td class="rank-pos">#${idx + 1}</td>
+          <td class="team-name team-main">${team.teamName}</td>
+          <td class="num ok">${team.count}</td>
+          <td class="num">#${team.bestPos}</td>
+          <td class="num ok">${team.wins}</td>
+          <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
+          <td class="team-players">${playersText}</td>
+        </tr>
+      `;
+    }).join('');
+
+    $ranking.innerHTML = `
+      <div class="ranking-head">
+        <div>
+          <h2 class="ranking-title">Ranking Equipos Top ${limit}</h2>
+          <p class="ranking-meta">Cantidad de jugadores de cada equipo dentro del Top ${limit}. Desempate: mejor puesto, partidos ganados y diferencia de triángulos.</p>
+        </div>
+      </div>
+      <div class="ranking-table-wrap">
+        <table class="ranking-table team-ranking-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Equipo</th>
+              <th class="num">Jug.</th>
+              <th class="num">Mejor</th>
+              <th class="num">PG</th>
+              <th class="num">DIF</th>
+              <th>Jugadores</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
   async function loadRanking(limit) {
     clearResults();
     setStatus('Armando ranking…', 'info');
@@ -255,7 +364,9 @@
     try {
       const data = await fetchJson(apiUrl('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(limit)));
       setStatus('', 'info');
-      renderRanking(data, limit);
+      lastRankingData = data;
+      lastRankingLimit = limit;
+      renderRankingSwitch();
     } catch (err) {
       console.error(err);
       clearRanking();
@@ -304,6 +415,13 @@
   });
   $rankingButtons.forEach((btn) => {
     btn.addEventListener('click', () => loadRanking(Number(btn.dataset.rankingLimit || 10)));
+  });
+  $rankingTabs.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentRankingTab = btn.dataset.rankingTab || 'players';
+      $rankingTabs.forEach((item) => item.classList.toggle('active', item === btn));
+      renderRankingSwitch();
+    });
   });
   $form?.addEventListener('submit', searchPlayer);
 })();

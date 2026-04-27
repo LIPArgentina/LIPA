@@ -97,3 +97,32 @@ header img{ height:34px; width:auto; display:block; }
   .ranking-btn{ flex:1; }
   .ranking-head{ display:block; }
 }
+
+
+.ranking-tabs{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  margin-right:4px;
+}
+.tab-btn{ opacity:.68; }
+.tab-btn.active{
+  opacity:1;
+  background:linear-gradient(180deg,#ffd966 0%, #ffcc00 60%, #e5b300 100%);
+  color:#1b1600;
+  box-shadow:inset 0 -1px 0 #b28900, 0 1px 5px rgba(0,0,0,.4);
+}
+.team-ranking-table{ min-width:680px; }
+.team-ranking-table .team-main{ color:#fff; font-weight:900; }
+.team-ranking-table .team-players{
+  color:var(--muted);
+  font-weight:700;
+  max-width:360px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+@media (max-width:760px){
+  .ranking-tabs{ width:100%; margin-right:0; }
+  .tab-btn{ flex:1; }
+}
