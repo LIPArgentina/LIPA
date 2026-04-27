@@ -8,6 +8,8 @@
   const $category = document.getElementById('categorySelect');
   const $player = document.getElementById('playerInput');
   const $datalist = document.getElementById('playerSuggestions');
+  const $team = document.getElementById('teamInput');
+  const $teamDatalist = document.getElementById('teamSuggestions');
   const $status = document.getElementById('statusBox');
   const $summary = document.getElementById('summaryBox');
   const $results = document.getElementById('resultsBox');
@@ -17,6 +19,8 @@
 
   let debounceTimer = null;
   let lastSuggestions = [];
+  let lastTeamSuggestions = [];
+  let teamDebounceTimer = null;
   let currentRankingTab = 'players';
   let lastRankingData = null;
   let lastRankingLimit = 10;
@@ -84,6 +88,18 @@
     });
   }
 
+  function renderTeamSuggestions(items = []) {
+    lastTeamSuggestions = items;
+    if (!$teamDatalist) return;
+    $teamDatalist.innerHTML = '';
+    items.forEach((item) => {
+      const option = document.createElement('option');
+      option.value = item.name || '';
+      option.label = item.label || item.name || '';
+      $teamDatalist.appendChild(option);
+    });
+  }
+
   async function loadSuggestions() {
     const q = String($player?.value || '').trim();
     const category = String($category?.value || '').trim();
@@ -104,6 +120,28 @@
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(loadSuggestions, 250);
   }
+
+  async function loadTeamSuggestions() {
+    const q = String($team?.value || '').trim();
+    const category = String($category?.value || '').trim();
+    if (q.length < 2 || !category) {
+      renderTeamSuggestions([]);
+      return;
+    }
+
+    try {
+      const data = await fetchJson(apiUrl('/api/cruces/team-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q)));
+      renderTeamSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function scheduleTeamSuggestions() {
+    clearTimeout(teamDebounceTimer);
+    teamDebounceTimer = setTimeout(loadTeamSuggestions, 250);
+  }
+
 
   function resultClass(result) {
     if (result === 'ganado') return 'win';
@@ -347,6 +385,97 @@
     `;
   }
 
+
+  function renderTeamSearchResults(data) {
+    const items = Array.isArray(data?.players) ? data.players : [];
+    const team = data?.team || {};
+    if (!$ranking) return;
+
+    $ranking.hidden = false;
+    if (!items.length) {
+      $ranking.innerHTML = '<div class="ranking-empty">No hay jugadores para mostrar en ese equipo.</div>';
+      return;
+    }
+
+    const rows = items.map((item, idx) => {
+      const diff = Number(item.diff || 0);
+      const diffClass = diff >= 0 ? 'ok' : 'bad';
+      return `
+        <tr>
+          <td class="rank-pos">#${idx + 1}</td>
+          <td class="player-name">${item.name || ''}</td>
+          <td class="team-name">${item.teamName || team.name || ''}</td>
+          <td class="num">${Number(item.played || 0)}</td>
+          <td class="num ok">${Number(item.wins || 0)}</td>
+          <td class="num bad">${Number(item.losses || 0)}</td>
+          <td class="num">${Number(item.triangulosFavor || 0)}</td>
+          <td class="num">${Number(item.triangulosContra || 0)}</td>
+          <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
+          <td class="num">${Number(item.effectiveness || 0)}%</td>
+        </tr>
+      `;
+    }).join('');
+
+    $ranking.innerHTML = `
+      <div class="ranking-head">
+        <div>
+          <h2 class="ranking-title">Jugadores de ${team.name || 'equipo'}</h2>
+          <p class="ranking-meta">Ordenado por partidos ganados. Desempate: diferencia de triángulos. ${Number(data?.totalActivePlayers || 0)} jugadores activos sobre ${Number(data?.totalRegisteredPlayers || 0)} registrados.</p>
+        </div>
+      </div>
+      <div class="ranking-table-wrap">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Jugador</th>
+              <th>Equipo</th>
+              <th class="num">PJ</th>
+              <th class="num">PG</th>
+              <th class="num">PP</th>
+              <th class="num">TF</th>
+              <th class="num">TC</th>
+              <th class="num">DIF</th>
+              <th class="num">EFEC</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  async function searchTeam() {
+    clearResults();
+    clearRanking();
+    setStatus('Buscando equipo…', 'info');
+
+    const q = String($team?.value || '').trim();
+    const category = String($category?.value || '').trim();
+
+    if (!category || q.length < 2) {
+      setStatus('Seleccioná una categoría y escribí al menos 2 letras del equipo.', 'error');
+      return;
+    }
+
+    try {
+      const data = await fetchJson(apiUrl('/api/cruces/team-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q)));
+      renderTeamSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : lastTeamSuggestions);
+
+      if (!data?.team) {
+        const count = Array.isArray(data?.suggestions) ? data.suggestions.length : 0;
+        setStatus(count ? 'Elegí una coincidencia de equipo de la lista y volvé a buscar.' : 'No se encontraron equipos con esa búsqueda.', count ? 'info' : 'error');
+        return;
+      }
+
+      setStatus('', 'info');
+      renderTeamSearchResults(data);
+    } catch (err) {
+      console.error(err);
+      setStatus(err?.message || 'No se pudo consultar el equipo.', 'error');
+    }
+  }
+
   async function loadRanking(limit) {
     clearResults();
     setStatus('Armando ranking…', 'info');
@@ -376,6 +505,13 @@
 
   async function searchPlayer(ev) {
     ev?.preventDefault();
+
+    const teamQ = String($team?.value || '').trim();
+    if (teamQ.length >= 2) {
+      await searchTeam();
+      return;
+    }
+
     clearResults();
     clearRanking();
     setStatus('Buscando jugador…', 'info');
@@ -384,7 +520,7 @@
     const category = String($category?.value || '').trim();
 
     if (!category || q.length < 2) {
-      setStatus('Seleccioná una categoría y escribí al menos 2 letras.', 'error');
+      setStatus('Seleccioná una categoría y escribí al menos 2 letras de un jugador o equipo.', 'error');
       return;
     }
 
@@ -407,11 +543,26 @@
     }
   }
 
-  $player?.addEventListener('input', scheduleSuggestions);
+  $player?.addEventListener('input', () => {
+    if (String($player.value || '').trim()) {
+      if ($team) $team.value = '';
+      renderTeamSuggestions([]);
+    }
+    scheduleSuggestions();
+  });
+  $team?.addEventListener('input', () => {
+    if (String($team.value || '').trim()) {
+      if ($player) $player.value = '';
+      renderSuggestions([]);
+    }
+    scheduleTeamSuggestions();
+  });
   $category?.addEventListener('change', () => {
     renderSuggestions([]);
+    renderTeamSuggestions([]);
     clearRanking();
     scheduleSuggestions();
+    scheduleTeamSuggestions();
   });
   $rankingButtons.forEach((btn) => {
     btn.addEventListener('click', () => loadRanking(Number(btn.dataset.rankingLimit || 10)));

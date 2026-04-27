@@ -1497,5 +1497,200 @@ router.get('/player-ranking', async (req, res) => {
   }
 });
 
+async function findTeamsByCategory(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  if (!division) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT id, slug_uid, slug_base, display_name, division
+    FROM equipos
+    WHERE LOWER(division) = $1
+    ORDER BY display_name ASC, id ASC
+    `,
+    [division]
+  );
+
+  return rows;
+}
+
+async function getRegisteredPlayersForTeam(teamId) {
+  if (!teamId) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT TRIM(nombre) AS name
+    FROM jugadores
+    WHERE equipo_id = $1
+      AND TRIM(COALESCE(nombre, '')) <> ''
+    ORDER BY nombre ASC
+    `,
+    [teamId]
+  );
+
+  return rows.map((row) => String(row.name || '').trim()).filter(Boolean);
+}
+
+function teamInfoMatchesSide(teamInfo = {}, sideSlug = '', sideName = '') {
+  const candidates = [teamInfo.slug_uid, teamInfo.slug_base, teamInfo.display_name]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  return candidates.some((candidate) => (
+    samePlayerTeamSlug(sideSlug, candidate) || normalizeText(sideName) === normalizeText(candidate)
+  ));
+}
+
+function sortPlayerStatsRows(a, b) {
+  if (b.wins !== a.wins) return b.wins - a.wins;
+  if (b.diff !== a.diff) return b.diff - a.diff;
+  if (a.losses !== b.losses) return a.losses - b.losses;
+  if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
+  return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+}
+
+router.get('/team-query', async (req, res) => {
+  setNoCache(res);
+  try {
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const q = String(req.query.q || '').trim();
+
+    if (!category) {
+      return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
+    }
+
+    if (!q || normalizeText(q).length < 2) {
+      return res.json({ ok: true, category, q, suggestions: [], team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
+    }
+
+    const teams = await findTeamsByCategory(category);
+    const suggestions = teams
+      .filter((team) => (
+        includesNormalizedName(team.display_name, q) ||
+        includesNormalizedName(team.slug_uid, q) ||
+        includesNormalizedName(team.slug_base, q)
+      ))
+      .map((team) => ({
+        name: team.display_name,
+        teamSlug: team.slug_uid || team.slug_base,
+        teamBase: team.slug_base,
+        label: team.display_name,
+        id: team.id
+      }))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
+      .slice(0, 12);
+
+    const exactSuggestion = suggestions.find((item) => sameNormalizedName(item.name, q));
+    const exactTeam = exactSuggestion
+      ? teams.find((team) => Number(team.id) === Number(exactSuggestion.id))
+      : null;
+
+    if (!exactTeam) {
+      return res.json({ ok: true, category, q, suggestions, team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
+    }
+
+    const [registeredPlayers, results] = await Promise.all([
+      getRegisteredPlayersForTeam(exactTeam.id),
+      buildAllValidatedCrucesForPlayerQuery(category)
+    ]);
+
+    const playersMap = new Map();
+    const ensureTeamPlayer = (playerName) => {
+      const key = normalizeText(playerName);
+      if (!key) return null;
+      if (!playersMap.has(key)) {
+        playersMap.set(key, {
+          name: String(playerName || '').trim(),
+          teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
+          teamName: exactTeam.display_name,
+          played: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          triangulosFavor: 0,
+          triangulosContra: 0,
+          diff: 0,
+          effectiveness: 0
+        });
+      }
+      return playersMap.get(key);
+    };
+
+    registeredPlayers.forEach(ensureTeamPlayer);
+
+    for (const item of results) {
+      const localPlayers = getIndividualPlayers(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+
+      const scan = [
+        {
+          players: localPlayers,
+          scoreRows: localScores,
+          opponentScoreRows: visitanteScores,
+          teamSlug: item.localSlug,
+          teamName: item.localName
+        },
+        {
+          players: visitantePlayers,
+          scoreRows: visitanteScores,
+          opponentScoreRows: localScores,
+          teamSlug: item.visitanteSlug,
+          teamName: item.visitanteName
+        }
+      ];
+
+      for (const side of scan) {
+        if (!teamInfoMatchesSide(exactTeam, side.teamSlug, side.teamName)) continue;
+        side.players.forEach((playerName, idx) => {
+          const cleanName = String(playerName || '').trim();
+          if (!cleanName) return;
+          const row = ensureTeamPlayer(cleanName);
+          if (!row) return;
+
+          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
+          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
+          row.played += 1;
+          row.triangulosFavor += triangulosFavor;
+          row.triangulosContra += triangulosContra;
+          if (triangulosFavor > triangulosContra) row.wins += 1;
+          else if (triangulosFavor < triangulosContra) row.losses += 1;
+          else row.draws += 1;
+        });
+      }
+    }
+
+    const players = Array.from(playersMap.values())
+      .map((item) => ({
+        ...item,
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
+        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
+      }))
+      .sort(sortPlayerStatsRows);
+
+    const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
+
+    return res.json({
+      ok: true,
+      category,
+      q,
+      suggestions,
+      team: {
+        id: exactTeam.id,
+        name: exactTeam.display_name,
+        teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
+        teamBase: exactTeam.slug_base
+      },
+      totalRegisteredPlayers: registeredPlayers.length,
+      totalActivePlayers,
+      players
+    });
+  } catch (err) {
+    console.error('GET /team-query', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo consultar el equipo.' });
+  }
+});
+
 
 module.exports = router;

@@ -28,7 +28,7 @@ header img{ height:34px; width:auto; display:block; }
 .lead{ max-width:700px; margin:9px 0 0; color:#f4f4f4; line-height:1.35; font-size:clamp(12px,1.4vw,14px); }
 .search-card,.summary-box,.status-box,.match-card{ background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 5px 12px #0006; }
 .search-card{ padding:10px 12px; margin:14px 0; }
-.search-form{ display:grid; grid-template-columns:130px 1fr auto; gap:9px; align-items:end; }
+.search-form{ display:grid; grid-template-columns:130px minmax(180px,1fr) minmax(180px,1fr) auto; gap:9px; align-items:end; }
 .field{ display:flex; flex-direction:column; gap:4px; }
 .field label{ color:var(--gold); font-weight:900; letter-spacing:.06em; text-transform:uppercase; font-size:12px; }
 .field input,.field select{ width:100%; min-height:30px; background:#000; color:#fff; border:1px solid #444; border-radius:8px; padding:5px 8px; font:inherit; font-size:13px; font-weight:700; }

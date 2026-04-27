@@ -37,7 +37,7 @@
       </div>
     </section>
 
-    <section class="search-card" aria-label="Buscar jugador">
+    <section class="search-card" aria-label="Buscar jugador o equipo">
       <form id="consultaForm" class="search-form" autocomplete="off">
         <div class="field">
           <label for="categorySelect">Categoría</label>
@@ -49,8 +49,14 @@
 
         <div class="field field-player">
           <label for="playerInput">Jugador</label>
-          <input id="playerInput" type="search" list="playerSuggestions" placeholder="Nombre o apellido" required minlength="2" />
+          <input id="playerInput" type="search" list="playerSuggestions" placeholder="Nombre o apellido" minlength="2" />
           <datalist id="playerSuggestions"></datalist>
+        </div>
+
+        <div class="field field-team">
+          <label for="teamInput">Equipo</label>
+          <input id="teamInput" type="search" list="teamSuggestions" placeholder="Nombre del equipo" minlength="2" />
+          <datalist id="teamSuggestions"></datalist>
         </div>
 
         <button id="btnBuscar" class="btn btn-primary" type="submit">Buscar</button>
