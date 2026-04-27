@@ -68,7 +68,7 @@ function ensureConsultasButton() {
   btn.style.textDecoration = "none";
 
   if (isAdmin()) {
-    btn.href = "./consultas.html";
+    btn.href = "./consultas/consultas.html";
     btn.classList.remove("hidden");
     return;
   }
