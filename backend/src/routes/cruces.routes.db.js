@@ -869,9 +869,8 @@ async function resolveEquipoInfoBySlug(slug, categoryHint = '') {
     FROM equipos
     WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1
     ORDER BY
-      CASE WHEN $2 <> '' AND LOWER(division) = $2 THEN 0 ELSE 1 END,
       CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END,
-      CASE WHEN LOWER(slug_base) = $1 THEN 0 ELSE 1 END,
+      CASE WHEN LOWER(division) = $2 THEN 0 ELSE 1 END,
       id ASC
     LIMIT 1
     `,
@@ -1315,6 +1314,7 @@ router.get('/player-query', async (req, res) => {
           players: localPlayers,
           scoreRows: localScores,
           opponentScoreRows: visitanteScores,
+          opponentPlayers: visitantePlayers,
           teamSlug: item.localSlug,
           teamName: item.localName,
           opponentSlug: item.visitanteSlug,
@@ -1324,6 +1324,7 @@ router.get('/player-query', async (req, res) => {
           players: visitantePlayers,
           scoreRows: visitanteScores,
           opponentScoreRows: localScores,
+          opponentPlayers: localPlayers,
           teamSlug: item.visitanteSlug,
           teamName: item.visitanteName,
           opponentSlug: item.localSlug,
@@ -1337,6 +1338,7 @@ router.get('/player-query', async (req, res) => {
           if (!sameNormalizedName(playerName, exact.name)) return;
           const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
           const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
+          const opponentPlayerName = String(side.opponentPlayers?.[idx] || '').trim();
           matches.push({
             fechaISO: item.fechaISO,
             category: item.category || category,
@@ -1345,6 +1347,7 @@ router.get('/player-query', async (req, res) => {
             teamName: side.teamName,
             opponentSlug: side.opponentSlug,
             opponentName: side.opponentName,
+            opponentPlayerName,
             row: idx + 1,
             triangulosFavor,
             triangulosContra,

@@ -135,7 +135,7 @@
         <div class="match-head">
           <div>
             <h3 class="match-title">${item.teamName || ''}</h3>
-            <p class="match-rival">vs ${item.opponentName || ''}</p>
+            <p class="match-rival">vs ${item.opponentPlayerName || 'Rival'} · ${item.opponentName || ''}</p>
             <span class="result-pill ${cls}">${item.result || ''}</span>
           </div>
           <time class="match-date">${formatDate(item.fechaISO)}</time>
