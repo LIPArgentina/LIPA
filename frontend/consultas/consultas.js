@@ -101,6 +101,8 @@
     const matches = Array.isArray(data?.matches) ? data.matches : [];
     const ganados = matches.filter((item) => item.result === 'ganado').length;
     const perdidos = matches.filter((item) => item.result === 'perdido').length;
+    const triangulosFavorTotal = matches.reduce((acc, item) => acc + (Number(item.triangulosFavor || 0) || 0), 0);
+    const triangulosContraTotal = matches.reduce((acc, item) => acc + (Number(item.triangulosContra || 0) || 0), 0);
 
     $summary.hidden = false;
     $summary.innerHTML = `
@@ -120,6 +122,14 @@
         <div class="summary-count summary-loss">
           <strong>${perdidos}</strong>
           <span>perdidos</span>
+        </div>
+        <div class="summary-count summary-tri-favor">
+          <strong>${triangulosFavorTotal}</strong>
+          <span>triángulos a favor</span>
+        </div>
+        <div class="summary-count summary-tri-contra">
+          <strong>${triangulosContraTotal}</strong>
+          <span>triángulos en contra</span>
         </div>
       </div>
     `;
