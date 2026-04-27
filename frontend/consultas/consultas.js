@@ -98,15 +98,29 @@
 
   function renderSummary(data) {
     const player = data?.player || {};
+    const matches = Array.isArray(data?.matches) ? data.matches : [];
+    const ganados = matches.filter((item) => item.result === 'ganado').length;
+    const perdidos = matches.filter((item) => item.result === 'perdido').length;
+
     $summary.hidden = false;
     $summary.innerHTML = `
       <div>
         <h2 class="summary-title">${player.name || 'Jugador'}</h2>
         <p class="summary-meta">${player.teamName || ''} · Categoría ${(data.category || '').toUpperCase()}</p>
       </div>
-      <div class="summary-count">
-        <strong>${Number(data.total || 0)}</strong>
-        <span>partidos jugados</span>
+      <div class="summary-stats">
+        <div class="summary-count">
+          <strong>${Number(data.total || 0)}</strong>
+          <span>partidos jugados</span>
+        </div>
+        <div class="summary-count summary-win">
+          <strong>${ganados}</strong>
+          <span>ganados</span>
+        </div>
+        <div class="summary-count summary-loss">
+          <strong>${perdidos}</strong>
+          <span>perdidos</span>
+        </div>
       </div>
     `;
   }
@@ -120,7 +134,8 @@
       card.innerHTML = `
         <div class="match-head">
           <div>
-            <h3 class="match-title">${item.teamName || ''} vs ${item.opponentName || ''}</h3>
+            <h3 class="match-title">${item.teamName || ''}</h3>
+            <p class="match-rival">vs ${item.opponentName || ''}</p>
             <span class="result-pill ${cls}">${item.result || ''}</span>
           </div>
           <time class="match-date">${formatDate(item.fechaISO)}</time>
@@ -133,10 +148,6 @@
           <div class="stat ${cls === 'loss' ? 'loss' : ''}">
             <span>Triángulos en contra</span>
             <strong>${Number(item.triangulosContra || 0)}</strong>
-          </div>
-          <div class="stat">
-            <span>Individual</span>
-            <strong>${Number(item.row || 0)}</strong>
           </div>
         </div>
       `;
