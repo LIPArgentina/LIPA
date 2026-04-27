@@ -1136,4 +1136,226 @@ router.get('/results', async (req, res) => {
   }
 });
 
+function includesNormalizedName(name, query) {
+  const a = normalizeText(name || '');
+  const q = normalizeText(query || '');
+  return !!q && a.includes(q);
+}
+
+function sameNormalizedName(a, b) {
+  return normalizeText(a || '') === normalizeText(b || '');
+}
+
+function getIndividualPlayers(planilla = {}) {
+  return Array.isArray(planilla?.individuales)
+    ? planilla.individuales.map((name) => String(name || '').trim())
+    : [];
+}
+
+async function buildAllValidatedCrucesForPlayerQuery(category = '') {
+  const { rows } = await pool.query(
+    `
+    SELECT fecha_key, team, status_json, validated, updated_at
+    FROM cruces_validations
+    ORDER BY updated_at DESC
+    `
+  );
+
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = String(row.fecha_key || '');
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  }
+
+  const teamCache = new Map();
+  const resolveCached = async (slug) => {
+    const key = `${String(category || '').toLowerCase()}::${normalizeSlug(slug)}`;
+    if (teamCache.has(key)) return teamCache.get(key);
+    const info = await resolveEquipoInfoBySlug(slug, category);
+    teamCache.set(key, info);
+    return info;
+  };
+
+  const results = [];
+
+  for (const [fechaKey, entries] of grouped.entries()) {
+    const parts = String(fechaKey).split('::');
+    const matchDate = parts[0] || '';
+    const localSlug = normalizeSlug(parts[1] || '');
+    const visitanteSlug = normalizeSlug(parts[2] || '');
+
+    if (!localSlug || !visitanteSlug) continue;
+
+    const localEntry = entries.find((row) => normalizeSlug(row.team) === localSlug) || null;
+    const visitanteEntry = entries.find((row) => normalizeSlug(row.team) === visitanteSlug) || null;
+
+    if (!localEntry || !visitanteEntry) continue;
+    if (!localEntry.validated || !visitanteEntry.validated) continue;
+
+    const diff = compareFullStatus(localEntry.status_json || {}, visitanteEntry.status_json || {});
+    if (diff.length) continue;
+
+    const [localInfo, visitanteInfo] = await Promise.all([
+      resolveCached(localSlug),
+      resolveCached(visitanteSlug)
+    ]);
+
+    if (category) {
+      const localDivision = String(localInfo?.division || '').trim().toLowerCase();
+      const visitanteDivision = String(visitanteInfo?.division || '').trim().toLowerCase();
+      const hasKnownDivision = !!(localDivision || visitanteDivision);
+
+      if (hasKnownDivision && (localDivision !== category || visitanteDivision !== category)) {
+        continue;
+      }
+    }
+
+    const localUpdatedAt = localEntry?.updated_at ? new Date(localEntry.updated_at).getTime() : 0;
+    const visitanteUpdatedAt = visitanteEntry?.updated_at ? new Date(visitanteEntry.updated_at).getTime() : 0;
+    const snapshot = localUpdatedAt >= visitanteUpdatedAt
+      ? (localEntry.status_json || visitanteEntry.status_json || {})
+      : (visitanteEntry.status_json || localEntry.status_json || {});
+
+    const localStatus = snapshot?.local || {};
+    const visitanteStatus = snapshot?.visitante || {};
+
+    results.push({
+      fechaISO: matchDate,
+      category: category || localInfo?.division || visitanteInfo?.division || null,
+      localSlug,
+      visitanteSlug,
+      localName: localInfo?.display_name || localSlug,
+      visitanteName: visitanteInfo?.display_name || visitanteSlug,
+      localPlanilla: snapshot?.localPlanilla || null,
+      visitantePlanilla: snapshot?.visitantePlanilla || null,
+      local: {
+        scoreRows: Array.isArray(localStatus?.scoreRows) ? localStatus.scoreRows : []
+      },
+      visitante: {
+        scoreRows: Array.isArray(visitanteStatus?.scoreRows) ? visitanteStatus.scoreRows : []
+      }
+    });
+  }
+
+  return results;
+}
+
+router.get('/player-query', async (req, res) => {
+  setNoCache(res);
+  try {
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const q = String(req.query.q || '').trim();
+
+    if (!category) {
+      return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
+    }
+
+    if (!q || normalizeText(q).length < 2) {
+      return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, matches: [] });
+    }
+
+    const results = await buildAllValidatedCrucesForPlayerQuery(category);
+    const suggestionsMap = new Map();
+
+    for (const item of results) {
+      const sides = [
+        { teamSlug: item.localSlug, teamName: item.localName, players: getIndividualPlayers(item.localPlanilla) },
+        { teamSlug: item.visitanteSlug, teamName: item.visitanteName, players: getIndividualPlayers(item.visitantePlanilla) }
+      ];
+
+      for (const side of sides) {
+        side.players.forEach((playerName) => {
+          if (!playerName || !includesNormalizedName(playerName, q)) return;
+          const key = `${normalizeText(playerName)}::${normalizeSlug(side.teamSlug)}`;
+          if (!suggestionsMap.has(key)) {
+            suggestionsMap.set(key, {
+              name: playerName,
+              teamSlug: side.teamSlug,
+              teamName: side.teamName,
+              label: `${playerName} · ${side.teamName}`
+            });
+          }
+        });
+      }
+    }
+
+    const suggestions = Array.from(suggestionsMap.values())
+      .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+      .slice(0, 12);
+
+    const exact = suggestions.find((item) => sameNormalizedName(item.name, q));
+    if (!exact) {
+      return res.json({ ok: true, category, q, suggestions, player: null, total: 0, matches: [] });
+    }
+
+    const matches = [];
+    for (const item of results) {
+      const localPlayers = getIndividualPlayers(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+
+      const scan = [
+        {
+          players: localPlayers,
+          scoreRows: localScores,
+          opponentScoreRows: visitanteScores,
+          teamSlug: item.localSlug,
+          teamName: item.localName,
+          opponentSlug: item.visitanteSlug,
+          opponentName: item.visitanteName
+        },
+        {
+          players: visitantePlayers,
+          scoreRows: visitanteScores,
+          opponentScoreRows: localScores,
+          teamSlug: item.visitanteSlug,
+          teamName: item.visitanteName,
+          opponentSlug: item.localSlug,
+          opponentName: item.localName
+        }
+      ];
+
+      for (const side of scan) {
+        if (normalizeSlug(side.teamSlug) !== normalizeSlug(exact.teamSlug)) continue;
+        side.players.forEach((playerName, idx) => {
+          if (!sameNormalizedName(playerName, exact.name)) return;
+          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
+          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
+          matches.push({
+            fechaISO: item.fechaISO,
+            category: item.category || category,
+            playerName,
+            teamSlug: side.teamSlug,
+            teamName: side.teamName,
+            opponentSlug: side.opponentSlug,
+            opponentName: side.opponentName,
+            row: idx + 1,
+            triangulosFavor,
+            triangulosContra,
+            result: triangulosFavor > triangulosContra ? 'ganado' : (triangulosFavor < triangulosContra ? 'perdido' : 'empatado')
+          });
+        });
+      }
+    }
+
+    matches.sort((a, b) => String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')));
+
+    return res.json({
+      ok: true,
+      category,
+      q,
+      suggestions,
+      player: exact,
+      total: matches.length,
+      matches
+    });
+  } catch (err) {
+    console.error('GET /player-query', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo consultar el jugador.' });
+  }
+});
+
+
 module.exports = router;

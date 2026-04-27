@@ -60,6 +60,23 @@ function ensureManageTeamButton() {
   btn.removeAttribute("href");
 }
 
+function ensureConsultasButton() {
+  const btn = document.getElementById("btnConsultas");
+  if (!btn) return;
+
+  btn.classList.add("btn", "btn-outline", "btn-sm");
+  btn.style.textDecoration = "none";
+
+  if (isAdmin()) {
+    btn.href = "./consultas.html";
+    btn.classList.remove("hidden");
+    return;
+  }
+
+  btn.classList.add("hidden");
+  btn.removeAttribute("href");
+}
+
 function redirectAfterLogin() {
   const sess = readSession();
   const role = (sess?.role || "").toLowerCase();
@@ -84,6 +101,7 @@ function setupAuthBridge() {
     const data = event.data || {};
     if (data.type === "lpi:auth-success") {
       ensureManageTeamButton();
+      ensureConsultasButton();
       redirectAfterLogin();
     }
   });
@@ -91,16 +109,19 @@ function setupAuthBridge() {
   window.addEventListener("storage", (event) => {
     if (event.key === "lpi.session" && event.newValue) {
       ensureManageTeamButton();
+      ensureConsultasButton();
     }
   });
 
   window.addEventListener("login:success", () => {
     ensureManageTeamButton();
+    ensureConsultasButton();
     redirectAfterLogin();
   });
 
   window.addEventListener("logout:success", () => {
     ensureManageTeamButton();
+    ensureConsultasButton();
   });
 }
 
@@ -443,6 +464,7 @@ function setupBannerAdmin() {
 
 document.addEventListener("DOMContentLoaded", () => {
   ensureManageTeamButton();
+  ensureConsultasButton();
   setupAuthBridge();
   setupBannerAdmin();
   loadBannerForHome();

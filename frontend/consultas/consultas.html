@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Consultas · Liga Independiente de Pool</title>
+  <link rel="icon" href="./logo_liga.png" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/consultas.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="consultas-topbar">
+    <a class="brand" href="./index.html" aria-label="Volver al inicio">
+      <img src="./logo_liga.png" alt="Liga Independiente de Pool" class="brand__logo">
+      <span class="brand__cta">CONSULTAS DE JUGADORES</span>
+    </a>
+
+    <div class="actions">
+      <a class="btn btn-outline btn-sm" href="./index.html">Inicio</a>
+    </div>
+  </header>
+
+  <main class="consultas-page">
+    <section class="consultas-hero">
+      <p class="eyebrow">Cruces validados</p>
+      <h1>Consulta por jugador</h1>
+      <p class="lead">Buscá un jugador individual por nombre o apellido para ver partidos jugados y triángulos a favor/en contra.</p>
+    </section>
+
+    <section class="search-card" aria-label="Buscar jugador">
+      <form id="consultaForm" class="search-form" autocomplete="off">
+        <div class="field">
+          <label for="categorySelect">Categoría</label>
+          <select id="categorySelect" required>
+            <option value="segunda">Segunda</option>
+            <option value="tercera">Tercera</option>
+          </select>
+        </div>
+
+        <div class="field field-player">
+          <label for="playerInput">Jugador</label>
+          <input id="playerInput" type="search" list="playerSuggestions" placeholder="Nombre o apellido" required minlength="2" />
+          <datalist id="playerSuggestions"></datalist>
+          <p id="hintText" class="hint">Escribí al menos 2 letras y elegí una coincidencia.</p>
+        </div>
+
+        <button id="btnBuscar" class="btn btn-primary" type="submit">Buscar</button>
+      </form>
+    </section>
+
+    <section id="statusBox" class="status-box" hidden></section>
+    <section id="summaryBox" class="summary-box" hidden></section>
+    <section id="resultsBox" class="results-list" aria-live="polite"></section>
+  </main>
+
+  <script src="./config.js"></script>
+  <script src="./consultas.js" defer></script>
+</body>
+</html>
