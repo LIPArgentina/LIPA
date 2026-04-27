@@ -869,8 +869,9 @@ async function resolveEquipoInfoBySlug(slug, categoryHint = '') {
     FROM equipos
     WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1
     ORDER BY
+      CASE WHEN $2 <> '' AND LOWER(division) = $2 THEN 0 ELSE 1 END,
       CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END,
-      CASE WHEN LOWER(division) = $2 THEN 0 ELSE 1 END,
+      CASE WHEN LOWER(slug_base) = $1 THEN 0 ELSE 1 END,
       id ASC
     LIMIT 1
     `,
