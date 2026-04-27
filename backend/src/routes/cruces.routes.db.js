@@ -1146,6 +1146,19 @@ function sameNormalizedName(a, b) {
   return normalizeText(a || '') === normalizeText(b || '');
 }
 
+function canonicalPlayerTeamSlug(value = "") {
+  return normalizeSlug(value)
+    .replace(/_(primera|segunda|tercera)$/i, "")
+    .replace(/-(primera|segunda|tercera)$/i, "");
+}
+
+function samePlayerTeamSlug(a, b) {
+  const aa = normalizeSlug(a);
+  const bb = normalizeSlug(b);
+  if (!aa || !bb) return false;
+  return aa === bb || canonicalPlayerTeamSlug(aa) === canonicalPlayerTeamSlug(bb) || slugMatchesTeam(aa, bb);
+}
+
 function getIndividualPlayers(planilla = {}) {
   return Array.isArray(planilla?.individuales)
     ? planilla.individuales.map((name) => String(name || '').trim())
@@ -1267,7 +1280,7 @@ router.get('/player-query', async (req, res) => {
       for (const side of sides) {
         side.players.forEach((playerName) => {
           if (!playerName || !includesNormalizedName(playerName, q)) return;
-          const key = `${normalizeText(playerName)}::${normalizeSlug(side.teamSlug)}`;
+          const key = `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(side.teamSlug)}`;
           if (!suggestionsMap.has(key)) {
             suggestionsMap.set(key, {
               name: playerName,
@@ -1318,7 +1331,7 @@ router.get('/player-query', async (req, res) => {
       ];
 
       for (const side of scan) {
-        if (normalizeSlug(side.teamSlug) !== normalizeSlug(exact.teamSlug)) continue;
+        if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
         side.players.forEach((playerName, idx) => {
           if (!sameNormalizedName(playerName, exact.name)) return;
           const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
