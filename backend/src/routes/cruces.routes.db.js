@@ -1395,6 +1395,24 @@ function ensureRankingRow(map, playerName, teamSlug, teamName) {
   return map.get(key);
 }
 
+async function countRegisteredIndividualPlayersByCategory(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  if (!division) return 0;
+
+  const { rows } = await pool.query(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM jugadores j
+    INNER JOIN equipos e ON e.id = j.equipo_id
+    WHERE LOWER(e.division) = $1
+      AND TRIM(COALESCE(j.nombre, '')) <> ''
+    `,
+    [division]
+  );
+
+  return Number(rows?.[0]?.total || 0);
+}
+
 router.get('/player-ranking', async (req, res) => {
   setNoCache(res);
   try {
@@ -1406,7 +1424,10 @@ router.get('/player-ranking', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
-    const results = await buildAllValidatedCrucesForPlayerQuery(category);
+    const [results, totalRegisteredPlayers] = await Promise.all([
+      buildAllValidatedCrucesForPlayerQuery(category),
+      countRegisteredIndividualPlayersByCategory(category)
+    ]);
     const rankingMap = new Map();
 
     for (const item of results) {
@@ -1444,7 +1465,7 @@ router.get('/player-ranking', async (req, res) => {
       }
     }
 
-    const ranking = Array.from(rankingMap.values())
+    const fullRanking = Array.from(rankingMap.values())
       .map((item) => ({
         ...item,
         diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
@@ -1456,14 +1477,18 @@ router.get('/player-ranking', async (req, res) => {
         if (a.losses !== b.losses) return a.losses - b.losses;
         if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
         return String(a.name || '').localeCompare(String(b.name || ''), 'es');
-      })
-      .slice(0, limit);
+      });
+
+    const totalActivePlayers = fullRanking.length;
+    const ranking = fullRanking.slice(0, limit);
 
     return res.json({
       ok: true,
       category,
       limit,
       total: ranking.length,
+      totalRegisteredPlayers,
+      totalActivePlayers,
       ranking
     });
   } catch (err) {

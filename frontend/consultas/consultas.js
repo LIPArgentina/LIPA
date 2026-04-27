@@ -213,7 +213,7 @@
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Ranking Top ${limit}</h2>
-          <p class="ranking-meta">Ordenado por partidos ganados. Desempate: diferencia de triángulos.</p>
+          <p class="ranking-meta">Ordenado por partidos ganados. Desempate: diferencia de triángulos. Ranking realizado sobre una base de ${Number(data?.totalRegisteredPlayers || 0)} jugadores registrados y ${Number(data?.totalActivePlayers || 0)} jugadores activos.</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
