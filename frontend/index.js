@@ -60,6 +60,7 @@ function ensureManageTeamButton() {
   btn.removeAttribute("href");
 }
 
+
 function ensureConsultasButton() {
   const btn = document.getElementById("btnConsultas");
   if (!btn) return;
@@ -462,10 +463,79 @@ function setupBannerAdmin() {
   window.addEventListener("logout:success", updateVisibility);
 }
 
+
+const VISITOR_ID_KEY = "lipa.visitorId";
+const VISITOR_PING_MS = 60000;
+let visitorPingId = null;
+
+function getVisitorId() {
+  try {
+    let id = localStorage.getItem(VISITOR_ID_KEY);
+    if (!id) {
+      id = (crypto?.randomUUID?.() || `visitor-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+      localStorage.setItem(VISITOR_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return `visitor-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+async function trackVisitorActivity() {
+  try {
+    await fetch(apiUrl("/api/track-visit"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        visitorId: getVisitorId(),
+        path: location.pathname + location.search,
+        referrer: document.referrer || "",
+      }),
+      keepalive: true,
+    });
+  } catch (err) {
+    console.error("Stats track error:", err);
+  }
+}
+
+async function loadPublicStats() {
+  try {
+    const res = await fetch(apiUrl("/api/public-stats"), { cache: "no-store" });
+    if (!res.ok) throw new Error("GET /api/public-stats failed");
+
+    const data = await res.json();
+    const el = document.getElementById("statsBar");
+    if (!el) return;
+
+    el.textContent = `Online: ${data.online ?? 0} | Hoy: ${data.today ?? 0} | Semana: ${data.week ?? 0}`;
+  } catch (err) {
+    console.error("Stats load error:", err);
+  }
+}
+
+function startPublicStats() {
+  trackVisitorActivity();
+  loadPublicStats();
+
+  if (visitorPingId) clearInterval(visitorPingId);
+  visitorPingId = setInterval(() => {
+    trackVisitorActivity();
+    loadPublicStats();
+  }, VISITOR_PING_MS);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      trackVisitorActivity();
+      loadPublicStats();
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   ensureManageTeamButton();
   ensureConsultasButton();
   setupAuthBridge();
   setupBannerAdmin();
   loadBannerForHome();
+  startPublicStats();
 });

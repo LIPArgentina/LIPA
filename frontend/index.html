@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Liga Independiente de Pool</title>
   <link rel="icon" href="./logo_liga.png" />
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-MS31S9P5K7"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-MS31S9P5K7');
+  </script>
+
   <link rel="stylesheet" href="/styles.css" />
   <link rel="stylesheet" href="/index.css" />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
@@ -99,47 +109,17 @@
   </dialog>
   
 
+  
+
   <footer class="site-footer">
     <div class="site-footer__inner">
       <a class="site-footer__link" href="./politica-privacidad.html">Política de Privacidad</a>
+      <span class="site-footer__stats" id="statsBar">Online: — | Hoy: — | Semana: —</span>
     </div>
   </footer>
 
-  <style>
-    .site-footer{
-      margin-top: 1.5rem;
-      padding: 24px 16px 34px;
-      border-top: 1px solid var(--line);
-      background: #0c0e12;
-    }
-    .site-footer__inner{
-      width: min(900px, 92%);
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      text-align: center;
-    }
-    .site-footer__text{
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.92rem;
-      letter-spacing: 0.04em;
-    }
-    .site-footer__link{
-      color: #ffd966;
-      font-weight: 700;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    .site-footer__link:hover{
-      opacity: .9;
-    }
-  </style>
-
   <script src="./config.js"></script>
-<script type="module" src="./templates/banner.js" defer></script>
+  <script type="module" src="./templates/banner.js" defer></script>
   <script type="module" src="./app.js" defer></script>
   <script type="module" src="./index.js" defer></script>
 </body>
