@@ -1136,4 +1136,561 @@ router.get('/results', async (req, res) => {
   }
 });
 
+function includesNormalizedName(name, query) {
+  const a = normalizeText(name || '');
+  const q = normalizeText(query || '');
+  return !!q && a.includes(q);
+}
+
+function sameNormalizedName(a, b) {
+  return normalizeText(a || '') === normalizeText(b || '');
+}
+
+function canonicalPlayerTeamSlug(value = "") {
+  return normalizeSlug(value)
+    .replace(/_(primera|segunda|tercera)$/i, "")
+    .replace(/-(primera|segunda|tercera)$/i, "");
+}
+
+function samePlayerTeamSlug(a, b) {
+  const aa = normalizeSlug(a);
+  const bb = normalizeSlug(b);
+  if (!aa || !bb) return false;
+  return aa === bb || canonicalPlayerTeamSlug(aa) === canonicalPlayerTeamSlug(bb) || slugMatchesTeam(aa, bb);
+}
+
+function getIndividualPlayers(planilla = {}) {
+  return Array.isArray(planilla?.individuales)
+    ? planilla.individuales.map((name) => String(name || '').trim())
+    : [];
+}
+
+async function buildAllValidatedCrucesForPlayerQuery(category = '') {
+  const { rows } = await pool.query(
+    `
+    SELECT fecha_key, team, status_json, validated, updated_at
+    FROM cruces_validations
+    ORDER BY updated_at DESC
+    `
+  );
+
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = String(row.fecha_key || '');
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  }
+
+  const teamCache = new Map();
+  const resolveCached = async (slug) => {
+    const key = `${String(category || '').toLowerCase()}::${normalizeSlug(slug)}`;
+    if (teamCache.has(key)) return teamCache.get(key);
+    const info = await resolveEquipoInfoBySlug(slug, category);
+    teamCache.set(key, info);
+    return info;
+  };
+
+  const results = [];
+
+  for (const [fechaKey, entries] of grouped.entries()) {
+    const parts = String(fechaKey).split('::');
+    const matchDate = parts[0] || '';
+    const localSlug = normalizeSlug(parts[1] || '');
+    const visitanteSlug = normalizeSlug(parts[2] || '');
+
+    if (!localSlug || !visitanteSlug) continue;
+
+    const localEntry = entries.find((row) => normalizeSlug(row.team) === localSlug) || null;
+    const visitanteEntry = entries.find((row) => normalizeSlug(row.team) === visitanteSlug) || null;
+
+    if (!localEntry || !visitanteEntry) continue;
+    if (!localEntry.validated || !visitanteEntry.validated) continue;
+
+    const diff = compareFullStatus(localEntry.status_json || {}, visitanteEntry.status_json || {});
+    if (diff.length) continue;
+
+    const [localInfo, visitanteInfo] = await Promise.all([
+      resolveCached(localSlug),
+      resolveCached(visitanteSlug)
+    ]);
+
+    if (category) {
+      const localDivision = String(localInfo?.division || '').trim().toLowerCase();
+      const visitanteDivision = String(visitanteInfo?.division || '').trim().toLowerCase();
+      const hasKnownDivision = !!(localDivision || visitanteDivision);
+
+      if (hasKnownDivision && (localDivision !== category || visitanteDivision !== category)) {
+        continue;
+      }
+    }
+
+    const localUpdatedAt = localEntry?.updated_at ? new Date(localEntry.updated_at).getTime() : 0;
+    const visitanteUpdatedAt = visitanteEntry?.updated_at ? new Date(visitanteEntry.updated_at).getTime() : 0;
+    const snapshot = localUpdatedAt >= visitanteUpdatedAt
+      ? (localEntry.status_json || visitanteEntry.status_json || {})
+      : (visitanteEntry.status_json || localEntry.status_json || {});
+
+    const localStatus = snapshot?.local || {};
+    const visitanteStatus = snapshot?.visitante || {};
+
+    results.push({
+      fechaISO: matchDate,
+      category: category || localInfo?.division || visitanteInfo?.division || null,
+      localSlug,
+      visitanteSlug,
+      localName: localInfo?.display_name || localSlug,
+      visitanteName: visitanteInfo?.display_name || visitanteSlug,
+      localPlanilla: snapshot?.localPlanilla || null,
+      visitantePlanilla: snapshot?.visitantePlanilla || null,
+      local: {
+        scoreRows: Array.isArray(localStatus?.scoreRows) ? localStatus.scoreRows : []
+      },
+      visitante: {
+        scoreRows: Array.isArray(visitanteStatus?.scoreRows) ? visitanteStatus.scoreRows : []
+      }
+    });
+  }
+
+  return results;
+}
+
+router.get('/player-query', async (req, res) => {
+  setNoCache(res);
+  try {
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const q = String(req.query.q || '').trim();
+
+    if (!category) {
+      return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
+    }
+
+    if (!q || normalizeText(q).length < 2) {
+      return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, matches: [] });
+    }
+
+    const results = await buildAllValidatedCrucesForPlayerQuery(category);
+    const suggestionsMap = new Map();
+
+    for (const item of results) {
+      const sides = [
+        { teamSlug: item.localSlug, teamName: item.localName, players: getIndividualPlayers(item.localPlanilla) },
+        { teamSlug: item.visitanteSlug, teamName: item.visitanteName, players: getIndividualPlayers(item.visitantePlanilla) }
+      ];
+
+      for (const side of sides) {
+        side.players.forEach((playerName) => {
+          if (!playerName || !includesNormalizedName(playerName, q)) return;
+          const key = `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(side.teamSlug)}`;
+          if (!suggestionsMap.has(key)) {
+            suggestionsMap.set(key, {
+              name: playerName,
+              teamSlug: side.teamSlug,
+              teamName: side.teamName,
+              label: `${playerName} · ${side.teamName}`
+            });
+          }
+        });
+      }
+    }
+
+    const suggestions = Array.from(suggestionsMap.values())
+      .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+      .slice(0, 12);
+
+    const exact = suggestions.find((item) => sameNormalizedName(item.name, q));
+    if (!exact) {
+      return res.json({ ok: true, category, q, suggestions, player: null, total: 0, matches: [] });
+    }
+
+    const matches = [];
+    for (const item of results) {
+      const localPlayers = getIndividualPlayers(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+
+      const scan = [
+        {
+          players: localPlayers,
+          scoreRows: localScores,
+          opponentScoreRows: visitanteScores,
+          opponentPlayers: visitantePlayers,
+          teamSlug: item.localSlug,
+          teamName: item.localName,
+          opponentSlug: item.visitanteSlug,
+          opponentName: item.visitanteName
+        },
+        {
+          players: visitantePlayers,
+          scoreRows: visitanteScores,
+          opponentScoreRows: localScores,
+          opponentPlayers: localPlayers,
+          teamSlug: item.visitanteSlug,
+          teamName: item.visitanteName,
+          opponentSlug: item.localSlug,
+          opponentName: item.localName
+        }
+      ];
+
+      for (const side of scan) {
+        if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
+        side.players.forEach((playerName, idx) => {
+          if (!sameNormalizedName(playerName, exact.name)) return;
+          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
+          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
+          const opponentPlayerName = String(side.opponentPlayers?.[idx] || '').trim();
+          matches.push({
+            fechaISO: item.fechaISO,
+            category: item.category || category,
+            playerName,
+            teamSlug: side.teamSlug,
+            teamName: side.teamName,
+            opponentSlug: side.opponentSlug,
+            opponentName: side.opponentName,
+            opponentPlayerName,
+            row: idx + 1,
+            triangulosFavor,
+            triangulosContra,
+            result: triangulosFavor > triangulosContra ? 'ganado' : (triangulosFavor < triangulosContra ? 'perdido' : 'empatado')
+          });
+        });
+      }
+    }
+
+    matches.sort((a, b) => String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')));
+
+    return res.json({
+      ok: true,
+      category,
+      q,
+      suggestions,
+      player: exact,
+      total: matches.length,
+      matches
+    });
+  } catch (err) {
+    console.error('GET /player-query', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo consultar el jugador.' });
+  }
+});
+
+
+function ensureRankingRow(map, playerName, teamSlug, teamName) {
+  const key = `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`;
+  if (!map.has(key)) {
+    map.set(key, {
+      name: String(playerName || '').trim(),
+      teamSlug,
+      teamName,
+      played: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      triangulosFavor: 0,
+      triangulosContra: 0,
+      diff: 0,
+      effectiveness: 0
+    });
+  }
+  return map.get(key);
+}
+
+async function countRegisteredIndividualPlayersByCategory(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  if (!division) return 0;
+
+  const { rows } = await pool.query(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM jugadores j
+    INNER JOIN equipos e ON e.id = j.equipo_id
+    WHERE LOWER(e.division) = $1
+      AND TRIM(COALESCE(j.nombre, '')) <> ''
+    `,
+    [division]
+  );
+
+  return Number(rows?.[0]?.total || 0);
+}
+
+router.get('/player-ranking', async (req, res) => {
+  setNoCache(res);
+  try {
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const rawLimit = Number(req.query.limit || 10);
+    const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
+
+    if (!category) {
+      return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
+    }
+
+    const [results, totalRegisteredPlayers] = await Promise.all([
+      buildAllValidatedCrucesForPlayerQuery(category),
+      countRegisteredIndividualPlayersByCategory(category)
+    ]);
+    const rankingMap = new Map();
+
+    for (const item of results) {
+      const localPlayers = getIndividualPlayers(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+      const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
+
+      for (let idx = 0; idx < max; idx++) {
+        const localPlayer = String(localPlayers[idx] || '').trim();
+        const visitantePlayer = String(visitantePlayers[idx] || '').trim();
+        const localScore = Number(localScores[idx] ?? 0) || 0;
+        const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
+
+        if (localPlayer) {
+          const row = ensureRankingRow(rankingMap, localPlayer, item.localSlug, item.localName);
+          row.played += 1;
+          row.triangulosFavor += localScore;
+          row.triangulosContra += visitanteScore;
+          if (localScore > visitanteScore) row.wins += 1;
+          else if (localScore < visitanteScore) row.losses += 1;
+          else row.draws += 1;
+        }
+
+        if (visitantePlayer) {
+          const row = ensureRankingRow(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
+          row.played += 1;
+          row.triangulosFavor += visitanteScore;
+          row.triangulosContra += localScore;
+          if (visitanteScore > localScore) row.wins += 1;
+          else if (visitanteScore < localScore) row.losses += 1;
+          else row.draws += 1;
+        }
+      }
+    }
+
+    const fullRanking = Array.from(rankingMap.values())
+      .map((item) => ({
+        ...item,
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
+        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
+      }))
+      .sort((a, b) => {
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.diff !== a.diff) return b.diff - a.diff;
+        if (a.losses !== b.losses) return a.losses - b.losses;
+        if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+      });
+
+    const totalActivePlayers = fullRanking.length;
+    const ranking = fullRanking.slice(0, limit);
+
+    return res.json({
+      ok: true,
+      category,
+      limit,
+      total: ranking.length,
+      totalRegisteredPlayers,
+      totalActivePlayers,
+      ranking
+    });
+  } catch (err) {
+    console.error('GET /player-ranking', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo armar el ranking.' });
+  }
+});
+
+async function findTeamsByCategory(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  if (!division) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT id, slug_uid, slug_base, display_name, division
+    FROM equipos
+    WHERE LOWER(division) = $1
+    ORDER BY display_name ASC, id ASC
+    `,
+    [division]
+  );
+
+  return rows;
+}
+
+async function getRegisteredPlayersForTeam(teamId) {
+  if (!teamId) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT TRIM(nombre) AS name
+    FROM jugadores
+    WHERE equipo_id = $1
+      AND TRIM(COALESCE(nombre, '')) <> ''
+    ORDER BY nombre ASC
+    `,
+    [teamId]
+  );
+
+  return rows.map((row) => String(row.name || '').trim()).filter(Boolean);
+}
+
+function teamInfoMatchesSide(teamInfo = {}, sideSlug = '', sideName = '') {
+  const candidates = [teamInfo.slug_uid, teamInfo.slug_base, teamInfo.display_name]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  return candidates.some((candidate) => (
+    samePlayerTeamSlug(sideSlug, candidate) || normalizeText(sideName) === normalizeText(candidate)
+  ));
+}
+
+function sortPlayerStatsRows(a, b) {
+  if (b.wins !== a.wins) return b.wins - a.wins;
+  if (b.diff !== a.diff) return b.diff - a.diff;
+  if (a.losses !== b.losses) return a.losses - b.losses;
+  if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
+  return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+}
+
+router.get('/team-query', async (req, res) => {
+  setNoCache(res);
+  try {
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const q = String(req.query.q || '').trim();
+
+    if (!category) {
+      return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
+    }
+
+    if (!q || normalizeText(q).length < 2) {
+      return res.json({ ok: true, category, q, suggestions: [], team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
+    }
+
+    const teams = await findTeamsByCategory(category);
+    const suggestions = teams
+      .filter((team) => (
+        includesNormalizedName(team.display_name, q) ||
+        includesNormalizedName(team.slug_uid, q) ||
+        includesNormalizedName(team.slug_base, q)
+      ))
+      .map((team) => ({
+        name: team.display_name,
+        teamSlug: team.slug_uid || team.slug_base,
+        teamBase: team.slug_base,
+        label: team.display_name,
+        id: team.id
+      }))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
+      .slice(0, 12);
+
+    const exactSuggestion = suggestions.find((item) => sameNormalizedName(item.name, q));
+    const exactTeam = exactSuggestion
+      ? teams.find((team) => Number(team.id) === Number(exactSuggestion.id))
+      : null;
+
+    if (!exactTeam) {
+      return res.json({ ok: true, category, q, suggestions, team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
+    }
+
+    const [registeredPlayers, results] = await Promise.all([
+      getRegisteredPlayersForTeam(exactTeam.id),
+      buildAllValidatedCrucesForPlayerQuery(category)
+    ]);
+
+    const playersMap = new Map();
+    const ensureTeamPlayer = (playerName) => {
+      const key = normalizeText(playerName);
+      if (!key) return null;
+      if (!playersMap.has(key)) {
+        playersMap.set(key, {
+          name: String(playerName || '').trim(),
+          teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
+          teamName: exactTeam.display_name,
+          played: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          triangulosFavor: 0,
+          triangulosContra: 0,
+          diff: 0,
+          effectiveness: 0
+        });
+      }
+      return playersMap.get(key);
+    };
+
+    registeredPlayers.forEach(ensureTeamPlayer);
+
+    for (const item of results) {
+      const localPlayers = getIndividualPlayers(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+
+      const scan = [
+        {
+          players: localPlayers,
+          scoreRows: localScores,
+          opponentScoreRows: visitanteScores,
+          teamSlug: item.localSlug,
+          teamName: item.localName
+        },
+        {
+          players: visitantePlayers,
+          scoreRows: visitanteScores,
+          opponentScoreRows: localScores,
+          teamSlug: item.visitanteSlug,
+          teamName: item.visitanteName
+        }
+      ];
+
+      for (const side of scan) {
+        if (!teamInfoMatchesSide(exactTeam, side.teamSlug, side.teamName)) continue;
+        side.players.forEach((playerName, idx) => {
+          const cleanName = String(playerName || '').trim();
+          if (!cleanName) return;
+          const row = ensureTeamPlayer(cleanName);
+          if (!row) return;
+
+          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
+          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
+          row.played += 1;
+          row.triangulosFavor += triangulosFavor;
+          row.triangulosContra += triangulosContra;
+          if (triangulosFavor > triangulosContra) row.wins += 1;
+          else if (triangulosFavor < triangulosContra) row.losses += 1;
+          else row.draws += 1;
+        });
+      }
+    }
+
+    const players = Array.from(playersMap.values())
+      .map((item) => ({
+        ...item,
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
+        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
+      }))
+      .sort(sortPlayerStatsRows);
+
+    const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
+
+    return res.json({
+      ok: true,
+      category,
+      q,
+      suggestions,
+      team: {
+        id: exactTeam.id,
+        name: exactTeam.display_name,
+        teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
+        teamBase: exactTeam.slug_base
+      },
+      totalRegisteredPlayers: registeredPlayers.length,
+      totalActivePlayers,
+      players
+    });
+  } catch (err) {
+    console.error('GET /team-query', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo consultar el equipo.' });
+  }
+});
+
+
 module.exports = router;
