@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLAVES | Liga de Pool Independiente</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="llaves.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png" /></a>
+      <div class="header-center">
+        <div class="title">LLAVES <span id="categorySubtitle" class="subtitle">TERCERA</span></div>
+      </div>
+      <nav class="actions">
+        <a class="btn" href="../admin.html">VOLVER</a>
+      </nav>
+    </header>
+
+    <section class="category-bar">
+      <button class="cat-btn" data-category="segunda" type="button">SEGUNDA</button>
+      <button class="cat-btn active" data-category="tercera" type="button">TERCERA</button>
+    </section>
+
+    <div class="bracket-scroll">
+      <main class="bracket bracket-tercera" id="bracketRoot" aria-label="Llaves eliminatorias">
+        <section class="bracket-col qf-left" aria-label="Cuartos de final izquierda">
+          <div id="slot-q1"></div>
+          <div id="slot-q2"></div>
+        </section>
+
+        <section class="bracket-col sf-left" aria-label="Semifinal izquierda">
+          <div id="slot-s1"></div>
+        </section>
+
+        <section class="bracket-col center-col" aria-label="Final y tercer puesto">
+          <div id="slot-final"></div>
+          <div id="slot-third"></div>
+        </section>
+
+        <section class="bracket-col sf-right" aria-label="Semifinal derecha">
+          <div id="slot-s2"></div>
+        </section>
+
+        <section class="bracket-col qf-right" aria-label="Cuartos de final derecha">
+          <div id="slot-q3"></div>
+          <div id="slot-q4"></div>
+        </section>
+      </main>
+    </div>
+
+    <div class="save-wrap">
+      <button id="saveBracket" class="save-btn" type="button">Guardar llaves</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="llaves.js"></script>
+</body>
+</html>

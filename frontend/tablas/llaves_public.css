@@ -1,0 +1,198 @@
+#llavesPublicMount{
+  --ll-bg:#0a0a0a;
+  --ll-card:#16171a;
+  --ll-ink:#ffffff;
+  --ll-muted:#cfcfcf;
+  --ll-gold:#ffcc00;
+  --ll-gold-dark:#b28900;
+  --ll-line:#ffffff22;
+  --ll-whitebox:#f4f4f4;
+  --ll-shadow:0 10px 24px rgba(0,0,0,.38);
+  margin:14px 0 22px;
+  color:var(--ll-ink);
+  font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+}
+#llavesPublicMount *{ box-sizing:border-box; }
+#llavesPublicMount .llaves-public-box{
+  border:1px solid var(--ll-line);
+  border-radius:18px;
+  padding:12px 10px 14px;
+  background:linear-gradient(180deg, rgba(255,204,0,.035), rgba(255,204,0,.008));
+  box-shadow:0 10px 24px rgba(0,0,0,.24);
+}
+#llavesPublicMount .llaves-public-title{
+  margin:0 0 10px;
+  color:var(--ll-gold);
+  font-size:clamp(15px,1.7vw,22px);
+  font-weight:900;
+  letter-spacing:.08em;
+  text-align:center;
+  text-transform:uppercase;
+}
+#llavesPublicMount .bracket-scroll{
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding-bottom:8px;
+}
+#llavesPublicMount .bracket{
+  display:grid;
+  gap:10px;
+  align-items:start;
+  width:max-content;
+  min-width:max-content;
+  margin:0 auto;
+}
+#llavesPublicMount .bracket-tercera{ grid-template-columns:440px 440px 440px 440px 440px; }
+#llavesPublicMount .bracket-segunda{ grid-template-columns:440px 440px 440px; }
+#llavesPublicMount .bracket-col{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+#llavesPublicMount .qf-left,
+#llavesPublicMount .qf-right{ padding-top:4px; }
+#llavesPublicMount .sf-left,
+#llavesPublicMount .sf-right{ padding-top:48px; }
+#llavesPublicMount .center-col{ padding-top:18px; gap:16px; }
+#llavesPublicMount .tie-card{
+  position:relative;
+  width:440px;
+  max-width:440px;
+  padding:10px 9px 9px;
+  overflow:visible;
+  background:var(--ll-card);
+  border:1px solid var(--ll-line);
+  border-radius:16px;
+  box-shadow:var(--ll-shadow);
+}
+#llavesPublicMount .tie-card::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto 0;
+  height:2px;
+  background:linear-gradient(90deg, transparent, var(--ll-gold), transparent);
+  opacity:.85;
+}
+#llavesPublicMount .tie-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+#llavesPublicMount .tie-title{ margin:0; font-size:14px; font-weight:900; letter-spacing:.04em; text-transform:uppercase; }
+#llavesPublicMount .tie-subtitle{ display:none; }
+#llavesPublicMount [data-round-card="final"] .tie-title{ font-size:18px; }
+#llavesPublicMount [data-round-card="third"] .tie-title{ font-size:13px; opacity:.88; line-height:1.05; }
+#llavesPublicMount .tie-helper{ margin:3px 0 0; font-size:10px; opacity:.72; line-height:1.25; }
+#llavesPublicMount .round-group{ display:flex; flex-direction:column; gap:8px; }
+#llavesPublicMount .match-block{ border:1px solid var(--ll-line); border-radius:12px; padding:7px; background:#101114; overflow:visible; }
+#llavesPublicMount .match-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+#llavesPublicMount .match-label{ font-size:10px; font-weight:900; letter-spacing:.12em; color:var(--ll-gold); text-transform:uppercase; }
+#llavesPublicMount .fecha-view{ color:#fff; font-weight:800; font-size:10px; opacity:.9; white-space:nowrap; }
+
+/* FIX FINAL */
+#llavesPublicMount .team-row{
+  display:grid;
+  grid-template-columns:22px 28px 140px 140px 28px 22px;
+  gap:6px;
+  align-items:center;
+  justify-content:start;
+}
+
+#llavesPublicMount .team-view,
+#llavesPublicMount .score-view{ border-radius:7px; font-weight:900; min-width:0; }
+#llavesPublicMount .team-view{ width:100%; display:block; background:#000; color:#fff; border:1px solid #444; padding:5px 6px; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:26px; line-height:14px; }
+#llavesPublicMount .score-view{ height:24px; display:flex; align-items:center; justify-content:center; font-size:10px; border:1px solid var(--ll-gold-dark); color:#1b1600; background:var(--ll-gold); box-shadow:0 3px 0 var(--ll-gold-dark); }
+#llavesPublicMount .score-view-white{ border:1px solid #cfcfcf; color:#111; background:var(--ll-whitebox); box-shadow:0 3px 0 #cfcfcf; }
+#llavesPublicMount .llaves-public-error{ color:#ffdddd; border:1px solid #7a1d1d; background:#220b0b; border-radius:12px; padding:10px; font-weight:800; text-align:center; }
+
+@media (max-width: 900px){
+  #llavesPublicMount .llaves-public-box{
+    padding:10px 8px 12px;
+  }
+
+  #llavesPublicMount .bracket{
+    gap:6px;
+    margin:0;
+    justify-content:start;
+  }
+
+  #llavesPublicMount .bracket-tercera{
+    grid-template-columns:318px 318px 318px 318px 318px;
+  }
+
+  #llavesPublicMount .bracket-segunda{
+    grid-template-columns:318px 318px 318px;
+  }
+
+  #llavesPublicMount .bracket-col{
+    gap:10px;
+  }
+
+  #llavesPublicMount .sf-left,
+  #llavesPublicMount .sf-right{
+    padding-top:36px;
+  }
+
+  #llavesPublicMount .center-col{
+    padding-top:14px;
+    gap:12px;
+  }
+
+  #llavesPublicMount .tie-card{
+    width:318px;
+    max-width:318px;
+    padding:8px 7px 8px;
+    border-radius:14px;
+  }
+
+  #llavesPublicMount .tie-title{
+    font-size:12px;
+  }
+
+  #llavesPublicMount [data-round-card="final"] .tie-title{
+    font-size:15px;
+  }
+
+  #llavesPublicMount [data-round-card="third"] .tie-title{
+    font-size:11px;
+  }
+
+  #llavesPublicMount .tie-helper{
+    font-size:9px;
+  }
+
+  #llavesPublicMount .round-group{
+    gap:6px;
+  }
+
+  #llavesPublicMount .match-block{
+    padding:6px;
+    border-radius:10px;
+  }
+
+  #llavesPublicMount .match-top{
+    gap:6px;
+    margin-bottom:5px;
+  }
+
+  #llavesPublicMount .match-label,
+  #llavesPublicMount .fecha-view{
+    font-size:9px;
+  }
+
+  #llavesPublicMount .team-row{
+    grid-template-columns:16px 20px 102px 102px 20px 16px;
+    gap:4px;
+    justify-content:start;
+  }
+
+  #llavesPublicMount .team-view{
+    padding:4px 5px;
+    font-size:8.5px;
+    min-height:20px;
+    line-height:12px;
+  }
+
+  #llavesPublicMount .score-view{
+    height:20px;
+    font-size:8.5px;
+    border-radius:6px;
+    box-shadow:0 2px 0 var(--ll-gold-dark);
+  }
+
+  #llavesPublicMount .score-view-white{
+    box-shadow:0 2px 0 #cfcfcf;
+  }
+}
