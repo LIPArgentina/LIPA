@@ -75,13 +75,24 @@ const isLocalRequest = (req) => {
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   skip: (req) => {
     if (isLocalRequest(req)) return true;
 
     // Login de equipos y auth no se limitan para evitar bloquear pruebas locales
     if (req.path.startsWith('/team/')) return true;
     if (req.path.startsWith('/auth/')) return true;
+
+    // Lecturas públicas no limitadas
+    if (req.method === 'GET') {
+      if (req.path.startsWith('/fixture')) return true;
+      if (req.path.startsWith('/llaves')) return true;
+      if (req.path.startsWith('/admin/planillas')) return true;
+      if (req.path.startsWith('/cruces/status')) return true;
+      if (req.path.startsWith('/cruces/match-status')) return true;
+      if (req.path.startsWith('/cruces/lock-status')) return true;
+      if (req.path.startsWith('/teams')) return true;
+    }
 
     return false;
   },
