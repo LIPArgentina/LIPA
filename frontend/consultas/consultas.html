@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>CONSULTAS | Liga de Pool Independiente</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="consultas.css"/>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
+    <div class="header-center">
+      <div class="title">CONSULTAS</div>
+    </div>
+    <nav class="actions">
+      <a class="btn" href="../index.html">VOLVER</a>
+    </nav>
+  </header>
+
+  <main class="consultas-page">
+    <section class="consultas-hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Cruces validados</p>
+        <h1>Consulta por jugador</h1>
+        <p class="lead">Buscá un jugador individual por nombre o apellido para ver partidos jugados y triángulos a favor/en contra.</p>
+      </div>
+      <div class="ranking-actions" aria-label="Ranking por categoría">
+        <div class="ranking-tabs" aria-label="Tipo de ranking">
+          <button class="btn tab-btn active" type="button" data-ranking-tab="players">Jugadores</button>
+          <button class="btn tab-btn" type="button" data-ranking-tab="teams">Equipos</button>
+        </div>
+        <button class="btn ranking-btn" type="button" data-ranking-limit="10">Top 10</button>
+        <button class="btn ranking-btn" type="button" data-ranking-limit="20">Top 20</button>
+        <button class="btn ranking-btn" type="button" data-ranking-limit="50">Top 50</button>
+      </div>
+    </section>
+
+    <section class="search-card" aria-label="Buscar jugador o equipo">
+      <form id="consultaForm" class="search-form" autocomplete="off">
+        <div class="field">
+          <label for="categorySelect">Categoría</label>
+          <select id="categorySelect" required>
+            <option value="segunda">Segunda</option>
+            <option value="tercera">Tercera</option>
+          </select>
+        </div>
+
+        <div class="field field-player">
+          <label for="playerInput">Jugador</label>
+          <input id="playerInput" type="search" list="playerSuggestions" placeholder="Nombre o apellido" minlength="2" />
+          <datalist id="playerSuggestions"></datalist>
+        </div>
+
+        <div class="field field-team">
+          <label for="teamInput">Equipo</label>
+          <input id="teamInput" type="search" list="teamSuggestions" placeholder="Nombre del equipo" minlength="2" />
+          <datalist id="teamSuggestions"></datalist>
+        </div>
+
+        <button id="btnBuscar" class="btn btn-primary" type="submit">Buscar</button>
+      </form>
+    </section>
+
+    <section id="rankingBox" class="ranking-box" hidden></section>
+    <section id="statusBox" class="status-box" hidden></section>
+    <section id="summaryBox" class="summary-box" hidden></section>
+    <section id="resultsBox" class="results-list" aria-live="polite"></section>
+  </main>
+</div>
+
+<script src="../config.js"></script>
+<script src="consultas.js" defer></script>
+</body>
+</html>

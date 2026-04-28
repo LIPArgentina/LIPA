@@ -28,6 +28,7 @@
 
     <div class="actions">
       <button id="btnBanner" class="btn btn-outline btn-sm hidden">Banner</button>
+      <a id="btnConsultas" class="btn btn-outline btn-sm hidden" href="./consultas/consultas.html">Consultas</a>
       <a id="btnAdminEquipos" class="btn btn-outline btn-sm hidden" href="#">Administrar equipos</a>
 
       <div id="sessionBox">
@@ -63,12 +64,98 @@
     </div>
   </div>
 
+  <dialog id="bannerModal" class="modal">
+    <form method="dialog" class="modal__panel" id="bannerForm" autocomplete="off">
+      <div class="modal__header">
+        <h3>Banner de portada</h3>
+      </div>
+
+      <div class="modal__body">
+        <div class="field__label-row">
+          <label class="field__label" for="bannerText">Texto del banner</label>
+
+          <div class="banner-tabs" id="bannerTabs">
+            <button type="button" class="banner-tab is-active" data-index="0">1</button>
+            <button type="button" class="banner-tab" data-index="1">2</button>
+            <button type="button" class="banner-tab" data-index="2">3</button>
+            <button type="button" class="banner-tab" data-index="3">4</button>
+            <button type="button" class="banner-tab" data-index="4">5</button>
+          </div>
+        </div>
+
+        <textarea id="bannerText" class="field__control"></textarea>
+
+        <div class="field__grid">
+          <div>
+            <label class="field__label" for="bannerHref">Link (URL opcional)</label>
+            <input id="bannerHref" type="url" class="field__control" />
+          </div>
+
+          <div>
+            <label class="field__label" for="bannerLabel">Texto del botón (opcional)</label>
+            <input id="bannerLabel" type="text" class="field__control" />
+          </div>
+        </div>
+
+        <p id="bannerMsg" class="ok hidden">¡Guardado!</p>
+        <p id="bannerErr" class="error hidden">No se pudo guardar</p>
+      </div>
+
+      <div class="modal__footer">
+        <button id="cancelBanner" class="btn btn-ghost" value="cancel" formmethod="dialog">Cancelar</button>
+        <button id="submitBanner" class="btn btn-primary" value="confirm">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+  
+
+  
+
   <footer class="site-footer">
     <div class="site-footer__inner">
       <a class="site-footer__link" href="./politica-privacidad.html">Política de Privacidad</a>
       <span class="site-footer__stats" id="statsBar">Online: — | Hoy: — | Semana: —</span>
     </div>
   </footer>
+
+  <style>
+    .site-footer{
+      margin-top: 1.5rem;
+      padding: 24px 16px 34px;
+      border-top: 1px solid var(--line);
+      background: #0c0e12;
+    }
+    .site-footer__inner{
+      width: min(900px, 92%);
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+    }
+    .site-footer__text{
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      letter-spacing: 0.04em;
+    }
+    .site-footer__link{
+      color: #ffd966;
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .site-footer__link:hover{
+      opacity: .9;
+    }
+    .site-footer__stats{
+      color: var(--muted);
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+  </style>
 
   <script src="./config.js"></script>
   <script type="module" src="./templates/banner.js" defer></script>
