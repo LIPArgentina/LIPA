@@ -7,6 +7,7 @@ const createTeamPlayersRouter = require('./teamPlayers.routes');
 const adminPlanillas = require('./admin.planillas');
 const createPicturesRouter = require('./pictures.routes');
 const createStatsRouter = require('./stats.routes');
+const createLlavesRouter = require('./llaves.routes'); // 👈 AGREGADO
 
 module.exports = function createApiRouter(deps) {
   const { DATA_DIR } = deps;
@@ -41,6 +42,9 @@ module.exports = function createApiRouter(deps) {
 
   // Stats públicas
   router.use('/', createStatsRouter(deps));
+
+  // Llaves (NUEVO) 👇
+  router.use('/', createLlavesRouter(deps));
 
   return router;
 };
