@@ -85,15 +85,31 @@ const API_BASE = (() => {
 
 async function fetchFixture(kind){
   const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=tercera`;
-  const apiRes = await fetch(apiUrl, { cache: 'no-store' });
-  const apiData = await apiRes.json().catch(() => null);
 
-  if (!apiRes.ok || !apiData?.ok || !apiData?.data) {
-    throw new Error(apiData?.error || `No se pudo cargar fixture ${kind} desde PostgreSQL`);
+  try {
+    const apiRes = await fetch(apiUrl, { cache: 'no-store' });
+
+    if (apiRes.ok) {
+      const apiData = await apiRes.json().catch(() => null);
+
+      if (apiData?.ok && apiData?.data) {
+        console.log('✔ API TERCERA');
+        cache[kind] = apiData.data;
+        return apiData.data;
+      }
+    }
+  } catch (err) {
+    console.warn('fallback JSON', err);
   }
 
-  cache[kind] = apiData.data;
-  return apiData.data;
+  const file = kind === 'vuelta'
+    ? '../fixture/fixture.vuelta.tercera.json'
+    : '../fixture/fixture.ida.tercera.json';
+
+  const res = await fetch(file, { cache: 'no-store' });
+  const data = await res.json();
+  cache[kind] = data;
+  return data;
 }
 
 function clearFixtureCards(){
@@ -391,14 +407,14 @@ function setActive(kind){
 
 async function switchFixture(kind){
   selectedKind = kind;
-  try { localStorage.setItem('fixture_kind_tercera', kind); } catch(_) {}
+  try { localStorage.setItem('fixture_kind', kind); } catch(_) {}
   if (!cache[kind]) await fetchFixture(kind);
   renderSelectedFixture();
   setActive(kind);
 }
 
 async function init(){
-  try { selectedKind = localStorage.getItem('fixture_kind_tercera') || 'ida'; } catch(_) { selectedKind = 'ida'; }
+  try { selectedKind = localStorage.getItem('fixture_kind') || 'ida'; } catch(_) { selectedKind = 'ida'; }
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {
     btn.addEventListener('click', () => {
       const kind = btn.getAttribute('data-fixture') || 'ida';
