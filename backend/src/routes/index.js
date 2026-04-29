@@ -6,6 +6,7 @@ const createFechasRouter = require('./fechas.routes');
 const createTeamPlayersRouter = require('./teamPlayers.routes');
 const adminPlanillas = require('./admin.planillas');
 const createPicturesRouter = require('./pictures.routes');
+const createStatsRouter = require('./stats.routes');
 const createLlavesRouter = require('./llaves.routes');
 
 module.exports = function createApiRouter(deps) {
@@ -39,7 +40,10 @@ module.exports = function createApiRouter(deps) {
   // Pictures
   router.use('/pictures', createPicturesRouter(deps));
 
-  // Llaves
+  // Stats públicas: /api/track-visit y /api/public-stats
+  router.use('/', createStatsRouter(deps));
+
+  // Llaves públicas/admin: /api/llaves y /api/llaves/proximo-cruce
   router.use('/', createLlavesRouter(deps));
 
   return router;
