@@ -7,7 +7,7 @@ const createTeamPlayersRouter = require('./teamPlayers.routes');
 const adminPlanillas = require('./admin.planillas');
 const createPicturesRouter = require('./pictures.routes');
 const createStatsRouter = require('./stats.routes');
-const createLlavesRouter = require('./llaves.routes'); // 👈 AGREGADO
+const createLlavesRouter = require('./llaves.routes');
 
 module.exports = function createApiRouter(deps) {
   const { DATA_DIR } = deps;
@@ -40,10 +40,10 @@ module.exports = function createApiRouter(deps) {
   // Pictures
   router.use('/pictures', createPicturesRouter(deps));
 
-  // Stats públicas
+  // Stats públicas: /api/track-visit y /api/public-stats
   router.use('/', createStatsRouter(deps));
 
-  // Llaves (NUEVO) 👇
+  // Llaves públicas/admin: /api/llaves y /api/llaves/proximo-cruce
   router.use('/', createLlavesRouter(deps));
 
   return router;
