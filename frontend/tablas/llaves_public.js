@@ -39,9 +39,12 @@ let currentCategory = 'tercera';
 function normalizeTeamName(name){
   const raw = String(name || '').trim().replace(/\s+/g, ' ');
   if (!raw) return '';
-  const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const aliases = {'ANEXO':'ANEXO 2DA','ANEXO 2DA':'ANEXO 2DA','ANEXO 2DA.':'ANEXO 2DA','ANEXO 2DA ':'ANEXO 2DA','ANEXO 2da':'ANEXO 2DA'};
-  return aliases[raw] || aliases[upper] || raw;
+
+  // Importante: no convertir "ANEXO" en "ANEXO 2DA" de forma global.
+  // En tercera existe ANEXO, mientras que ANEXO 2DA pertenece a otra categoría.
+  // La pantalla pública de llaves debe respetar exactamente el nombre que viene
+  // desde fixture/posiciones o desde /llaves para la categoría actual.
+  return raw;
 }
 function unique(list){ return Array.from(new Set(list.filter(Boolean))); }
 function getCategoryConfig(category=currentCategory){ return CATEGORY_CONFIG[category] || CATEGORY_CONFIG.tercera; }
