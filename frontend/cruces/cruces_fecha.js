@@ -284,6 +284,40 @@ function apiUrl(path){
   }
 
 
+  async function loadProximoCruceFromLlaves(category, team){
+    const cleanCategory = String(category || '').trim();
+    const cleanTeam = String(team || '').trim();
+    if (!cleanCategory || !cleanTeam) return null;
+
+    try {
+      const qs = new URLSearchParams({
+        category: cleanCategory,
+        team: cleanTeam
+      });
+
+      const llavesData = await fetchJson(apiUrl('/api/llaves/proximo-cruce?') + qs.toString(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+
+      const match = llavesData?.match;
+      if (!match?.local || !match?.visitante) return null;
+
+      return {
+        local: match.local,
+        visitante: match.visitante,
+        localSlug: teamSlugFromRef(match.local) || normPlanillaSlug(match.local),
+        visitanteSlug: teamSlugFromRef(match.visitante) || normPlanillaSlug(match.visitante),
+        date: match.date || null,
+        source: 'llaves'
+      };
+    } catch (err) {
+      console.warn('No se pudo cargar próximo cruce desde llaves', err);
+      return null;
+    }
+  }
+
+
   function extractCrucesFromFecha(fechaNode){
     const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
     const cruces = [];
@@ -444,11 +478,22 @@ function apiUrl(path){
       normalized[normalized.length - 1];
 
     if (!chosen) {
+      const ctx = getCrucesTeamContext();
+      const match = await loadProximoCruceFromLlaves(category, ctx.primaryTeam || '');
+      if (match) {
+        return {
+          cruces: [match],
+          fechaFixture: match.date,
+          fixtureKind: 'llaves'
+        };
+      }
       return { cruces: [], fechaFixture: null, fixtureKind: null };
     }
 
+    const cruces = extractCrucesFromFecha(chosen.raw);
+
     return {
-      cruces: extractCrucesFromFecha(chosen.raw),
+      cruces,
       fechaFixture: chosen.key,
       fixtureKind: chosen.kind || null
     };
@@ -2378,10 +2423,18 @@ function isAndroidAppWebView(){
 
       const crucesRaw = await loadCrucesFromDb(category);
       const cruces = Array.isArray(crucesRaw?.cruces) ? crucesRaw.cruces : [];
-      if (!cruces.length) throw new Error('No se encontraron cruces en la base de datos para esta categoría.');
 
-      const match = findCruceForTeam(cruces, teamCandidates);
-      if (!match) throw new Error('No se encontró un cruce para el equipo logueado.');
+      let match = findCruceForTeam(cruces, teamCandidates);
+
+      // Si el fixture ya no tiene una fecha/cruce para este equipo,
+      // pasamos a llaves para tomar el próximo rival eliminatorio.
+      if (!match) {
+        match = await loadProximoCruceFromLlaves(category, teamSlug);
+      }
+
+      if (!match) {
+        throw new Error('No se encontró un cruce para el equipo logueado ni en fixture ni en llaves.');
+      }
 
       window.__CRUCE_FECHA_ISO = match.date || crucesRaw?.fechaFixture || new Date().toISOString().slice(0,10);
 
