@@ -764,6 +764,13 @@ router.post('/validate', async (req, res) => {
       snapshot: validatedSnapshot
     });
 
+    const llavesSync = await syncValidatedMatchIntoLlaves({
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      snapshot: validatedSnapshot
+    });
+
     return res.json({
       ok: true,
       tipo: 'validado',
@@ -771,7 +778,8 @@ router.post('/validate', async (req, res) => {
       locked: true,
       validated: true,
       lockedUntil: lockUntil,
-      fixtureSync
+      fixtureSync,
+      llavesSync
     });
   } catch (err) {
     console.error('POST /validate', err);
@@ -1004,6 +1012,123 @@ async function syncValidatedMatchIntoFixture({
         kind: row.kind,
         category,
         group: updatedGroup,
+        date: dateKey
+      };
+    }
+  }
+
+  return { updated: false, reason: 'match_not_found', category, date: dateKey };
+}
+
+
+function normalizeLlavesTeamKey(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' Y ')
+    .replace(/\b(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)\b/gi, ' ')
+    .replace(/[^A-Z0-9]/gi, '')
+    .replace(/(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)$/i, '')
+    .toUpperCase();
+}
+
+function buildLlavesTeamCandidates(teamInfo = null, fallbackSlug = '') {
+  const values = [
+    teamInfo?.display_name,
+    teamInfo?.slug_base,
+    teamInfo?.slug_uid,
+    fallbackSlug
+  ];
+
+  return [...new Set(
+    values
+      .map((value) => normalizeLlavesTeamKey(value || ''))
+      .filter(Boolean)
+  )];
+}
+
+function llavesTeamMatches(teamName, candidates = []) {
+  const key = normalizeLlavesTeamKey(teamName || '');
+  return !!key && candidates.includes(key);
+}
+
+async function syncValidatedMatchIntoLlaves({
+  fechaISO,
+  localSlug,
+  visitanteSlug,
+  snapshot
+}) {
+  const dateKey = normalizeDateOnly(fechaISO);
+  if (!dateKey || !snapshot) {
+    return { updated: false, reason: 'missing_data' };
+  }
+
+  const { category, localInfo, visitanteInfo } = await inferCategoryFromMatch(localSlug, visitanteSlug);
+  if (!category) {
+    return { updated: false, reason: 'category_not_found' };
+  }
+
+  const localCandidates = buildLlavesTeamCandidates(localInfo, localSlug);
+  const visitanteCandidates = buildLlavesTeamCandidates(visitanteInfo, visitanteSlug);
+
+  const localPuntos = Number(snapshot?.local?.puntosTotales ?? 0);
+  const localExtra = Number(snapshot?.local?.triangulosTotales ?? snapshot?.local?.triangulos ?? 0);
+  const visitantePuntos = Number(snapshot?.visitante?.puntosTotales ?? 0);
+  const visitanteExtra = Number(snapshot?.visitante?.triangulosTotales ?? snapshot?.visitante?.triangulos ?? 0);
+
+  const { rows } = await pool.query(
+    `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
+    [category]
+  );
+
+  const data = rows[0]?.data && typeof rows[0].data === 'object'
+    ? rows[0].data
+    : null;
+
+  const rounds = Array.isArray(data?.rounds) ? data.rounds : [];
+  if (!rounds.length) {
+    return { updated: false, reason: 'llaves_missing', category, date: dateKey };
+  }
+
+  for (const round of rounds) {
+    const legs = Array.isArray(round?.legs) ? round.legs : [];
+
+    for (let legIndex = 0; legIndex < legs.length; legIndex++) {
+      const leg = legs[legIndex];
+      if (!leg || normalizeDateOnly(leg?.date) !== dateKey) continue;
+
+      const homeIsLocal = llavesTeamMatches(leg?.home?.team, localCandidates);
+      const awayIsVisitante = llavesTeamMatches(leg?.away?.team, visitanteCandidates);
+      const homeIsVisitante = llavesTeamMatches(leg?.home?.team, visitanteCandidates);
+      const awayIsLocal = llavesTeamMatches(leg?.away?.team, localCandidates);
+
+      if (homeIsLocal && awayIsVisitante) {
+        leg.home.puntos = localPuntos;
+        leg.home.puntosExtra = localExtra;
+        leg.away.puntos = visitantePuntos;
+        leg.away.puntosExtra = visitanteExtra;
+      } else if (homeIsVisitante && awayIsLocal) {
+        leg.home.puntos = visitantePuntos;
+        leg.home.puntosExtra = visitanteExtra;
+        leg.away.puntos = localPuntos;
+        leg.away.puntosExtra = localExtra;
+      } else {
+        continue;
+      }
+
+      await pool.query(
+        `INSERT INTO llaves_data (category, data, created_at, updated_at)
+         VALUES ($1, $2::jsonb, NOW(), NOW())
+         ON CONFLICT (category)
+         DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+        [category, JSON.stringify(data)]
+      );
+
+      return {
+        updated: true,
+        category,
+        roundId: round?.id || null,
+        legIndex,
         date: dateKey
       };
     }
