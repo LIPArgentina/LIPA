@@ -15,7 +15,12 @@ module.exports = function createLlavesRouter() {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/&/g, ' Y ')
+      .replace(/[._-]+/g, ' ')
+      .replace(/\b(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
       .replace(/[^A-Z0-9]/gi, '')
+      .replace(/(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)$/i, '')
       .toUpperCase();
   }
 
