@@ -461,10 +461,6 @@ function apiUrl(path){
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayKey = makeKey(yesterday);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowKey = makeKey(tomorrow);
-
     const normalized = fechas
       .map((fecha) => ({ raw: fecha, key: toDateKey(fecha?.date), kind: fecha?.__kind || '' }))
       .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.key))
@@ -473,9 +469,7 @@ function apiUrl(path){
     const chosen =
       normalized.find((item) => item.key === todayKey) ||
       normalized.find((item) => item.key === yesterdayKey) ||
-      normalized.find((item) => item.key === tomorrowKey) ||
-      normalized.find((item) => item.key > tomorrowKey) ||
-      normalized[normalized.length - 1];
+      normalized.find((item) => item.key > todayKey);
 
     if (!chosen) {
       const ctx = getCrucesTeamContext();
@@ -491,6 +485,19 @@ function apiUrl(path){
     }
 
     const cruces = extractCrucesFromFecha(chosen.raw);
+    const ctx = getCrucesTeamContext();
+    const cruceEquipo = findCruceForTeam(cruces, ctx.candidates);
+
+    if (!cruceEquipo) {
+      const match = await loadProximoCruceFromLlaves(category, ctx.primaryTeam || '');
+      if (match) {
+        return {
+          cruces: [match],
+          fechaFixture: match.date,
+          fixtureKind: 'llaves'
+        };
+      }
+    }
 
     return {
       cruces,
