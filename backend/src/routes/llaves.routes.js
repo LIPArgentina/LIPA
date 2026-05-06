@@ -160,6 +160,9 @@ module.exports = function createLlavesRouter() {
         const legs = Array.isArray(round?.legs) ? round.legs : [];
 
         legs.forEach((leg, legIndex) => {
+          // El desempate (leg 2) no se abre como planilla completa;
+          // se gestiona desde el bloque DESEMPATE en cruces_fecha.
+          if (legIndex >= 2) return;
           if (!legContainsTeam(leg, teamKey)) return;
 
           const match = buildMatchFromLeg(leg, round?.id || '', legIndex);

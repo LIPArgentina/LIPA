@@ -443,6 +443,48 @@ function buildFechaKey(fechaISO, localSlug, visitanteSlug) {
   return `${fechaISO}::${normalizeSlug(localSlug)}::${normalizeSlug(visitanteSlug)}`;
 }
 
+function buildTiebreakFechaKey(fechaISO, localSlug, visitanteSlug) {
+  return `${buildFechaKey(fechaISO, localSlug, visitanteSlug)}::desempate`;
+}
+
+function normalizeTiebreakStatus(status = {}) {
+  const localPair = Array.isArray(status?.local?.pareja) ? status.local.pareja : [];
+  const visitantePair = Array.isArray(status?.visitante?.pareja) ? status.visitante.pareja : [];
+  return {
+    tipo: 'desempate',
+    fechaISO: normalizeDateOnly(status?.fechaISO || ''),
+    localSlug: normalizeSlug(status?.localSlug || ''),
+    visitanteSlug: normalizeSlug(status?.visitanteSlug || ''),
+    local: {
+      pareja: localPair.map(v => String(v || '').trim()).slice(0, 2),
+      puntos: Number(status?.local?.puntos || 0)
+    },
+    visitante: {
+      pareja: visitantePair.map(v => String(v || '').trim()).slice(0, 2),
+      puntos: Number(status?.visitante?.puntos || 0)
+    }
+  };
+}
+
+function compareTiebreakStatus(a = {}, b = {}) {
+  const A = normalizeTiebreakStatus(a);
+  const B = normalizeTiebreakStatus(b);
+  const diffs = [];
+  if (!valuesEqual(A.local.pareja[0], B.local.pareja[0])) diffs.push({ type: 'tiebreak', side: 'local', field: 'pareja1' });
+  if (!valuesEqual(A.local.pareja[1], B.local.pareja[1])) diffs.push({ type: 'tiebreak', side: 'local', field: 'pareja2' });
+  if (!valuesEqual(A.visitante.pareja[0], B.visitante.pareja[0])) diffs.push({ type: 'tiebreak', side: 'visitante', field: 'pareja1' });
+  if (!valuesEqual(A.visitante.pareja[1], B.visitante.pareja[1])) diffs.push({ type: 'tiebreak', side: 'visitante', field: 'pareja2' });
+  if (Number(A.local.puntos || 0) !== Number(B.local.puntos || 0)) diffs.push({ type: 'tiebreak', side: 'local', field: 'puntos' });
+  if (Number(A.visitante.puntos || 0) !== Number(B.visitante.puntos || 0)) diffs.push({ type: 'tiebreak', side: 'visitante', field: 'puntos' });
+  return diffs;
+}
+
+function isValidTiebreakScore(localPts, visitantePts) {
+  const l = Number(localPts || 0);
+  const v = Number(visitantePts || 0);
+  return ((l === 5 && v >= 0 && v <= 4) || (v === 5 && l >= 0 && l <= 4));
+}
+
 function valuesEqual(a, b) {
   return normalizeText(a) === normalizeText(b);
 }
@@ -867,6 +909,202 @@ router.get('/lock-status', async (req, res) => {
 });
 
 
+async function findLlavesSeriesForMatch({ fechaISO, localSlug, visitanteSlug }) {
+  const dateKey = normalizeDateOnly(fechaISO);
+  const { category, localInfo, visitanteInfo } = await inferCategoryFromMatch(localSlug, visitanteSlug);
+  if (!category) return { found: false, reason: 'category_not_found' };
+
+  const localCandidates = buildLlavesTeamCandidates(localInfo, localSlug);
+  const visitanteCandidates = buildLlavesTeamCandidates(visitanteInfo, visitanteSlug);
+  const { rows } = await pool.query(`SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`, [category]);
+  const data = rows[0]?.data && typeof rows[0].data === 'object' ? rows[0].data : null;
+  const rounds = Array.isArray(data?.rounds) ? data.rounds : [];
+
+  for (const round of rounds) {
+    const legs = Array.isArray(round?.legs) ? round.legs : [];
+    for (let legIndex = 0; legIndex < legs.length; legIndex++) {
+      const leg = legs[legIndex];
+      if (!leg || normalizeDateOnly(leg?.date) !== dateKey) continue;
+      const homeIsLocal = llavesTeamMatches(leg?.home?.team, localCandidates);
+      const awayIsVisitante = llavesTeamMatches(leg?.away?.team, visitanteCandidates);
+      const homeIsVisitante = llavesTeamMatches(leg?.home?.team, visitanteCandidates);
+      const awayIsLocal = llavesTeamMatches(leg?.away?.team, localCandidates);
+      if ((homeIsLocal && awayIsVisitante) || (homeIsVisitante && awayIsLocal)) {
+        return { found: true, category, data, round, legs, leg, legIndex, localCandidates, visitanteCandidates, localInfo, visitanteInfo };
+      }
+    }
+  }
+  return { found: false, reason: 'match_not_found', category, date: dateKey };
+}
+
+function computeLlavesSeriesTie(round) {
+  const legs = Array.isArray(round?.legs) ? round.legs : [];
+  if (legs.length < 2) return { needsTiebreak: false, reason: 'series_incomplete' };
+  const ida = legs[0];
+  const vuelta = legs[1];
+  if (!legHasAnyScore(ida) || !legHasAnyScore(vuelta)) return { needsTiebreak: false, reason: 'legs_not_played' };
+  const teams = [ida?.home?.team, ida?.away?.team, vuelta?.home?.team, vuelta?.away?.team].map(v => normalizeLlavesTeamKey(v || '')).filter(Boolean);
+  const uniq = [...new Set(teams)];
+  if (uniq.length < 2) return { needsTiebreak: false, reason: 'teams_missing' };
+  const totals = Object.fromEntries(uniq.slice(0, 2).map(k => [k, { puntos: 0, triangulos: 0 }]));
+  [ida, vuelta].forEach(leg => {
+    const h = normalizeLlavesTeamKey(leg?.home?.team || '');
+    const a = normalizeLlavesTeamKey(leg?.away?.team || '');
+    if (totals[h]) { totals[h].puntos += Number(leg?.home?.puntos || 0); totals[h].triangulos += Number(leg?.home?.puntosExtra || 0); }
+    if (totals[a]) { totals[a].puntos += Number(leg?.away?.puntos || 0); totals[a].triangulos += Number(leg?.away?.puntosExtra || 0); }
+  });
+  const values = Object.values(totals);
+  const needsTiebreak = values.length === 2 && values[0].puntos === values[1].puntos && values[0].triangulos === values[1].triangulos;
+  return { needsTiebreak, totals };
+}
+
+function legHasAnyScore(leg) {
+  return [leg?.home?.puntos, leg?.away?.puntos, leg?.home?.puntosExtra, leg?.away?.puntosExtra].some(v => Number(v || 0) > 0);
+}
+
+async function getTiebreakRows(fechaISO, localSlug, visitanteSlug) {
+  const fechaKey = buildTiebreakFechaKey(fechaISO, localSlug, visitanteSlug);
+  const { rows } = await pool.query(
+    `SELECT team, status_json, validated, locked_until, updated_at
+     FROM cruces_validations
+     WHERE fecha_key = $1 AND team IN ($2, $3)`,
+    [fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]
+  );
+  return { fechaKey, rows };
+}
+
+router.get('/series-status', async (req, res) => {
+  setNoCache(res);
+  try {
+    const fechaISO = normalizeDateOnly(req.query.fechaISO || '');
+    const localSlug = String(req.query.localSlug || '').trim();
+    const visitanteSlug = String(req.query.visitanteSlug || '').trim();
+    const equipoSlug = normalizeSlug(req.query.equipoSlug || '');
+    if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug) return res.status(400).json({ ok: false, error: 'Faltan parámetros' });
+    const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
+    if (!teamKey) return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
+
+    const found = await findLlavesSeriesForMatch({ fechaISO, localSlug, visitanteSlug });
+    if (!found.found) return res.json({ ok: true, needsTiebreak: false, reason: found.reason || 'not_found' });
+    const tie = computeLlavesSeriesTie(found.round);
+    const { rows } = await getTiebreakRows(fechaISO, localSlug, visitanteSlug);
+    const localKey = normalizeSlug(localSlug);
+    const visitanteKey = normalizeSlug(visitanteSlug);
+    const mine = rows.find(r => r.team === teamKey) || null;
+    const localRow = rows.find(r => r.team === localKey) || null;
+    const visitanteRow = rows.find(r => r.team === visitanteKey) || null;
+    const bothValidated = !!(localRow?.validated && visitanteRow?.validated && localRow?.status_json && visitanteRow?.status_json);
+    const diff = bothValidated ? compareTiebreakStatus(localRow.status_json, visitanteRow.status_json) : [];
+    const lockedUntil = localRow?.locked_until || visitanteRow?.locked_until || null;
+    const locked = !!(lockedUntil && new Date(lockedUntil).getTime() > Date.now());
+    const status = bothValidated && !diff.length ? (localRow.status_json || visitanteRow.status_json) : (mine?.status_json || localRow?.status_json || visitanteRow?.status_json || null);
+    return res.json({
+      ok: true,
+      needsTiebreak: !!tie.needsTiebreak,
+      totals: tie.totals || null,
+      roundId: found.round?.id || null,
+      legIndex: found.legIndex,
+      tiebreak: {
+        validated: bothValidated && !diff.length,
+        locked,
+        lockedUntil: lockedUntil || null,
+        mineValidated: !!mine?.validated,
+        localValidated: !!localRow?.validated,
+        visitanteValidated: !!visitanteRow?.validated,
+        mismatch: !!diff.length,
+        diff,
+        status
+      }
+    });
+  } catch (err) {
+    console.error('GET /series-status', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo obtener el estado de la serie' });
+  }
+});
+
+router.get('/tiebreak-lock-status', async (req, res) => {
+  setNoCache(res);
+  try {
+    const fechaISO = normalizeDateOnly(req.query.fechaISO || '');
+    const localSlug = String(req.query.localSlug || '').trim();
+    const visitanteSlug = String(req.query.visitanteSlug || '').trim();
+    const equipoSlug = normalizeSlug(req.query.equipoSlug || '');
+    if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug) return res.status(400).json({ ok: false, error: 'Faltan parámetros' });
+    const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
+    if (!teamKey) return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
+    const { rows } = await getTiebreakRows(fechaISO, localSlug, visitanteSlug);
+    const localRow = rows.find(r => r.team === normalizeSlug(localSlug)) || null;
+    const visitanteRow = rows.find(r => r.team === normalizeSlug(visitanteSlug)) || null;
+    const bothValidated = !!(localRow?.validated && visitanteRow?.validated && localRow?.status_json && visitanteRow?.status_json);
+    const diff = bothValidated ? compareTiebreakStatus(localRow.status_json, visitanteRow.status_json) : [];
+    const lockedUntil = localRow?.locked_until || visitanteRow?.locked_until || null;
+    const locked = !!(lockedUntil && new Date(lockedUntil).getTime() > Date.now());
+    return res.json({ ok: true, tipo: bothValidated && !diff.length ? 'validado' : 'pendiente', locked, validated: bothValidated && !diff.length, lockedUntil: lockedUntil || null });
+  } catch (err) {
+    console.error('GET /tiebreak-lock-status', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo obtener el estado del desempate' });
+  }
+});
+
+router.post('/tiebreak-validate', async (req, res) => {
+  try {
+    const { fechaISO, localSlug, visitanteSlug, equipoSlug: rawEquipoSlug, status } = req.body || {};
+    const equipoSlug = normalizeSlug(rawEquipoSlug || '');
+    if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug || !status) return res.status(400).json({ ok: false, error: 'Faltan datos' });
+    const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
+    if (!teamKey) return res.status(400).json({ ok: false, error: 'El equipo no pertenece a este cruce.' });
+    const cleanStatus = normalizeTiebreakStatus({ ...status, fechaISO, localSlug, visitanteSlug });
+    if (!cleanStatus.local.pareja[0] || !cleanStatus.local.pareja[1] || !cleanStatus.visitante.pareja[0] || !cleanStatus.visitante.pareja[1]) {
+      return res.status(400).json({ ok: false, error: 'Faltan jugadores en las parejas del desempate' });
+    }
+    if (!isValidTiebreakScore(cleanStatus.local.puntos, cleanStatus.visitante.puntos)) {
+      return res.status(400).json({ ok: false, error: 'El desempate debe terminar cuando un equipo llega a 5, con el rival entre 0 y 4' });
+    }
+    const found = await findLlavesSeriesForMatch({ fechaISO, localSlug, visitanteSlug });
+    if (!found.found) return res.status(404).json({ ok: false, error: 'No se encontró la serie de llaves para este desempate' });
+    const tie = computeLlavesSeriesTie(found.round);
+    if (!tie.needsTiebreak) return res.status(400).json({ ok: false, error: 'La serie no requiere desempate' });
+
+    const fechaKey = buildTiebreakFechaKey(fechaISO, localSlug, visitanteSlug);
+    await pool.query(
+      `INSERT INTO cruces_validations (team, fecha_key, validacion_json, status_json, validated, locked_until, updated_at)
+       VALUES ($1, $2, $3::jsonb, $4::jsonb, true, NULL, NOW())
+       ON CONFLICT (team, fecha_key)
+       DO UPDATE SET validacion_json = EXCLUDED.validacion_json, status_json = EXCLUDED.status_json, validated = true, locked_until = NULL, updated_at = NOW()`,
+      [teamKey, fechaKey, JSON.stringify(cleanStatus), JSON.stringify(cleanStatus)]
+    );
+
+    const rivalKey = teamKey === normalizeSlug(localSlug) ? normalizeSlug(visitanteSlug) : normalizeSlug(localSlug);
+    const { rows } = await pool.query(
+      `SELECT team, status_json, validated, updated_at
+       FROM cruces_validations
+       WHERE fecha_key = $1 AND team IN ($2, $3)`,
+      [fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]
+    );
+    const mine = rows.find(r => r.team === teamKey) || null;
+    const rival = rows.find(r => r.team === rivalKey) || null;
+    if (!rival?.validated || !rival?.status_json) {
+      return res.json({ ok: true, tipo: 'pendiente', mensaje: 'PENDIENTE: tu rival todavía no validó el desempate' });
+    }
+    const diff = compareTiebreakStatus(mine?.status_json || {}, rival?.status_json || {});
+    if (diff.length) return res.json({ ok: false, tipo: 'mismatch', error: 'Los datos del desempate no coinciden con tu rival', diff });
+
+    const lockUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await pool.query(
+      `UPDATE cruces_validations SET locked_until = $1::timestamptz, updated_at = NOW()
+       WHERE fecha_key = $2 AND team IN ($3, $4)`,
+      [lockUntil, fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]
+    );
+    const latest = (new Date(mine.updated_at).getTime() >= new Date(rival.updated_at).getTime()) ? mine.status_json : rival.status_json;
+    const llavesSync = await syncTiebreakIntoLlaves({ fechaISO, localSlug, visitanteSlug, snapshot: latest });
+    return res.json({ ok: true, tipo: 'validado', mensaje: 'Desempate validado', locked: true, validated: true, lockedUntil: lockUntil, llavesSync });
+  } catch (err) {
+    console.error('POST /tiebreak-validate', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo validar el desempate' });
+  }
+});
+
+
 async function resolveEquipoInfoBySlug(slug, categoryHint = '') {
   const slugNorm = normalizeSlug(slug);
   if (!slugNorm) return null;
@@ -1135,6 +1373,64 @@ async function syncValidatedMatchIntoLlaves({
   }
 
   return { updated: false, reason: 'match_not_found', category, date: dateKey };
+}
+
+
+async function syncTiebreakIntoLlaves({ fechaISO, localSlug, visitanteSlug, snapshot }) {
+  const dateKey = normalizeDateOnly(fechaISO);
+  if (!dateKey || !snapshot) return { updated: false, reason: 'missing_data' };
+  const found = await findLlavesSeriesForMatch({ fechaISO, localSlug, visitanteSlug });
+  if (!found.found) return { updated: false, reason: found.reason || 'match_not_found' };
+
+  const round = found.round;
+  const legs = Array.isArray(round.legs) ? round.legs : (round.legs = []);
+  while (legs.length < 3) {
+    legs.push({ date: dateKey, home: { team: 'WO', puntos: 0, puntosExtra: 0 }, away: { team: 'WO', puntos: 0, puntosExtra: 0 } });
+  }
+
+  const extra = legs[2];
+  extra.date = extra.date || dateKey;
+  const localPts = Number(snapshot?.local?.puntos || 0);
+  const visitantePts = Number(snapshot?.visitante?.puntos || 0);
+  const localPair = Array.isArray(snapshot?.local?.pareja) ? snapshot.local.pareja : [];
+  const visitantePair = Array.isArray(snapshot?.visitante?.pareja) ? snapshot.visitante.pareja : [];
+
+  const homeIsLocal = llavesTeamMatches(extra?.home?.team, found.localCandidates);
+  const awayIsVisitante = llavesTeamMatches(extra?.away?.team, found.visitanteCandidates);
+  const homeIsVisitante = llavesTeamMatches(extra?.home?.team, found.visitanteCandidates);
+  const awayIsLocal = llavesTeamMatches(extra?.away?.team, found.localCandidates);
+
+  if (!(homeIsLocal && awayIsVisitante) && !(homeIsVisitante && awayIsLocal)) {
+    // Regla visual de LIPA para desempate: se toma el orden de la vuelta si existe.
+    extra.home.team = found.legs?.[1]?.home?.team || found.leg?.home?.team || localSlug;
+    extra.away.team = found.legs?.[1]?.away?.team || found.leg?.away?.team || visitanteSlug;
+  }
+
+  if (llavesTeamMatches(extra.home.team, found.localCandidates)) {
+    extra.home.puntos = localPts;
+    extra.home.puntosExtra = 0;
+    extra.home.pareja = localPair;
+    extra.away.puntos = visitantePts;
+    extra.away.puntosExtra = 0;
+    extra.away.pareja = visitantePair;
+  } else {
+    extra.home.puntos = visitantePts;
+    extra.home.puntosExtra = 0;
+    extra.home.pareja = visitantePair;
+    extra.away.puntos = localPts;
+    extra.away.puntosExtra = 0;
+    extra.away.pareja = localPair;
+  }
+
+  await pool.query(
+    `INSERT INTO llaves_data (category, data, created_at, updated_at)
+     VALUES ($1, $2::jsonb, NOW(), NOW())
+     ON CONFLICT (category)
+     DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+    [found.category, JSON.stringify(found.data)]
+  );
+
+  return { updated: true, category: found.category, roundId: round?.id || null, legIndex: 2, date: dateKey };
 }
 
 router.get('/results', async (req, res) => {

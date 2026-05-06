@@ -1247,3 +1247,136 @@ header.lpi-top {
     min-height: 16px;
   }
 }
+
+/* === DESEMPATE DE SERIE === */
+.tiebreak-card{
+  max-width:min(920px, calc(100vw - 24px));
+  margin:18px auto 28px;
+  background:#151617;
+  border:1px solid #ffffff18;
+  border-radius:22px;
+  padding:18px;
+  box-shadow:0 12px 40px #00000055, inset 0 1px 0 #ffffff10;
+}
+.tiebreak-card[hidden]{ display:none !important; }
+.tiebreak-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:16px;
+}
+.tiebreak-kicker{
+  color:var(--accent);
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+.tiebreak-header h2{
+  margin:2px 0 4px;
+  color:var(--accent);
+  font-size:clamp(24px, 4vw, 34px);
+  line-height:.95;
+  font-weight:900;
+}
+.tiebreak-header p{
+  margin:0;
+  color:var(--muted);
+  font-size:14px;
+}
+.tiebreak-state{
+  border:1px solid #b28900;
+  color:var(--accent);
+  background:#0e0f11;
+  border-radius:12px;
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.tiebreak-grid{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr);
+  gap:14px;
+  align-items:start;
+}
+.tiebreak-side{
+  background:#0e0f11;
+  border:1px solid #ffffff12;
+  border-radius:16px;
+  padding:12px;
+}
+.tiebreak-side h3{
+  margin:0 0 10px;
+  color:var(--accent);
+  text-align:center;
+  font-size:16px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.tiebreak-player{
+  width:100%;
+  height:42px;
+  margin:6px 0;
+  border:1px solid #3a3d41;
+  border-radius:12px;
+  background:#fff;
+  color:#111;
+  padding:0 10px;
+  font-weight:800;
+}
+.tiebreak-score{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding-top:42px;
+}
+.tiebreak-score span{
+  color:var(--accent);
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.tiebreak-points{
+  width:58px;
+  height:46px;
+  border:1px solid #b28900;
+  border-radius:12px;
+  background:var(--accent);
+  color:#1b1b1b;
+  font-size:18px;
+  font-weight:900;
+  text-align:center;
+  appearance:none;
+  padding-left:22px;
+  box-shadow:inset 0 -2px 0 #00000020;
+}
+.tiebreak-actions{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:16px;
+}
+.tiebreak-actions .btn,
+.tiebreak-actions .btn-validate{
+  min-height:42px;
+}
+.tiebreak-msg{
+  min-height:20px;
+  margin-top:10px;
+  text-align:center;
+  font-size:14px;
+  font-weight:800;
+  color:var(--muted);
+}
+.tiebreak-msg.error{ color:#ff8d8d; }
+.tiebreak-msg.success{ color:#8dffb1; }
+.tiebreak-msg.info{ color:#8eb7ff; }
+@media (max-width: 760px){
+  .tiebreak-grid{ grid-template-columns:1fr; }
+  .tiebreak-score{ padding-top:0; }
+  .tiebreak-header{ flex-direction:column; }
+}
