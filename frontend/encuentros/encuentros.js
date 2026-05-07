@@ -262,6 +262,47 @@
     return div;
   }
 
+
+  function renderTiebreakSideCard(item, side){
+    const isLeft = side === 'left';
+    const name = isLeft ? item.localName : item.visitanteName;
+    const opponent = isLeft ? item.visitanteName : item.localName;
+    const data = isLeft ? (item.local || {}) : (item.visitante || {});
+    const pair = Array.isArray(data.pareja) ? data.pareja : [];
+    const puntos = Number(data.puntos || 0);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'wrap tiebreak-result-wrap ' + (isLeft ? 'readonly-left' : 'readonly-right');
+
+    const card = document.createElement('div');
+    card.className = 'card tiebreak-result-card';
+
+    const title = document.createElement('h2');
+    title.className = 'title';
+    title.textContent = String(name || '').toUpperCase();
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const formattedDate = formatDate(item.fechaISO);
+    meta.textContent = formattedDate ? `vs ${opponent} · ${formattedDate}` : `vs ${opponent}`;
+
+    const section = document.createElement('div');
+    section.className = 'section tiebreak-result-section';
+    section.innerHTML = '<h2>DESEMPATE</h2>';
+
+    pair.slice(0, 2).forEach((player, idx) => {
+      section.appendChild(makeRow(idx + 1, player || '', side, null, 'DESEMPATE'));
+    });
+
+    const score = document.createElement('div');
+    score.className = 'tiebreak-result-score';
+    score.textContent = String(puntos);
+
+    card.append(title, meta, section, score);
+    wrap.appendChild(card);
+    return wrap;
+  }
+
   function renderSideCard(planilla, scoreData, opponent, date, teamName, side){
     const card = document.querySelector('#card-template').content.cloneNode(true).querySelector('.card');
     card.querySelector('.title').textContent = String(teamName || '').toUpperCase();
@@ -299,8 +340,12 @@
 
   function renderEncounter(item){
     const node = document.importNode(document.getElementById('encounter-template').content, true);
+    const isTiebreak = String(item?.tipo || '').toLowerCase() === 'desempate';
     node.querySelector('.encounter-title').textContent =
-      `${String(item.localName || '').toUpperCase()} VS ${String(item.visitanteName || '').toUpperCase()}`;
+      `${isTiebreak ? 'DESEMPATE · ' : ''}${String(item.localName || '').toUpperCase()} VS ${String(item.visitanteName || '').toUpperCase()}`;
+
+    const shell = node.querySelector('.encounter-shell');
+    if (shell && isTiebreak) shell.classList.add('encounter-tiebreak');
 
     const photosBtn = node.querySelector('[data-open-photos]');
     if (photosBtn) {
@@ -312,27 +357,32 @@
     const leftRoot = node.querySelector('.encounter-left');
     const rightRoot = node.querySelector('.encounter-right');
 
-    leftRoot.appendChild(
-      renderSideCard(
-        item.localPlanilla || {},
-        item.local || {},
-        item.visitanteName || item.visitanteSlug || '',
-        item.fechaISO,
-        item.localName || item.localSlug || '',
-        'left'
-      )
-    );
+    if (isTiebreak) {
+      leftRoot.appendChild(renderTiebreakSideCard(item, 'left'));
+      rightRoot.appendChild(renderTiebreakSideCard(item, 'right'));
+    } else {
+      leftRoot.appendChild(
+        renderSideCard(
+          item.localPlanilla || {},
+          item.local || {},
+          item.visitanteName || item.visitanteSlug || '',
+          item.fechaISO,
+          item.localName || item.localSlug || '',
+          'left'
+        )
+      );
 
-    rightRoot.appendChild(
-      renderSideCard(
-        item.visitantePlanilla || {},
-        item.visitante || {},
-        item.localName || item.localSlug || '',
-        item.fechaISO,
-        item.visitanteName || item.visitanteSlug || '',
-        'right'
-      )
-    );
+      rightRoot.appendChild(
+        renderSideCard(
+          item.visitantePlanilla || {},
+          item.visitante || {},
+          item.localName || item.localSlug || '',
+          item.fechaISO,
+          item.visitanteName || item.visitanteSlug || '',
+          'right'
+        )
+      );
+    }
 
     return node;
   }

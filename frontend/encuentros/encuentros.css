@@ -546,3 +546,66 @@ body.photos-open{ overflow:hidden; }
     min-height:34px;
   }
 }
+
+
+/* Resultado de desempate: no muestra triángulos ni tanteador general */
+.encounter-tiebreak .encounter-title::before{
+  content:'SERIE EMPATADA';
+  display:block;
+  color:#b8c0cf;
+  font-size:10px;
+  letter-spacing:.12em;
+  margin-bottom:3px;
+}
+
+.tiebreak-result-card{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.tiebreak-result-section{
+  margin-top:8px;
+}
+
+.tiebreak-result-section h2{
+  color:#ffe65a;
+}
+
+.tiebreak-result-score{
+  align-self:center;
+  min-width:48px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  background:#ffe65a;
+  color:#1b1600;
+  font-weight:900;
+  font-size:22px;
+  box-shadow:0 5px 0 #b28900;
+  margin-top:4px;
+}
+
+.encounter-tiebreak .totals-wrap,
+.encounter-tiebreak .wins-wrap{
+  display:none !important;
+}
+
+.encounter-tiebreak .empty-pts{
+  display:none !important;
+}
+
+.encounter-tiebreak .encounter-left .row .slot,
+.encounter-tiebreak .encounter-right .row .slot{
+  text-align:left;
+}
+
+@media (max-width: 900px){
+  .tiebreak-result-score{
+    min-width:40px;
+    height:34px;
+    font-size:18px;
+    border-radius:10px;
+  }
+}

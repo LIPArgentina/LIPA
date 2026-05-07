@@ -1476,6 +1476,7 @@ router.get('/results', async (req, res) => {
       const matchDate = parts[0] || fechaISO;
       const localSlug = normalizeSlug(parts[1] || '');
       const visitanteSlug = normalizeSlug(parts[2] || '');
+      const isTiebreakResult = String(parts[3] || '').trim().toLowerCase() === 'desempate';
 
       if (!localSlug || !visitanteSlug) continue;
 
@@ -1485,7 +1486,9 @@ router.get('/results', async (req, res) => {
       if (!localEntry || !visitanteEntry) continue;
       if (!localEntry.validated || !visitanteEntry.validated) continue;
 
-      const diff = compareFullStatus(localEntry.status_json || {}, visitanteEntry.status_json || {});
+      const diff = isTiebreakResult
+        ? compareTiebreakStatus(localEntry.status_json || {}, visitanteEntry.status_json || {})
+        : compareFullStatus(localEntry.status_json || {}, visitanteEntry.status_json || {});
       if (diff.length) continue;
 
       const [localInfo, visitanteInfo] = await Promise.all([
@@ -1512,7 +1515,32 @@ router.get('/results', async (req, res) => {
       const localStatus = snapshot?.local || {};
       const visitanteStatus = snapshot?.visitante || {};
 
+      if (isTiebreakResult) {
+        const cleanTiebreak = normalizeTiebreakStatus(snapshot || {});
+        results.push({
+          tipo: 'desempate',
+          fechaISO: matchDate,
+          category: category || localInfo?.division || visitanteInfo?.division || null,
+          localSlug,
+          visitanteSlug,
+          localName: localInfo?.display_name || localSlug,
+          visitanteName: visitanteInfo?.display_name || visitanteSlug,
+          local: {
+            pareja: Array.isArray(cleanTiebreak.local?.pareja) ? cleanTiebreak.local.pareja : [],
+            puntos: Number(cleanTiebreak.local?.puntos || 0)
+          },
+          visitante: {
+            pareja: Array.isArray(cleanTiebreak.visitante?.pareja) ? cleanTiebreak.visitante.pareja : [],
+            puntos: Number(cleanTiebreak.visitante?.puntos || 0)
+          },
+          updatedAt: localEntry?.updated_at || visitanteEntry?.updated_at || null,
+          validated: true
+        });
+        continue;
+      }
+
       results.push({
+        tipo: 'cruce',
         fechaISO: matchDate,
         category: category || localInfo?.division || visitanteInfo?.division || null,
         localSlug,
