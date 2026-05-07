@@ -1765,15 +1765,37 @@ function renderTiebreakBlock(serverState = {}) {
 
 function wireTiebreakDirtyGuard(locked) {
   if (locked) return;
+
+  const markTiebreakEdited = () => {
+    tiebreakUserDirty = true;
+
+    // Si el equipo estaba esperando al rival pero necesita corregir algo,
+    // detenemos el polling para que no vuelva a pisar los campos mientras edita.
+    if (tiebreakPollTimer) {
+      clearInterval(tiebreakPollTimer);
+      tiebreakPollTimer = null;
+    }
+
+    clearTiebreakDiffVisual();
+    setTiebreakMsg('', '');
+
+    const btn = document.getElementById('btnValidarDesempate');
+    if (btn && !btn.classList.contains('success')) {
+      btn.disabled = false;
+      btn.textContent = 'VALIDAR DESEMPATE';
+      btn.classList.remove('pending', 'error');
+    }
+
+    const state = document.getElementById('tiebreakState');
+    if (state && !state.classList.contains('success')) {
+      state.textContent = 'PENDIENTE';
+      state.classList.remove('success');
+    }
+  };
+
   document.querySelectorAll('.tiebreak-player, .tiebreak-points').forEach(el => {
-    el.addEventListener('focus', () => {
-      tiebreakUserDirty = true;
-    });
-    el.addEventListener('change', () => {
-      tiebreakUserDirty = true;
-      clearTiebreakDiffVisual();
-      setTiebreakMsg('', '');
-    });
+    el.addEventListener('focus', markTiebreakEdited);
+    el.addEventListener('change', markTiebreakEdited);
   });
 }
 
@@ -1864,6 +1886,9 @@ function wireTiebreakActions(locked) {
     const error = validateTiebreakStatus(status);
     if (error) { setTiebreakMsg(error, 'error'); return; }
     try {
+      // A partir de este POST, el estado local vuelve a estar sincronizado.
+      // Si queda pendiente, el polling debe seguir hasta que responda el rival.
+      tiebreakUserDirty = false;
       btn.disabled = true;
       btn.textContent = 'VALIDANDO...';
       const res = await fetch(apiUrl('/api/cruces/tiebreak-validate'), {
@@ -1928,7 +1953,7 @@ async function refreshTiebreakBlock() {
       renderTiebreakBlock(data);
     }
 
-    if (data?.tiebreak?.mismatch) {
+    if (data?.tiebreak?.mismatch && !tiebreakUserDirty) {
       applyTiebreakDiffVisual(data.tiebreak.diff);
       setTiebreakMsg('Los datos del desempate no coinciden con tu rival.', 'error');
     }
@@ -1946,8 +1971,12 @@ async function refreshTiebreakBlock() {
 function startTiebreakPolling() {
   if (tiebreakPollTimer) clearInterval(tiebreakPollTimer);
   tiebreakPollTimer = setInterval(async () => {
+    // Si el capitán está corrigiendo, no consultamos para no pisar la UI.
+    // El polling se reanuda automáticamente cuando vuelve a validar.
+    if (tiebreakUserDirty) return;
+
     const data = await refreshTiebreakBlock();
-    if (data?.tiebreak?.validated || data?.tiebreak?.mismatch) {
+    if (data?.tiebreak?.validated || data?.tiebreak?.locked || data?.tiebreak?.mismatch) {
       clearInterval(tiebreakPollTimer);
       tiebreakPollTimer = null;
     }
