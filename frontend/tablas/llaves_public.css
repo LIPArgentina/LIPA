@@ -225,3 +225,17 @@
     box-shadow:0 2px 0 #cfcfcf;
   }
 }
+
+
+/* Desempate: solo muestra puntos, sin triángulos/puntosExtra */
+#llavesPublicMount .match-block-extra .team-row-extra{
+  grid-template-columns:22px 140px 140px 22px;
+}
+#llavesPublicMount .match-block-extra .score-view{
+  width:22px;
+}
+@media (max-width: 900px){
+  #llavesPublicMount .match-block-extra .team-row-extra{
+    grid-template-columns:22px minmax(0, 1fr) minmax(0, 1fr) 22px;
+  }
+}

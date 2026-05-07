@@ -398,6 +398,26 @@ function createLegMarkup(roundId, legIndex, legData, totalLegs){
     ? `<button class="btn-delete-desempate" type="button" data-action="delete-desempate" data-round="${escapeHtml(roundId)}">BORRAR</button>`
     : '';
 
+  const rowMarkup = isExtra
+    ? `
+      <div class="team-row team-row-extra">
+        <select class="score-badge" data-side="home" data-field="puntos">${makeScoreOptions(5, legData.home.puntos)}</select>
+        <select class="select-team" data-side="home" data-field="team">${makeTeamOptions(legData.home.team)}</select>
+        <select class="select-team" data-side="away" data-field="team">${makeTeamOptions(legData.away.team)}</select>
+        <select class="score-badge" data-side="away" data-field="puntos">${makeScoreOptions(5, legData.away.puntos)}</select>
+      </div>
+    `
+    : `
+      <div class="team-row">
+        <select class="score-badge" data-side="home" data-field="puntos">${makeScoreOptions(9, legData.home.puntos)}</select>
+        <select class="score-badge score-badge-white" data-side="home" data-field="puntosExtra">${makeScoreOptions(54, legData.home.puntosExtra)}</select>
+        <select class="select-team" data-side="home" data-field="team">${makeTeamOptions(legData.home.team)}</select>
+        <select class="select-team" data-side="away" data-field="team">${makeTeamOptions(legData.away.team)}</select>
+        <select class="score-badge score-badge-white" data-side="away" data-field="puntosExtra">${makeScoreOptions(54, legData.away.puntosExtra)}</select>
+        <select class="score-badge" data-side="away" data-field="puntos">${makeScoreOptions(9, legData.away.puntos)}</select>
+      </div>
+    `;
+
   return `
     <div class="match-block ${isExtra ? 'match-block-extra' : ''}" data-round="${roundId}" data-leg="${legIndex}">
       <div class="match-top">
@@ -407,14 +427,7 @@ function createLegMarkup(roundId, legIndex, legData, totalLegs){
           <input type="date" class="fecha-input" data-field="date" value="${escapeHtml(legData.date || '')}" />
         </div>
       </div>
-      <div class="team-row">
-        <select class="score-badge" data-side="home" data-field="puntos">${makeScoreOptions(9, legData.home.puntos)}</select>
-        <select class="score-badge score-badge-white" data-side="home" data-field="puntosExtra">${makeScoreOptions(54, legData.home.puntosExtra)}</select>
-        <select class="select-team" data-side="home" data-field="team">${makeTeamOptions(legData.home.team)}</select>
-        <select class="select-team" data-side="away" data-field="team">${makeTeamOptions(legData.away.team)}</select>
-        <select class="score-badge score-badge-white" data-side="away" data-field="puntosExtra">${makeScoreOptions(54, legData.away.puntosExtra)}</select>
-        <select class="score-badge" data-side="away" data-field="puntos">${makeScoreOptions(9, legData.away.puntos)}</select>
-      </div>
+      ${rowMarkup}
     </div>
   `;
 }
