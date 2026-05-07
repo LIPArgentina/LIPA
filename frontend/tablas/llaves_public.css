@@ -90,6 +90,14 @@
   justify-content:start;
 }
 
+
+#llavesPublicMount .tiebreak-team-row{
+  grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 22px;
+}
+#llavesPublicMount .match-block-extra .team-view{
+  min-width:0;
+}
+
 #llavesPublicMount .team-view,
 #llavesPublicMount .score-view{ border-radius:7px; font-weight:900; min-width:0; }
 #llavesPublicMount .team-view{ width:100%; display:block; background:#000; color:#fff; border:1px solid #444; padding:5px 6px; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:26px; line-height:14px; }
@@ -207,6 +215,11 @@
     justify-content:start;
   }
 
+
+  #llavesPublicMount .tiebreak-team-row{
+    grid-template-columns:16px minmax(0,1fr) minmax(0,1fr) 16px;
+  }
+
   #llavesPublicMount .team-view{
     padding:4px 5px;
     font-size:8.5px;
@@ -223,19 +236,5 @@
 
   #llavesPublicMount .score-view-white{
     box-shadow:0 2px 0 #cfcfcf;
-  }
-}
-
-
-/* Desempate: solo muestra puntos, sin triángulos/puntosExtra */
-#llavesPublicMount .match-block-extra .team-row-extra{
-  grid-template-columns:22px 140px 140px 22px;
-}
-#llavesPublicMount .match-block-extra .score-view{
-  width:22px;
-}
-@media (max-width: 900px){
-  #llavesPublicMount .match-block-extra .team-row-extra{
-    grid-template-columns:22px minmax(0, 1fr) minmax(0, 1fr) 22px;
   }
 }

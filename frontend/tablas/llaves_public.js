@@ -67,8 +67,8 @@ function createLegMarkup(roundId,legIndex,legData,totalLegs){
   const label=isExtra?'Desempate':(totalLegs===1?'Partido':(legIndex===0?'Ida':'Vuelta'));
   const rawDate=String(legData.date||'');
   const dateHtml=rawDate?`<a class="llaves-encuentros-btn" href="${escapeHtml(buildEncuentrosUrl(rawDate))}" aria-label="Ver encuentros del ${escapeHtml(formatDate(rawDate))}">ENCUENTROS</a>`:'';
-  const rowHtml=isExtra
-    ? `<div class="team-row team-row-extra"><div class="score-view">${Number(legData.home.puntos||0)}</div><div class="team-view">${escapeHtml(normalizeTeamName(legData.home.team)||'WO')}</div><div class="team-view">${escapeHtml(normalizeTeamName(legData.away.team)||'WO')}</div><div class="score-view">${Number(legData.away.puntos||0)}</div></div>`
+  const rowHtml = isExtra
+    ? `<div class="team-row tiebreak-team-row"><div class="score-view">${Number(legData.home.puntos||0)}</div><div class="team-view">${escapeHtml(normalizeTeamName(legData.home.team)||'WO')}</div><div class="team-view">${escapeHtml(normalizeTeamName(legData.away.team)||'WO')}</div><div class="score-view">${Number(legData.away.puntos||0)}</div></div>`
     : `<div class="team-row"><div class="score-view">${Number(legData.home.puntos||0)}</div><div class="score-view score-view-white">${Number(legData.home.puntosExtra||0)}</div><div class="team-view">${escapeHtml(normalizeTeamName(legData.home.team)||'WO')}</div><div class="team-view">${escapeHtml(normalizeTeamName(legData.away.team)||'WO')}</div><div class="score-view score-view-white">${Number(legData.away.puntosExtra||0)}</div><div class="score-view">${Number(legData.away.puntos||0)}</div></div>`;
   return `<div class="match-block ${isExtra?'match-block-extra':''}" data-round="${escapeHtml(roundId)}" data-leg="${legIndex}"><div class="match-top"><div class="match-label">${label}</div><div class="fecha-actions">${dateHtml}<div class="fecha-view">${escapeHtml(formatDate(rawDate))}</div></div></div>${rowHtml}</div>`;
 }
