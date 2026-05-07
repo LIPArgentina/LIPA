@@ -47,6 +47,7 @@ const CATEGORY_CONFIG = {
 
 let currentCategory = 'tercera';
 let TEAM_OPTIONS = ['WO'];
+let CURRENT_STANDINGS = null;
 
 function normalizeTeamName(name){
   const raw = String(name || '').trim().replace(/\s+/g, ' ');
@@ -758,7 +759,83 @@ function llSetSeriesTeams(round, teamA, teamB){
   }
 }
 
-function applyAutomaticAdvance(data){
+function flattenStandings(standings){
+  const flat = {};
+  Object.values(standings || {}).forEach(rows => {
+    (rows || []).forEach(row => {
+      const key = normalizeForCompare(row?.equipo || row?.team || '');
+      if (!key) return;
+      flat[key] = {
+        equipo: row.equipo || row.team || '',
+        pts: Number(row.pts || 0),
+        tr: Number(row.tr || 0),
+        pos: Number(row.pos || 0)
+      };
+    });
+  });
+  return flat;
+}
+
+function collectQuarterStats(data){
+  const stats = {};
+  ['q1','q2','q3','q4'].forEach(roundId => {
+    const round = llGetRound(data, roundId);
+    const legs = Array.isArray(round?.legs) ? round.legs.slice(0, 2) : [];
+    legs.forEach(leg => {
+      [
+        { team: leg?.home?.team, pts: leg?.home?.puntos, tr: leg?.home?.puntosExtra },
+        { team: leg?.away?.team, pts: leg?.away?.puntos, tr: leg?.away?.puntosExtra }
+      ].forEach(item => {
+        const key = normalizeForCompare(item.team || '');
+        if (!key || key === 'WO') return;
+        if (!stats[key]) stats[key] = { pts: 0, tr: 0 };
+        stats[key].pts += Number(item.pts || 0);
+        stats[key].tr += Number(item.tr || 0);
+      });
+    });
+  });
+  return stats;
+}
+
+function stableTieSeed(value){
+  const text = normalizeForCompare(value || '');
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function compareSportingAdvantage(teamA, teamB, data, standings){
+  const a = normalizeTeamName(teamA) || 'WO';
+  const b = normalizeTeamName(teamB) || 'WO';
+  if (!llIsRealTeam(a) || !llIsRealTeam(b)) return [a, b];
+
+  const aKey = normalizeForCompare(a);
+  const bKey = normalizeForCompare(b);
+  const standingStats = flattenStandings(standings || CURRENT_STANDINGS || {});
+  const quarterStats = collectQuarterStats(data);
+  const sA = standingStats[aKey] || { pts: 0, tr: 0 };
+  const sB = standingStats[bKey] || { pts: 0, tr: 0 };
+  const qA = quarterStats[aKey] || { pts: 0, tr: 0 };
+  const qB = quarterStats[bKey] || { pts: 0, tr: 0 };
+
+  const checks = [
+    [Number(sA.pts || 0), Number(sB.pts || 0)],
+    [Number(sA.tr || 0), Number(sB.tr || 0)],
+    [Number(qA.pts || 0), Number(qB.pts || 0)],
+    [Number(qA.tr || 0), Number(qB.tr || 0)]
+  ];
+
+  for (const [va, vb] of checks) {
+    if (va > vb) return [a, b];
+    if (vb > va) return [b, a];
+  }
+
+  return stableTieSeed(a) <= stableTieSeed(b) ? [a, b] : [b, a];
+}
+
+function applyAutomaticAdvance(data, standings = CURRENT_STANDINGS){
   llEnsureExtraIfNeeded(data);
 
   if (currentCategory === 'tercera') {
@@ -767,8 +844,11 @@ function applyAutomaticAdvance(data){
     const q3 = llSeriesWinner(llGetRound(data, 'q3'));
     const q4 = llSeriesWinner(llGetRound(data, 'q4'));
 
-    llSetSeriesTeams(llGetRound(data, 's1'), q1.winner, q2.winner);
-    llSetSeriesTeams(llGetRound(data, 's2'), q3.winner, q4.winner);
+    const [s1Best, s1Other] = compareSportingAdvantage(q1.winner, q2.winner, data, standings);
+    const [s2Best, s2Other] = compareSportingAdvantage(q3.winner, q4.winner, data, standings);
+
+    llSetSeriesTeams(llGetRound(data, 's1'), s1Best, s1Other);
+    llSetSeriesTeams(llGetRound(data, 's2'), s2Best, s2Other);
   }
 
   const s1 = llSeriesWinner(llGetRound(data, 's1'));
@@ -828,7 +908,7 @@ async function renderCategory(category){
   const data = getDefaultData(category);
 
   // 1) clasificados iniciales siempre desde fixture/tablas
-  await applyAutomaticEntrants(data, category);
+  CURRENT_STANDINGS = await applyAutomaticEntrants(data, category);
 
   // 2) recuperar resultados/fechas guardadas
   const savedDbData = await loadFromServer(category);
