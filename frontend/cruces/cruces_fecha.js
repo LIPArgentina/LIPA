@@ -1660,6 +1660,7 @@ updatePictureButton(false);
 
 // === DESEMPATE DE SERIE ===
 let tiebreakPollTimer = null;
+let tiebreakUserDirty = false;
 
 function getAllPlayersFromPlan(plan) {
   const values = [
@@ -1758,7 +1759,22 @@ function renderTiebreakBlock(serverState = {}) {
   `;
 
   wireTiebreakActions(locked);
+  wireTiebreakDirtyGuard(locked);
   updateTiebreakPictureButton(locked);
+}
+
+function wireTiebreakDirtyGuard(locked) {
+  if (locked) return;
+  document.querySelectorAll('.tiebreak-player, .tiebreak-points').forEach(el => {
+    el.addEventListener('focus', () => {
+      tiebreakUserDirty = true;
+    });
+    el.addEventListener('change', () => {
+      tiebreakUserDirty = true;
+      clearTiebreakDiffVisual();
+      setTiebreakMsg('', '');
+    });
+  });
 }
 
 function buildScoreOptions(selected) {
@@ -1903,12 +1919,21 @@ async function refreshTiebreakBlock() {
   try {
     const qs = withBust({ fechaISO: getCurrentFechaISO(), localSlug, visitanteSlug, equipoSlug: mySlug });
     const data = await fetchJson(apiUrl('/api/cruces/series-status?') + qs.toString(), { cache: 'no-store', credentials: 'same-origin' });
-    renderTiebreakBlock(data);
+    const mount = document.getElementById('tiebreakMount');
+    const hasEditableBlock = !!(mount && !mount.hidden && mount.querySelector('.tiebreak-player, .tiebreak-points'));
+    const finalValidated = !!(data?.tiebreak?.validated || data?.tiebreak?.locked);
+    const keepCurrentInputs = hasEditableBlock && !finalValidated && (tiebreakUserDirty || data?.tiebreak?.mismatch);
+
+    if (!keepCurrentInputs) {
+      renderTiebreakBlock(data);
+    }
+
     if (data?.tiebreak?.mismatch) {
       applyTiebreakDiffVisual(data.tiebreak.diff);
       setTiebreakMsg('Los datos del desempate no coinciden con tu rival.', 'error');
     }
-    if (data?.tiebreak?.validated || data?.tiebreak?.locked) {
+    if (finalValidated) {
+      tiebreakUserDirty = false;
       setTiebreakValidatedUi();
     }
     return data;
@@ -1922,7 +1947,7 @@ function startTiebreakPolling() {
   if (tiebreakPollTimer) clearInterval(tiebreakPollTimer);
   tiebreakPollTimer = setInterval(async () => {
     const data = await refreshTiebreakBlock();
-    if (data?.tiebreak?.validated) {
+    if (data?.tiebreak?.validated || data?.tiebreak?.mismatch) {
       clearInterval(tiebreakPollTimer);
       tiebreakPollTimer = null;
     }
