@@ -1380,3 +1380,22 @@ header.lpi-top {
   .tiebreak-score{ padding-top:0; }
   .tiebreak-header{ flex-direction:column; }
 }
+
+/* Ajustes desempate: validación visual */
+.tiebreak-player.tiebreak-field-error,
+.tiebreak-points.tiebreak-field-error{
+  border:2px solid #ff4d4d !important;
+  box-shadow:0 0 0 3px rgba(255,77,77,.22), inset 0 -2px 0 #00000020 !important;
+}
+.tiebreak-state.success{
+  background:linear-gradient(145deg, #00c853, #009624) !important;
+  border-color:#0f5132 !important;
+  color:#fff !important;
+}
+.tiebreak-actions .btn-validate.success{
+  background:linear-gradient(145deg, #00c853, #009624) !important;
+  border:1px solid #0f5132 !important;
+  color:#fff !important;
+  box-shadow:0 0 6px rgba(0,200,83,0.4);
+  cursor:default;
+}

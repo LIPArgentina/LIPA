@@ -1474,6 +1474,7 @@ function startValidationPolling(btn) {
         clearMismatchVisual();
         setBtnState('success', data?.mensaje || 'VALIDACIÓN EXITOSA');
         updatePictureButton(true);
+        refreshTiebreakBlock().catch?.(() => {});
         showToast('Validación exitosa', 'success');
       } else if (data?.tipo === 'mismatch') {
         if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
@@ -1728,9 +1729,9 @@ function renderTiebreakBlock(serverState = {}) {
       <div>
         <div class="tiebreak-kicker">SERIE EMPATADA</div>
         <h2>DESEMPATE</h2>
-        <p>Elegí una pareja por equipo. Gana el primero que llega a 5.</p>
+        <p>Cada capitán designa a 2 jugadores de la plantilla completa presentada para la fecha, suplentes incluidos.</p>
       </div>
-      <div class="tiebreak-state" id="tiebreakState">${locked ? 'VALIDADO' : (mineValidated ? 'ESPERANDO RIVAL' : 'PENDIENTE')}</div>
+      <div class="tiebreak-state${locked ? ' success' : ''}" id="tiebreakState">${locked ? 'VALIDADO' : (mineValidated ? 'ESPERANDO RIVAL' : 'PENDIENTE')}</div>
     </div>
     <div class="tiebreak-grid">
       <div class="tiebreak-side left">
@@ -1750,7 +1751,7 @@ function renderTiebreakBlock(serverState = {}) {
       </div>
     </div>
     <div class="tiebreak-actions">
-      <button type="button" class="btn-validate" id="btnValidarDesempate" ${locked ? 'disabled' : ''}>${locked ? 'DESEMPATE VALIDADO' : 'VALIDAR DESEMPATE'}</button>
+      <button type="button" class="btn-validate ${locked ? 'success' : ''}" id="btnValidarDesempate" ${locked ? 'disabled' : ''}>${locked ? 'DESEMPATE VALIDADO' : 'VALIDAR DESEMPATE'}</button>
       <a class="btn disabled" id="btnSubirFotoDesempate" href="#" aria-disabled="true">SUBIR FOTO DESEMPATE</a>
     </div>
     <div class="tiebreak-msg" id="tiebreakMsg"></div>
@@ -1797,10 +1798,52 @@ function validateTiebreakStatus(status) {
   return '';
 }
 
+
+function clearTiebreakDiffVisual() {
+  document.querySelectorAll('.tiebreak-field-error').forEach(el => {
+    el.classList.remove('tiebreak-field-error');
+  });
+}
+
+function applyTiebreakDiffVisual(diffList) {
+  clearTiebreakDiffVisual();
+  if (!Array.isArray(diffList)) return;
+
+  diffList.forEach(item => {
+    if (item?.type !== 'tiebreak') return;
+    const side = item.side === 'visitante' ? 'visitante' : 'local';
+    if (item.field === 'puntos') {
+      const pts = document.querySelector(`.tiebreak-points[data-side="${side}"]`);
+      if (pts) pts.classList.add('tiebreak-field-error');
+      return;
+    }
+
+    const playerIndex = item.field === 'pareja2' ? 1 : 0;
+    const player = document.querySelector(`.tiebreak-player[data-side="${side}"][data-player="${playerIndex}"]`);
+    if (player) player.classList.add('tiebreak-field-error');
+  });
+}
+
+function setTiebreakValidatedUi() {
+  const btn = document.getElementById('btnValidarDesempate');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'DESEMPATE VALIDADO';
+    btn.classList.remove('pending', 'error');
+    btn.classList.add('success');
+  }
+  const state = document.getElementById('tiebreakState');
+  if (state) {
+    state.textContent = 'VALIDADO';
+    state.classList.add('success');
+  }
+}
+
 function wireTiebreakActions(locked) {
   const btn = document.getElementById('btnValidarDesempate');
   if (!btn || locked) return;
   btn.addEventListener('click', async () => {
+    clearTiebreakDiffVisual();
     const status = readTiebreakStatus();
     const error = validateTiebreakStatus(status);
     if (error) { setTiebreakMsg(error, 'error'); return; }
@@ -1816,19 +1859,24 @@ function wireTiebreakActions(locked) {
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) throw new Error(data?.error || 'No se pudo validar el desempate');
       if (data.tipo === 'pendiente') {
+        clearTiebreakDiffVisual();
         setTiebreakMsg(data.mensaje || 'Esperando validación del rival.', 'info');
         btn.textContent = 'ESPERANDO RIVAL';
+        btn.classList.add('pending');
         startTiebreakPolling();
         return;
       }
       if (data.tipo === 'mismatch' || data.ok === false) {
+        applyTiebreakDiffVisual(data.diff);
         setTiebreakMsg(data.error || 'Los datos del desempate no coinciden.', 'error');
         btn.disabled = false;
         btn.textContent = 'VALIDAR DESEMPATE';
         return;
       }
+      clearTiebreakDiffVisual();
       setTiebreakMsg('Desempate validado correctamente.', 'success');
       await refreshTiebreakBlock();
+      setTiebreakValidatedUi();
     } catch (err) {
       setTiebreakMsg(err?.message || 'Error inesperado.', 'error');
       btn.disabled = false;
@@ -1856,6 +1904,13 @@ async function refreshTiebreakBlock() {
     const qs = withBust({ fechaISO: getCurrentFechaISO(), localSlug, visitanteSlug, equipoSlug: mySlug });
     const data = await fetchJson(apiUrl('/api/cruces/series-status?') + qs.toString(), { cache: 'no-store', credentials: 'same-origin' });
     renderTiebreakBlock(data);
+    if (data?.tiebreak?.mismatch) {
+      applyTiebreakDiffVisual(data.tiebreak.diff);
+      setTiebreakMsg('Los datos del desempate no coinciden con tu rival.', 'error');
+    }
+    if (data?.tiebreak?.validated || data?.tiebreak?.locked) {
+      setTiebreakValidatedUi();
+    }
     return data;
   } catch (err) {
     console.warn('series-status', err);
