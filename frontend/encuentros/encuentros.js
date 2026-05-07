@@ -155,21 +155,26 @@
     resetPhotosViewer();
     openPhotosModal();
 
+    const isTiebreak = String(item?.tipo || '').toLowerCase() === 'desempate';
     const subtitle = [
+      isTiebreak ? 'DESEMPATE ·' : '',
       String(item.localName || '').toUpperCase(),
       'vs',
       String(item.visitanteName || '').toUpperCase(),
       '·',
       formatDate(item.fechaISO)
-    ].join(' ');
+    ].filter(Boolean).join(' ');
     photosModalSubtitle.textContent = subtitle;
     setPhotosStatus('Buscando fotos del encuentro…', 'info');
 
-    const url = apiUrl(
-      '/api/pictures/match?fechaISO=' + encodeURIComponent(item.fechaISO || '') +
-      '&localSlug=' + encodeURIComponent(item.localSlug || '') +
-      '&visitanteSlug=' + encodeURIComponent(item.visitanteSlug || '')
-    );
+    const params = new URLSearchParams({
+      fechaISO: item.fechaISO || '',
+      localSlug: item.localSlug || '',
+      visitanteSlug: item.visitanteSlug || ''
+    });
+    if (isTiebreak) params.set('tipo', 'desempate');
+
+    const url = apiUrl('/api/pictures/match?' + params.toString());
 
     try {
       const data = await fetchJson(url, { cache: 'no-store', credentials: 'same-origin' });
