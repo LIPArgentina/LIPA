@@ -392,11 +392,37 @@
     return node;
   }
 
+  function normalizeFilterTeam(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/&/g, ' Y ')
+      .replace(/\b(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)\b/gi, ' ')
+      .replace(/[^A-Z0-9]/gi, '')
+      .replace(/(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)$/i, '')
+      .toUpperCase();
+  }
+
+  function resultMatchesTeams(item, localKey, visitanteKey){
+    if (!localKey && !visitanteKey) return true;
+    const itemLocal = normalizeFilterTeam(item?.localName || item?.localSlug || '');
+    const itemVisitante = normalizeFilterTeam(item?.visitanteName || item?.visitanteSlug || '');
+    if (localKey && visitanteKey) {
+      return (itemLocal === localKey && itemVisitante === visitanteKey) ||
+             (itemLocal === visitanteKey && itemVisitante === localKey);
+    }
+    const only = localKey || visitanteKey;
+    return itemLocal === only || itemVisitante === only;
+  }
+
   async function init(){
     const params = new URLSearchParams(location.search);
     const category = String(params.get('category') || 'segunda').trim().toLowerCase();
     const rawDate = params.get('date') || params.get('fechaISO') || '';
     const rawFecha = params.get('fecha') || '';
+    const tipoFiltro = String(params.get('tipo') || '').trim().toLowerCase();
+    const localFiltro = normalizeFilterTeam(params.get('local') || '');
+    const visitanteFiltro = normalizeFilterTeam(params.get('visitante') || '');
     const fechaISO = buildDateKey(rawDate);
 
     document.getElementById('categoryLabel').textContent = `Categoría ${category.toUpperCase()}`;
@@ -426,7 +452,13 @@
     const container = document.getElementById('resultsContainer');
     container.innerHTML = '';
 
-    const results = Array.isArray(data?.results) ? data.results : [];
+    let results = Array.isArray(data?.results) ? data.results : [];
+    if (tipoFiltro === 'cruce' || tipoFiltro === 'desempate') {
+      results = results.filter(item => String(item?.tipo || 'cruce').toLowerCase() === tipoFiltro);
+    }
+    if (localFiltro || visitanteFiltro) {
+      results = results.filter(item => resultMatchesTeams(item, localFiltro, visitanteFiltro));
+    }
     document.getElementById('heroTitle').textContent = results.length ? 'Encuentros validados' : 'Sin encuentros validados';
     document.getElementById('metaText').textContent = results.length
       ? `${results.length} encuentro${results.length === 1 ? '' : 's'} validado${results.length === 1 ? '' : 's'}`
