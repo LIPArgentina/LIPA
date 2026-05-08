@@ -282,3 +282,18 @@ header img{
     min-height:360px;
   }
 }
+
+
+/* Fix: asegurar que hidden gane sobre reglas propias de iframe/overlay */
+[hidden]{
+  display:none !important;
+}
+
+.map-card iframe{
+  display:block;
+}
+
+.map-card iframe[hidden],
+.map-empty[hidden]{
+  display:none !important;
+}

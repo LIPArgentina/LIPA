@@ -166,8 +166,6 @@
     }
 
     if (isLikelyUrl(location)) {
-      // Los links cortos de Google Maps (maps.app.goo.gl) no se pueden embeber directo.
-      // Para el visor usamos Google Maps como búsqueda; el botón mantiene el link original.
       return {
         label: location,
         openUrl: location,
@@ -186,10 +184,12 @@
     if ($result) $result.hidden = true;
     if ($mapFrame) {
       $mapFrame.hidden = true;
+      $mapFrame.style.display = 'none';
       $mapFrame.removeAttribute('src');
     }
     if ($mapEmpty) {
       $mapEmpty.hidden = false;
+      $mapEmpty.style.display = 'flex';
       $mapEmpty.textContent = 'Seleccioná un equipo para ver el mapa.';
     }
     if ($mapLink) {
@@ -222,8 +222,12 @@
       if ($mapFrame) {
         $mapFrame.src = mapData.embedUrl;
         $mapFrame.hidden = false;
+        $mapFrame.style.display = 'block';
       }
-      if ($mapEmpty) $mapEmpty.hidden = true;
+      if ($mapEmpty) {
+        $mapEmpty.hidden = true;
+        $mapEmpty.style.display = 'none';
+      }
       setStatus('', 'info');
       return;
     }
@@ -234,10 +238,12 @@
     }
     if ($mapFrame) {
       $mapFrame.hidden = true;
+      $mapFrame.style.display = 'none';
       $mapFrame.removeAttribute('src');
     }
     if ($mapEmpty) {
       $mapEmpty.hidden = false;
+      $mapEmpty.style.display = 'flex';
       $mapEmpty.textContent = 'Este equipo todavía no tiene ubicación cargada.';
     }
     setStatus('Este equipo no tiene ubicación cargada.', 'error');
