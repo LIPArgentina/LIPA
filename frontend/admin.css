@@ -83,7 +83,7 @@ select{ width:100%; background:#0f1116; color:var(--white); border:1px solid var
 
 .team-actions-cell{
   white-space:nowrap;
-  width:120px;
+  width:90px;
 }
 .btn-reset-pass{
   display:inline-flex;
@@ -378,23 +378,3 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
   }
 }
 
-
-/* Botón probar cruces por fila */
-.btn-test-cruces{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:34px;
-  height:34px;
-  margin-right:6px;
-  border:1px solid #4caf50;
-  background:#11161f;
-  color:#4caf50;
-  border-radius:10px;
-  font-size:16px;
-  cursor:pointer;
-}
-.btn-test-cruces:hover{
-  background:#1b1e22;
-  filter:brightness(1.1);
-}

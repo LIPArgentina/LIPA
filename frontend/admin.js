@@ -193,7 +193,6 @@ function renderRows(users){
       <td><input class="input sala" type="text" value="${(by.sala.get(name)||'').replace(/"/g,'&quot;')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
       <td><input class="input location" type="url" value="${normalizeLocation(by.ubicacion.get(name)||'').replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
       <td class="team-actions-cell">
-        <button class="btn-test-cruces" type="button" title="Probar cruces">🎯</button>
         <button class="btn-reset-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${name || ('fila ' + (i+1))}" ${canReset ? '' : 'disabled'}>🔑</button>
         <button class="btn-del-team" type="button">Eliminar</button>
       </td>`;
@@ -243,29 +242,6 @@ function renderRows(users){
         resetBtn.disabled = false;
       }
     });
-
-    const testBtn = tr.querySelector('.btn-test-cruces');
-    testBtn?.addEventListener('click', () => {
-      const teamName = tr.querySelector('.team')?.value?.trim();
-      if (!teamName) {
-        toast('Ese equipo no tiene nombre');
-        return;
-      }
-      const teamSlug = slugify(teamName);
-      const url = new URL('cruces/cruces_fecha.html', location.href);
-      url.searchParams.set('team', teamSlug);
-      url.searchParams.set('cat', _activeDiv || 'primera');
-      url.searchParams.set('test', '1');
-      url.searchParams.set('admin', '1');
-      const win = window.open(url.toString(), '_blank', 'noopener');
-      if (!win) {
-        toast('El navegador bloqueó la pestaña');
-        return;
-      }
-      toast(`Modo prueba: ${teamName}`);
-    });
-
-
     tbody.appendChild(tr);
   }
 }
@@ -348,28 +324,6 @@ function fillTeamSelect(){
   });
 }
 function getSelectedTeamSlug(){ return $('#teamSelect')?.value || ''; }
-function openCrucesTestMode(){
-  const teamSlug = getSelectedTeamSlug();
-  if (!teamSlug) {
-    toast('Elegí un equipo primero');
-    return;
-  }
-
-  const teamName = teamsInDiv.find(t => t.slug === teamSlug)?.name || teamSlug;
-  const url = new URL('cruces/cruces_fecha.html', location.href);
-  url.searchParams.set('team', teamSlug);
-  url.searchParams.set('cat', _activeDiv || 'primera');
-  url.searchParams.set('test', '1');
-  url.searchParams.set('admin', '1');
-
-  const win = window.open(url.toString(), '_blank', 'noopener');
-  if (!win) {
-    toast('El navegador bloqueó la pestaña. Habilitá popups para este sitio.');
-    return;
-  }
-
-  toast(`Modo prueba abierto para ${teamName}`);
-}
 function refreshDraftButtons(){
   return;
 }
