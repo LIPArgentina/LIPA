@@ -1328,6 +1328,47 @@ async function syncValidatedMatchIntoLlaves({
     return { updated: false, reason: 'llaves_missing', category, date: dateKey };
   }
 
+  const localDisplayName = localInfo?.display_name || localInfo?.slug_base || localSlug;
+  const visitanteDisplayName = visitanteInfo?.display_name || visitanteInfo?.slug_base || visitanteSlug;
+
+  const persistLlavesSync = async ({ round, legIndex, mode }) => {
+    await pool.query(
+      `INSERT INTO llaves_data (category, data, created_at, updated_at)
+       VALUES ($1, $2::jsonb, NOW(), NOW())
+       ON CONFLICT (category)
+       DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+      [category, JSON.stringify(data)]
+    );
+
+    return {
+      updated: true,
+      category,
+      roundId: round?.id || null,
+      legIndex,
+      date: dateKey,
+      mode
+    };
+  };
+
+  const applyLlavesScore = (leg, orientation) => {
+    if (!leg.home) leg.home = { team: 'WO', puntos: 0, puntosExtra: 0 };
+    if (!leg.away) leg.away = { team: 'WO', puntos: 0, puntosExtra: 0 };
+
+    if (orientation === 'direct') {
+      leg.home.puntos = localPuntos;
+      leg.home.puntosExtra = localExtra;
+      leg.away.puntos = visitantePuntos;
+      leg.away.puntosExtra = visitanteExtra;
+      return;
+    }
+
+    leg.home.puntos = visitantePuntos;
+    leg.home.puntosExtra = visitanteExtra;
+    leg.away.puntos = localPuntos;
+    leg.away.puntosExtra = localExtra;
+  };
+
+  // 1) Camino normal: la llave guardada ya tiene ambos equipos reales.
   for (const round of rounds) {
     const legs = Array.isArray(round?.legs) ? round.legs : [];
 
@@ -1341,34 +1382,59 @@ async function syncValidatedMatchIntoLlaves({
       const awayIsLocal = llavesTeamMatches(leg?.away?.team, localCandidates);
 
       if (homeIsLocal && awayIsVisitante) {
-        leg.home.puntos = localPuntos;
-        leg.home.puntosExtra = localExtra;
-        leg.away.puntos = visitantePuntos;
-        leg.away.puntosExtra = visitanteExtra;
-      } else if (homeIsVisitante && awayIsLocal) {
-        leg.home.puntos = visitantePuntos;
-        leg.home.puntosExtra = visitanteExtra;
-        leg.away.puntos = localPuntos;
-        leg.away.puntosExtra = localExtra;
-      } else {
-        continue;
+        applyLlavesScore(leg, 'direct');
+        return persistLlavesSync({ round, legIndex, mode: 'exact' });
       }
 
-      await pool.query(
-        `INSERT INTO llaves_data (category, data, created_at, updated_at)
-         VALUES ($1, $2::jsonb, NOW(), NOW())
-         ON CONFLICT (category)
-         DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-        [category, JSON.stringify(data)]
-      );
+      if (homeIsVisitante && awayIsLocal) {
+        applyLlavesScore(leg, 'swapped');
+        return persistLlavesSync({ round, legIndex, mode: 'exact_swapped' });
+      }
+    }
+  }
 
-      return {
-        updated: true,
-        category,
-        roundId: round?.id || null,
-        legIndex,
-        date: dateKey
-      };
+  // 2) Fallback para fases avanzadas generadas dinámicamente en frontend.
+  // Si la DB todavía tiene WO/WO o un solo equipo real, sincronizamos por fecha
+  // solo sobre partidos sin resultado para no pisar cruces ya guardados.
+  for (const round of rounds) {
+    const legs = Array.isArray(round?.legs) ? round.legs : [];
+
+    for (let legIndex = 0; legIndex < legs.length; legIndex++) {
+      const leg = legs[legIndex];
+      if (!leg || normalizeDateOnly(leg?.date) !== dateKey) continue;
+      if (legIndex >= 2) continue;
+      if (legHasAnyScore(leg)) continue;
+
+      if (!leg.home) leg.home = { team: 'WO', puntos: 0, puntosExtra: 0 };
+      if (!leg.away) leg.away = { team: 'WO', puntos: 0, puntosExtra: 0 };
+
+      const homeKey = normalizeLlavesTeamKey(leg.home.team || '');
+      const awayKey = normalizeLlavesTeamKey(leg.away.team || '');
+      const homeIsReal = !!homeKey && homeKey !== 'WO';
+      const awayIsReal = !!awayKey && awayKey !== 'WO';
+
+      // No pisar un partido real distinto.
+      if (homeIsReal && awayIsReal) continue;
+
+      // Si hay un solo equipo real, respetamos la orientación cuando coincide.
+      const homeIsLocal = llavesTeamMatches(leg.home.team, localCandidates);
+      const awayIsVisitante = llavesTeamMatches(leg.away.team, visitanteCandidates);
+      const homeIsVisitante = llavesTeamMatches(leg.home.team, visitanteCandidates);
+      const awayIsLocal = llavesTeamMatches(leg.away.team, localCandidates);
+
+      if (homeIsLocal || awayIsVisitante || (!homeIsReal && !awayIsReal)) {
+        leg.home.team = localDisplayName;
+        leg.away.team = visitanteDisplayName;
+        applyLlavesScore(leg, 'direct');
+        return persistLlavesSync({ round, legIndex, mode: 'date_fallback' });
+      }
+
+      if (homeIsVisitante || awayIsLocal) {
+        leg.home.team = visitanteDisplayName;
+        leg.away.team = localDisplayName;
+        applyLlavesScore(leg, 'swapped');
+        return persistLlavesSync({ round, legIndex, mode: 'date_fallback_swapped' });
+      }
     }
   }
 
