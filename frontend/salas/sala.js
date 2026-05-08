@@ -161,22 +161,24 @@
       return {
         label: q,
         openUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
-        embedUrl: `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=16&output=embed`
+        embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=16&output=embed`
       };
     }
 
     if (isLikelyUrl(location)) {
+      // Los links cortos de Google Maps (maps.app.goo.gl) no se pueden embeber directo.
+      // Para el visor usamos Google Maps como búsqueda; el botón mantiene el link original.
       return {
         label: location,
         openUrl: location,
-        embedUrl: `https://maps.google.com/maps?q=${encodeURIComponent(location)}&output=embed`
+        embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(location)}&z=16&output=embed`
       };
     }
 
     return {
       label: location,
       openUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`,
-      embedUrl: `https://maps.google.com/maps?q=${encodeURIComponent(location)}&output=embed`
+      embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(location)}&z=16&output=embed`
     };
   }
 
