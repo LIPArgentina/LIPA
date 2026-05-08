@@ -174,7 +174,6 @@ function renderRows(users){
   tbody.innerHTML = '';
   const teams = (users||[]).filter(u => u && u.role === 'team');
   const by = {
-    cap:  new Map(teams.map(u => [u.username, u.captain || ''])),
     mail: new Map(teams.map(u => [u.username, u.email   || ''])),
     tel:  new Map(teams.map(u => [u.username, u.phone   || ''])),
     id:   new Map(teams.map(u => [u.username, u.id || null])),
@@ -274,11 +273,10 @@ function collectRows(){
   const rows = [];
   $$('#tbodyTeams tr').forEach(tr => {
     const name    = tr.querySelector('.team')?.value.trim()     || '';
-    const captain = tr.querySelector('.captain')?.value.trim()  || '';
     const email   = tr.querySelector('.email')?.value.trim()    || '';
     const phone   = tr.querySelector('.phone')?.value.trim()    || '';
     if(!name) return;
-    rows.push({ username:name, role:'team', captain, email, phone });
+    rows.push({ username:name, role:'team', email, phone });
   });
   return rows;
 }
@@ -526,7 +524,6 @@ async function loadTeamsForDivision(div){
         id: u.id || null,
         username: u.username || u.name || '',
         role: 'team',
-        captain: u.captain || '',
         email: u.email || '',
         phone: u.phone || '',
         slug: u.slug || slugify(u.username || u.name || '')
