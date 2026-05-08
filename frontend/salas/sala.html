@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>EQUIPOS Y SALAS | Liga de Pool Independiente</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="sala.css"/>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
+    <div class="header-center">
+      <div class="title">EQUIPOS Y SALAS</div>
+    </div>
+    <nav class="actions">
+      <a class="btn" href="../index.html">VOLVER</a>
+    </nav>
+  </header>
+
+  <main class="salas-page">
+    <section class="salas-hero">
+      <p class="eyebrow">Consulta pública</p>
+      <h1>Buscá el equipo y mirá dónde juega</h1>
+      <p class="lead">Seleccioná una categoría y luego un equipo para ver la sala asignada y su ubicación.</p>
+    </section>
+
+    <section class="search-card" aria-label="Buscar sala por equipo">
+      <form id="salaForm" class="search-form" autocomplete="off">
+        <div class="field">
+          <label for="categorySelect">Categoría</label>
+          <select id="categorySelect" required>
+            <option value="primera">Primera</option>
+            <option value="segunda">Segunda</option>
+            <option value="tercera">Tercera</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="teamSelect">Equipo</label>
+          <select id="teamSelect" required>
+            <option value="">Cargando equipos...</option>
+          </select>
+        </div>
+
+        <button id="btnBuscar" class="btn btn-primary" type="submit">Ver sala</button>
+      </form>
+    </section>
+
+    <section id="statusBox" class="status-box" hidden></section>
+
+    <section id="resultBox" class="sala-card" hidden aria-live="polite">
+      <div class="sala-info">
+        <p class="sala-label">Equipo</p>
+        <h2 id="teamName" class="sala-title">—</h2>
+
+        <div class="sala-details">
+          <div class="detail-card">
+            <span>Sala</span>
+            <strong id="roomName">—</strong>
+          </div>
+          <div class="detail-card">
+            <span>Ubicación</span>
+            <strong id="locationText">—</strong>
+          </div>
+        </div>
+
+        <div class="sala-actions">
+          <a id="mapLink" class="btn btn-primary" href="#" target="_blank" rel="noopener noreferrer" hidden>Abrir en Google Maps</a>
+        </div>
+      </div>
+
+      <div class="map-card">
+        <iframe
+          id="mapFrame"
+          title="Mapa de ubicación"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          hidden>
+        </iframe>
+        <div id="mapEmpty" class="map-empty">
+          Seleccioná un equipo para ver el mapa.
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="../config.js"></script>
+<script src="sala.js" defer></script>
+</body>
+</html>
