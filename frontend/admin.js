@@ -55,7 +55,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 function toast(msg){ const t=$('#toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 1800); }
-function normalizePhone(p){ return String(p||'').trim(); }
+function normalizeLocation(p){ return String(p||'').trim(); }
 function slugify(s){
   return String(s||'').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -174,8 +174,8 @@ function renderRows(users){
   tbody.innerHTML = '';
   const teams = (users||[]).filter(u => u && u.role === 'team');
   const by = {
-    mail: new Map(teams.map(u => [u.username, u.email   || ''])),
-    tel:  new Map(teams.map(u => [u.username, u.phone   || ''])),
+    sala: new Map(teams.map(u => [u.username, u.sala || u.email || ''])),
+    ubicacion: new Map(teams.map(u => [u.username, u.ubicacion || u.location || u.phone || ''])),
     id:   new Map(teams.map(u => [u.username, u.id || null])),
   };
   const names = teams.map(u => u.username);
@@ -190,8 +190,8 @@ function renderRows(users){
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
-            <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
-      <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
+      <td><input class="input sala" type="text" value="${(by.sala.get(name)||'').replace(/"/g,'&quot;')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
+      <td><input class="input location" type="url" value="${normalizeLocation(by.ubicacion.get(name)||'').replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
       <td class="team-actions-cell">
         <button class="btn-test-cruces" type="button" title="Probar cruces">🎯</button>
         <button class="btn-reset-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${name || ('fila ' + (i+1))}" ${canReset ? '' : 'disabled'}>🔑</button>
@@ -273,10 +273,12 @@ function collectRows(){
   const rows = [];
   $$('#tbodyTeams tr').forEach(tr => {
     const name    = tr.querySelector('.team')?.value.trim()     || '';
-    const email   = tr.querySelector('.email')?.value.trim()    || '';
-    const phone   = tr.querySelector('.phone')?.value.trim()    || '';
+    const sala      = tr.querySelector('.sala')?.value.trim()      || '';
+    const ubicacion = tr.querySelector('.location')?.value.trim()  || '';
     if(!name) return;
-    rows.push({ username:name, role:'team', email, phone });
+    // Se mantienen las claves email/phone porque el backend/DB anterior guarda esos campos.
+    // Ahora email = SALA y phone = UBICACIÓN (link de Google Maps o texto de ubicación).
+    rows.push({ username:name, role:'team', email:sala, phone:ubicacion });
   });
   return rows;
 }
@@ -524,8 +526,8 @@ async function loadTeamsForDivision(div){
         id: u.id || null,
         username: u.username || u.name || '',
         role: 'team',
-        email: u.email || '',
-        phone: u.phone || '',
+        email: u.sala || u.email || '',
+        phone: u.ubicacion || u.location || u.phone || '',
         slug: u.slug || slugify(u.username || u.name || '')
       }))
       .filter(u => u.username);
