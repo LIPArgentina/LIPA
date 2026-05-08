@@ -150,9 +150,11 @@
     return /^https?:\/\//i.test(String(value || '').trim());
   }
 
-  function buildMapData(rawLocation){
+  function buildMapData(rawLocation, fallbackQuery = ''){
     const location = String(rawLocation || '').trim();
-    if (!location) return null;
+    const fallback = String(fallbackQuery || '').trim();
+
+    if (!location && !fallback) return null;
 
     const coords = extractCoords(location);
 
@@ -166,17 +168,27 @@
     }
 
     if (isLikelyUrl(location)) {
+      const isShortGoogleMaps =
+        /maps\.app\.goo\.gl/i.test(location) ||
+        /goo\.gl\/maps/i.test(location);
+
+      // Los links cortos no sirven como query para iframe: Google no los expande dentro del embed.
+      // Para el visor usamos la sala como búsqueda; el botón mantiene el link original.
+      const embedQuery = isShortGoogleMaps && fallback ? fallback : location;
+
       return {
-        label: location,
+        label: embedQuery,
         openUrl: location,
-        embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(location)}&z=16&output=embed`
+        embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(embedQuery)}&z=16&output=embed`
       };
     }
 
+    const query = location || fallback;
+
     return {
-      label: location,
-      openUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`,
-      embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(location)}&z=16&output=embed`
+      label: query,
+      openUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
+      embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=16&output=embed`
     };
   }
 
@@ -184,12 +196,10 @@
     if ($result) $result.hidden = true;
     if ($mapFrame) {
       $mapFrame.hidden = true;
-      $mapFrame.style.display = 'none';
       $mapFrame.removeAttribute('src');
     }
     if ($mapEmpty) {
       $mapEmpty.hidden = false;
-      $mapEmpty.style.display = 'flex';
       $mapEmpty.textContent = 'Seleccioná un equipo para ver el mapa.';
     }
     if ($mapLink) {
@@ -207,7 +217,7 @@
 
     const sala = team.sala || 'Sin sala cargada';
     const ubicacion = team.ubicacion || '';
-    const mapData = buildMapData(ubicacion);
+    const mapData = buildMapData(ubicacion, sala);
 
     if ($result) $result.hidden = false;
     if ($teamName) $teamName.textContent = team.name || 'Equipo';
@@ -222,12 +232,8 @@
       if ($mapFrame) {
         $mapFrame.src = mapData.embedUrl;
         $mapFrame.hidden = false;
-        $mapFrame.style.display = 'block';
       }
-      if ($mapEmpty) {
-        $mapEmpty.hidden = true;
-        $mapEmpty.style.display = 'none';
-      }
+      if ($mapEmpty) $mapEmpty.hidden = true;
       setStatus('', 'info');
       return;
     }
@@ -238,12 +244,10 @@
     }
     if ($mapFrame) {
       $mapFrame.hidden = true;
-      $mapFrame.style.display = 'none';
       $mapFrame.removeAttribute('src');
     }
     if ($mapEmpty) {
       $mapEmpty.hidden = false;
-      $mapEmpty.style.display = 'flex';
       $mapEmpty.textContent = 'Este equipo todavía no tiene ubicación cargada.';
     }
     setStatus('Este equipo no tiene ubicación cargada.', 'error');
