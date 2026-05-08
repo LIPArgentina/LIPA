@@ -152,6 +152,11 @@
   outline-offset:3px;
 }
 
+/* ====== Home – botón Equipos y Salas ancho completo ====== */
+.cta-grid .btn-cta-wide{
+  grid-column: 1 / -1;
+}
+
 /* ====== Home – header mobile fino ====== */
 @media (max-width: 768px) {
   .topbar {

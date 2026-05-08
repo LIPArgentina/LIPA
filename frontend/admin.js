@@ -55,7 +55,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 function toast(msg){ const t=$('#toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 1800); }
-function normalizePhone(p){ return String(p||'').trim(); }
+function normalizeLocation(p){ return String(p||'').trim(); }
 function slugify(s){
   return String(s||'').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -174,9 +174,8 @@ function renderRows(users){
   tbody.innerHTML = '';
   const teams = (users||[]).filter(u => u && u.role === 'team');
   const by = {
-    cap:  new Map(teams.map(u => [u.username, u.captain || ''])),
-    mail: new Map(teams.map(u => [u.username, u.email   || ''])),
-    tel:  new Map(teams.map(u => [u.username, u.phone   || ''])),
+    sala: new Map(teams.map(u => [u.username, u.sala || u.email || ''])),
+    ubicacion: new Map(teams.map(u => [u.username, u.ubicacion || u.location || u.phone || ''])),
     id:   new Map(teams.map(u => [u.username, u.id || null])),
   };
   const names = teams.map(u => u.username);
@@ -191,10 +190,9 @@ function renderRows(users){
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
-            <td><input class="input email" type="email" value="${(by.mail.get(name)||'').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico fila ${i+1}"></td>
-      <td><input class="input phone" type="tel" value="${normalizePhone(by.tel.get(name)||'').replace(/"/g,'&quot;')}" placeholder="11 1234 5678" aria-label="Teléfono fila ${i+1}"></td>
+      <td><input class="input sala" type="text" value="${(by.sala.get(name)||'').replace(/"/g,'&quot;')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
+      <td><input class="input location" type="url" value="${normalizeLocation(by.ubicacion.get(name)||'').replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
       <td class="team-actions-cell">
-        <button class="btn-test-cruces" type="button" title="Probar cruces">🎯</button>
         <button class="btn-reset-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${name || ('fila ' + (i+1))}" ${canReset ? '' : 'disabled'}>🔑</button>
         <button class="btn-del-team" type="button">Eliminar</button>
       </td>`;
@@ -244,29 +242,6 @@ function renderRows(users){
         resetBtn.disabled = false;
       }
     });
-
-    const testBtn = tr.querySelector('.btn-test-cruces');
-    testBtn?.addEventListener('click', () => {
-      const teamName = tr.querySelector('.team')?.value?.trim();
-      if (!teamName) {
-        toast('Ese equipo no tiene nombre');
-        return;
-      }
-      const teamSlug = slugify(teamName);
-      const url = new URL('cruces/cruces_fecha.html', location.href);
-      url.searchParams.set('team', teamSlug);
-      url.searchParams.set('cat', _activeDiv || 'primera');
-      url.searchParams.set('test', '1');
-      url.searchParams.set('admin', '1');
-      const win = window.open(url.toString(), '_blank', 'noopener');
-      if (!win) {
-        toast('El navegador bloqueó la pestaña');
-        return;
-      }
-      toast(`Modo prueba: ${teamName}`);
-    });
-
-
     tbody.appendChild(tr);
   }
 }
@@ -274,11 +249,12 @@ function collectRows(){
   const rows = [];
   $$('#tbodyTeams tr').forEach(tr => {
     const name    = tr.querySelector('.team')?.value.trim()     || '';
-    const captain = tr.querySelector('.captain')?.value.trim()  || '';
-    const email   = tr.querySelector('.email')?.value.trim()    || '';
-    const phone   = tr.querySelector('.phone')?.value.trim()    || '';
+    const sala      = tr.querySelector('.sala')?.value.trim()      || '';
+    const ubicacion = tr.querySelector('.location')?.value.trim()  || '';
     if(!name) return;
-    rows.push({ username:name, role:'team', captain, email, phone });
+    // Se mantienen las claves email/phone porque el backend/DB anterior guarda esos campos.
+    // Ahora email = SALA y phone = UBICACIÓN (link de Google Maps o texto de ubicación).
+    rows.push({ username:name, role:'team', email:sala, phone:ubicacion });
   });
   return rows;
 }
@@ -348,28 +324,6 @@ function fillTeamSelect(){
   });
 }
 function getSelectedTeamSlug(){ return $('#teamSelect')?.value || ''; }
-function openCrucesTestMode(){
-  const teamSlug = getSelectedTeamSlug();
-  if (!teamSlug) {
-    toast('Elegí un equipo primero');
-    return;
-  }
-
-  const teamName = teamsInDiv.find(t => t.slug === teamSlug)?.name || teamSlug;
-  const url = new URL('cruces/cruces_fecha.html', location.href);
-  url.searchParams.set('team', teamSlug);
-  url.searchParams.set('cat', _activeDiv || 'primera');
-  url.searchParams.set('test', '1');
-  url.searchParams.set('admin', '1');
-
-  const win = window.open(url.toString(), '_blank', 'noopener');
-  if (!win) {
-    toast('El navegador bloqueó la pestaña. Habilitá popups para este sitio.');
-    return;
-  }
-
-  toast(`Modo prueba abierto para ${teamName}`);
-}
 function refreshDraftButtons(){
   return;
 }
@@ -526,9 +480,8 @@ async function loadTeamsForDivision(div){
         id: u.id || null,
         username: u.username || u.name || '',
         role: 'team',
-        captain: u.captain || '',
-        email: u.email || '',
-        phone: u.phone || '',
+        email: u.sala || u.email || '',
+        phone: u.ubicacion || u.location || u.phone || '',
         slug: u.slug || slugify(u.username || u.name || '')
       }))
       .filter(u => u.username);
