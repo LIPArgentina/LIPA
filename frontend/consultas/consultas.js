@@ -461,7 +461,7 @@
     });
 
     try {
-      const fetchLimit = currentRankingTab === 'teams' ? 10000 : limit;
+      const fetchLimit = limit;
       const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
       const data = await fetchJson(apiUrl(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
       setStatus('', 'info');

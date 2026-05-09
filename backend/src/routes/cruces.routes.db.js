@@ -2049,8 +2049,18 @@ router.get('/team-ranking', async (req, res) => {
 
     const results = await buildAllValidatedCrucesForPlayerQuery(category);
     const rankingMap = new Map();
+    const countedMatches = new Set();
 
     for (const item of results) {
+      // Evita contar dos veces el mismo cruce si en la DB quedó guardado
+      // también con el orden invertido de equipos. La fecha separa ida/vuelta.
+      const matchTeamsKey = [canonicalPlayerTeamSlug(item.localSlug), canonicalPlayerTeamSlug(item.visitanteSlug)]
+        .sort()
+        .join('::');
+      const matchKey = `${String(item.fechaISO || '')}::${matchTeamsKey}`;
+      if (countedMatches.has(matchKey)) continue;
+      countedMatches.add(matchKey);
+
       const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
       const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
 
