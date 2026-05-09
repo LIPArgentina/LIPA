@@ -2236,21 +2236,36 @@ btn.onclick = async () => {
   }
 
   
-  function sheetFileNameForMatch(ext){
-    const exportData = window.__CRUCE_EXPORT_DATA__ || {};
-    const localName = exportData.local?.name || 'local';
-    const visitanteName = exportData.visitante?.name || 'visitante';
-    const category = exportData.category || deriveCategory() || 'categoria';
-    const slugify = (value) => String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .toLowerCase();
-    return `planilla-${slugify(category)}-${slugify(localName)}-vs-${slugify(visitanteName)}.${ext}`;
+  
+function sheetFileNameForMatch(ext){
+  const exportData = window.__CRUCE_EXPORT_DATA__ || {};
+
+  const localRaw = exportData.local?.name || exportData.local?.team || 'local';
+  const visitanteRaw = exportData.visitante?.name || exportData.visitante?.team || 'visitante';
+
+  const slugify = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+
+  const fechaRaw = String(exportData.date || exportData.fecha || window.__CRUCE_FECHA_ISO || '').trim();
+  let fecha = '';
+  if (fechaRaw) {
+    const m = fechaRaw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) fecha = `${m[1]}-${m[2]}-${m[3]}`;
   }
 
-  function isAndroidAppWebView(){
+  const local = slugify(localRaw);
+  const visitante = slugify(visitanteRaw);
+
+  return `${local}-vs-${visitante}${fecha ? '-' + fecha : ''}.${ext}`;
+}
+
+
+
+function isAndroidAppWebView(){
     return !!(window.AndroidBridge && typeof window.AndroidBridge.saveBase64File === 'function');
   }
 
