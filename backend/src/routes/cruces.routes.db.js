@@ -2012,6 +2012,94 @@ router.get('/player-ranking', async (req, res) => {
   }
 });
 
+
+
+function ensureTeamRankingRow(map, teamSlug, teamName) {
+  const key = canonicalPlayerTeamSlug(teamSlug || teamName || 'sin-equipo');
+  if (!map.has(key)) {
+    map.set(key, {
+      teamSlug,
+      teamName: String(teamName || 'Sin equipo').trim(),
+      played: 0,
+      puntosFavor: 0,
+      puntosContra: 0,
+      diffPuntos: 0,
+      triangulosFavor: 0,
+      triangulosContra: 0,
+      diffTriangulos: 0
+    });
+  }
+  return map.get(key);
+}
+
+router.get('/team-ranking', async (req, res) => {
+  setNoCache(res);
+  try {
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const rawLimit = Number(req.query.limit || 10);
+    const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
+
+    if (!category) {
+      return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
+    }
+
+    const results = await buildAllValidatedCrucesForPlayerQuery(category);
+    const rankingMap = new Map();
+
+    for (const item of results) {
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+
+      const localPF = localScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
+      const visitantePF = visitanteScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
+
+      const localTF = localScores.filter((n) => Number(n || 0) > 0).length;
+      const visitanteTF = visitanteScores.filter((n) => Number(n || 0) > 0).length;
+
+      const localRow = ensureTeamRankingRow(rankingMap, item.localSlug, item.localName);
+      localRow.played += 1;
+      localRow.puntosFavor += localPF;
+      localRow.puntosContra += visitantePF;
+      localRow.triangulosFavor += localTF;
+      localRow.triangulosContra += visitanteTF;
+
+      const visitanteRow = ensureTeamRankingRow(rankingMap, item.visitanteSlug, item.visitanteName);
+      visitanteRow.played += 1;
+      visitanteRow.puntosFavor += visitantePF;
+      visitanteRow.puntosContra += localPF;
+      visitanteRow.triangulosFavor += visitanteTF;
+      visitanteRow.triangulosContra += localTF;
+    }
+
+    const ranking = Array.from(rankingMap.values())
+      .map((item) => ({
+        ...item,
+        diffPuntos: Number(item.puntosFavor || 0) - Number(item.puntosContra || 0),
+        diffTriangulos: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0)
+      }))
+      .sort((a, b) => {
+        if (b.puntosFavor !== a.puntosFavor) return b.puntosFavor - a.puntosFavor;
+        if (b.diffPuntos !== a.diffPuntos) return b.diffPuntos - a.diffPuntos;
+        if (b.diffTriangulos !== a.diffTriangulos) return b.diffTriangulos - a.diffTriangulos;
+        if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
+        if (a.puntosContra !== b.puntosContra) return a.puntosContra - b.puntosContra;
+        return String(a.teamName || '').localeCompare(String(b.teamName || ''), 'es');
+      })
+      .slice(0, limit);
+
+    return res.json({
+      ok: true,
+      category,
+      limit,
+      total: ranking.length,
+      ranking
+    });
+  } catch (err) {
+    console.error('GET /team-ranking', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo armar el ranking de equipos.' });
+  }
+});
+
 async function findTeamsByCategory(category = '') {
   const division = String(category || '').trim().toLowerCase();
   if (!division) return [];

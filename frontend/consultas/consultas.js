@@ -299,71 +299,30 @@
   }
 
   function renderTeamsRanking(data, limit) {
-    const players = Array.isArray(data?.ranking) ? data.ranking : [];
+    const items = Array.isArray(data?.ranking) ? data.ranking : [];
     if (!$ranking) return;
 
     $ranking.hidden = false;
-    if (!players.length) {
+    if (!items.length) {
       $ranking.innerHTML = '<div class="ranking-empty">No hay datos suficientes para armar el ranking por equipos.</div>';
       return;
     }
 
-    const teams = new Map();
-    players.forEach((player) => {
-      const teamName = String(player.teamName || 'Sin equipo').trim() || 'Sin equipo';
-      const key = teamName.toUpperCase();
-      if (!teams.has(key)) {
-        teams.set(key, {
-          teamName,
-          points: 0,
-          played: 0,
-          wins: 0,
-          losses: 0,
-          triangulosFavor: 0,
-          triangulosContra: 0,
-          diff: 0,
-          activePlayers: 0
-        });
-      }
-
-      const row = teams.get(key);
-      const tf = Number(player.triangulosFavor || 0) || 0;
-      const tc = Number(player.triangulosContra || 0) || 0;
-      const played = Number(player.played || 0) || 0;
-      row.points += tf;
-      row.played += played;
-      row.wins += Number(player.wins || 0) || 0;
-      row.losses += Number(player.losses || 0) || 0;
-      row.triangulosFavor += tf;
-      row.triangulosContra += tc;
-      row.diff += Number.isFinite(Number(player.diff)) ? Number(player.diff) : (tf - tc);
-      if (played > 0) row.activePlayers += 1;
-    });
-
-    const items = Array.from(teams.values())
-      .sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points;
-        if (b.diff !== a.diff) return b.diff - a.diff;
-        return a.teamName.localeCompare(b.teamName, 'es');
-      })
-      .slice(0, Number(limit || 10));
-
     const rows = items.map((team, idx) => {
-      const diff = Number(team.diff || 0);
-      const diffClass = diff >= 0 ? 'ok' : 'bad';
+      const diffP = Number(team.diffPuntos || 0);
+      const diffT = Number(team.diffTriangulos || 0);
 
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
           <td class="team-name team-main">${team.teamName}</td>
-          <td class="num ok">${Number(team.points || 0)}</td>
           <td class="num">${Number(team.played || 0)}</td>
-          <td class="num ok">${Number(team.wins || 0)}</td>
-          <td class="num bad">${Number(team.losses || 0)}</td>
+          <td class="num ok">${Number(team.puntosFavor || 0)}</td>
+          <td class="num bad">${Number(team.puntosContra || 0)}</td>
+          <td class="num ${diffP >= 0 ? 'ok' : 'bad'}">${diffP > 0 ? '+' : ''}${diffP}</td>
           <td class="num">${Number(team.triangulosFavor || 0)}</td>
           <td class="num">${Number(team.triangulosContra || 0)}</td>
-          <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
-          <td class="num">${Number(team.activePlayers || 0)}</td>
+          <td class="num ${diffT >= 0 ? 'ok' : 'bad'}">${diffT > 0 ? '+' : ''}${diffT}</td>
         </tr>
       `;
     }).join('');
@@ -372,7 +331,7 @@
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Ranking Equipos Top ${limit}</h2>
-          <p class="ranking-meta">Ordenado por puntos totales del equipo. Desempate: mayor diferencia de triángulos.</p>
+          <p class="ranking-meta">Ordenado por puntos a favor. Desempate: diferencia de puntos y diferencia de triángulos.</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
@@ -381,14 +340,13 @@
             <tr>
               <th>#</th>
               <th>Equipo</th>
-              <th class="num">PTS</th>
               <th class="num">PJ</th>
-              <th class="num">PG</th>
-              <th class="num">PP</th>
+              <th class="num">PF</th>
+              <th class="num">PC</th>
+              <th class="num">DIF-P</th>
               <th class="num">TF</th>
               <th class="num">TC</th>
-              <th class="num">DIF</th>
-              <th class="num">Jug.</th>
+              <th class="num">DIF-T</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -504,7 +462,8 @@
 
     try {
       const fetchLimit = currentRankingTab === 'teams' ? 10000 : limit;
-      const data = await fetchJson(apiUrl('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
+      const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
+      const data = await fetchJson(apiUrl(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
       setStatus('', 'info');
       lastRankingData = data;
       lastRankingLimit = limit;
