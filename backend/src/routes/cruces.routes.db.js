@@ -2049,19 +2049,41 @@ router.get('/team-ranking', async (req, res) => {
 
     const results = await buildAllValidatedCrucesForPlayerQuery(category);
     const rankingMap = new Map();
+    const countedMatches = new Set();
 
     for (const item of results) {
+      // Evita contar dos veces el mismo cruce si en la DB quedó guardado
+      // también con el orden invertido de equipos. La fecha separa ida/vuelta.
+      const matchTeamsKey = [canonicalPlayerTeamSlug(item.localSlug), canonicalPlayerTeamSlug(item.visitanteSlug)]
+        .sort()
+        .join('::');
+      const matchKey = `${String(item.fechaISO || '')}::${matchTeamsKey}`;
+      if (countedMatches.has(matchKey)) continue;
+      countedMatches.add(matchKey);
+
       const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
       const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
 
       // Puntos = puntosTotales de la planilla.
       // Triángulos = triangulosTotales de la planilla.
       // Fallbacks para planillas viejas que no tengan esos campos.
-      const localPF = Number(item.local?.puntosTotales ?? 0) || localScores.filter((n) => Number(n || 0) > 0).length;
-      const visitantePF = Number(item.visitante?.puntosTotales ?? 0) || visitanteScores.filter((n) => Number(n || 0) > 0).length;
+      const localPF = item.local?.puntosTotales !== undefined && item.local?.puntosTotales !== null
+        ? Number(item.local.puntosTotales) || 0
+        : localScores.filter((n) => Number(n || 0) > 0).length;
+      const visitantePF = item.visitante?.puntosTotales !== undefined && item.visitante?.puntosTotales !== null
+        ? Number(item.visitante.puntosTotales) || 0
+        : visitanteScores.filter((n) => Number(n || 0) > 0).length;
 
-      const localTF = Number(item.local?.triangulosTotales ?? item.local?.triangulos ?? 0) || localScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
-      const visitanteTF = Number(item.visitante?.triangulosTotales ?? item.visitante?.triangulos ?? 0) || visitanteScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
+      const localTF = (item.local?.triangulosTotales !== undefined && item.local?.triangulosTotales !== null)
+        ? Number(item.local.triangulosTotales) || 0
+        : ((item.local?.triangulos !== undefined && item.local?.triangulos !== null)
+          ? Number(item.local.triangulos) || 0
+          : localScores.reduce((acc, n) => acc + (Number(n) || 0), 0));
+      const visitanteTF = (item.visitante?.triangulosTotales !== undefined && item.visitante?.triangulosTotales !== null)
+        ? Number(item.visitante.triangulosTotales) || 0
+        : ((item.visitante?.triangulos !== undefined && item.visitante?.triangulos !== null)
+          ? Number(item.visitante.triangulos) || 0
+          : visitanteScores.reduce((acc, n) => acc + (Number(n) || 0), 0));
 
       const localRow = ensureTeamRankingRow(rankingMap, item.localSlug, item.localName);
       localRow.played += 1;
