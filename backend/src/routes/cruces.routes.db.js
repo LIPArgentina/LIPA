@@ -2067,11 +2067,23 @@ router.get('/team-ranking', async (req, res) => {
       // Puntos = puntosTotales de la planilla.
       // Triángulos = triangulosTotales de la planilla.
       // Fallbacks para planillas viejas que no tengan esos campos.
-      const localPF = Number(item.local?.puntosTotales ?? 0) || localScores.filter((n) => Number(n || 0) > 0).length;
-      const visitantePF = Number(item.visitante?.puntosTotales ?? 0) || visitanteScores.filter((n) => Number(n || 0) > 0).length;
+      const localPF = item.local?.puntosTotales !== undefined && item.local?.puntosTotales !== null
+        ? Number(item.local.puntosTotales) || 0
+        : localScores.filter((n) => Number(n || 0) > 0).length;
+      const visitantePF = item.visitante?.puntosTotales !== undefined && item.visitante?.puntosTotales !== null
+        ? Number(item.visitante.puntosTotales) || 0
+        : visitanteScores.filter((n) => Number(n || 0) > 0).length;
 
-      const localTF = Number(item.local?.triangulosTotales ?? item.local?.triangulos ?? 0) || localScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
-      const visitanteTF = Number(item.visitante?.triangulosTotales ?? item.visitante?.triangulos ?? 0) || visitanteScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
+      const localTF = (item.local?.triangulosTotales !== undefined && item.local?.triangulosTotales !== null)
+        ? Number(item.local.triangulosTotales) || 0
+        : ((item.local?.triangulos !== undefined && item.local?.triangulos !== null)
+          ? Number(item.local.triangulos) || 0
+          : localScores.reduce((acc, n) => acc + (Number(n) || 0), 0));
+      const visitanteTF = (item.visitante?.triangulosTotales !== undefined && item.visitante?.triangulosTotales !== null)
+        ? Number(item.visitante.triangulosTotales) || 0
+        : ((item.visitante?.triangulos !== undefined && item.visitante?.triangulos !== null)
+          ? Number(item.visitante.triangulos) || 0
+          : visitanteScores.reduce((acc, n) => acc + (Number(n) || 0), 0));
 
       const localRow = ensureTeamRankingRow(rankingMap, item.localSlug, item.localName);
       localRow.played += 1;
