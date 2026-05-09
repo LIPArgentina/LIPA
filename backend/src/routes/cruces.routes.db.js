@@ -2050,11 +2050,14 @@ router.get('/team-ranking', async (req, res) => {
       const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
       const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
 
-      const localPF = localScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
-      const visitantePF = visitanteScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
+      // Puntos = puntosTotales de la planilla.
+      // Triángulos = triangulosTotales de la planilla.
+      // Fallbacks para planillas viejas que no tengan esos campos.
+      const localPF = Number(item.local?.puntosTotales ?? 0) || localScores.filter((n) => Number(n || 0) > 0).length;
+      const visitantePF = Number(item.visitante?.puntosTotales ?? 0) || visitanteScores.filter((n) => Number(n || 0) > 0).length;
 
-      const localTF = localScores.filter((n) => Number(n || 0) > 0).length;
-      const visitanteTF = visitanteScores.filter((n) => Number(n || 0) > 0).length;
+      const localTF = Number(item.local?.triangulosTotales ?? item.local?.triangulos ?? 0) || localScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
+      const visitanteTF = Number(item.visitante?.triangulosTotales ?? item.visitante?.triangulos ?? 0) || visitanteScores.reduce((acc, n) => acc + (Number(n) || 0), 0);
 
       const localRow = ensureTeamRankingRow(rankingMap, item.localSlug, item.localName);
       localRow.played += 1;
