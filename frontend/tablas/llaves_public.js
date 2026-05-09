@@ -40,10 +40,9 @@ let CURRENT_STANDINGS = null;
 function normalizeTeamName(name){
   const raw = String(name || '').trim().replace(/\s+/g, ' ');
   if (!raw) return '';
-
-  // No convertir "ANEXO" en "ANEXO 2DA" de forma global.
-  // En tercera existe ANEXO; ANEXO 2DA pertenece a segunda.
-  return raw;
+  const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const aliases = {'ANEXO':'ANEXO 2DA','ANEXO 2DA':'ANEXO 2DA','ANEXO 2DA.':'ANEXO 2DA','ANEXO 2DA ':'ANEXO 2DA','ANEXO 2da':'ANEXO 2DA'};
+  return aliases[raw] || aliases[upper] || raw;
 }
 function unique(list){ return Array.from(new Set(list.filter(Boolean))); }
 function getCategoryConfig(category=currentCategory){ return CATEGORY_CONFIG[category] || CATEGORY_CONFIG.tercera; }
