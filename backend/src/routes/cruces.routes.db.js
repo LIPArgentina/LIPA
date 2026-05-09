@@ -1758,10 +1758,14 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
       localPlanilla: snapshot?.localPlanilla || null,
       visitantePlanilla: snapshot?.visitantePlanilla || null,
       local: {
-        scoreRows: Array.isArray(localStatus?.scoreRows) ? localStatus.scoreRows : []
+        scoreRows: Array.isArray(localStatus?.scoreRows) ? localStatus.scoreRows : [],
+        triangulosTotales: Number(localStatus?.triangulosTotales ?? localStatus?.triangulos ?? 0),
+        puntosTotales: Number(localStatus?.puntosTotales ?? 0)
       },
       visitante: {
-        scoreRows: Array.isArray(visitanteStatus?.scoreRows) ? visitanteStatus.scoreRows : []
+        scoreRows: Array.isArray(visitanteStatus?.scoreRows) ? visitanteStatus.scoreRows : [],
+        triangulosTotales: Number(visitanteStatus?.triangulosTotales ?? visitanteStatus?.triangulos ?? 0),
+        puntosTotales: Number(visitanteStatus?.puntosTotales ?? 0)
       }
     });
   }
