@@ -126,3 +126,18 @@ header img{ height:34px; width:auto; display:block; }
   .ranking-tabs{ width:100%; margin-right:0; }
   .tab-btn{ flex:1; }
 }
+
+.hero-reload{
+  min-height:86px;
+  display:flex;
+  align-items:center;
+}
+.reload-btn{
+  min-width:130px;
+  min-height:38px;
+  font-size:13px;
+}
+@media (max-width:760px){
+  .hero-reload{ min-height:auto; }
+  .reload-btn{ width:100%; }
+}

@@ -16,6 +16,7 @@
   const $ranking = document.getElementById('rankingBox');
   const $rankingButtons = Array.from(document.querySelectorAll('[data-ranking-limit]'));
   const $rankingTabs = Array.from(document.querySelectorAll('[data-ranking-tab]'));
+  const $reload = document.getElementById('btnRecargar');
 
   let debounceTimer = null;
   let lastSuggestions = [];
@@ -24,6 +25,7 @@
   let currentRankingTab = 'players';
   let lastRankingData = null;
   let lastRankingLimit = 10;
+  let lastRankingMode = 'players';
 
   function apiUrl(path) {
     return API_BASE + path;
@@ -74,6 +76,7 @@
     }
     $rankingButtons.forEach((btn) => btn.classList.remove('active'));
     lastRankingData = null;
+    lastRankingMode = 'players';
   }
 
   function renderSuggestions(items = []) {
@@ -284,6 +287,10 @@
 
   function renderRankingSwitch() {
     if (!lastRankingData) return;
+    if (lastRankingMode !== currentRankingTab) {
+      loadRanking(lastRankingLimit);
+      return;
+    }
     if (currentRankingTab === 'teams') {
       renderTeamsRanking(lastRankingData, lastRankingLimit);
       return;
@@ -302,59 +309,61 @@
     }
 
     const teams = new Map();
-    players.forEach((player, idx) => {
+    players.forEach((player) => {
       const teamName = String(player.teamName || 'Sin equipo').trim() || 'Sin equipo';
       const key = teamName.toUpperCase();
       if (!teams.has(key)) {
         teams.set(key, {
           teamName,
-          count: 0,
-          bestPos: idx + 1,
+          points: 0,
+          played: 0,
           wins: 0,
+          losses: 0,
+          triangulosFavor: 0,
+          triangulosContra: 0,
           diff: 0,
-          players: []
+          activePlayers: 0
         });
       }
 
       const row = teams.get(key);
-      const pos = idx + 1;
-      row.count += 1;
-      row.bestPos = Math.min(row.bestPos, pos);
-      row.wins += Number(player.wins || 0);
-      row.diff += Number(player.diff || 0);
-      row.players.push({
-        name: player.name || '',
-        pos,
-        wins: Number(player.wins || 0),
-        diff: Number(player.diff || 0)
-      });
+      const tf = Number(player.triangulosFavor || 0) || 0;
+      const tc = Number(player.triangulosContra || 0) || 0;
+      const played = Number(player.played || 0) || 0;
+      row.points += tf;
+      row.played += played;
+      row.wins += Number(player.wins || 0) || 0;
+      row.losses += Number(player.losses || 0) || 0;
+      row.triangulosFavor += tf;
+      row.triangulosContra += tc;
+      row.diff += Number.isFinite(Number(player.diff)) ? Number(player.diff) : (tf - tc);
+      if (played > 0) row.activePlayers += 1;
     });
 
-    const items = Array.from(teams.values()).sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      if (a.bestPos !== b.bestPos) return a.bestPos - b.bestPos;
-      if (b.wins !== a.wins) return b.wins - a.wins;
-      if (b.diff !== a.diff) return b.diff - a.diff;
-      return a.teamName.localeCompare(b.teamName, 'es');
-    });
+    const items = Array.from(teams.values())
+      .sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.diff !== a.diff) return b.diff - a.diff;
+        return a.teamName.localeCompare(b.teamName, 'es');
+      })
+      .slice(0, Number(limit || 10));
 
     const rows = items.map((team, idx) => {
       const diff = Number(team.diff || 0);
       const diffClass = diff >= 0 ? 'ok' : 'bad';
-      const playersText = team.players
-        .sort((a, b) => a.pos - b.pos)
-        .map((player) => `${player.name} (#${player.pos})`)
-        .join(', ');
 
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
           <td class="team-name team-main">${team.teamName}</td>
-          <td class="num ok">${team.count}</td>
-          <td class="num">#${team.bestPos}</td>
-          <td class="num ok">${team.wins}</td>
+          <td class="num ok">${Number(team.points || 0)}</td>
+          <td class="num">${Number(team.played || 0)}</td>
+          <td class="num ok">${Number(team.wins || 0)}</td>
+          <td class="num bad">${Number(team.losses || 0)}</td>
+          <td class="num">${Number(team.triangulosFavor || 0)}</td>
+          <td class="num">${Number(team.triangulosContra || 0)}</td>
           <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
-          <td class="team-players">${playersText}</td>
+          <td class="num">${Number(team.activePlayers || 0)}</td>
         </tr>
       `;
     }).join('');
@@ -363,7 +372,7 @@
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Ranking Equipos Top ${limit}</h2>
-          <p class="ranking-meta">Cantidad de jugadores de cada equipo dentro del Top ${limit}. Desempate: mejor puesto, partidos ganados y diferencia de triángulos.</p>
+          <p class="ranking-meta">Ordenado por puntos totales del equipo. Desempate: mayor diferencia de triángulos.</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
@@ -372,11 +381,14 @@
             <tr>
               <th>#</th>
               <th>Equipo</th>
-              <th class="num">Jug.</th>
-              <th class="num">Mejor</th>
+              <th class="num">PTS</th>
+              <th class="num">PJ</th>
               <th class="num">PG</th>
+              <th class="num">PP</th>
+              <th class="num">TF</th>
+              <th class="num">TC</th>
               <th class="num">DIF</th>
-              <th>Jugadores</th>
+              <th class="num">Jug.</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -491,10 +503,12 @@
     });
 
     try {
-      const data = await fetchJson(apiUrl('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(limit)));
+      const fetchLimit = currentRankingTab === 'teams' ? 10000 : limit;
+      const data = await fetchJson(apiUrl('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
       setStatus('', 'info');
       lastRankingData = data;
       lastRankingLimit = limit;
+      lastRankingMode = currentRankingTab;
       renderRankingSwitch();
     } catch (err) {
       console.error(err);
@@ -574,5 +588,6 @@
       renderRankingSwitch();
     });
   });
+  $reload?.addEventListener('click', () => window.location.reload());
   $form?.addEventListener('submit', searchPlayer);
 })();

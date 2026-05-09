@@ -115,11 +115,11 @@ module.exports = function createPicturesRouter(deps) {
     return options;
   }
 
-  async function isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug }) {
+  async function isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug, tipo = '' }) {
     const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
     if (!teamKey) return false;
     const rivalKey = teamKey === normalizeSlug(localSlug) ? normalizeSlug(visitanteSlug) : normalizeSlug(localSlug);
-    const fechaKey = buildFechaKey(fechaISO, localSlug, visitanteSlug);
+    const fechaKey = buildFechaKey(fechaISO, localSlug, visitanteSlug) + (String(tipo || '').toLowerCase() === 'desempate' ? '::desempate' : '');
     const { rows } = await pool.query(`SELECT team, validated, status_json, locked_until FROM cruces_validations WHERE fecha_key = $1 AND team IN ($2, $3)`, [fechaKey, normalizeSlug(localSlug), normalizeSlug(visitanteSlug)]);
     const mine = rows.find(r => r.team === teamKey) || null;
     const rival = rows.find(r => r.team === rivalKey) || null;
@@ -148,7 +148,11 @@ module.exports = function createPicturesRouter(deps) {
     return `/api/pictures/public/file?file=${encodeURIComponent(filePath)}`;
   }
 
-  async function listTeamPictures(fechaISO, teamSlug) {
+  function isTiebreakPicturesFolder(folderSlug) {
+    return /(^|_)desempate$/i.test(normalizeSlug(folderSlug));
+  }
+
+  async function listTeamPictures(fechaISO, teamSlug, { tipo = '' } = {}) {
     if (!fechaISO || !teamSlug) return [];
 
     const fechaDir = path.join(picturesRoot, fechaISO);
@@ -160,12 +164,18 @@ module.exports = function createPicturesRouter(deps) {
     }
 
     const normalized = normalizeSlug(teamSlug);
+    const wantsTiebreak = String(tipo || '').trim().toLowerCase() === 'desempate';
+
     const candidates = dirEntries
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .filter((name) => {
         const slug = normalizeSlug(name);
-        return slug === normalized || slug.startsWith(normalized + '_');
+        const belongsToTeam = slug === normalized || slug.startsWith(normalized + '_');
+        if (!belongsToTeam) return false;
+
+        const isTiebreakFolder = isTiebreakPicturesFolder(slug);
+        return wantsTiebreak ? isTiebreakFolder : !isTiebreakFolder;
       });
 
     const items = [];
@@ -186,13 +196,14 @@ module.exports = function createPicturesRouter(deps) {
           size: stat.size,
           modifiedAt: stat.mtime.toISOString(),
           imageUrl: buildPublicImageUrl(relFile),
-          sourceTeamSlug: folderName
+          sourceTeamSlug: folderName,
+          tipo: wantsTiebreak ? 'desempate' : 'cruce'
         });
       }
     }
 
     items.sort((a, b) => a.filename.localeCompare(b.filename, 'es', { numeric: true, sensitivity: 'base' }));
-    return items.slice(0, REQUIRED_PICTURES);
+    return items.slice(0, wantsTiebreak ? 1 : REQUIRED_PICTURES);
   }
 
   const crcTable = new Uint32Array(256).map((_, index) => {
@@ -277,7 +288,9 @@ module.exports = function createPicturesRouter(deps) {
       try {
         const fechaISO = String(req.body?.fechaISO || '').slice(0, 10);
         const teamSlug = resolveUploadTeamSlug(req) || 'equipo';
-        const teamDir = path.join(picturesRoot, fechaISO || 'sin-fecha', teamSlug);
+        const tipo = String(req.body?.tipo || '').trim().toLowerCase();
+        const folderSlug = tipo === 'desempate' ? `${teamSlug}_desempate` : teamSlug;
+        const teamDir = path.join(picturesRoot, fechaISO || 'sin-fecha', folderSlug);
         await ensureDir(teamDir);
         cb(null, teamDir);
       } catch (err) { cb(err); }
@@ -317,19 +330,21 @@ module.exports = function createPicturesRouter(deps) {
       const localSlug = normalizeSlug(req.body?.localSlug || '');
       const visitanteSlug = normalizeSlug(req.body?.visitanteSlug || '');
       const teamSlug = resolveUploadTeamSlug(req);
+      const tipo = String(req.body?.tipo || '').trim().toLowerCase();
+      const requiredPictures = tipo === 'desempate' ? 1 : REQUIRED_PICTURES;
       const files = Array.isArray(req.files) ? req.files : [];
       const manualAdminUpload = adminMode || isManualAdminUpload(req);
       if (!fechaISO) return res.status(400).json({ ok: false, error: 'Falta la fecha de carga' });
       if (!teamSlug) return res.status(400).json({ ok: false, error: manualAdminUpload ? 'Falta el teamSlug para la carga manual' : 'No se pudo identificar el equipo' });
       if (!manualAdminUpload && (!localSlug || !visitanteSlug)) return res.status(400).json({ ok: false, error: 'Faltan datos del cruce' });
       if (!files.length) return res.status(400).json({ ok: false, error: 'No se recibieron imágenes' });
-      if (files.length !== REQUIRED_PICTURES) {
+      if (files.length !== requiredPictures) {
         for (const file of files) { try { await fs.promises.unlink(file.path); } catch (_) {} }
-        if (files.length < REQUIRED_PICTURES) return res.status(400).json({ ok: false, error: `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para completar las ${REQUIRED_PICTURES} requeridas` });
-        return res.status(400).json({ ok: false, error: `Solo se permiten ${REQUIRED_PICTURES} fotos por carga` });
+        if (files.length < requiredPictures) return res.status(400).json({ ok: false, error: `Faltan ${requiredPictures - files.length} foto${requiredPictures - files.length === 1 ? '' : 's'} para completar las ${requiredPictures} requerida${requiredPictures === 1 ? '' : 's'}` });
+        return res.status(400).json({ ok: false, error: `Solo se permiten ${requiredPictures} foto${requiredPictures === 1 ? '' : 's'} por carga` });
       }
       if (!manualAdminUpload) {
-        const allowed = await isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug: teamSlug });
+        const allowed = await isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug: teamSlug, tipo });
         if (!allowed) {
           for (const file of files) { try { await fs.promises.unlink(file.path); } catch (_) {} }
           return res.status(403).json({ ok: false, error: 'Solo podés subir fotos cuando el cruce ya esté validado por ambos equipos' });
@@ -337,7 +352,7 @@ module.exports = function createPicturesRouter(deps) {
       }
       const normalizedFiles = [];
       for (const file of files) normalizedFiles.push(await convertHeicToJpeg(file));
-      const result = normalizedFiles.map(file => ({ teamSlug, fechaISO, filename: file.filename, originalName: file.originalname, size: file.size, uploadedAt: new Date().toISOString() }));
+      const result = normalizedFiles.map(file => ({ teamSlug, tipo, fechaISO, filename: file.filename, originalName: file.originalname, size: file.size, uploadedAt: new Date().toISOString() }));
       return res.json({ ok: true, files: result });
     } catch (err) {
       const files = Array.isArray(req.files) ? req.files : [];
@@ -365,11 +380,14 @@ module.exports = function createPicturesRouter(deps) {
       const fechaISO = String(req.query?.fechaISO || '').slice(0, 10);
       const localSlug = normalizeSlug(req.query?.localSlug || '');
       const visitanteSlug = normalizeSlug(req.query?.visitanteSlug || '');
+      const tipo = String(req.query?.tipo || '').trim().toLowerCase() === 'desempate' ? 'desempate' : 'cruce';
+
       if (!fechaISO || !localSlug || !visitanteSlug) return res.status(400).json({ ok: false, error: 'Faltan datos del encuentro' });
-      const localItems = await listTeamPictures(fechaISO, localSlug);
-      const visitanteItems = await listTeamPictures(fechaISO, visitanteSlug);
+
+      const localItems = await listTeamPictures(fechaISO, localSlug, { tipo });
+      const visitanteItems = await listTeamPictures(fechaISO, visitanteSlug, { tipo });
       const chosen = localItems.length ? { teamSlug: localSlug, items: localItems } : { teamSlug: visitanteSlug, items: visitanteItems };
-      return res.json({ ok: true, fechaISO, teamSlug: chosen.teamSlug, items: chosen.items });
+      return res.json({ ok: true, fechaISO, tipo, teamSlug: chosen.teamSlug, items: chosen.items });
     } catch (err) {
       return res.status(500).json({ ok: false, error: 'No se pudieron cargar las fotos del encuentro' });
     }

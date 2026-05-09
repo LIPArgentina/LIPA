@@ -155,21 +155,26 @@
     resetPhotosViewer();
     openPhotosModal();
 
+    const isTiebreak = String(item?.tipo || '').toLowerCase() === 'desempate';
     const subtitle = [
+      isTiebreak ? 'DESEMPATE ·' : '',
       String(item.localName || '').toUpperCase(),
       'vs',
       String(item.visitanteName || '').toUpperCase(),
       '·',
       formatDate(item.fechaISO)
-    ].join(' ');
+    ].filter(Boolean).join(' ');
     photosModalSubtitle.textContent = subtitle;
     setPhotosStatus('Buscando fotos del encuentro…', 'info');
 
-    const url = apiUrl(
-      '/api/pictures/match?fechaISO=' + encodeURIComponent(item.fechaISO || '') +
-      '&localSlug=' + encodeURIComponent(item.localSlug || '') +
-      '&visitanteSlug=' + encodeURIComponent(item.visitanteSlug || '')
-    );
+    const params = new URLSearchParams({
+      fechaISO: item.fechaISO || '',
+      localSlug: item.localSlug || '',
+      visitanteSlug: item.visitanteSlug || ''
+    });
+    if (isTiebreak) params.set('tipo', 'desempate');
+
+    const url = apiUrl('/api/pictures/match?' + params.toString());
 
     try {
       const data = await fetchJson(url, { cache: 'no-store', credentials: 'same-origin' });
@@ -262,6 +267,47 @@
     return div;
   }
 
+
+  function renderTiebreakSideCard(item, side){
+    const isLeft = side === 'left';
+    const name = isLeft ? item.localName : item.visitanteName;
+    const opponent = isLeft ? item.visitanteName : item.localName;
+    const data = isLeft ? (item.local || {}) : (item.visitante || {});
+    const pair = Array.isArray(data.pareja) ? data.pareja : [];
+    const puntos = Number(data.puntos || 0);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'wrap tiebreak-result-wrap ' + (isLeft ? 'readonly-left' : 'readonly-right');
+
+    const card = document.createElement('div');
+    card.className = 'card tiebreak-result-card';
+
+    const title = document.createElement('h2');
+    title.className = 'title';
+    title.textContent = String(name || '').toUpperCase();
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const formattedDate = formatDate(item.fechaISO);
+    meta.textContent = formattedDate ? `vs ${opponent} · ${formattedDate}` : `vs ${opponent}`;
+
+    const section = document.createElement('div');
+    section.className = 'section tiebreak-result-section';
+    section.innerHTML = '<h2>DESEMPATE</h2>';
+
+    pair.slice(0, 2).forEach((player, idx) => {
+      section.appendChild(makeRow(idx + 1, player || '', side, null, 'DESEMPATE'));
+    });
+
+    const score = document.createElement('div');
+    score.className = 'tiebreak-result-score';
+    score.textContent = String(puntos);
+
+    card.append(title, meta, section, score);
+    wrap.appendChild(card);
+    return wrap;
+  }
+
   function renderSideCard(planilla, scoreData, opponent, date, teamName, side){
     const card = document.querySelector('#card-template').content.cloneNode(true).querySelector('.card');
     card.querySelector('.title').textContent = String(teamName || '').toUpperCase();
@@ -299,8 +345,12 @@
 
   function renderEncounter(item){
     const node = document.importNode(document.getElementById('encounter-template').content, true);
+    const isTiebreak = String(item?.tipo || '').toLowerCase() === 'desempate';
     node.querySelector('.encounter-title').textContent =
-      `${String(item.localName || '').toUpperCase()} VS ${String(item.visitanteName || '').toUpperCase()}`;
+      `${isTiebreak ? 'DESEMPATE · ' : ''}${String(item.localName || '').toUpperCase()} VS ${String(item.visitanteName || '').toUpperCase()}`;
+
+    const shell = node.querySelector('.encounter-shell');
+    if (shell && isTiebreak) shell.classList.add('encounter-tiebreak');
 
     const photosBtn = node.querySelector('[data-open-photos]');
     if (photosBtn) {
@@ -312,29 +362,57 @@
     const leftRoot = node.querySelector('.encounter-left');
     const rightRoot = node.querySelector('.encounter-right');
 
-    leftRoot.appendChild(
-      renderSideCard(
-        item.localPlanilla || {},
-        item.local || {},
-        item.visitanteName || item.visitanteSlug || '',
-        item.fechaISO,
-        item.localName || item.localSlug || '',
-        'left'
-      )
-    );
+    if (isTiebreak) {
+      leftRoot.appendChild(renderTiebreakSideCard(item, 'left'));
+      rightRoot.appendChild(renderTiebreakSideCard(item, 'right'));
+    } else {
+      leftRoot.appendChild(
+        renderSideCard(
+          item.localPlanilla || {},
+          item.local || {},
+          item.visitanteName || item.visitanteSlug || '',
+          item.fechaISO,
+          item.localName || item.localSlug || '',
+          'left'
+        )
+      );
 
-    rightRoot.appendChild(
-      renderSideCard(
-        item.visitantePlanilla || {},
-        item.visitante || {},
-        item.localName || item.localSlug || '',
-        item.fechaISO,
-        item.visitanteName || item.visitanteSlug || '',
-        'right'
-      )
-    );
+      rightRoot.appendChild(
+        renderSideCard(
+          item.visitantePlanilla || {},
+          item.visitante || {},
+          item.localName || item.localSlug || '',
+          item.fechaISO,
+          item.visitanteName || item.visitanteSlug || '',
+          'right'
+        )
+      );
+    }
 
     return node;
+  }
+
+  function normalizeFilterTeam(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/&/g, ' Y ')
+      .replace(/\b(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)\b/gi, ' ')
+      .replace(/[^A-Z0-9]/gi, '')
+      .replace(/(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)$/i, '')
+      .toUpperCase();
+  }
+
+  function resultMatchesTeams(item, localKey, visitanteKey){
+    if (!localKey && !visitanteKey) return true;
+    const itemLocal = normalizeFilterTeam(item?.localName || item?.localSlug || '');
+    const itemVisitante = normalizeFilterTeam(item?.visitanteName || item?.visitanteSlug || '');
+    if (localKey && visitanteKey) {
+      return (itemLocal === localKey && itemVisitante === visitanteKey) ||
+             (itemLocal === visitanteKey && itemVisitante === localKey);
+    }
+    const only = localKey || visitanteKey;
+    return itemLocal === only || itemVisitante === only;
   }
 
   async function init(){
@@ -342,6 +420,9 @@
     const category = String(params.get('category') || 'segunda').trim().toLowerCase();
     const rawDate = params.get('date') || params.get('fechaISO') || '';
     const rawFecha = params.get('fecha') || '';
+    const tipoFiltro = String(params.get('tipo') || '').trim().toLowerCase();
+    const localFiltro = normalizeFilterTeam(params.get('local') || '');
+    const visitanteFiltro = normalizeFilterTeam(params.get('visitante') || '');
     const fechaISO = buildDateKey(rawDate);
 
     document.getElementById('categoryLabel').textContent = `Categoría ${category.toUpperCase()}`;
@@ -371,7 +452,13 @@
     const container = document.getElementById('resultsContainer');
     container.innerHTML = '';
 
-    const results = Array.isArray(data?.results) ? data.results : [];
+    let results = Array.isArray(data?.results) ? data.results : [];
+    if (tipoFiltro === 'cruce' || tipoFiltro === 'desempate') {
+      results = results.filter(item => String(item?.tipo || 'cruce').toLowerCase() === tipoFiltro);
+    }
+    if (localFiltro || visitanteFiltro) {
+      results = results.filter(item => resultMatchesTeams(item, localFiltro, visitanteFiltro));
+    }
     document.getElementById('heroTitle').textContent = results.length ? 'Encuentros validados' : 'Sin encuentros validados';
     document.getElementById('metaText').textContent = results.length
       ? `${results.length} encuentro${results.length === 1 ? '' : 's'} validado${results.length === 1 ? '' : 's'}`

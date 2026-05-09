@@ -336,3 +336,12 @@ header img{ height:60px; width:auto; display:block; }
 .btn-delete-desempate:hover{
   background:#3a1010;
 }
+
+
+/* Desempate: solo muestra puntos, sin triángulos/puntosExtra */
+.match-block-extra .team-row-extra{
+  grid-template-columns:34px minmax(220px,1fr) minmax(220px,1fr) 34px;
+}
+.match-block-extra .score-badge{
+  width:34px;
+}

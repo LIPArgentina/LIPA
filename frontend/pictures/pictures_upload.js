@@ -5,6 +5,8 @@
   const localSlug = (qs.get('localSlug') || '').trim().toLowerCase();
   const visitanteSlug = (qs.get('visitanteSlug') || '').trim().toLowerCase();
   const team = (qs.get('team') || '').trim().toLowerCase();
+  const tipo = (qs.get('tipo') || '').trim().toLowerCase();
+  const isTiebreak = tipo === 'desempate';
 
   const matchInfo = document.getElementById('matchInfo');
   const statusBox = document.getElementById('statusBox');
@@ -14,7 +16,11 @@
   const previewContainer = document.getElementById('previewContainer');
   const btnUpload = document.getElementById('btnUpload');
   const btnVolver = document.getElementById('btnVolver');
-  const REQUIRED_PICTURES = 9;
+  if (isTiebreak) {
+    const h1 = document.querySelector('h1');
+    if (h1) h1.textContent = 'Subir foto del desempate';
+  }
+  const REQUIRED_PICTURES = isTiebreak ? 1 : 9;
 
   function getToken() {
     try {
@@ -47,7 +53,7 @@
       return;
     }
 
-    pickedFilesText.textContent = `${files.length} / ${REQUIRED_PICTURES} fotos seleccionadas`;
+    pickedFilesText.textContent = `${files.length} / ${REQUIRED_PICTURES} foto${REQUIRED_PICTURES === 1 ? '' : 's'} seleccionada${files.length === 1 ? '' : 's'}`;
 
     files.forEach(file => {
       if (!String(file.type || '').startsWith('image/')) return;
@@ -64,10 +70,10 @@
   }
 
   async function checkStatus() {
-    matchInfo.textContent = `Fecha ${fechaISO} · ${localSlug} vs ${visitanteSlug}`;
+    matchInfo.textContent = `${isTiebreak ? 'Desempate · ' : ''}Fecha ${fechaISO} · ${localSlug} vs ${visitanteSlug}`;
     if (btnVolver) btnVolver.href = `../cruces/cruces_fecha.html?team=${encodeURIComponent(team)}`;
 
-    const url = new URL(API_BASE + '/api/cruces/lock-status');
+    const url = new URL(API_BASE + (isTiebreak ? '/api/cruces/tiebreak-lock-status' : '/api/cruces/lock-status'));
     url.searchParams.set('fechaISO', fechaISO);
     url.searchParams.set('equipoSlug', team);
     url.searchParams.set('localSlug', localSlug);
@@ -79,7 +85,7 @@
     btnUpload.disabled = !ok;
     picturesInput.disabled = !ok;
     btnChoosePhotos.disabled = !ok;
-    setStatus(ok ? 'Cruce validado. Ya podés subir fotos.' : 'Todavía no está habilitada la subida de fotos.', ok ? 'success' : 'error');
+    setStatus(ok ? (isTiebreak ? 'Desempate validado. Ya podés subir la foto.' : 'Cruce validado. Ya podés subir fotos.') : 'Todavía no está habilitada la subida de fotos.', ok ? 'success' : 'error');
   }
 
   btnChoosePhotos?.addEventListener('click', () => {
@@ -110,7 +116,7 @@
   btnUpload?.addEventListener('click', async () => {
     const files = Array.from(picturesInput.files || []);
     if (!files.length) {
-      setStatus('Tenés que elegir 9 fotos.', 'error');
+      setStatus(`Tenés que elegir ${REQUIRED_PICTURES} foto${REQUIRED_PICTURES === 1 ? '' : 's'}.`, 'error');
       return;
     }
 
@@ -127,6 +133,7 @@
     body.append('fechaISO', fechaISO);
     body.append('localSlug', localSlug);
     body.append('visitanteSlug', visitanteSlug);
+    body.append('tipo', tipo);
     for (const file of files) body.append('pictures', file);
 
     btnUpload.disabled = true;
@@ -144,7 +151,7 @@
       picturesInput.value = '';
       updatePreview();
       pickedFilesText.textContent = 'No se eligió ningún archivo';
-      setStatus('Las 9 fotos se subieron correctamente.', 'success');
+      setStatus(isTiebreak ? 'La foto del desempate se subió correctamente.' : 'Las 9 fotos se subieron correctamente.', 'success');
     } catch (err) {
       setStatus(err.message || 'No se pudieron subir las fotos.', 'error');
     } finally {
