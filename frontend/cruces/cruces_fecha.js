@@ -751,6 +751,90 @@ function apiUrl(path){
     return row;
   }
 
+
+  // ---------------- UBICACIÓN GOOGLE MAPS ----------------
+  function extractCoords(value){
+    const text = String(value || '').trim();
+
+    let match = text.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+    if (match) return { lat: match[1], lng: match[2] };
+
+    match = text.match(/[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+    if (match) return { lat: match[1], lng: match[2] };
+
+    match = text.match(/[?&]ll=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+    if (match) return { lat: match[1], lng: match[2] };
+
+    match = text.match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/);
+    if (match) return { lat: match[1], lng: match[2] };
+
+    return null;
+  }
+
+  function isLikelyUrl(value){
+    return /^https?:\/\//i.test(String(value || '').trim());
+  }
+
+  function buildGoogleMapsUrl(rawLocation, fallbackQuery = ''){
+    const location = String(rawLocation || '').trim();
+    const fallback = String(fallbackQuery || '').trim();
+
+    if (!location && !fallback) return '';
+
+    const coords = extractCoords(location);
+    if (coords) {
+      const q = `${coords.lat},${coords.lng}`;
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+    }
+
+    if (isLikelyUrl(location)) return location;
+
+    const query = location || fallback;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  }
+
+  function teamMatchesForMaps(a, b){
+    const aVariants = teamKeyVariants(a);
+    const bVariants = new Set(teamKeyVariants(b));
+    return aVariants.some(value => bVariants.has(value));
+  }
+
+  async function setupTeamMapButton(button, teamName){
+    try {
+      const category = deriveCategory();
+      if (!button || !category || !teamName) return;
+
+      const data = await fetchJson(apiUrl('/api/teams?division=' + encodeURIComponent(category)), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+
+      const rawTeams =
+        Array.isArray(data) ? data :
+        Array.isArray(data?.teams) ? data.teams :
+        Array.isArray(data?.users) ? data.users :
+        [];
+
+      const team = rawTeams.find(item => {
+        const name = item?.username || item?.name || item?.team || item?.teamName || item?.equipo || item?.nombre || '';
+        return teamMatchesForMaps(name, teamName);
+      });
+
+      if (!team) return;
+
+      const sala = team?.sala || team?.room || team?.email || '';
+      const ubicacion = team?.ubicacion || team?.location || team?.maps || team?.phone || '';
+      const url = buildGoogleMapsUrl(ubicacion, sala || teamName);
+
+      if (!url) return;
+
+      button.href = url;
+      button.hidden = false;
+    } catch (err) {
+      console.warn('No se pudo cargar ubicación del equipo', teamName, err);
+    }
+  }
+
   function renderSide(rootId, planilla, opponent, date, teamName) {
     const root = document.getElementById(rootId);
     if (!root) return;
@@ -759,7 +843,22 @@ function apiUrl(path){
     const card = document.querySelector('#card-template').content.cloneNode(true).querySelector('.card');
     card.querySelector('.title').textContent = teamName.toUpperCase();
     const formattedDate = formatDate(date);
-    card.querySelector('.meta').textContent = formattedDate ? `vs ${opponent} · ${formattedDate}` : `vs ${opponent}`;
+    const meta = card.querySelector('.meta');
+    if (meta) {
+      meta.innerHTML = '';
+
+      const mapBtn = document.createElement('a');
+      mapBtn.className = 'team-map-btn';
+      mapBtn.href = '#';
+      mapBtn.target = '_blank';
+      mapBtn.rel = 'noopener noreferrer';
+      mapBtn.textContent = 'UBICACIÓN';
+      mapBtn.setAttribute('aria-label', `Abrir ubicación de ${teamName} en Google Maps`);
+      mapBtn.hidden = true;
+
+      meta.appendChild(mapBtn);
+      setupTeamMapButton(mapBtn, teamName);
+    }
 
     const secs = card.querySelector('.sections');
     const data = {
