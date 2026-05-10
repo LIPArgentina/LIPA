@@ -1399,3 +1399,31 @@ header.lpi-top {
   box-shadow:0 0 6px rgba(0,200,83,0.4);
   cursor:default;
 }
+
+
+/* === BOTÓN UBICACIÓN GOOGLE MAPS EN CRUCES === */
+.team-map-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:7px 12px;
+  border-radius:10px;
+  background:#ffe65a;
+  color:#111;
+  font-weight:900;
+  text-decoration:none;
+  font-size:12px;
+  letter-spacing:.04em;
+  border:1px solid #b28900;
+  box-shadow:inset 0 -1px 0 #b28900, 0 2px 8px rgba(0,0,0,.35);
+  cursor:pointer;
+}
+
+.team-map-btn:hover{
+  filter:brightness(1.08);
+  transform:translateY(-1px);
+}
+
+.team-map-btn[hidden]{
+  display:none !important;
+}
