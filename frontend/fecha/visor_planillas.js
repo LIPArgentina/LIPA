@@ -765,12 +765,15 @@ function resetCategoryHeaderIndicators(){
 
     const status = await r.json();
 
-    // Si el backend no encontró próxima fecha en fixture, el visor intenta mostrar
-    // la próxima fecha cargada en llaves para que la automatización no quede vacía.
-    if (!status?.scheduledAt) {
-      const llavesScheduledAt = await loadNextScheduledAtFromLlaves(category);
-      if (llavesScheduledAt) {
+    // Si el backend trae una fecha vieja de fixture, el visor prefiere la próxima fecha de llaves.
+    // Esto evita mostrar/programar una fecha anterior cuando ya estamos en fase de cruces.
+    const llavesScheduledAt = await loadNextScheduledAtFromLlaves(category);
+    if (llavesScheduledAt) {
+      const statusDate = parseDateKeyFromValue(status?.scheduledAt);
+      const llavesDate = parseDateKeyFromValue(llavesScheduledAt);
+      if (!status?.scheduledAt || (llavesDate && (!statusDate || llavesDate > statusDate))) {
         status.scheduledAt = llavesScheduledAt;
+        status.nextFixtureDate = llavesDate || status.nextFixtureDate;
         status.scheduleSource = 'llaves';
       }
     }

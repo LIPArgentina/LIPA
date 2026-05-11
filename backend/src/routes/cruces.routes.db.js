@@ -166,6 +166,48 @@ function computeNextAutomation(fixtures = []) {
   };
 }
 
+
+function parseLlavesDateKey(value) {
+  const raw = String(value || '').trim();
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+}
+
+function collectLlavesAutomationDates(node, out = []) {
+  if (!node) return out;
+  if (Array.isArray(node)) {
+    node.forEach((item) => collectLlavesAutomationDates(item, out));
+    return out;
+  }
+  if (typeof node !== 'object') return out;
+
+  const possibleDate = node.date || node.fecha || node.fechaISO || node.fechaKey || node.scheduledAt;
+  const hasMatchShape = !!(
+    node.local || node.visitante || node.localSlug || node.visitanteSlug ||
+    node.home || node.away || node.teamA || node.teamB || node.equipoA || node.equipoB ||
+    node.player1 || node.player2
+  );
+  const dateKey = parseLlavesDateKey(possibleDate);
+  if (dateKey && hasMatchShape) out.push({ date: dateKey, kind: 'llaves' });
+
+  Object.values(node).forEach((value) => collectLlavesAutomationDates(value, out));
+  return out;
+}
+
+async function fetchAutomationLlavesInfo(category) {
+  if (!category) return [];
+  try {
+    const { rows } = await pool.query(
+      `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
+      [category]
+    );
+    return collectLlavesAutomationDates(rows?.[0]?.data || null, []);
+  } catch (err) {
+    console.warn('No se pudieron cargar fechas de llaves para automatización', { category, err: err?.message });
+    return [];
+  }
+}
+
 async function fetchAutomationFixtureInfo(team) {
   const category = inferCategoryFromTeamMarker(team);
   if (!category) {
@@ -204,10 +246,17 @@ async function fetchAutomationFixtureInfo(team) {
     }
   }
 
+  // En fase de llaves puede no existir una próxima fecha útil en fixture.
+  // Para que la habilitación automática siga el cruce real, sumamos las fechas cargadas en llaves_data.
+  const llavesFixtures = await fetchAutomationLlavesInfo(category);
+  const automationFixtures = [...fixtures, ...llavesFixtures];
+  const automation = computeNextAutomation(automationFixtures);
+
   return {
     category,
-    fixtures,
-    ...computeNextAutomation(fixtures)
+    fixtures: automationFixtures,
+    ...automation,
+    source: llavesFixtures.some(item => item.date === automation.nextFixtureDate) ? 'llaves' : 'fixture'
   };
 }
 
