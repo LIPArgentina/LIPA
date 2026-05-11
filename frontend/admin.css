@@ -437,3 +437,16 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
     flex:1 1 100px;
   }
 }
+
+
+/* ===== Header admin: botón carga manual torneo ===== */
+@media (max-width: 480px) {
+  #btnCargaManualTorneo {
+    font-size: 0;
+  }
+  #btnCargaManualTorneo::after {
+    content: "TORNEO";
+    font-size: 0.58rem;
+    line-height: 1;
+  }
+}

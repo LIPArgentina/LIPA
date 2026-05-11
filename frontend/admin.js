@@ -13,11 +13,13 @@
     const btnCrucesManual = document.getElementById('btnCrucesManual');
     const btnFecha   = document.getElementById('btnFecha');
     const btnPictures = document.getElementById('btnPictures');
+    const btnCargaManualTorneo = document.getElementById('btnCargaManualTorneo');
     if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
     if(btnLlaves) btnLlaves.href = withMode(btnLlaves.getAttribute('href') || 'llaves/llaves.html');
     if(btnCrucesManual) btnCrucesManual.href = withMode(btnCrucesManual.getAttribute('href') || 'cruces/cruces_manuales.html');
     if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
     if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
+    if(btnCargaManualTorneo) btnCargaManualTorneo.href = withMode(btnCargaManualTorneo.getAttribute('href') || 'torneos/carga_manual_torneo.html');
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 
@@ -37,11 +39,13 @@
     const btnCrucesManual = document.getElementById('btnCrucesManual');
     const btnFecha   = document.getElementById('btnFecha');
     const btnPictures = document.getElementById('btnPictures');
+    const btnCargaManualTorneo = document.getElementById('btnCargaManualTorneo');
     if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
     if(btnLlaves) btnLlaves.href = withMode(btnLlaves.getAttribute('href') || 'llaves/llaves.html');
     if(btnCrucesManual) btnCrucesManual.href = withMode(btnCrucesManual.getAttribute('href') || 'cruces/cruces_manuales.html');
     if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
     if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
+    if(btnCargaManualTorneo) btnCargaManualTorneo.href = withMode(btnCargaManualTorneo.getAttribute('href') || 'torneos/carga_manual_torneo.html');
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 
