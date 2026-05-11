@@ -513,6 +513,7 @@ function renderSalasRows(salas){
 
   for (let i = 0; i < SALAS_SLOTS; i++){
     const sala = rows[i] || { id: null, nombre: '', direccion: '', ubicacion: '' };
+    const canReset = Boolean(sala.id);
     const tr = document.createElement('tr');
     if (sala.id) tr.dataset.salaId = String(sala.id);
 
@@ -521,7 +522,10 @@ function renderSalasRows(salas){
       <td><input class="input sala-name" type="text" value="${sala.nombre.replace(/"/g,'&quot;')}" placeholder="Nombre de sala" aria-label="Nombre de sala fila ${i + 1}"></td>
       <td><input class="input sala-address" type="text" value="${sala.direccion.replace(/"/g,'&quot;')}" placeholder="Dirección" aria-label="Dirección fila ${i + 1}"></td>
       <td><input class="input sala-location" type="url" value="${normalizeLocation(sala.ubicacion).replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación fila ${i + 1}"></td>
-      <td class="team-actions-cell"><button class="btn-del-sala" type="button">Eliminar</button></td>`;
+      <td class="team-actions-cell">
+        <button class="btn-reset-pass btn-reset-sala-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${sala.nombre || ('fila ' + (i + 1))}" ${canReset ? '' : 'disabled'}>🔑</button>
+        <button class="btn-del-sala" type="button">Eliminar</button>
+      </td>`;
 
     tr.querySelector('.btn-del-sala')?.addEventListener('click', () => {
       const name = tr.querySelector('.sala-name')?.value?.trim() || `fila ${i + 1}`;
@@ -530,6 +534,47 @@ function renderSalasRows(salas){
       tr.querySelector('.sala-address').value = '';
       tr.querySelector('.sala-location').value = '';
       delete tr.dataset.salaId;
+      const resetBtn = tr.querySelector('.btn-reset-sala-pass');
+      if (resetBtn) resetBtn.disabled = true;
+    });
+
+    const resetBtn = tr.querySelector('.btn-reset-sala-pass');
+    resetBtn?.addEventListener('click', async () => {
+      const salaName = tr.querySelector('.sala-name')?.value?.trim() || `fila ${i + 1}`;
+      const rawId = tr.dataset.salaId;
+      const salaId = rawId ? Number(rawId) : NaN;
+
+      if (!Number.isFinite(salaId) || salaId <= 0) {
+        alert('Esa sala todavía no tiene ID en la base. Guardala primero y después vas a poder blanquearle la contraseña.');
+        return;
+      }
+
+      const ok = confirm(`¿Blanquear la contraseña de "${salaName}"?\n\nSe va a generar una contraseña temporal nueva.`);
+      if (!ok) return;
+
+      try {
+        resetBtn.disabled = true;
+
+        const resp = await fetch(`${API_BASE}/api/admin/reset-sala-password/${encodeURIComponent(salaId)}`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+
+        const tempPassword = String(data.newPassword || '').trim();
+        const copied = await copyToClipboard(tempPassword);
+        openResetPassModal(salaName, tempPassword, copied);
+        toast(`Contraseña blanqueada: ${salaName}`);
+      } catch (err) {
+        console.error('reset-sala-password', err);
+        alert(err?.message || 'No se pudo blanquear la contraseña');
+      } finally {
+        resetBtn.disabled = false;
+      }
     });
 
     tbody.appendChild(tr);

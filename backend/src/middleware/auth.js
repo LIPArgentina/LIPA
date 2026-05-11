@@ -7,21 +7,41 @@ function getJwtSecret() {
   return s;
 }
 
+function getToken(req) {
+  return (
+    (req.cookies && req.cookies.lpi_auth) ||
+    (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7)
+      : null)
+  );
+}
+
 function requireTeam(req, res, next) {
   try {
-    const token =
-      (req.cookies && req.cookies.lpi_auth) ||
-      (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
-        ? req.headers.authorization.slice(7)
-        : null);
-
+    const token = getToken(req);
     if (!token) return res.status(401).json({ ok: false, msg: 'no autenticade' });
 
     const payload = jwt.verify(token, getJwtSecret());
     if (payload.role !== 'team' || !payload.slug) {
       return res.status(403).json({ ok: false, msg: 'sin permisos' });
     }
-    req.user = payload; // { role:'team', slug, iat, exp }
+    req.user = payload;
+    return next();
+  } catch (err) {
+    return res.status(401).json({ ok: false, msg: 'token inválido' });
+  }
+}
+
+function requireSala(req, res, next) {
+  try {
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ ok: false, msg: 'no autenticade' });
+
+    const payload = jwt.verify(token, getJwtSecret());
+    if (payload.role !== 'sala' || !payload.salaId || !payload.slug) {
+      return res.status(403).json({ ok: false, msg: 'sin permisos' });
+    }
+    req.user = payload;
     return next();
   } catch (err) {
     return res.status(401).json({ ok: false, msg: 'token inválido' });
@@ -30,23 +50,18 @@ function requireTeam(req, res, next) {
 
 function requireAdmin(req, res, next) {
   try {
-    const token =
-      (req.cookies && req.cookies.lpi_auth) ||
-      (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
-        ? req.headers.authorization.slice(7)
-        : null);
-
+    const token = getToken(req);
     if (!token) return res.status(401).json({ ok: false, msg: 'no autenticade' });
 
     const payload = jwt.verify(token, getJwtSecret());
     if (payload.role !== 'admin') {
       return res.status(403).json({ ok: false, msg: 'sin permisos' });
     }
-    req.user = payload; // { role:'admin', iat, exp }
+    req.user = payload;
     return next();
   } catch (err) {
     return res.status(401).json({ ok: false, msg: 'token inválido' });
   }
 }
 
-module.exports = { requireTeam, requireAdmin };
+module.exports = { requireTeam, requireSala, requireAdmin };

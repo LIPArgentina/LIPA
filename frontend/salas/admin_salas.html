@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>ADMINISTRACIÓN DE SALA | Liga de Pool Independiente</title>
+  <link rel="icon" href="../logo_liga.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="./admin_salas.css"/>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
+    <div class="header-center">
+      <div class="title">ADMINISTRACIÓN DE SALA</div>
+      <div class="subtitle" id="salaName">Sala</div>
+    </div>
+    <nav class="actions">
+      <button class="btn" id="btnChangePassword" type="button">CAMBIAR CONTRASEÑA</button>
+      <a class="btn" href="../index.html">VOLVER</a>
+    </nav>
+  </header>
+</div>
+
+<dialog class="modal" id="passModal">
+  <form autocomplete="off" class="modal__panel" id="passForm" method="dialog">
+    <div class="modal__header"><h3>Cambiar contraseña</h3></div>
+    <div class="modal__body">
+      <label class="field__label" for="oldPass">Contraseña actual</label>
+      <input class="field__control" id="oldPass" type="password"/>
+      <label class="field__toggle" for="toggle_oldPass">
+        <input data-toggle="#oldPass" id="toggle_oldPass" type="checkbox"/> Mostrar
+      </label>
+
+      <label class="field__label" for="newPass">Nueva contraseña</label>
+      <input class="field__control" id="newPass" type="password">
+      <label class="field__toggle" for="toggle_newPass">
+        <input data-toggle="#newPass" id="toggle_newPass" type="checkbox"/> Mostrar
+      </label>
+
+      <label class="field__label" for="newPass2">Repetir nueva contraseña</label>
+      <input class="field__control" id="newPass2" type="password">
+      <label class="field__toggle" for="toggle_newPass2">
+        <input data-toggle="#newPass2" id="toggle_newPass2" type="checkbox"/> Mostrar
+      </label>
+
+      <p class="error" id="passError" hidden>Revisá los campos</p>
+      <p class="success" id="passSuccess" hidden>¡Contraseña actualizada!</p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-ghost" id="btnCancelPass" type="button">Cancelar</button>
+      <button class="btn btn-primary" id="submitPass" type="submit">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="../config.js"></script>
+<script src="./admin_salas.js" defer></script>
+</body>
+</html>
