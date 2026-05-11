@@ -128,6 +128,129 @@ async function loadFixture(kind, category){
   });
 }
 
+
+async function loadLlaves(category){
+  const qs = new URLSearchParams({ category });
+  return await fetchJson(`${API_BASE}/api/llaves?` + qs.toString(), { cache: 'no-store' });
+}
+
+function teamNameFromLlavesRef(ref){
+  if (typeof ref === 'string') return ref.trim();
+  if (!ref || typeof ref !== 'object') return '';
+  return String(ref.team || ref.equipo || ref.nombre || ref.displayName || ref.slug || '').trim();
+}
+
+function normalizeLlavesTeam(value){
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' Y ')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\b(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[^A-Z0-9]/gi, '')
+    .replace(/(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)$/i, '')
+    .toUpperCase();
+}
+
+function isWoTeam(value){
+  return normalizeLlavesTeam(value) === 'WO';
+}
+
+function llavesLegHasScores(leg){
+  return [
+    leg?.home?.puntos,
+    leg?.away?.puntos,
+    leg?.home?.puntosExtra,
+    leg?.away?.puntosExtra
+  ].some((value) => Number(value || 0) > 0);
+}
+
+function buildCruceFromLlavesLeg(leg, round, roundIndex, legIndex){
+  const local = teamNameFromLlavesRef(leg?.home);
+  const visitante = teamNameFromLlavesRef(leg?.away);
+  if (!local || !visitante) return null;
+  if (isWoTeam(local) || isWoTeam(visitante)) return null;
+
+  return {
+    local,
+    visitante,
+    date: String(leg?.date || '').trim() || null,
+    roundId: round?.id || '',
+    roundIndex,
+    legIndex,
+    played: llavesLegHasScores(leg),
+    source: 'llaves'
+  };
+}
+
+function extractLlavesCruces(raw){
+  const llavesData = raw?.data || raw?.llaves || raw;
+  const rounds = Array.isArray(llavesData?.rounds) ? llavesData.rounds : [];
+  const cruces = [];
+
+  rounds.forEach((round, roundIndex) => {
+    const legs = Array.isArray(round?.legs) ? round.legs : [];
+    legs.forEach((leg, legIndex) => {
+      // El tercer leg/desempate no se imprime como planilla normal.
+      if (legIndex >= 2) return;
+      const cruce = buildCruceFromLlavesLeg(leg, round, roundIndex, legIndex);
+      if (cruce) cruces.push(cruce);
+    });
+  });
+
+  const dedup = new Map();
+  cruces.forEach((item) => {
+    const key = [item.date || '', item.roundId || '', item.legIndex, compactKey(item.local), compactKey(item.visitante)].join('::');
+    if (!dedup.has(key)) dedup.set(key, item);
+  });
+  return [...dedup.values()];
+}
+
+function selectBestLlavesCruces(cruces){
+  if (!Array.isArray(cruces) || !cruces.length) return null;
+
+  const pending = cruces.filter((item) => !item.played);
+  const pool = pending.length ? pending : cruces;
+
+  const withDate = pool.filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(String(item.date || '').slice(0, 10)));
+  let selectedDate = '';
+
+  if (withDate.length) {
+    const todayKey = dateKeyFromRaw(new Date());
+    const sortedDates = [...new Set(withDate.map((item) => String(item.date).slice(0, 10)))]
+      .sort((a, b) => a.localeCompare(b));
+
+    selectedDate = sortedDates.find((date) => date >= todayKey) || sortedDates[sortedDates.length - 1] || '';
+  }
+
+  const selectedCruces = selectedDate
+    ? pool.filter((item) => String(item.date || '').slice(0, 10) === selectedDate)
+    : pool;
+
+  return {
+    selected: {
+      kind: 'llaves',
+      dateKey: selectedDate || 'sin fecha',
+      rawDate: selectedDate || ''
+    },
+    cruces: selectedCruces.sort((a, b) => (a.roundIndex - b.roundIndex) || (a.legIndex - b.legIndex) || compactKey(a.local).localeCompare(compactKey(b.local)))
+  };
+}
+
+async function loadBestLlavesCruces(category){
+  try {
+    const raw = await loadLlaves(category);
+    const cruces = extractLlavesCruces(raw);
+    const selected = selectBestLlavesCruces(cruces);
+    if (selected && selected.cruces.length) return selected;
+  } catch (err) {
+    console.warn('No se pudieron cargar cruces desde llaves, uso fixture como fallback', err);
+  }
+  return null;
+}
+
 function parseISOAsLocal(iso){
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
   if (m) return new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0);
@@ -214,6 +337,9 @@ function extractCrucesFromFechaNode(fechaNode){
 }
 
 async function loadBestFixtureCruces(category){
+  const llavesInfo = await loadBestLlavesCruces(category);
+  if (llavesInfo) return llavesInfo;
+
   const [idaRaw, vueltaRaw] = await Promise.all([
     loadFixture('ida', category),
     loadFixture('vuelta', category).catch(() => null)
@@ -632,7 +758,7 @@ async function reload(){
       totalCompletos
         ? ('Se encontraron ' + totalCompletos + ' planilla' + (totalCompletos === 1 ? '' : 's') + ' completa' + (totalCompletos === 1 ? '' : 's'))
         : 'No hay cruces completos todavía',
-      'Fixture usado: ' + selectedKind.toUpperCase() +
+      (selectedKind === 'llaves' ? 'Llaves usadas: ' : 'Fixture usado: ') + selectedKind.toUpperCase() +
       ' · Fecha: ' + selectedDate +
       ' · Cruces detectados: ' + totalCruces +
       ' · Completos: ' + totalCompletos
