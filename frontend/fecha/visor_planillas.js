@@ -582,6 +582,83 @@ function resetCategoryHeaderIndicators(){
     return label.__parts;
   }
 
+
+  const llavesScheduleCache = {
+    tercera: undefined,
+    segunda: undefined
+  };
+
+  function parseDateKeyFromValue(value){
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const direct = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (direct) return direct[1] + '-' + direct[2] + '-' + direct[3];
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function scheduledAtFromDateKey(dateKey){
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return '';
+    // La habilitación automática se muestra a las 20:00 hs AR, igual que el texto actual del visor.
+    return dateKey + 'T20:00:00-03:00';
+  }
+
+  function collectLlavesDateKeys(node, out){
+    if (!node) return;
+
+    if (Array.isArray(node)) {
+      node.forEach(item => collectLlavesDateKeys(item, out));
+      return;
+    }
+
+    if (typeof node !== 'object') return;
+
+    const possibleDate = node.date || node.fecha || node.fechaISO || node.fechaKey || node.scheduledAt;
+    const hasMatchShape = !!(
+      node.local || node.visitante || node.localSlug || node.visitanteSlug ||
+      node.teamA || node.teamB || node.equipoA || node.equipoB ||
+      node.player1 || node.player2
+    );
+
+    const dateKey = parseDateKeyFromValue(possibleDate);
+    if (dateKey && hasMatchShape) out.push(dateKey);
+
+    Object.values(node).forEach(value => collectLlavesDateKeys(value, out));
+  }
+
+  async function loadNextScheduledAtFromLlaves(category){
+    if (llavesScheduleCache[category] !== undefined) return llavesScheduleCache[category];
+
+    try {
+      const qs = new URLSearchParams({ category });
+      const r = await fetch(`${API_BASE}/api/llaves?` + qs.toString(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+
+      const data = await r.json().catch(() => null);
+      const dates = [];
+      collectLlavesDateKeys(data, dates);
+
+      const uniqueDates = Array.from(new Set(dates)).sort();
+      if (!uniqueDates.length) {
+        llavesScheduleCache[category] = '';
+        return '';
+      }
+
+      const today = fechaKeyActual();
+      const nextDate = uniqueDates.find(dateKey => dateKey >= today) || uniqueDates[uniqueDates.length - 1];
+      llavesScheduleCache[category] = scheduledAtFromDateKey(nextDate);
+      return llavesScheduleCache[category];
+    } catch (e) {
+      console.warn('No se pudo obtener próxima fecha de llaves para ' + category, e);
+      llavesScheduleCache[category] = '';
+      return '';
+    }
+  }
+
   function formatScheduledAt(value){
     if (!value) return '';
     try {
@@ -685,7 +762,20 @@ function resetCategoryHeaderIndicators(){
       cache: 'no-store'
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    return await r.json();
+
+    const status = await r.json();
+
+    // Si el backend no encontró próxima fecha en fixture, el visor intenta mostrar
+    // la próxima fecha cargada en llaves para que la automatización no quede vacía.
+    if (!status?.scheduledAt) {
+      const llavesScheduledAt = await loadNextScheduledAtFromLlaves(category);
+      if (llavesScheduledAt) {
+        status.scheduledAt = llavesScheduledAt;
+        status.scheduleSource = 'llaves';
+      }
+    }
+
+    return status;
   }
 
   async function refreshCategory(category){

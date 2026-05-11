@@ -284,11 +284,89 @@ function apiUrl(path){
   }
 
 
+  function normalizeLlavesTeam(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/&/g, ' Y ')
+      .replace(/[._-]+/g, ' ')
+      .replace(/\b(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[^A-Z0-9]/gi, '')
+      .replace(/(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)$/i, '')
+      .toUpperCase();
+  }
+
+  function llavesLegHasScores(leg) {
+    return [
+      leg?.home?.puntos,
+      leg?.away?.puntos,
+      leg?.home?.puntosExtra,
+      leg?.away?.puntosExtra
+    ].some(value => Number(value || 0) > 0);
+  }
+
+  function buildMatchFromLlavesLeg(leg, roundId, legIndex) {
+    const local = String(leg?.home?.team || '').trim();
+    const visitante = String(leg?.away?.team || '').trim();
+    if (!local || !visitante) return null;
+    if (normalizeLlavesTeam(local) === 'WO' || normalizeLlavesTeam(visitante) === 'WO') return null;
+    return {
+      roundId,
+      legIndex,
+      date: String(leg?.date || '').trim() || null,
+      local,
+      visitante,
+      localSlug: normPlanillaSlug(local),
+      visitanteSlug: normPlanillaSlug(visitante),
+      source: 'llaves'
+    };
+  }
+
+  function findProximoCruceInLlavesData(llavesData, team) {
+    const teamKey = normalizeLlavesTeam(team);
+    if (!teamKey) return null;
+
+    const rounds = Array.isArray(llavesData?.rounds) ? llavesData.rounds : [];
+    const candidates = [];
+
+    rounds.forEach((round, roundIndex) => {
+      const legs = Array.isArray(round?.legs) ? round.legs : [];
+      legs.forEach((leg, legIndex) => {
+        // El desempate se maneja en el bloque de desempate, no como planilla completa.
+        if (legIndex >= 2) return;
+        const homeKey = normalizeLlavesTeam(leg?.home?.team);
+        const awayKey = normalizeLlavesTeam(leg?.away?.team);
+        if (homeKey !== teamKey && awayKey !== teamKey) return;
+        const match = buildMatchFromLlavesLeg(leg, round?.id || '', legIndex);
+        if (!match) return;
+        candidates.push({
+          ...match,
+          roundIndex,
+          played: llavesLegHasScores(leg)
+        });
+      });
+    });
+
+    const pending = candidates
+      .filter(item => !item.played)
+      .sort((a, b) => {
+        const ad = a.date || '9999-12-31';
+        const bd = b.date || '9999-12-31';
+        return ad.localeCompare(bd) || (a.roundIndex - b.roundIndex) || (a.legIndex - b.legIndex);
+      });
+
+    return pending[0] || candidates
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.roundIndex - a.roundIndex) || (b.legIndex - a.legIndex))[0] || null;
+  }
+
   async function loadProximoCruceFromLlaves(category, team){
     const cleanCategory = String(category || '').trim();
     const cleanTeam = String(team || '').trim();
     if (!cleanCategory || !cleanTeam) return null;
 
+    // 1) Camino ideal: backend ya calcula el próximo cruce igual que la pantalla de llaves.
     try {
       const qs = new URLSearchParams({
         category: cleanCategory,
@@ -301,22 +379,37 @@ function apiUrl(path){
       });
 
       const match = llavesData?.match;
-      if (!match?.local || !match?.visitante) return null;
-
-      return {
-        local: match.local,
-        visitante: match.visitante,
-        localSlug: teamSlugFromRef(match.local) || normPlanillaSlug(match.local),
-        visitanteSlug: teamSlugFromRef(match.visitante) || normPlanillaSlug(match.visitante),
-        date: match.date || null,
-        source: 'llaves'
-      };
+      if (match?.local && match?.visitante) {
+        return {
+          local: match.local,
+          visitante: match.visitante,
+          localSlug: teamSlugFromRef(match.local) || normPlanillaSlug(match.local),
+          visitanteSlug: teamSlugFromRef(match.visitante) || normPlanillaSlug(match.visitante),
+          date: match.date || null,
+          source: 'llaves'
+        };
+      }
     } catch (err) {
-      console.warn('No se pudo cargar próximo cruce desde llaves', err);
-      return null;
+      console.warn('No se pudo cargar próximo cruce desde /api/llaves/proximo-cruce; pruebo fallback /api/llaves', err);
     }
-  }
 
+    // 2) Fallback: si el endpoint nuevo no existe o devuelve vacío, leo la data guardada de llaves.
+    try {
+      const qs = new URLSearchParams({ category: cleanCategory });
+      const data = await fetchJson(apiUrl('/api/llaves?') + qs.toString(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+
+      const llavesData = data?.data || data?.llaves || data;
+      const match = findProximoCruceInLlavesData(llavesData, cleanTeam);
+      if (match?.local && match?.visitante) return match;
+    } catch (err) {
+      console.warn('No se pudo cargar próximo cruce desde llaves fallback', err);
+    }
+
+    return null;
+  }
 
   function extractCrucesFromFecha(fechaNode){
     const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
