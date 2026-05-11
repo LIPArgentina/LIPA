@@ -407,3 +407,14 @@
     font-size: 0.62rem;
   }
 }
+
+/* Mobile: texto correcto cuando el acceso es de dueño de sala */
+@media (max-width: 768px) {
+  #btnAdminEquipos.btn-admin-salas::after {
+    content: "Adm. sala";
+  }
+
+  #btnAdminEquipos.btn-admin-team::after {
+    content: "Adm. equipos";
+  }
+}

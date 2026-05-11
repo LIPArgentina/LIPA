@@ -39,11 +39,28 @@ function ensureManageTeamButton() {
   btn.style.textDecoration = "none";
 
   const sess = readSession();
-  const admin = (sess?.role || "").toLowerCase() === "admin";
+  const role = (sess?.role || "").toLowerCase();
 
-  if (admin) {
+  btn.classList.remove("btn-admin-salas");
+  btn.classList.remove("btn-admin-team");
+
+  if (role === "admin") {
     btn.textContent = "Administrar equipos";
     btn.href = "./admin.html";
+    btn.classList.add("btn-admin-team");
+    btn.classList.remove("hidden");
+    return;
+  }
+
+  if (role === "sala" && sess?.slug) {
+    const slug = String(sess.slug);
+    const params = new URLSearchParams();
+    params.set("sala", slug);
+    if (sess.token) params.set("token", String(sess.token));
+
+    btn.textContent = "Administrar sala";
+    btn.href = `./salas/admin_salas.html?${params.toString()}`;
+    btn.classList.add("btn-admin-salas");
     btn.classList.remove("hidden");
     return;
   }
@@ -51,7 +68,8 @@ function ensureManageTeamButton() {
   if (sess?.slug) {
     const slug = String(sess.slug);
     btn.textContent = "Administrar equipo";
-    btn.href = `/templates/plantilla.html?team=${encodeURIComponent(slug)}`;
+    btn.href = `./templates/plantilla.html?team=${encodeURIComponent(slug)}`;
+    btn.classList.add("btn-admin-team");
     btn.classList.remove("hidden");
     return;
   }
@@ -88,8 +106,16 @@ function redirectAfterLogin() {
     return;
   }
 
+  if (role === "sala" && slug) {
+    const params = new URLSearchParams();
+    params.set("sala", slug);
+    if (sess?.token) params.set("token", String(sess.token));
+    location.href = `./salas/admin_salas.html?${params.toString()}`;
+    return;
+  }
+
   if (slug) {
-    location.href = `/templates/plantilla.html?team=${encodeURIComponent(slug)}`;
+    location.href = `./templates/plantilla.html?team=${encodeURIComponent(slug)}`;
     return;
   }
 
