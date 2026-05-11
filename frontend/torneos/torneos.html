@@ -3,83 +3,30 @@
 <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1" name="viewport"/>
-  <title>TORNEOS | Liga de Pool Independiente</title>
+  <title>PRÓXIMOS TORNEOS | Liga de Pool Independiente</title>
+
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="torneos.css"/>
+
+  <link rel="stylesheet" href="../salas/sala.css"/>
 </head>
+
 <body>
 <div class="container">
+
   <header>
-    <a href="../../index.html" title="Inicio"><img alt="LPI" src="../../logo_liga.png"/></a>
+    <a href="../index.html" title="Inicio">
+      <img alt="LPI" src="../logo_liga.png"/>
+    </a>
+
     <div class="header-center">
       <div class="title">PRÓXIMOS TORNEOS</div>
     </div>
+
     <nav class="actions">
-      <a class="btn" href="../../index.html">VOLVER</a>
+      <a class="btn" href="../index.html">VOLVER</a>
     </nav>
   </header>
 
-  <main class="torneos-page">
-    <section class="torneos-hero">
-      <p class="eyebrow">Consulta pública</p>
-      <h1>Próximos torneos de la Liga</h1>
-      <p class="lead">En esta sección se publicarán los torneos disponibles, fechas, categorías y datos de inscripción.</p>
-    </section>
-
-    <section class="search-card" aria-label="Filtros de torneos">
-      <form id="torneosForm" class="search-form" autocomplete="off">
-        <div class="field">
-          <label for="categorySelect">Categoría</label>
-          <select id="categorySelect">
-            <option value="todos">Todas</option>
-            <option value="primera">Primera</option>
-            <option value="segunda">Segunda</option>
-            <option value="tercera">Tercera</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label for="statusSelect">Estado</label>
-          <select id="statusSelect">
-            <option value="todos">Todos</option>
-            <option value="proximamente">Próximamente</option>
-            <option value="inscripcion">Inscripción abierta</option>
-          </select>
-        </div>
-
-        <button id="btnFiltrar" class="btn btn-primary" type="submit">Filtrar</button>
-      </form>
-    </section>
-
-    <section id="statusBox" class="status-box info">Los torneos se irán actualizando a medida que la comisión confirme fechas y cupos.</section>
-
-    <section id="torneosList" class="torneos-grid" aria-live="polite">
-      <article class="torneo-card" data-category="todos" data-status="proximamente">
-        <div class="torneo-card__head">
-          <p class="torneo-label">Próximamente</p>
-          <span class="torneo-badge">A confirmar</span>
-        </div>
-        <h2>Torneo LPI</h2>
-        <div class="torneo-details">
-          <div class="detail-card">
-            <span>Categoría</span>
-            <strong>Todas</strong>
-          </div>
-          <div class="detail-card">
-            <span>Fecha</span>
-            <strong>A confirmar</strong>
-          </div>
-          <div class="detail-card detail-card--wide">
-            <span>Inscripción</span>
-            <strong>La información estará disponible próximamente.</strong>
-          </div>
-        </div>
-      </article>
-    </section>
-  </main>
 </div>
-
-<script src="../../config.js"></script>
-<script src="torneos.js" defer></script>
 </body>
 </html>
