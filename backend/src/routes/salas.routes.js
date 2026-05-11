@@ -1,12 +1,22 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db');
+const { requireSala } = require('../middleware/auth');
 
 const DEFAULT_SALA_PASSWORD = '1234';
+const MAX_TORNEOS_POR_SALA = 6;
+const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const ALLOWED_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
-module.exports = function createSalasRouter() {
+module.exports = function createSalasRouter(deps = {}) {
   const router = express.Router();
+  const picturesRoot = deps.PICTURES_DIR || path.resolve(__dirname, '../../data/pictures');
+  const torneosRoot = path.join(picturesRoot, 'torneos');
 
   function buildSlug(value = '') {
     return String(value || '')
@@ -14,6 +24,15 @@ module.exports = function createSalasRouter() {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]/g, '');
+  }
+
+  function safeName(value = '') {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9._-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 120) || 'archivo';
   }
 
   function generatePassword(length = 6) {
@@ -29,6 +48,46 @@ module.exports = function createSalasRouter() {
     const secret = process.env.JWT_SECRET;
     if (!secret) throw new Error('Falta JWT_SECRET en servidor');
     return secret;
+  }
+
+  async function ensureDir(dir) {
+    await fs.promises.mkdir(dir, { recursive: true });
+  }
+
+  function normalizeCurrency(value) {
+    const v = String(value || 'ARS').trim().toUpperCase();
+    return v === 'USD' ? 'USD' : 'ARS';
+  }
+
+  function normalizeValor(value) {
+    const clean = String(value ?? '').replace(/[^0-9]/g, '');
+    return clean ? Number(clean) : null;
+  }
+
+  function normalizeDateTime(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+  }
+
+  function toPublicTorneo(row) {
+    return {
+      id: row.id,
+      salaId: row.sala_id,
+      salaSlug: row.sala_slug,
+      sala: row.sala_nombre,
+      slot: row.slot,
+      categoria: row.categoria || '',
+      fechaHora: row.fecha_hora,
+      valor: row.valor,
+      moneda: row.moneda || 'ARS',
+      mediaType: row.media_type,
+      mediaUrl: `/api/sala-torneos/media/${encodeURIComponent(row.id)}`,
+      updatedAt: row.updated_at,
+      createdAt: row.created_at
+    };
   }
 
   async function ensureTable() {
@@ -56,6 +115,34 @@ module.exports = function createSalasRouter() {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_slug_unique
       ON salas (slug)
       WHERE slug IS NOT NULL AND slug <> ''
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sala_torneos (
+        id SERIAL PRIMARY KEY,
+        sala_id INTEGER NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+        slot INTEGER NOT NULL CHECK (slot >= 1 AND slot <= 6),
+        categoria TEXT DEFAULT '',
+        fecha_hora TIMESTAMPTZ NOT NULL,
+        valor INTEGER,
+        moneda TEXT NOT NULL DEFAULT 'ARS',
+        media_type TEXT NOT NULL,
+        media_path TEXT NOT NULL,
+        original_name TEXT DEFAULT '',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(sala_id, slot)
+      )
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_sala_torneos_fecha_hora
+      ON sala_torneos (fecha_hora ASC)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_sala_torneos_sala_id
+      ON sala_torneos (sala_id)
     `);
   }
 
@@ -111,6 +198,81 @@ module.exports = function createSalasRouter() {
 
     return null;
   }
+
+  async function getTorneosBySala(salaId) {
+    await ensureTable();
+    const { rows } = await pool.query(
+      `SELECT
+         t.*,
+         s.nombre AS sala_nombre,
+         s.slug AS sala_slug
+       FROM sala_torneos t
+       JOIN salas s ON s.id = t.sala_id
+       WHERE t.sala_id = $1
+       ORDER BY t.fecha_hora ASC, t.updated_at DESC, t.id ASC`,
+      [salaId]
+    );
+    return rows;
+  }
+
+  async function reorderSalaTorneos(salaId, client = pool) {
+    const { rows } = await client.query(
+      `SELECT id
+       FROM sala_torneos
+       WHERE sala_id = $1
+       ORDER BY fecha_hora ASC, updated_at DESC, id ASC`,
+      [salaId]
+    );
+
+    // Dos pasos para evitar choques con UNIQUE(sala_id, slot) al reordenar.
+    for (let i = 0; i < rows.length; i++) {
+      await client.query(`UPDATE sala_torneos SET slot = $1 WHERE id = $2`, [-(i + 1), rows[i].id]);
+    }
+
+    let slot = 1;
+    for (const row of rows.slice(0, MAX_TORNEOS_POR_SALA)) {
+      await client.query(`UPDATE sala_torneos SET slot = $1, updated_at = NOW() WHERE id = $2`, [slot, row.id]);
+      slot += 1;
+    }
+  }
+
+  async function removeFileIfExists(filePath) {
+    if (!filePath) return;
+    const root = path.resolve(picturesRoot);
+    const fullPath = path.resolve(filePath);
+    if (!fullPath.startsWith(root + path.sep) && fullPath !== root) return;
+    try { await fs.promises.unlink(fullPath); } catch (_) {}
+  }
+
+  const storage = multer.diskStorage({
+    async destination(req, _file, cb) {
+      try {
+        const salaSlug = buildSlug(req.user?.slug || req.body?.slug || 'sala');
+        const dir = path.join(torneosRoot, salaSlug || 'sala');
+        await ensureDir(dir);
+        cb(null, dir);
+      } catch (err) {
+        cb(err);
+      }
+    },
+    filename(_req, file, cb) {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      const safeExt = ALLOWED_IMAGE_EXTS.has(ext) ? ext : '.jpg';
+      const base = safeName(path.basename(file.originalname || 'torneo', ext));
+      cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${base}${safeExt}`);
+    }
+  });
+
+  const uploadTorneoImage = multer({
+    storage,
+    limits: { fileSize: 8 * 1024 * 1024 },
+    fileFilter(_req, file, cb) {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      const mime = String(file.mimetype || '').toLowerCase();
+      if (ALLOWED_IMAGE_MIMES.has(mime) && ALLOWED_IMAGE_EXTS.has(ext)) return cb(null, true);
+      return cb(new Error('Solo se permiten imágenes JPG, PNG, WEBP o GIF.'));
+    }
+  });
 
   // GET /api/salas
   router.get('/salas', async (_req, res) => {
@@ -321,6 +483,168 @@ module.exports = function createSalasRouter() {
     } catch (err) {
       console.error('POST /api/admin/reset-sala-password/:id', err);
       return res.status(500).json({ ok: false, error: 'Error al resetear la contraseña' });
+    }
+  });
+
+  // GET /api/sala/torneos
+  router.get('/sala/torneos', requireSala, async (req, res) => {
+    try {
+      const salaId = Number(req.user.salaId);
+      const rows = await getTorneosBySala(salaId);
+      return res.json({ ok: true, torneos: rows.map(toPublicTorneo) });
+    } catch (err) {
+      console.error('GET /api/sala/torneos', err);
+      return res.status(500).json({ ok: false, error: 'No se pudieron cargar los torneos de la sala' });
+    }
+  });
+
+  // POST /api/sala/torneos/:slot
+  router.post('/sala/torneos/:slot', requireSala, uploadTorneoImage.single('imagen'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await ensureTable();
+
+      const salaId = Number(req.user.salaId);
+      const slot = Number(req.params.slot);
+      if (!Number.isFinite(slot) || slot < 1 || slot > MAX_TORNEOS_POR_SALA) {
+        return res.status(400).json({ ok: false, error: 'Slot inválido' });
+      }
+
+      const categoria = String(req.body?.categoria || '').trim();
+      const fechaHora = normalizeDateTime(req.body?.fechaHora || req.body?.fecha_hora);
+      const valor = normalizeValor(req.body?.valor);
+      const moneda = normalizeCurrency(req.body?.moneda);
+
+      if (!categoria) return res.status(400).json({ ok: false, error: 'Falta categoría' });
+      if (!fechaHora) return res.status(400).json({ ok: false, error: 'Falta fecha y hora del torneo' });
+      if (valor === null) return res.status(400).json({ ok: false, error: 'Falta valor' });
+      if (!req.file) return res.status(400).json({ ok: false, error: 'Falta imagen' });
+
+      await client.query('BEGIN');
+
+      const old = await client.query(
+        `SELECT media_path FROM sala_torneos WHERE sala_id = $1 AND slot = $2 LIMIT 1`,
+        [salaId, slot]
+      );
+
+      await client.query(
+        `INSERT INTO sala_torneos (
+           sala_id, slot, categoria, fecha_hora, valor, moneda,
+           media_type, media_path, original_name, created_at, updated_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         ON CONFLICT (sala_id, slot)
+         DO UPDATE SET
+           categoria = EXCLUDED.categoria,
+           fecha_hora = EXCLUDED.fecha_hora,
+           valor = EXCLUDED.valor,
+           moneda = EXCLUDED.moneda,
+           media_type = EXCLUDED.media_type,
+           media_path = EXCLUDED.media_path,
+           original_name = EXCLUDED.original_name,
+           updated_at = NOW()`,
+        [salaId, slot, categoria, fechaHora, valor, moneda, req.file.mimetype, req.file.path, req.file.originalname || '']
+      );
+
+      await reorderSalaTorneos(salaId, client);
+      await client.query('COMMIT');
+
+      if (old.rows[0]?.media_path && old.rows[0].media_path !== req.file.path) {
+        await removeFileIfExists(old.rows[0].media_path);
+      }
+
+      const rows = await getTorneosBySala(salaId);
+      return res.json({ ok: true, torneos: rows.map(toPublicTorneo) });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      if (req.file?.path) await removeFileIfExists(req.file.path);
+      console.error('POST /api/sala/torneos/:slot', err);
+      return res.status(500).json({ ok: false, error: err?.message || 'No se pudo guardar el torneo' });
+    } finally {
+      client.release();
+    }
+  });
+
+  // DELETE /api/sala/torneos/:slot
+  router.delete('/sala/torneos/:slot', requireSala, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await ensureTable();
+      const salaId = Number(req.user.salaId);
+      const slot = Number(req.params.slot);
+      if (!Number.isFinite(slot) || slot < 1 || slot > MAX_TORNEOS_POR_SALA) {
+        return res.status(400).json({ ok: false, error: 'Slot inválido' });
+      }
+
+      await client.query('BEGIN');
+      const old = await client.query(
+        `DELETE FROM sala_torneos
+         WHERE sala_id = $1 AND slot = $2
+         RETURNING media_path`,
+        [salaId, slot]
+      );
+      await reorderSalaTorneos(salaId, client);
+      await client.query('COMMIT');
+
+      if (old.rows[0]?.media_path) await removeFileIfExists(old.rows[0].media_path);
+
+      const rows = await getTorneosBySala(salaId);
+      return res.json({ ok: true, torneos: rows.map(toPublicTorneo) });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('DELETE /api/sala/torneos/:slot', err);
+      return res.status(500).json({ ok: false, error: 'No se pudo eliminar el torneo' });
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/torneos
+  router.get('/torneos', async (_req, res) => {
+    try {
+      await ensureTable();
+      const { rows } = await pool.query(
+        `SELECT
+           t.*,
+           s.nombre AS sala_nombre,
+           s.slug AS sala_slug
+         FROM sala_torneos t
+         JOIN salas s ON s.id = t.sala_id
+         WHERE t.fecha_hora >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') AT TIME ZONE 'America/Argentina/Buenos_Aires'
+         ORDER BY t.fecha_hora ASC, t.updated_at DESC, t.id ASC`
+      );
+      return res.json({ ok: true, torneos: rows.map(toPublicTorneo) });
+    } catch (err) {
+      console.error('GET /api/torneos', err);
+      return res.status(500).json({ ok: false, error: 'No se pudieron cargar los torneos' });
+    }
+  });
+
+  // GET /api/sala-torneos/media/:id
+  router.get('/sala-torneos/media/:id', async (req, res) => {
+    try {
+      await ensureTable();
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id) || id <= 0) return res.status(404).end();
+
+      const { rows } = await pool.query(
+        `SELECT media_path, media_type FROM sala_torneos WHERE id = $1 LIMIT 1`,
+        [id]
+      );
+      const row = rows[0];
+      if (!row?.media_path) return res.status(404).end();
+
+      const root = path.resolve(picturesRoot);
+      const fullPath = path.resolve(row.media_path);
+      if (!fullPath.startsWith(root + path.sep) && fullPath !== root) return res.status(403).end();
+      if (!fs.existsSync(fullPath)) return res.status(404).end();
+
+      res.set('Cache-Control', 'public, max-age=86400');
+      if (row.media_type) res.type(row.media_type);
+      return res.sendFile(fullPath);
+    } catch (err) {
+      console.error('GET /api/sala-torneos/media/:id', err);
+      return res.status(500).end();
     }
   });
 
