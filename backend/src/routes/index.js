@@ -2,6 +2,7 @@ const express = require('express');
 const createBannerRouter = require('./banner.routes');
 const createAdminRouter = require('./admin.routes');
 const createEquiposRouter = require('./equipos.routes');
+const createSalasRouter = require('./salas.routes');
 const createFechasRouter = require('./fechas.routes');
 const createTeamPlayersRouter = require('./teamPlayers.routes');
 const adminPlanillas = require('./admin.planillas');
@@ -21,6 +22,9 @@ module.exports = function createApiRouter(deps) {
 
   // Equipos primero para que /teams y /save-teams no queden tapados
   router.use('/', createEquiposRouter(deps));
+
+  // Salas: /api/salas y /api/save-salas
+  router.use('/', createSalasRouter(deps));
 
   // Visor admin de planillas
   router.use('/admin', adminPlanillas);
