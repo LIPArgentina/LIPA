@@ -6,7 +6,7 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db');
-const { requireSala, requireAdmin } = require('../middleware/auth');
+const { requireSala } = require('../middleware/auth');
 
 const DEFAULT_SALA_PASSWORD = '1234';
 const MAX_TORNEOS_POR_SALA = 6;
@@ -217,21 +217,62 @@ module.exports = function createSalasRouter(deps = {}) {
 
   async function reorderSalaTorneos(salaId, client = pool) {
     const { rows } = await client.query(
-      `SELECT id
+      `SELECT
+         sala_id,
+         categoria,
+         fecha_hora,
+         valor,
+         moneda,
+         media_type,
+         media_path,
+         original_name,
+         created_at,
+         updated_at,
+         id
        FROM sala_torneos
        WHERE sala_id = $1
        ORDER BY fecha_hora ASC, updated_at DESC, id ASC`,
       [salaId]
     );
 
-    // Dos pasos para evitar choques con UNIQUE(sala_id, slot) al reordenar.
-    for (let i = 0; i < rows.length; i++) {
-      await client.query(`UPDATE sala_torneos SET slot = $1 WHERE id = $2`, [-(i + 1), rows[i].id]);
-    }
+    const ordered = rows.slice(0, MAX_TORNEOS_POR_SALA);
+
+    await client.query(
+      `DELETE FROM sala_torneos
+       WHERE sala_id = $1`,
+      [salaId]
+    );
 
     let slot = 1;
-    for (const row of rows.slice(0, MAX_TORNEOS_POR_SALA)) {
-      await client.query(`UPDATE sala_torneos SET slot = $1, updated_at = NOW() WHERE id = $2`, [slot, row.id]);
+    for (const row of ordered) {
+      await client.query(
+        `INSERT INTO sala_torneos (
+           sala_id,
+           slot,
+           categoria,
+           fecha_hora,
+           valor,
+           moneda,
+           media_type,
+           media_path,
+           original_name,
+           created_at,
+           updated_at
+         )
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())`,
+        [
+          row.sala_id,
+          slot,
+          row.categoria,
+          row.fecha_hora,
+          row.valor,
+          row.moneda,
+          row.media_type,
+          row.media_path,
+          row.original_name,
+          row.created_at || new Date()
+        ]
+      );
       slot += 1;
     }
   }
@@ -242,86 +283,6 @@ module.exports = function createSalasRouter(deps = {}) {
     const fullPath = path.resolve(filePath);
     if (!fullPath.startsWith(root + path.sep) && fullPath !== root) return;
     try { await fs.promises.unlink(fullPath); } catch (_) {}
-  }
-
-
-  async function getTorneosBySalaIdForAdmin(salaId) {
-    await ensureTable();
-    const { rows } = await pool.query(
-      `SELECT
-         t.*,
-         s.nombre AS sala_nombre,
-         s.slug AS sala_slug
-       FROM sala_torneos t
-       JOIN salas s ON s.id = t.sala_id
-       WHERE t.sala_id = $1
-       ORDER BY t.fecha_hora ASC, t.updated_at DESC, t.id ASC`,
-      [salaId]
-    );
-    return rows;
-  }
-
-  async function saveTorneoForSala({ salaId, slot, categoria, fechaHora, valor, moneda, file }) {
-    const client = await pool.connect();
-
-    try {
-      await ensureTable();
-
-      if (!Number.isFinite(Number(salaId)) || Number(salaId) <= 0) {
-        throw new Error('Sala inválida');
-      }
-
-      if (!Number.isFinite(Number(slot)) || Number(slot) < 1 || Number(slot) > MAX_TORNEOS_POR_SALA) {
-        throw new Error('Slot inválido');
-      }
-
-      if (!categoria) throw new Error('Falta categoría');
-      if (!fechaHora) throw new Error('Falta fecha y hora del torneo');
-      if (valor === null || valor === undefined) throw new Error('Falta valor');
-      if (!file) throw new Error('Falta imagen');
-
-      await client.query('BEGIN');
-
-      const old = await client.query(
-        `SELECT media_path FROM sala_torneos WHERE sala_id = $1 AND slot = $2 LIMIT 1`,
-        [salaId, slot]
-      );
-
-      await client.query(
-        `INSERT INTO sala_torneos (
-           sala_id, slot, categoria, fecha_hora, valor, moneda,
-           media_type, media_path, original_name, created_at, updated_at
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-         ON CONFLICT (sala_id, slot)
-         DO UPDATE SET
-           categoria = EXCLUDED.categoria,
-           fecha_hora = EXCLUDED.fecha_hora,
-           valor = EXCLUDED.valor,
-           moneda = EXCLUDED.moneda,
-           media_type = EXCLUDED.media_type,
-           media_path = EXCLUDED.media_path,
-           original_name = EXCLUDED.original_name,
-           updated_at = NOW()`,
-        [salaId, slot, categoria, fechaHora, valor, moneda, file.mimetype, file.path, file.originalname || '']
-      );
-
-      await reorderSalaTorneos(salaId, client);
-      await client.query('COMMIT');
-
-      if (old.rows[0]?.media_path && old.rows[0].media_path !== file.path) {
-        await removeFileIfExists(old.rows[0].media_path);
-      }
-
-      const rows = await getTorneosBySalaIdForAdmin(salaId);
-      return rows.map(toPublicTorneo);
-    } catch (err) {
-      await client.query('ROLLBACK');
-      if (file?.path) await removeFileIfExists(file.path);
-      throw err;
-    } finally {
-      client.release();
-    }
   }
 
   const storage = multer.diskStorage({
@@ -676,50 +637,6 @@ module.exports = function createSalasRouter(deps = {}) {
       return res.status(500).json({ ok: false, error: 'No se pudo eliminar el torneo' });
     } finally {
       client.release();
-    }
-  });
-
-
-  // GET /api/admin/sala-torneos/:salaId
-  router.get('/admin/sala-torneos/:salaId', requireAdmin, async (req, res) => {
-    try {
-      const salaId = Number(req.params.salaId);
-      if (!Number.isFinite(salaId) || salaId <= 0) {
-        return res.status(400).json({ ok: false, error: 'Sala inválida' });
-      }
-
-      const rows = await getTorneosBySalaIdForAdmin(salaId);
-      return res.json({ ok: true, torneos: rows.map(toPublicTorneo) });
-    } catch (err) {
-      console.error('GET /api/admin/sala-torneos/:salaId', err);
-      return res.status(500).json({ ok: false, error: 'No se pudieron cargar los torneos de la sala' });
-    }
-  });
-
-  // POST /api/admin/sala-torneos/:salaId/:slot
-  router.post('/admin/sala-torneos/:salaId/:slot', requireAdmin, uploadTorneoImage.single('imagen'), async (req, res) => {
-    try {
-      const salaId = Number(req.params.salaId);
-      const slot = Number(req.params.slot);
-      const categoria = String(req.body?.categoria || '').trim();
-      const fechaHora = normalizeDateTime(req.body?.fechaHora || req.body?.fecha_hora);
-      const valor = normalizeValor(req.body?.valor);
-      const moneda = normalizeCurrency(req.body?.moneda);
-
-      const torneos = await saveTorneoForSala({
-        salaId,
-        slot,
-        categoria,
-        fechaHora,
-        valor,
-        moneda,
-        file: req.file
-      });
-
-      return res.json({ ok: true, torneos });
-    } catch (err) {
-      console.error('POST /api/admin/sala-torneos/:salaId/:slot', err);
-      return res.status(500).json({ ok: false, error: err?.message || 'No se pudo guardar el torneo manual' });
     }
   });
 
