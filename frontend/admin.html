@@ -58,7 +58,9 @@
             <tbody id="tbodyTeams"></tbody>
           </table>
         </div>
-        <div class="footer">
+        <div class="footer table-tools">
+          <button id="btnExportTeams" class="btn" type="button">Exportar</button>
+          <button id="btnImportTeams" class="btn" type="button">Importar</button>
           <button id="btnSaveTeams" class="btn" type="button">Guardar</button>
         </div>
       </div>
@@ -112,11 +114,15 @@
           <tbody id="tbodySalas"></tbody>
         </table>
       </div>
-      <div class="footer">
+      <div class="footer table-tools">
+        <button id="btnExportSalas" class="btn" type="button">Exportar</button>
+        <button id="btnImportSalas" class="btn" type="button">Importar</button>
         <button id="btnSaveSalas" class="btn" type="button">Guardar</button>
       </div>
     </div>
   </div>
+
+  <input id="tableImportFile" type="file" accept="application/json,.json" hidden>
 
   <div class="toast" id="toast"></div>
 

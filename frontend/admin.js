@@ -591,6 +591,128 @@ function showAdminTab(tab){
   $('#salasAdminView')?.toggleAttribute('hidden', !isSalas);
 }
 
+
+/* ====== Exportar / importar tablas ====== */
+let pendingImportTable = null;
+
+function makeExportFilename(kind){
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (kind === 'salas') return `lpi-salas-${stamp}.json`;
+  return `lpi-${_activeDiv || 'division'}-equipos-${stamp}.json`;
+}
+
+function downloadJson(filename, payload){
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportTeamsTable(){
+  const teams = collectRows().map(item => ({
+    nombre: item.username || '',
+    sala: item.email || '',
+    ubicacion: item.phone || ''
+  }));
+
+  downloadJson(makeExportFilename('teams'), {
+    tipo: 'equipos',
+    division: _activeDiv,
+    exportado: new Date().toISOString(),
+    equipos: teams
+  });
+  toast(`Tabla ${_activeDiv} exportada`);
+}
+
+function exportSalasTable(){
+  const salas = collectSalasRows().map(item => ({
+    nombre: item.nombre || '',
+    direccion: item.direccion || '',
+    ubicacion: item.ubicacion || ''
+  }));
+
+  downloadJson(makeExportFilename('salas'), {
+    tipo: 'salas',
+    exportado: new Date().toISOString(),
+    salas
+  });
+  toast('Tabla salas exportada');
+}
+
+function openImportDialog(kind){
+  pendingImportTable = kind;
+  const input = $('#tableImportFile');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function getImportedArray(data, kind){
+  if (Array.isArray(data)) return data;
+  if (kind === 'salas') return Array.isArray(data?.salas) ? data.salas : [];
+  return Array.isArray(data?.equipos) ? data.equipos : Array.isArray(data?.teams) ? data.teams : [];
+}
+
+function importTeamsTable(items){
+  const users = (items || []).slice(0, 20).map(item => ({
+    id: item?.id || null,
+    username: item?.username || item?.nombre || item?.name || item?.equipo || '',
+    role: 'team',
+    email: item?.email || item?.sala || item?.room || '',
+    phone: item?.phone || item?.ubicacion || item?.location || item?.maps || '',
+    slug: item?.slug || slugify(item?.username || item?.nombre || item?.name || item?.equipo || '')
+  })).filter(item => item.username || item.email || item.phone);
+
+  renderRows(users);
+  teamsInDiv = users
+    .filter(item => item.username)
+    .map(item => ({ id: item.id, name: item.username, slug: item.slug || slugify(item.username) }));
+  fillTeamSelect();
+  if (teamsInDiv[0]?.slug) {
+    $('#teamSelect').value = teamsInDiv[0].slug;
+    changeTeam();
+  } else {
+    buildPlayersUI(Array(SLOTS).fill(''));
+  }
+  toast('Tabla importada. Revisá y guardá para actualizar la DB.');
+}
+
+function importSalasTable(items){
+  const salas = (items || []).slice(0, SALAS_SLOTS).map(item => ({
+    id: item?.id || null,
+    nombre: item?.nombre || item?.name || item?.sala || item?.room || '',
+    direccion: item?.direccion || item?.address || '',
+    ubicacion: item?.ubicacion || item?.location || item?.maps || ''
+  }));
+  renderSalasRows(salas);
+  toast('Tabla importada. Revisá y guardá para actualizar la DB.');
+}
+
+async function handleTableImportFile(ev){
+  const file = ev?.target?.files?.[0];
+  const kind = pendingImportTable;
+  pendingImportTable = null;
+  if (!file || !kind) return;
+
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const items = getImportedArray(data, kind);
+    if (!items.length) throw new Error('El archivo no tiene datos para importar.');
+
+    if (kind === 'salas') importSalasTable(items);
+    else importTeamsTable(items);
+  }catch(e){
+    console.warn('import-table', e);
+    alert(e?.message || 'No se pudo importar el archivo. Usá un JSON exportado desde esta pantalla.');
+  }
+}
+
 /* ====== Carga de división ====== */
 let _activeDiv = 'primera';
 async function loadDivision(div){
@@ -643,8 +765,13 @@ document.addEventListener('DOMContentLoaded', () => {
   ensureResetPassUI();
   $$('.sw').forEach(btn => btn.addEventListener('click', () => loadDivision(btn.dataset.div)));
   $('#btnSaveTeams')?.addEventListener('click', saveTeams);
+  $('#btnExportTeams')?.addEventListener('click', exportTeamsTable);
+  $('#btnImportTeams')?.addEventListener('click', () => openImportDialog('teams'));
   $('#btnSaveRoster')?.addEventListener('click', saveRoster);
   $('#btnSaveSalas')?.addEventListener('click', saveSalas);
+  $('#btnExportSalas')?.addEventListener('click', exportSalasTable);
+  $('#btnImportSalas')?.addEventListener('click', () => openImportDialog('salas'));
+  $('#tableImportFile')?.addEventListener('change', handleTableImportFile);
   $('#teamSelect')?.addEventListener('change', changeTeam);
   
   $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());

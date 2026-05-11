@@ -416,3 +416,24 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
 .btn-del-sala:hover{
   background:#202020;
 }
+
+/* ====== Exportar / importar tablas ====== */
+.table-tools{
+  align-items:center;
+  flex-wrap:wrap;
+}
+.table-tools .btn{
+  min-width:96px;
+}
+.table-tools .btn:last-child{
+  background:linear-gradient(180deg,var(--gold),#e6a800);
+  color:#1b1600;
+}
+@media (max-width: 520px){
+  .table-tools{
+    justify-content:stretch;
+  }
+  .table-tools .btn{
+    flex:1 1 100px;
+  }
+}
