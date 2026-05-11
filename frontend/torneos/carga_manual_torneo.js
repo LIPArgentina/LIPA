@@ -2,6 +2,7 @@
   'use strict';
 
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  const SESSION_KEY = 'lpi.session';
   const $ = (s) => document.querySelector(s);
 
   const salaSelect = $('#salaSelect');
@@ -23,6 +24,24 @@
   };
 
   function apiUrl(path){ return `${API_BASE}${path}`; }
+
+  function readSession(){
+    try {
+      return JSON.parse(localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY) || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  function getToken(){
+    const params = new URLSearchParams(location.search);
+    return params.get('token') || readSession().token || '';
+  }
+
+  function authHeaders(){
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
 
   function setStatus(text, type = 'info'){
     if (!statusBox) return;
@@ -55,10 +74,28 @@
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
+  function ensureAdminSession(){
+    const sess = readSession();
+    const role = String(sess?.role || '').toLowerCase();
+
+    if (role !== 'admin' || !getToken()) {
+      setStatus('No hay sesión admin válida. Volvé a ingresar como admin.', 'error');
+      return false;
+    }
+
+    return true;
+  }
+
   async function loadSalas(){
     try {
       setStatus('Cargando salas…', 'info');
-      const resp = await fetch(apiUrl('/api/salas'), { cache:'no-store', credentials:'include' });
+
+      const resp = await fetch(apiUrl('/api/salas'), {
+        cache:'no-store',
+        credentials:'include',
+        headers: authHeaders()
+      });
+
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || data.ok === false) throw new Error(data.error || `HTTP ${resp.status}`);
 
@@ -90,15 +127,19 @@
     fullBox.hidden = true;
 
     if (!salaId) return;
+    if (!ensureAdminSession()) return;
 
     try {
       setStatus('Cargando publicaciones de la sala…', 'info');
+
       const resp = await fetch(apiUrl(`/api/admin/sala-torneos/${encodeURIComponent(salaId)}`), {
         cache:'no-store',
-        credentials:'include'
+        credentials:'include',
+        headers: authHeaders()
       });
+
       const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || data.ok === false) throw new Error(data.error || `HTTP ${resp.status}`);
+      if (!resp.ok || data.ok === false) throw new Error(data.error || data.msg || `HTTP ${resp.status}`);
 
       state.torneos = Array.isArray(data.torneos) ? data.torneos : [];
       renderOverwriteOptions();
@@ -162,6 +203,8 @@
     const salaId = getSelectedSalaId();
     const slot = getUploadSlot();
 
+    if (!ensureAdminSession()) return;
+
     if (!salaId) {
       setStatus('Seleccioná una sala.', 'error');
       return;
@@ -206,10 +249,12 @@
       const resp = await fetch(apiUrl(`/api/admin/sala-torneos/${encodeURIComponent(salaId)}/${encodeURIComponent(slot)}`), {
         method:'POST',
         credentials:'include',
+        headers: authHeaders(),
         body: formData
       });
+
       const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || data.ok === false) throw new Error(data.error || `HTTP ${resp.status}`);
+      if (!resp.ok || data.ok === false) throw new Error(data.error || data.msg || `HTTP ${resp.status}`);
 
       state.torneos = Array.isArray(data.torneos) ? data.torneos : [];
       state.file = null;
@@ -231,7 +276,12 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    if (!ensureAdminSession()) {
+      btnGuardar.disabled = true;
+    }
+
     loadSalas();
+
     salaSelect.addEventListener('change', loadSalaTorneos);
     imageInput.addEventListener('change', () => {
       state.file = imageInput.files?.[0] || null;
