@@ -47,6 +47,8 @@
 
 /* ====== Config compartida ====== */
 const DIVISIONES = ['primera', 'segunda', 'tercera'];
+const ADMIN_TABS = ['primera', 'segunda', 'tercera', 'salas'];
+const SALAS_SLOTS = 30;
 const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
 const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
@@ -492,15 +494,118 @@ async function loadTeamsForDivision(div){
   }
 }
 
+
+/* ====== Tabla de salas ====== */
+function normalizeSala(item){
+  return {
+    id: item?.id || null,
+    nombre: String(item?.nombre || item?.name || item?.sala || item?.room || '').trim(),
+    direccion: String(item?.direccion || item?.address || '').trim(),
+    ubicacion: String(item?.ubicacion || item?.location || item?.maps || '').trim(),
+  };
+}
+
+function renderSalasRows(salas){
+  const tbody = $('#tbodySalas');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const rows = Array.isArray(salas) ? salas.map(normalizeSala).slice(0, SALAS_SLOTS) : [];
+
+  for (let i = 0; i < SALAS_SLOTS; i++){
+    const sala = rows[i] || { id: null, nombre: '', direccion: '', ubicacion: '' };
+    const tr = document.createElement('tr');
+    if (sala.id) tr.dataset.salaId = String(sala.id);
+
+    tr.innerHTML = `
+      <td class="col-idx">${i + 1}</td>
+      <td><input class="input sala-name" type="text" value="${sala.nombre.replace(/"/g,'&quot;')}" placeholder="Nombre de sala" aria-label="Nombre de sala fila ${i + 1}"></td>
+      <td><input class="input sala-address" type="text" value="${sala.direccion.replace(/"/g,'&quot;')}" placeholder="Dirección" aria-label="Dirección fila ${i + 1}"></td>
+      <td><input class="input sala-location" type="url" value="${normalizeLocation(sala.ubicacion).replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación fila ${i + 1}"></td>
+      <td class="team-actions-cell"><button class="btn-del-sala" type="button">Eliminar</button></td>`;
+
+    tr.querySelector('.btn-del-sala')?.addEventListener('click', () => {
+      const name = tr.querySelector('.sala-name')?.value?.trim() || `fila ${i + 1}`;
+      if (!confirm(`¿Eliminar la sala "${name}" de la tabla?`)) return;
+      tr.querySelector('.sala-name').value = '';
+      tr.querySelector('.sala-address').value = '';
+      tr.querySelector('.sala-location').value = '';
+      delete tr.dataset.salaId;
+    });
+
+    tbody.appendChild(tr);
+  }
+}
+
+function collectSalasRows(){
+  const rows = [];
+  $$('#tbodySalas tr').forEach(tr => {
+    const nombre = tr.querySelector('.sala-name')?.value.trim() || '';
+    const direccion = tr.querySelector('.sala-address')?.value.trim() || '';
+    const ubicacion = tr.querySelector('.sala-location')?.value.trim() || '';
+    if (!nombre && !direccion && !ubicacion) return;
+    const id = tr.dataset.salaId || null;
+    rows.push({ id, nombre, direccion, ubicacion });
+  });
+  return rows;
+}
+
+async function loadSalas(){
+  try{
+    const resp = await fetch(`${API_BASE}/api/salas`, {
+      cache: 'no-store',
+      credentials: 'include'
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+    const raw = Array.isArray(data) ? data : Array.isArray(data.salas) ? data.salas : [];
+    renderSalasRows(raw);
+  }catch(e){
+    console.warn('load-salas', e);
+    renderSalasRows([]);
+    toast('No se pudieron cargar las salas');
+  }
+}
+
+async function saveSalas(){
+  const salas = collectSalasRows();
+  try{
+    const resp = await fetch(`${API_BASE}/api/save-salas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ salas })
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok || json.ok === false) throw new Error(json.error || `HTTP ${resp.status}`);
+    toast('Salas guardadas correctamente');
+    await loadSalas();
+  }catch(e){
+    console.warn('save-salas', e);
+    toast('No se pudieron guardar las salas');
+  }
+}
+
+function showAdminTab(tab){
+  const isSalas = tab === 'salas';
+  $('#teamsAdminView')?.toggleAttribute('hidden', isSalas);
+  $('#salasAdminView')?.toggleAttribute('hidden', !isSalas);
+}
+
 /* ====== Carga de división ====== */
 let _activeDiv = 'primera';
 async function loadDivision(div){
   _activeDiv = div;
+  showAdminTab(div);
   $$('.sw').forEach(btn => {
     const on = btn.dataset.div === div;
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
+
+  if (div === 'salas') {
+    await loadSalas();
+    return;
+  }
 
   if (!DIVISIONES.includes(div)) {
     renderRows([]);
@@ -537,9 +642,10 @@ async function loadDivision(div){
 document.addEventListener('DOMContentLoaded', () => {
   ensureResetPassUI();
   $$('.sw').forEach(btn => btn.addEventListener('click', () => loadDivision(btn.dataset.div)));
-  $('#btnSaveTeams').addEventListener('click', saveTeams);
-  $('#btnSaveRoster').addEventListener('click', saveRoster);
-  $('#teamSelect').addEventListener('change', changeTeam);
+  $('#btnSaveTeams')?.addEventListener('click', saveTeams);
+  $('#btnSaveRoster')?.addEventListener('click', saveRoster);
+  $('#btnSaveSalas')?.addEventListener('click', saveSalas);
+  $('#teamSelect')?.addEventListener('change', changeTeam);
   
   $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());
   $('#btnApplyImport')?.addEventListener('click', importPlayersFromTextarea);

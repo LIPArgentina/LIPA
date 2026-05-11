@@ -36,10 +36,11 @@
         <button class="sw active" data-div="primera" aria-pressed="true">primera</button>
         <button class="sw" data-div="segunda" aria-pressed="false">segunda</button>
         <button class="sw" data-div="tercera" aria-pressed="false">tercera</button>
+        <button class="sw" data-div="salas" aria-pressed="false">salas</button>
       </div>
     </div>
 
-    <div class="grid-2">
+    <div id="teamsAdminView" class="grid-2">
       <!-- Izquierda: tabla de equipos de liga -->
       <div class="card">
         <div class="card-header"><h2 class="title">Equipos de liga</h2></div>
@@ -92,6 +93,27 @@
             <button id="btnSaveRoster" class="btn-save" type="button">Guardar</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="salasAdminView" class="card salas-admin-card" hidden>
+      <div class="card-header"><h2 class="title">Salas</h2></div>
+      <div class="table-wrap">
+        <table aria-label="Tabla de salas">
+          <thead>
+            <tr>
+              <th class="col-idx">#</th>
+              <th>Nombre de sala</th>
+              <th>Dirección</th>
+              <th>Ubicación</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbodySalas"></tbody>
+        </table>
+      </div>
+      <div class="footer">
+        <button id="btnSaveSalas" class="btn" type="button">Guardar</button>
       </div>
     </div>
   </div>
