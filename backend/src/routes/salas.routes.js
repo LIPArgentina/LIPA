@@ -73,6 +73,8 @@ module.exports = function createSalasRouter(deps = {}) {
   }
 
   function toPublicTorneo(row) {
+    const fileName = row.media_path ? path.basename(row.media_path) : '';
+
     return {
       id: row.id,
       salaId: row.sala_id,
@@ -84,7 +86,7 @@ module.exports = function createSalasRouter(deps = {}) {
       valor: row.valor,
       moneda: row.moneda || 'ARS',
       mediaType: row.media_type,
-      mediaUrl: `/api/sala-torneos/media/${encodeURIComponent(row.id)}`,
+      mediaUrl: fileName ? `/pictures/torneos/sala/${encodeURIComponent(fileName)}` : '',
       updatedAt: row.updated_at,
       createdAt: row.created_at
     };
