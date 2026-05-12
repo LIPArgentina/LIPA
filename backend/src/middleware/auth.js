@@ -8,12 +8,12 @@ function getJwtSecret() {
 }
 
 function getToken(req) {
-  return (
-    (req.cookies && req.cookies.lpi_auth) ||
-    (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
+  const bearer =
+    req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
       ? req.headers.authorization.slice(7)
-      : null)
-  );
+      : null;
+
+  return bearer || (req.cookies && req.cookies.lpi_auth) || null;
 }
 
 function requireTeam(req, res, next) {
@@ -38,7 +38,7 @@ function requireSala(req, res, next) {
     if (!token) return res.status(401).json({ ok: false, msg: 'no autenticade' });
 
     const payload = jwt.verify(token, getJwtSecret());
-    if (payload.role !== 'sala' || !payload.salaId || !payload.slug) {
+    if (payload.role !== 'sala' || !payload.salaId) {
       return res.status(403).json({ ok: false, msg: 'sin permisos' });
     }
     req.user = payload;
