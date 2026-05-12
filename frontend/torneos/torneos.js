@@ -44,6 +44,33 @@
       .replaceAll('"','&quot;');
   }
 
+  async function loadImageAsBlob(url){
+    const response = await fetch(url, {
+      cache: 'no-store',
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('No se pudo cargar la imagen');
+    }
+
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  async function hydrateTournamentImages(){
+    const images = document.querySelectorAll('.torneo-img[data-src]');
+
+    for (const img of images) {
+      try {
+        const blobUrl = await loadImageAsBlob(img.dataset.src);
+        img.src = blobUrl;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }
+
   function render(torneos){
     if (!grid) return;
     grid.innerHTML = '';
@@ -59,7 +86,7 @@
       card.className = 'torneo-card';
       card.innerHTML = `
         <div class="torneo-card__media">
-          <img alt="Torneo de ${escapeHtml(torneo.sala || 'sala')}" src="${apiUrl(torneo.mediaUrl)}" loading="lazy">
+          <img class="torneo-img" alt="Torneo de ${escapeHtml(torneo.sala || 'sala')}" data-src="${apiUrl(torneo.mediaUrl)}" loading="lazy">
         </div>
         <div class="torneo-card__body">
           <div class="torneo-row torneo-row--sala"><span>Sala</span><strong>${escapeHtml(torneo.sala || 'Sala')}</strong></div>
@@ -78,7 +105,10 @@
       const resp = await fetch(apiUrl('/api/torneos'), { cache: 'no-store' });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || data.ok === false) throw new Error(data.error || `HTTP ${resp.status}`);
+
       render(Array.isArray(data.torneos) ? data.torneos : []);
+      hydrateTournamentImages();
+
     } catch (err) {
       console.error(err);
       render([]);
