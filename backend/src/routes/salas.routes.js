@@ -782,15 +782,18 @@ module.exports = function createSalasRouter(deps = {}) {
       const row = rows[0];
       if (!row?.media_path) return res.status(404).end();
 
-      const root = path.resolve(picturesRoot);
-      const fullPath = path.resolve(row.media_path);
-      if (!fullPath.startsWith(root + path.sep) && fullPath !== root) return res.status(403).end();
-      if (!fs.existsSync(fullPath)) return res.status(404).end();
+      const fullPath = row.media_path;
+
+      if (!fullPath || !fs.existsSync(fullPath)) {
+        return res.status(404).end();
+      }
 
       res.set('Cache-Control', 'public, max-age=86400');
       res.set('Access-Control-Allow-Origin', 'https://lipa-frontend-staging.onrender.com');
       res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+
       if (row.media_type) res.type(row.media_type);
+
       return res.sendFile(fullPath);
     } catch (err) {
       console.error('GET /api/sala-torneos/media/:id', err);
