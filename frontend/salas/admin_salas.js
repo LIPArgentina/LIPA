@@ -83,7 +83,7 @@
       const resp = await fetch(apiUrl('/api/sala/change-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        credentials: 'include',
+        credentials: 'omit',
         body: JSON.stringify({ slug: getSalaSlug(), salaId: getSalaId(), oldPassword, newPassword })
       });
       const data = await resp.json().catch(() => ({}));
@@ -183,7 +183,7 @@
       setStatus('Cargando torneos…', 'info');
       const resp = await fetch(apiUrl('/api/sala/torneos'), {
         cache: 'no-store',
-        credentials: 'include',
+        credentials: 'omit',
         headers: authHeaders()
       });
       const data = await resp.json().catch(() => ({}));
@@ -227,7 +227,7 @@
       setStatus('Guardando torneo…', 'info');
       const resp = await fetch(apiUrl(`/api/sala/torneos/${encodeURIComponent(slot)}`), {
         method: 'POST',
-        credentials: 'include',
+        credentials: 'omit',
         headers: authHeaders(),
         body: formData
       });
@@ -249,7 +249,7 @@
       setStatus('Eliminando publicación…', 'info');
       const resp = await fetch(apiUrl(`/api/sala/torneos/${encodeURIComponent(slot)}`), {
         method: 'DELETE',
-        credentials: 'include',
+        credentials: 'omit',
         headers: authHeaders()
       });
       const data = await resp.json().catch(() => ({}));
