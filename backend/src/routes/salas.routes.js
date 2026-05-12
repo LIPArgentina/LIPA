@@ -788,6 +788,8 @@ module.exports = function createSalasRouter(deps = {}) {
       if (!fs.existsSync(fullPath)) return res.status(404).end();
 
       res.set('Cache-Control', 'public, max-age=86400');
+      res.set('Access-Control-Allow-Origin', 'https://lipa-frontend-staging.onrender.com');
+      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
       if (row.media_type) res.type(row.media_type);
       return res.sendFile(fullPath);
     } catch (err) {
