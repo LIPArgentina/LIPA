@@ -47,7 +47,7 @@
   async function loadImageAsBlob(url){
     const response = await fetch(url, {
       cache: 'no-store',
-      credentials: 'include'
+      credentials: 'omit'
     });
 
     if (!response.ok) {
