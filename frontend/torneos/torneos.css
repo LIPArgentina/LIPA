@@ -1,0 +1,29 @@
+:root{--bg:#0a0a0a;--ink:#ffffff;--gold:#ffcc00;--gold-soft:#ffd966;--line:#ffffff22;--panel:#16171a;--muted:#d0d0d0;--err:#ff6767;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.container{max-width:2000px;margin:0 auto;padding:9px 8px;}
+header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:7px;border-bottom:1px solid var(--line);padding-bottom:5px;}
+header img{height:34px;width:auto;display:block;}
+.header-center{display:flex;align-items:center;justify-content:center;gap:7px;}
+.title{font-weight:900;letter-spacing:.06em;color:var(--gold);font-size:clamp(16px,2.5vw,24px);text-align:center;}
+.actions{margin-left:auto;display:flex;gap:6px;}
+.btn{border:1px solid #b28900;background:transparent;color:var(--gold);font-weight:800;padding:7px 10px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font:inherit;font-size:12px;text-transform:uppercase;letter-spacing:.04em;}
+.btn:hover{filter:brightness(1.08);}
+.torneos-page{max-width:1040px;margin:0 auto;padding:18px 0 34px;}
+.torneos-hero{margin-bottom:14px;}
+.eyebrow{margin:0 0 4px;color:var(--muted);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
+.torneos-hero h1{margin:0;color:var(--ink);font-size:clamp(22px,3vw,34px);line-height:1;font-weight:900;letter-spacing:-.03em;}
+.lead{max-width:880px;margin:9px 0 0;color:#f4f4f4;line-height:1.35;font-size:14px;}
+.status-box{background:var(--panel);border:1px solid rgba(255,204,0,.45);border-radius:12px;box-shadow:0 5px 12px #0006;padding:9px 11px;margin:8px 0 14px;color:var(--muted);font-size:12px;}
+.status-box.error{border-color:rgba(255,103,103,.6);color:#ffb3b3;}
+.torneos-grid{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:18px;align-items:start;}
+.torneo-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 5px 12px #0006;overflow:hidden;min-width:0;}
+.torneo-card__media{height:260px;background:#050505;border-bottom:1px solid var(--line);}
+.torneo-card__media img{width:100%;height:100%;object-fit:cover;display:block;}
+.torneo-card__body{padding:12px;display:grid;gap:8px;}
+.torneo-row{background:#0f0f11;border:1px solid #ffffff12;border-radius:10px;padding:9px 10px;}
+.torneo-row span{display:block;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;}
+.torneo-row strong{display:block;color:#fff;font-size:15px;line-height:1.2;overflow-wrap:anywhere;}
+.torneo-row--sala strong{color:var(--gold);font-size:18px;text-transform:uppercase;}
+@media(max-width:900px){.torneos-grid{grid-template-columns:repeat(2, minmax(0,1fr));}.torneo-card__media{height:230px;}}
+@media(max-width:620px){.container{padding:8px 6px;}header{grid-template-columns:auto 1fr auto;}header img{height:32px;}.btn{padding:6px 8px;font-size:11px;}.torneos-grid{grid-template-columns:1fr;}.torneo-card__media{height:240px;}}

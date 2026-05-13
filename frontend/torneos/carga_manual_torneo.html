@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>CARGA MANUAL TORNEO | Liga de Pool Independiente</title>
+  <link rel="icon" href="../logo_liga.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="./carga_manual_torneo.css"/>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
+    <div class="header-center">
+      <div class="title">CARGA MANUAL TORNEO</div>
+      <div class="subtitle">Administración</div>
+    </div>
+    <nav class="actions">
+      <a class="btn" href="../admin.html">VOLVER ADMIN</a>
+      <a class="btn" href="../index.html">INICIO</a>
+    </nav>
+  </header>
+
+  <main class="manual-page">
+    <section class="manual-hero">
+      <p class="eyebrow">Carga manual</p>
+      <h1>Cargá un torneo en nombre de una sala</h1>
+      <p class="lead">Seleccioná la sala desde DB. Si ya tiene los 6 recuadros ocupados, elegí cuál querés sobreescribir del 1 al 6.</p>
+    </section>
+
+    <section id="statusBox" class="status-box" hidden></section>
+
+    <section class="manual-card">
+      <div class="field">
+        <label for="salaSelect">Sala</label>
+        <select id="salaSelect">
+          <option value="">Cargando salas...</option>
+        </select>
+      </div>
+
+      <div id="fullBox" class="full-box" hidden>
+        <p>Esta sala ya tiene 6 torneos cargados. Elegí cuál querés sobreescribir.</p>
+        <label for="overwriteSlot">Recuadro a sobreescribir</label>
+        <select id="overwriteSlot"></select>
+      </div>
+
+      <article class="torneo-slot">
+        <div class="torneo-slot__media" id="mediaBox">
+          <div class="torneo-slot__empty">Cargar imagen o GIF</div>
+          <input id="imageInput" class="torneo-slot__file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Cargar imagen">
+        </div>
+
+        <div class="torneo-slot__fields">
+          <label>Categoría
+            <input id="categoriaInput" type="text" placeholder="Ej: Parejas, Individual">
+          </label>
+          <label>Fecha y hora
+            <input id="fechaInput" type="datetime-local">
+          </label>
+          <label>Valor
+            <div class="valor-row">
+              <input id="valorInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Solo números">
+              <select id="monedaSelect">
+                <option value="ARS">Pesos</option>
+                <option value="USD">Dólares</option>
+              </select>
+            </div>
+          </label>
+        </div>
+
+        <div class="torneo-slot__actions">
+          <button class="btn btn-primary" id="btnGuardar" type="button">Guardar carga manual</button>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+
+<script src="../config.js"></script>
+<script src="./carga_manual_torneo.js" defer></script>
+</body>
+</html>

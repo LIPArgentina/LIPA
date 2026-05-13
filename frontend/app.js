@@ -110,15 +110,41 @@ function renderSession(sess) {
 
   const role = (sess.role || "").toLowerCase();
 
+  if (btnAdminEquipos) {
+    btnAdminEquipos.classList.remove("btn-admin-salas");
+    btnAdminEquipos.classList.remove("btn-admin-team");
+  }
+
   if (role === "admin") {
     if (btnAdminEquipos) {
       btnAdminEquipos.textContent = "Administrar equipos";
       btnAdminEquipos.href = "./admin.html";
+      btnAdminEquipos.classList.add("btn-admin-team");
       btnAdminEquipos.classList.remove("hidden");
     }
 
     if (btnBanner) btnBanner.classList.remove("hidden");
     if (brandCta) brandCta.textContent = "Hola, Admin!";
+  } else if (role === "sala") {
+    const slug = sess.slug || localStorage.getItem("lpi.lastSalaSlug") || "";
+    const token = sess.token || "";
+
+    if (btnAdminEquipos && slug) {
+      const params = new URLSearchParams();
+      params.set("sala", slug);
+      if (token) params.set("token", token);
+
+      btnAdminEquipos.textContent = "Administrar sala";
+      btnAdminEquipos.href = `./salas/admin_salas.html?${params.toString()}`;
+      btnAdminEquipos.classList.add("btn-admin-salas");
+      btnAdminEquipos.classList.remove("hidden");
+    } else if (btnAdminEquipos) {
+      btnAdminEquipos.classList.add("hidden");
+      btnAdminEquipos.removeAttribute("href");
+    }
+
+    if (btnBanner) btnBanner.classList.add("hidden");
+    if (brandCta) brandCta.textContent = `Hola, ${sess.displayName || "Sala"}!`;
   } else {
     const slug =
       sess.slug ||
@@ -128,6 +154,7 @@ function renderSession(sess) {
     if (btnAdminEquipos && slug) {
       btnAdminEquipos.textContent = "Administrar equipo";
       btnAdminEquipos.href = `./templates/plantilla.html?team=${encodeURIComponent(slug)}`;
+      btnAdminEquipos.classList.add("btn-admin-team");
       btnAdminEquipos.classList.remove("hidden");
     } else if (btnAdminEquipos) {
       btnAdminEquipos.classList.add("hidden");

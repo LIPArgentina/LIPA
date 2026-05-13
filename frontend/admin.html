@@ -21,6 +21,7 @@
       <a id="btnCrucesManual" class="btn btn-gold" href="cruces/cruces_manuales.html" aria-label="Abrir carga manual de cruces">CARGAR CRUCES MANUAL</a>
       <a id="btnFecha" class="btn btn-gold" href="/fecha/visor_planillas.html" aria-label="Abrir planillas de fecha">PLANILLAS FECHA</a>
       <a id="btnPictures" class="btn btn-gold" href="pictures/pictures_admin.html" aria-label="Abrir visor de fotos">PICTURES</a>
+      <a id="btnCargaManualTorneo" class="btn btn-gold" href="torneos/carga_manual_torneo.html" aria-label="Abrir carga manual de torneo">CARGA MANUAL TORNEO</a>
     </nav>
 
 <div class="top-right-actions">
@@ -36,10 +37,11 @@
         <button class="sw active" data-div="primera" aria-pressed="true">primera</button>
         <button class="sw" data-div="segunda" aria-pressed="false">segunda</button>
         <button class="sw" data-div="tercera" aria-pressed="false">tercera</button>
+        <button class="sw" data-div="salas" aria-pressed="false">salas</button>
       </div>
     </div>
 
-    <div class="grid-2">
+    <div id="teamsAdminView" class="grid-2">
       <!-- Izquierda: tabla de equipos de liga -->
       <div class="card">
         <div class="card-header"><h2 class="title">Equipos de liga</h2></div>
@@ -57,7 +59,9 @@
             <tbody id="tbodyTeams"></tbody>
           </table>
         </div>
-        <div class="footer">
+        <div class="footer table-tools">
+          <button id="btnExportTeams" class="btn" type="button">Exportar</button>
+          <button id="btnImportTeams" class="btn" type="button">Importar</button>
           <button id="btnSaveTeams" class="btn" type="button">Guardar</button>
         </div>
       </div>
@@ -94,7 +98,32 @@
         </div>
       </div>
     </div>
+
+    <div id="salasAdminView" class="card salas-admin-card" hidden>
+      <div class="card-header"><h2 class="title">Salas</h2></div>
+      <div class="table-wrap">
+        <table aria-label="Tabla de salas">
+          <thead>
+            <tr>
+              <th class="col-idx">#</th>
+              <th>Nombre de sala</th>
+              <th>Dirección</th>
+              <th>Ubicación</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbodySalas"></tbody>
+        </table>
+      </div>
+      <div class="footer table-tools">
+        <button id="btnExportSalas" class="btn" type="button">Exportar</button>
+        <button id="btnImportSalas" class="btn" type="button">Importar</button>
+        <button id="btnSaveSalas" class="btn" type="button">Guardar</button>
+      </div>
+    </div>
   </div>
+
+  <input id="tableImportFile" type="file" accept="application/json,.json" hidden>
 
   <div class="toast" id="toast"></div>
 

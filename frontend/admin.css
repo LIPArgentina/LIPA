@@ -378,3 +378,75 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
   }
 }
 
+
+
+/* ====== Admin: pestaña Salas ====== */
+[hidden]{
+  display:none !important;
+}
+
+.salas-admin-card{
+  width:100%;
+}
+
+#tbodySalas .sala-name,
+#tbodySalas .sala-address,
+#tbodySalas .sala-location{
+  max-width:none;
+}
+
+#salasAdminView thead th:nth-child(2),
+#salasAdminView tbody td:nth-child(2){ width:300px; }
+#salasAdminView thead th:nth-child(3),
+#salasAdminView tbody td:nth-child(3){ width:360px; }
+#salasAdminView thead th:nth-child(4),
+#salasAdminView tbody td:nth-child(4){ width:460px; }
+#salasAdminView thead th:nth-child(5),
+#salasAdminView tbody td:nth-child(5){ width:120px; }
+
+.btn-del-sala{
+  border:1px solid var(--border-2);
+  background:#1a1a1a;
+  color:#d6d6d6;
+  border-radius:18px;
+  padding:8px 10px;
+  font-weight:700;
+  cursor:pointer;
+}
+.btn-del-sala:hover{
+  background:#202020;
+}
+
+/* ====== Exportar / importar tablas ====== */
+.table-tools{
+  align-items:center;
+  flex-wrap:wrap;
+}
+.table-tools .btn{
+  min-width:96px;
+}
+.table-tools .btn:last-child{
+  background:linear-gradient(180deg,var(--gold),#e6a800);
+  color:#1b1600;
+}
+@media (max-width: 520px){
+  .table-tools{
+    justify-content:stretch;
+  }
+  .table-tools .btn{
+    flex:1 1 100px;
+  }
+}
+
+
+/* ===== Header admin: botón carga manual torneo ===== */
+@media (max-width: 480px) {
+  #btnCargaManualTorneo {
+    font-size: 0;
+  }
+  #btnCargaManualTorneo::after {
+    content: "TORNEO";
+    font-size: 0.58rem;
+    line-height: 1;
+  }
+}

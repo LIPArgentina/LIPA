@@ -229,6 +229,27 @@
     return [...dates].sort(compareDateDesc);
   }
 
+
+  async function fetchLlavesDates(teams = []) {
+    const categories = ['segunda', 'tercera'];
+    const dates = new Set();
+    const teamSlugs = unique((teams || []).map((team) => team?.slug || team?.teamSlug || team?.team || team?.nombre || team?.displayName));
+
+    if (!teamSlugs.length) return [];
+
+    await Promise.all(categories.flatMap(category => teamSlugs.map(async (team) => {
+      try {
+        const qs = new URLSearchParams({ category, team });
+        const data = await fetchJson(API_BASE + '/api/llaves/proximo-cruce?' + qs.toString());
+        const raw = String(data?.match?.date || data?.match?.fecha || data?.match?.fechaISO || '').trim();
+        const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (match) dates.add(match[1]);
+      } catch {}
+    })));
+
+    return [...dates].sort(compareDateDesc);
+  }
+
   async function fetchTeams() {
     try {
       const data = await fetchJson(API_BASE + '/api/pictures/admin/teams');
@@ -345,8 +366,11 @@
 
   async function refreshAvailableDates(groups) {
     const groupDates = unique((groups || []).map(group => String(group?.fechaISO || '').slice(0, 10))).sort(compareDateDesc);
-    const fixtureDates = await fetchFixtureDates();
-    availableDates = unique([...fixtureDates, ...groupDates]).sort(compareDateDesc);
+    const [fixtureDates, llavesDates] = await Promise.all([
+      fetchFixtureDates(),
+      fetchLlavesDates(availableTeams)
+    ]);
+    availableDates = unique([...llavesDates, ...fixtureDates, ...groupDates]).sort(compareDateDesc);
     fillSelectOptions(fechaFilter, availableDates, 'TODAS', true);
     fillSelectOptions(manualFechaISO, availableDates, 'Elegí una fecha', true);
   }

@@ -23,192 +23,81 @@
       <p>Elegí el tipo de acceso</p>
     </div>
 
-    <!-- SELECCIÓN CATEGORÍA -->
-
     <div class="category-grid" id="categoryGrid">
-
-      <button
-        type="button"
-        class="category-btn"
-        data-category="primera"
-      >
-        Primera
-      </button>
-
-      <button
-        type="button"
-        class="category-btn"
-        data-category="segunda"
-      >
-        Segunda
-      </button>
-
-      <button
-        type="button"
-        class="category-btn"
-        data-category="tercera"
-      >
-        Tercera
-      </button>
-
-      <button
-        type="button"
-        class="category-btn category-btn--admin"
-        data-category="admin"
-      >
-        Admin
-      </button>
-
+      <button type="button" class="category-btn" data-category="primera">Primera</button>
+      <button type="button" class="category-btn" data-category="segunda">Segunda</button>
+      <button type="button" class="category-btn" data-category="tercera">Tercera</button>
+      <button type="button" class="category-btn category-btn--salas" data-category="salas">Salas</button>
+      <button type="button" class="category-btn category-btn--admin" data-category="admin">Admin</button>
     </div>
 
-
-    <!-- LOGIN EQUIPO -->
-
-    <form
-      id="teamForm"
-      class="auth-form hidden"
-      autocomplete="on"
-    >
-
+    <form id="teamForm" class="auth-form hidden" autocomplete="on">
       <div class="form-head">
-        <button
-          type="button"
-          class="back-btn"
-          id="backFromTeam"
-        >
-          ← Volver
-        </button>
-
+        <button type="button" class="back-btn" id="backFromTeam">← Volver</button>
         <h2 id="teamFormTitle">Ingreso</h2>
       </div>
 
+      <label class="field-label" for="userSelect">Seleccioná usuario</label>
+      <select id="userSelect" name="username" class="field-control" autocomplete="username"></select>
 
-      <label
-        class="field-label"
-        for="userSelect"
-      >
-        Seleccioná usuario
-      </label>
-
-      <select
-        id="userSelect"
-        name="username"
-        class="field-control"
-        autocomplete="username"
-      >
-      </select>
-
-
-      <label
-        class="field-label"
-        for="passwordInput"
-      >
-        Contraseña
-      </label>
-
-      <input
-        id="passwordInput"
-        name="password"
-        type="password"
-        class="field-control"
-        autocomplete="current-password"
-      />
-
+      <label class="field-label" for="passwordInput">Contraseña</label>
+      <input id="passwordInput" name="password" type="password" class="field-control" autocomplete="current-password" />
 
       <label class="check-row">
-        <input
-          id="togglePass"
-          type="checkbox"
-        />
+        <input id="togglePass" type="checkbox" />
         <span>Mostrar contraseña</span>
       </label>
 
-
-      <p
-        id="teamError"
-        class="error hidden"
-      >
-        Usuario o contraseña incorrecta
-      </p>
-
+      <p id="teamError" class="error hidden">Usuario o contraseña incorrecta</p>
 
       <div class="form-actions">
-        <button
-          type="submit"
-          class="btn-primary"
-        >
-          Ingresar
-        </button>
+        <button type="submit" class="btn-primary">Ingresar</button>
       </div>
-
     </form>
 
-
-    <!-- LOGIN ADMIN -->
-
-    <form
-      id="adminForm"
-      class="auth-form hidden"
-      autocomplete="on"
-    >
-
+    <form id="salaForm" class="auth-form hidden" autocomplete="on">
       <div class="form-head">
-
-        <button
-          type="button"
-          class="back-btn"
-          id="backFromAdmin"
-        >
-          ← Volver
-        </button>
-
-        <h2>Ingreso Admin</h2>
-
+        <button type="button" class="back-btn" id="backFromSala">← Volver</button>
+        <h2>Ingreso Salas</h2>
       </div>
 
+      <label class="field-label" for="salaSelect">Seleccioná sala</label>
+      <select id="salaSelect" name="sala" class="field-control" autocomplete="username"></select>
 
-      <label
-        class="field-label"
-        for="adminPass"
-      >
-        Contraseña
-      </label>
-
-      <input
-        id="adminPass"
-        name="password"
-        type="password"
-        class="field-control"
-        autocomplete="current-password"
-      />
-
+      <label class="field-label" for="salaPass">Contraseña</label>
+      <input id="salaPass" name="password" type="password" class="field-control" autocomplete="current-password" />
 
       <label class="check-row">
-        <input
-          id="toggleAdminPass"
-          type="checkbox"
-        />
+        <input id="toggleSalaPass" type="checkbox" />
         <span>Mostrar contraseña</span>
       </label>
 
-
-      <p
-        id="adminError"
-        class="error hidden"
-      >
-        Contraseña incorrecta
-      </p>
-
+      <p id="salaError" class="error hidden">Sala o contraseña incorrecta</p>
 
       <div class="form-actions">
-        <button
-          type="submit"
-          class="btn-primary"
-        >
-          Ingresar
-        </button>
+        <button type="submit" class="btn-primary">Ingresar</button>
+      </div>
+    </form>
+
+    <form id="adminForm" class="auth-form hidden" autocomplete="on">
+      <div class="form-head">
+        <button type="button" class="back-btn" id="backFromAdmin">← Volver</button>
+        <h2>Ingreso Admin</h2>
       </div>
 
+      <label class="field-label" for="adminPass">Contraseña</label>
+      <input id="adminPass" name="password" type="password" class="field-control" autocomplete="current-password" />
+
+      <label class="check-row">
+        <input id="toggleAdminPass" type="checkbox" />
+        <span>Mostrar contraseña</span>
+      </label>
+
+      <p id="adminError" class="error hidden">Contraseña incorrecta</p>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">Ingresar</button>
+      </div>
     </form>
 
   </section>

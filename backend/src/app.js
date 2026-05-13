@@ -166,6 +166,14 @@ app.use('/frontend', express.static(FRONTEND_DIR));
 app.use('/templates', express.static(FRONTEND_TEMPLATES));
 app.use('/fecha', express.static(FRONTEND_FECHA));
 
+app.use('/pictures', express.static(PICTURES_DIR, {
+  maxAge: '1d',
+  setHeaders: (res) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+}));
+
 /* =========================================================
    TEST DB
 ========================================================= */

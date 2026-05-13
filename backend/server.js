@@ -1,10 +1,22 @@
 require("dotenv").config();
 
+const express = require("express");
+
 const bcrypt = require('bcryptjs');
 const pool = require("./db");
 const app = require("./src/app");
 
 const PORT = process.env.PORT || 3000;
+
+const PICTURES_DIR = process.env.PICTURES_DIR || "/opt/render/project/src/persistent/pictures";
+app.use("/pictures", express.static(PICTURES_DIR, {
+  maxAge: "1d",
+  setHeaders: (res) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+}));
+
 
 (async () => {
   try {

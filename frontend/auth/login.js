@@ -5,6 +5,7 @@ const sessionKey = "lpi.session";
 
 const categoryGrid = document.getElementById("categoryGrid");
 const teamForm = document.getElementById("teamForm");
+const salaForm = document.getElementById("salaForm");
 const adminForm = document.getElementById("adminForm");
 
 const teamFormTitle = document.getElementById("teamFormTitle");
@@ -13,15 +14,24 @@ const passwordInput = document.getElementById("passwordInput");
 const togglePass = document.getElementById("togglePass");
 const teamError = document.getElementById("teamError");
 
+const salaSelect = document.getElementById("salaSelect");
+const salaPass = document.getElementById("salaPass");
+const toggleSalaPass = document.getElementById("toggleSalaPass");
+const salaError = document.getElementById("salaError");
+
 const adminPass = document.getElementById("adminPass");
 const toggleAdminPass = document.getElementById("toggleAdminPass");
 const adminError = document.getElementById("adminError");
 
 const backFromTeam = document.getElementById("backFromTeam");
+const backFromSala = document.getElementById("backFromSala");
 const backFromAdmin = document.getElementById("backFromAdmin");
 
 let currentCategory = null;
 let currentUsers = [];
+let currentSalas = [];
+
+const BACKEND_URL = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 
 function slugify(s) {
   return String(s || "")
@@ -43,7 +53,16 @@ function normalizeUsers(list) {
     .filter((u) => u.role !== "admin" && u.username.toLowerCase() !== "admin" && u.slug.toLowerCase() !== "admin");
 }
 
-const BACKEND_URL = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+function normalizeSalas(list) {
+  return list
+    .map((s) => {
+      const nombre = s.nombre || s.name || s.sala || s.username || "";
+      const slug = (s.slug && String(s.slug).trim()) ? String(s.slug).trim() : slugify(nombre);
+      const id = s.id || null;
+      return nombre ? { id, nombre, slug } : null;
+    })
+    .filter(Boolean);
+}
 
 async function loadUsers(categoria) {
   try {
@@ -66,7 +85,6 @@ async function loadUsers(categoria) {
     const resp = await fetch(`${DATA_PATH}/usuarios.${categoria}.json`, { cache: "no-store" });
     if (resp.ok) {
       const data = await resp.json();
-
       if (Array.isArray(data)) return normalizeUsers(data);
       if (Array.isArray(data?.users)) return normalizeUsers(data.users);
     }
@@ -79,9 +97,7 @@ async function loadUsers(categoria) {
 
   try {
     await import(`${base}?v=${Date.now()}`);
-    if (Array.isArray(window.LPI_USERS)) {
-      return normalizeUsers(window.LPI_USERS);
-    }
+    if (Array.isArray(window.LPI_USERS)) return normalizeUsers(window.LPI_USERS);
   } catch (e) {
     console.debug("ESM import falló:", e?.message || e);
   }
@@ -100,13 +116,35 @@ async function loadUsers(categoria) {
   return [];
 }
 
+async function loadSalas() {
+  try {
+    const resp = await fetch(`${BACKEND_URL}/api/salas`, {
+      cache: "no-store",
+      credentials: "omit"
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (Array.isArray(data)) return normalizeSalas(data);
+      if (Array.isArray(data?.salas)) return normalizeSalas(data.salas);
+    }
+  } catch (e) {
+    console.debug("No se pudo leer salas desde API:", e?.message || e);
+  }
+
+  return [];
+}
+
 function showCategoryGrid() {
   categoryGrid.classList.remove("hidden");
   teamForm.classList.add("hidden");
+  salaForm.classList.add("hidden");
   adminForm.classList.add("hidden");
   teamError.classList.add("hidden");
+  salaError.classList.add("hidden");
   adminError.classList.add("hidden");
   passwordInput.value = "";
+  salaPass.value = "";
   adminPass.value = "";
 }
 
@@ -139,8 +177,46 @@ async function openTeamCategory(category) {
   passwordInput.type = "password";
 
   categoryGrid.classList.add("hidden");
+  salaForm.classList.add("hidden");
   adminForm.classList.add("hidden");
   teamForm.classList.remove("hidden");
+}
+
+async function openSalas() {
+  currentCategory = "salas";
+  currentSalas = await loadSalas();
+  currentSalas.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+
+  salaSelect.innerHTML = "";
+
+  for (const sala of currentSalas) {
+    const opt = document.createElement("option");
+    opt.value = sala.slug;
+    opt.textContent = sala.nombre;
+    if (sala.id) opt.dataset.id = String(sala.id);
+    salaSelect.appendChild(opt);
+  }
+
+  const lastSalaSlug = localStorage.getItem("lpi.lastSalaSlug");
+  if (lastSalaSlug) {
+    const exists = currentSalas.some((s) => s.slug === lastSalaSlug);
+    if (exists) salaSelect.value = lastSalaSlug;
+  }
+
+  salaError.classList.add("hidden");
+  salaPass.value = "";
+  toggleSalaPass.checked = false;
+  salaPass.type = "password";
+
+  categoryGrid.classList.add("hidden");
+  teamForm.classList.add("hidden");
+  adminForm.classList.add("hidden");
+  salaForm.classList.remove("hidden");
+
+  if (!currentSalas.length) {
+    salaError.textContent = "No hay salas cargadas";
+    salaError.classList.remove("hidden");
+  }
 }
 
 function openAdmin() {
@@ -151,14 +227,16 @@ function openAdmin() {
 
   categoryGrid.classList.add("hidden");
   teamForm.classList.add("hidden");
+  salaForm.classList.add("hidden");
   adminForm.classList.remove("hidden");
 }
 
-function establishSession({ role, displayName, slug, category, token }) {
-  const sess = { role, displayName, slug, category, token, ts: Date.now() };
+function establishSession({ role, displayName, slug, category, token, salaId }) {
+  const sess = { role, displayName, slug, category, token, salaId: salaId || null, ts: Date.now() };
   localStorage.setItem(sessionKey, JSON.stringify(sess));
 
-  if (slug) localStorage.setItem("lpi.lastTeamSlug", slug);
+  if (role === "sala" && slug) localStorage.setItem("lpi.lastSalaSlug", slug);
+  else if (slug) localStorage.setItem("lpi.lastTeamSlug", slug);
   if (category) localStorage.setItem("lpi.lastCategory", category);
 
   return sess;
@@ -167,9 +245,18 @@ function establishSession({ role, displayName, slug, category, token }) {
 function redirectAfterLogin(sess) {
   const role = (sess?.role || "").toLowerCase();
   const slug = sess?.slug;
+  const token = sess?.token || "";
 
   if (role === "admin") {
     window.location.href = "../admin.html";
+    return;
+  }
+
+  if (role === "sala") {
+    const params = new URLSearchParams();
+    if (slug) params.set("sala", slug);
+    if (token) params.set("token", token);
+    window.location.href = `../salas/admin_salas.html${params.toString() ? "?" + params.toString() : ""}`;
     return;
   }
 
@@ -195,17 +282,13 @@ function notifyParent(sess) {
 
 function finishLogin(sess) {
   const hasParent = notifyParent(sess);
-
   if (hasParent) {
     setTimeout(() => {
-      try {
-        window.close();
-      } catch {}
+      try { window.close(); } catch {}
       setTimeout(() => redirectAfterLogin(sess), 300);
     }, 120);
     return;
   }
-
   redirectAfterLogin(sess);
 }
 
@@ -235,7 +318,6 @@ async function submitTeamLogin(ev) {
     }
 
     const data = await res.json().catch(() => ({}));
-
     teamError.classList.add("hidden");
 
     const sess = establishSession({
@@ -250,6 +332,54 @@ async function submitTeamLogin(ev) {
   } catch {
     teamError.textContent = "No se pudo iniciar sesión";
     teamError.classList.remove("hidden");
+  }
+}
+
+async function submitSalaLogin(ev) {
+  ev.preventDefault();
+
+  const selectedSlug = salaSelect.value;
+  const selectedSala = currentSalas.find((s) => s.slug === selectedSlug);
+
+  if (!selectedSala) {
+    salaError.textContent = "Seleccioná una sala válida";
+    salaError.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    const res = await apiFetch("/api/sala/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        slug: selectedSala.slug,
+        salaId: selectedSala.id,
+        password: salaPass.value
+      })
+    });
+
+    if (!res.ok) {
+      salaError.textContent = "Sala o contraseña incorrecta";
+      salaError.classList.remove("hidden");
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    salaError.classList.add("hidden");
+
+    const sess = establishSession({
+      role: "sala",
+      displayName: data.displayName || selectedSala.nombre,
+      slug: data.slug || selectedSala.slug,
+      salaId: data.salaId || selectedSala.id || null,
+      category: "salas",
+      token: data.token || ""
+    });
+
+    finishLogin(sess);
+  } catch {
+    salaError.textContent = "No se pudo iniciar sesión";
+    salaError.classList.remove("hidden");
   }
 }
 
@@ -270,7 +400,6 @@ async function submitAdminLogin(ev) {
     }
 
     const data = await res.json().catch(() => ({}));
-
     adminError.classList.add("hidden");
 
     const sess = establishSession({
@@ -302,14 +431,24 @@ categoryGrid.addEventListener("click", async (e) => {
     return;
   }
 
+  if (category === "salas") {
+    await openSalas();
+    return;
+  }
+
   await openTeamCategory(category);
 });
 
 teamForm.addEventListener("submit", submitTeamLogin);
+salaForm.addEventListener("submit", submitSalaLogin);
 adminForm.addEventListener("submit", submitAdminLogin);
 
 togglePass.addEventListener("change", () => {
   passwordInput.type = togglePass.checked ? "text" : "password";
+});
+
+toggleSalaPass.addEventListener("change", () => {
+  salaPass.type = toggleSalaPass.checked ? "text" : "password";
 });
 
 toggleAdminPass.addEventListener("change", () => {
@@ -317,8 +456,7 @@ toggleAdminPass.addEventListener("change", () => {
 });
 
 backFromTeam.addEventListener("click", showCategoryGrid);
+backFromSala.addEventListener("click", showCategoryGrid);
 backFromAdmin.addEventListener("click", showCategoryGrid);
 
-document.addEventListener("DOMContentLoaded", () => {
-  showCategoryGrid();
-});
+document.addEventListener("DOMContentLoaded", showCategoryGrid);

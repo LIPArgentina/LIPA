@@ -226,3 +226,7 @@ select.field-control optgroup {
     font-size: 1.6rem;
   }
 }
+.category-btn--salas {
+  background: rgba(250, 204, 21, 0.12);
+  border-color: rgba(250, 204, 21, 0.38);
+}

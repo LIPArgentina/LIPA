@@ -13,11 +13,13 @@
     const btnCrucesManual = document.getElementById('btnCrucesManual');
     const btnFecha   = document.getElementById('btnFecha');
     const btnPictures = document.getElementById('btnPictures');
+    const btnCargaManualTorneo = document.getElementById('btnCargaManualTorneo');
     if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
     if(btnLlaves) btnLlaves.href = withMode(btnLlaves.getAttribute('href') || 'llaves/llaves.html');
     if(btnCrucesManual) btnCrucesManual.href = withMode(btnCrucesManual.getAttribute('href') || 'cruces/cruces_manuales.html');
     if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
     if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
+    if(btnCargaManualTorneo) btnCargaManualTorneo.href = withMode(btnCargaManualTorneo.getAttribute('href') || 'torneos/carga_manual_torneo.html');
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 
@@ -37,16 +39,20 @@
     const btnCrucesManual = document.getElementById('btnCrucesManual');
     const btnFecha   = document.getElementById('btnFecha');
     const btnPictures = document.getElementById('btnPictures');
+    const btnCargaManualTorneo = document.getElementById('btnCargaManualTorneo');
     if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
     if(btnLlaves) btnLlaves.href = withMode(btnLlaves.getAttribute('href') || 'llaves/llaves.html');
     if(btnCrucesManual) btnCrucesManual.href = withMode(btnCrucesManual.getAttribute('href') || 'cruces/cruces_manuales.html');
     if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
     if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
+    if(btnCargaManualTorneo) btnCargaManualTorneo.href = withMode(btnCargaManualTorneo.getAttribute('href') || 'torneos/carga_manual_torneo.html');
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 
 /* ====== Config compartida ====== */
 const DIVISIONES = ['primera', 'segunda', 'tercera'];
+const ADMIN_TABS = ['primera', 'segunda', 'tercera', 'salas'];
+const SALAS_SLOTS = 30;
 const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
 const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
@@ -492,15 +498,285 @@ async function loadTeamsForDivision(div){
   }
 }
 
+
+/* ====== Tabla de salas ====== */
+function normalizeSala(item){
+  return {
+    id: item?.id || null,
+    nombre: String(item?.nombre || item?.name || item?.sala || item?.room || '').trim(),
+    direccion: String(item?.direccion || item?.address || '').trim(),
+    ubicacion: String(item?.ubicacion || item?.location || item?.maps || '').trim(),
+  };
+}
+
+function renderSalasRows(salas){
+  const tbody = $('#tbodySalas');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const rows = Array.isArray(salas) ? salas.map(normalizeSala).slice(0, SALAS_SLOTS) : [];
+
+  for (let i = 0; i < SALAS_SLOTS; i++){
+    const sala = rows[i] || { id: null, nombre: '', direccion: '', ubicacion: '' };
+    const canReset = Boolean(sala.id);
+    const tr = document.createElement('tr');
+    if (sala.id) tr.dataset.salaId = String(sala.id);
+
+    tr.innerHTML = `
+      <td class="col-idx">${i + 1}</td>
+      <td><input class="input sala-name" type="text" value="${sala.nombre.replace(/"/g,'&quot;')}" placeholder="Nombre de sala" aria-label="Nombre de sala fila ${i + 1}"></td>
+      <td><input class="input sala-address" type="text" value="${sala.direccion.replace(/"/g,'&quot;')}" placeholder="Dirección" aria-label="Dirección fila ${i + 1}"></td>
+      <td><input class="input sala-location" type="url" value="${normalizeLocation(sala.ubicacion).replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación fila ${i + 1}"></td>
+      <td class="team-actions-cell">
+        <button class="btn-reset-pass btn-reset-sala-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${sala.nombre || ('fila ' + (i + 1))}" ${canReset ? '' : 'disabled'}>🔑</button>
+        <button class="btn-del-sala" type="button">Eliminar</button>
+      </td>`;
+
+    tr.querySelector('.btn-del-sala')?.addEventListener('click', () => {
+      const name = tr.querySelector('.sala-name')?.value?.trim() || `fila ${i + 1}`;
+      if (!confirm(`¿Eliminar la sala "${name}" de la tabla?`)) return;
+      tr.querySelector('.sala-name').value = '';
+      tr.querySelector('.sala-address').value = '';
+      tr.querySelector('.sala-location').value = '';
+      delete tr.dataset.salaId;
+      const resetBtn = tr.querySelector('.btn-reset-sala-pass');
+      if (resetBtn) resetBtn.disabled = true;
+    });
+
+    const resetBtn = tr.querySelector('.btn-reset-sala-pass');
+    resetBtn?.addEventListener('click', async () => {
+      const salaName = tr.querySelector('.sala-name')?.value?.trim() || `fila ${i + 1}`;
+      const rawId = tr.dataset.salaId;
+      const salaId = rawId ? Number(rawId) : NaN;
+
+      if (!Number.isFinite(salaId) || salaId <= 0) {
+        alert('Esa sala todavía no tiene ID en la base. Guardala primero y después vas a poder blanquearle la contraseña.');
+        return;
+      }
+
+      const ok = confirm(`¿Blanquear la contraseña de "${salaName}"?\n\nSe va a generar una contraseña temporal nueva.`);
+      if (!ok) return;
+
+      try {
+        resetBtn.disabled = true;
+
+        const resp = await fetch(`${API_BASE}/api/admin/reset-sala-password/${encodeURIComponent(salaId)}`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+
+        const tempPassword = String(data.newPassword || '').trim();
+        const copied = await copyToClipboard(tempPassword);
+        openResetPassModal(salaName, tempPassword, copied);
+        toast(`Contraseña blanqueada: ${salaName}`);
+      } catch (err) {
+        console.error('reset-sala-password', err);
+        alert(err?.message || 'No se pudo blanquear la contraseña');
+      } finally {
+        resetBtn.disabled = false;
+      }
+    });
+
+    tbody.appendChild(tr);
+  }
+}
+
+function collectSalasRows(){
+  const rows = [];
+  $$('#tbodySalas tr').forEach(tr => {
+    const nombre = tr.querySelector('.sala-name')?.value.trim() || '';
+    const direccion = tr.querySelector('.sala-address')?.value.trim() || '';
+    const ubicacion = tr.querySelector('.sala-location')?.value.trim() || '';
+    if (!nombre && !direccion && !ubicacion) return;
+    const id = tr.dataset.salaId || null;
+    rows.push({ id, nombre, direccion, ubicacion });
+  });
+  return rows;
+}
+
+async function loadSalas(){
+  try{
+    const resp = await fetch(`${API_BASE}/api/salas`, {
+      cache: 'no-store',
+      credentials: 'include'
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+    const raw = Array.isArray(data) ? data : Array.isArray(data.salas) ? data.salas : [];
+    renderSalasRows(raw);
+  }catch(e){
+    console.warn('load-salas', e);
+    renderSalasRows([]);
+    toast('No se pudieron cargar las salas');
+  }
+}
+
+async function saveSalas(){
+  const salas = collectSalasRows();
+  try{
+    const resp = await fetch(`${API_BASE}/api/save-salas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ salas })
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok || json.ok === false) throw new Error(json.error || `HTTP ${resp.status}`);
+    toast('Salas guardadas correctamente');
+    await loadSalas();
+  }catch(e){
+    console.warn('save-salas', e);
+    toast('No se pudieron guardar las salas');
+  }
+}
+
+function showAdminTab(tab){
+  const isSalas = tab === 'salas';
+  $('#teamsAdminView')?.toggleAttribute('hidden', isSalas);
+  $('#salasAdminView')?.toggleAttribute('hidden', !isSalas);
+}
+
+
+/* ====== Exportar / importar tablas ====== */
+let pendingImportTable = null;
+
+function makeExportFilename(kind){
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (kind === 'salas') return `lpi-salas-${stamp}.json`;
+  return `lpi-${_activeDiv || 'division'}-equipos-${stamp}.json`;
+}
+
+function downloadJson(filename, payload){
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportTeamsTable(){
+  const teams = collectRows().map(item => ({
+    nombre: item.username || '',
+    sala: item.email || '',
+    ubicacion: item.phone || ''
+  }));
+
+  downloadJson(makeExportFilename('teams'), {
+    tipo: 'equipos',
+    division: _activeDiv,
+    exportado: new Date().toISOString(),
+    equipos: teams
+  });
+  toast(`Tabla ${_activeDiv} exportada`);
+}
+
+function exportSalasTable(){
+  const salas = collectSalasRows().map(item => ({
+    nombre: item.nombre || '',
+    direccion: item.direccion || '',
+    ubicacion: item.ubicacion || ''
+  }));
+
+  downloadJson(makeExportFilename('salas'), {
+    tipo: 'salas',
+    exportado: new Date().toISOString(),
+    salas
+  });
+  toast('Tabla salas exportada');
+}
+
+function openImportDialog(kind){
+  pendingImportTable = kind;
+  const input = $('#tableImportFile');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function getImportedArray(data, kind){
+  if (Array.isArray(data)) return data;
+  if (kind === 'salas') return Array.isArray(data?.salas) ? data.salas : [];
+  return Array.isArray(data?.equipos) ? data.equipos : Array.isArray(data?.teams) ? data.teams : [];
+}
+
+function importTeamsTable(items){
+  const users = (items || []).slice(0, 20).map(item => ({
+    id: item?.id || null,
+    username: item?.username || item?.nombre || item?.name || item?.equipo || '',
+    role: 'team',
+    email: item?.email || item?.sala || item?.room || '',
+    phone: item?.phone || item?.ubicacion || item?.location || item?.maps || '',
+    slug: item?.slug || slugify(item?.username || item?.nombre || item?.name || item?.equipo || '')
+  })).filter(item => item.username || item.email || item.phone);
+
+  renderRows(users);
+  teamsInDiv = users
+    .filter(item => item.username)
+    .map(item => ({ id: item.id, name: item.username, slug: item.slug || slugify(item.username) }));
+  fillTeamSelect();
+  if (teamsInDiv[0]?.slug) {
+    $('#teamSelect').value = teamsInDiv[0].slug;
+    changeTeam();
+  } else {
+    buildPlayersUI(Array(SLOTS).fill(''));
+  }
+  toast('Tabla importada. Revisá y guardá para actualizar la DB.');
+}
+
+function importSalasTable(items){
+  const salas = (items || []).slice(0, SALAS_SLOTS).map(item => ({
+    id: item?.id || null,
+    nombre: item?.nombre || item?.name || item?.sala || item?.room || '',
+    direccion: item?.direccion || item?.address || '',
+    ubicacion: item?.ubicacion || item?.location || item?.maps || ''
+  }));
+  renderSalasRows(salas);
+  toast('Tabla importada. Revisá y guardá para actualizar la DB.');
+}
+
+async function handleTableImportFile(ev){
+  const file = ev?.target?.files?.[0];
+  const kind = pendingImportTable;
+  pendingImportTable = null;
+  if (!file || !kind) return;
+
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const items = getImportedArray(data, kind);
+    if (!items.length) throw new Error('El archivo no tiene datos para importar.');
+
+    if (kind === 'salas') importSalasTable(items);
+    else importTeamsTable(items);
+  }catch(e){
+    console.warn('import-table', e);
+    alert(e?.message || 'No se pudo importar el archivo. Usá un JSON exportado desde esta pantalla.');
+  }
+}
+
 /* ====== Carga de división ====== */
 let _activeDiv = 'primera';
 async function loadDivision(div){
   _activeDiv = div;
+  showAdminTab(div);
   $$('.sw').forEach(btn => {
     const on = btn.dataset.div === div;
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
+
+  if (div === 'salas') {
+    await loadSalas();
+    return;
+  }
 
   if (!DIVISIONES.includes(div)) {
     renderRows([]);
@@ -537,9 +813,15 @@ async function loadDivision(div){
 document.addEventListener('DOMContentLoaded', () => {
   ensureResetPassUI();
   $$('.sw').forEach(btn => btn.addEventListener('click', () => loadDivision(btn.dataset.div)));
-  $('#btnSaveTeams').addEventListener('click', saveTeams);
-  $('#btnSaveRoster').addEventListener('click', saveRoster);
-  $('#teamSelect').addEventListener('change', changeTeam);
+  $('#btnSaveTeams')?.addEventListener('click', saveTeams);
+  $('#btnExportTeams')?.addEventListener('click', exportTeamsTable);
+  $('#btnImportTeams')?.addEventListener('click', () => openImportDialog('teams'));
+  $('#btnSaveRoster')?.addEventListener('click', saveRoster);
+  $('#btnSaveSalas')?.addEventListener('click', saveSalas);
+  $('#btnExportSalas')?.addEventListener('click', exportSalasTable);
+  $('#btnImportSalas')?.addEventListener('click', () => openImportDialog('salas'));
+  $('#tableImportFile')?.addEventListener('change', handleTableImportFile);
+  $('#teamSelect')?.addEventListener('change', changeTeam);
   
   $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());
   $('#btnApplyImport')?.addEventListener('click', importPlayersFromTextarea);
