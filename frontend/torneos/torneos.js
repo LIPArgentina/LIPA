@@ -47,7 +47,6 @@
       .replaceAll('"','&quot;');
   }
 
-
   function openImageLightbox(src, alt){
     if (!lightbox || !lightboxImg || !src) return;
     lightboxImg.src = src;
@@ -63,37 +62,24 @@
     document.body.classList.remove('no-scroll');
   }
 
-  async function loadImageAsBlob(url){
-    const response = await fetch(url, {
-      cache: 'no-store',
-      credentials: 'omit'
-    });
-
-    if (!response.ok) {
-      throw new Error('No se pudo cargar la imagen');
-    }
-
-    const blob = await response.blob();
-    return URL.createObjectURL(blob);
-  }
-
-  async function hydrateTournamentImages(){
+  function hydrateTournamentImages(){
     const images = document.querySelectorAll('.torneo-img[data-src]');
 
     for (const img of images) {
-      try {
-        const blobUrl = await loadImageAsBlob(img.dataset.src);
-        img.src = blobUrl;
-        img.addEventListener('click', () => openImageLightbox(img.src, img.alt));
-        img.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter' || ev.key === ' ') {
-            ev.preventDefault();
-            openImageLightbox(img.src, img.alt);
-          }
-        });
-      } catch (err) {
-        console.error(err);
-      }
+      const src = img.dataset.src;
+      if (!src) continue;
+
+      // No usamos blob: porque el CSP puede bloquear imágenes blob.
+      // El servidor ya devuelve la imagen con URL propia, así que va directo al src.
+      img.src = src;
+
+      img.addEventListener('click', () => openImageLightbox(img.src, img.alt));
+      img.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          openImageLightbox(img.src, img.alt);
+        }
+      });
     }
   }
 
@@ -158,7 +144,6 @@
       setStatus(err?.message || 'No se pudieron cargar los torneos.', 'error');
     }
   }
-
 
   lightboxClose?.addEventListener('click', closeImageLightbox);
   lightbox?.addEventListener('click', (ev) => {

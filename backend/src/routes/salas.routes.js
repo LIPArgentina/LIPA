@@ -67,7 +67,15 @@ module.exports = function createSalasRouter(deps = {}) {
   function normalizeDateTime(value) {
     const raw = String(value || '').trim();
     if (!raw) return null;
-    const d = new Date(raw);
+
+    // Los input datetime-local llegan sin zona horaria, por ejemplo:
+    // 2026-05-19T19:00
+    // En Render/Node eso puede interpretarse como UTC y restar 3 horas al mostrarlo.
+    // Para torneos de Argentina lo guardamos explícitamente como UTC-03:00.
+    const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+    const normalized = hasTimezone ? raw : `${raw}:00-03:00`;
+
+    const d = new Date(normalized);
     if (Number.isNaN(d.getTime())) return null;
     return d;
   }
