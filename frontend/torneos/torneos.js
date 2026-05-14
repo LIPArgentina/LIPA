@@ -27,10 +27,20 @@
     if (!value) return '—';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('es-AR', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
+
+    const fecha = d.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
     });
+
+    const hora = d.toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+
+    return `${fecha}, ${hora} hs`;
   }
 
   function formatValor(valor, moneda){
@@ -62,24 +72,47 @@
     document.body.classList.remove('no-scroll');
   }
 
-  function hydrateTournamentImages(){
+  function blobToDataUrl(blob){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function loadImageAsDataUrl(url){
+    const response = await fetch(url, {
+      cache: 'no-store',
+      credentials: 'omit'
+    });
+
+    if (!response.ok) {
+      throw new Error('No se pudo cargar la imagen');
+    }
+
+    const blob = await response.blob();
+    return blobToDataUrl(blob);
+  }
+
+  async function hydrateTournamentImages(){
     const images = document.querySelectorAll('.torneo-img[data-src]');
 
     for (const img of images) {
-      const src = img.dataset.src;
-      if (!src) continue;
+      try {
+        const dataUrl = await loadImageAsDataUrl(img.dataset.src);
+        img.src = dataUrl;
 
-      // No usamos blob: porque el CSP puede bloquear imágenes blob.
-      // El servidor ya devuelve la imagen con URL propia, así que va directo al src.
-      img.src = src;
-
-      img.addEventListener('click', () => openImageLightbox(img.src, img.alt));
-      img.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' || ev.key === ' ') {
-          ev.preventDefault();
-          openImageLightbox(img.src, img.alt);
-        }
-      });
+        img.addEventListener('click', () => openImageLightbox(img.src, img.alt));
+        img.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            openImageLightbox(img.src, img.alt);
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
     }
   }
 
