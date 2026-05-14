@@ -4,6 +4,9 @@
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const grid = document.getElementById('torneosGrid');
   const statusBox = document.getElementById('statusBox');
+  const lightbox = document.getElementById('imageLightbox');
+  const lightboxImg = document.getElementById('imageLightboxImg');
+  const lightboxClose = document.getElementById('imageLightboxClose');
 
   function apiUrl(path){ return `${API_BASE}${path}`; }
 
@@ -44,6 +47,22 @@
       .replaceAll('"','&quot;');
   }
 
+
+  function openImageLightbox(src, alt){
+    if (!lightbox || !lightboxImg || !src) return;
+    lightboxImg.src = src;
+    lightboxImg.alt = alt || 'Imagen ampliada del torneo';
+    lightbox.hidden = false;
+    document.body.classList.add('no-scroll');
+  }
+
+  function closeImageLightbox(){
+    if (!lightbox || !lightboxImg) return;
+    lightbox.hidden = true;
+    lightboxImg.removeAttribute('src');
+    document.body.classList.remove('no-scroll');
+  }
+
   async function loadImageAsBlob(url){
     const response = await fetch(url, {
       cache: 'no-store',
@@ -65,6 +84,13 @@
       try {
         const blobUrl = await loadImageAsBlob(img.dataset.src);
         img.src = blobUrl;
+        img.addEventListener('click', () => openImageLightbox(img.src, img.alt));
+        img.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            openImageLightbox(img.src, img.alt);
+          }
+        });
       } catch (err) {
         console.error(err);
       }
@@ -86,7 +112,7 @@
       card.className = 'torneo-card';
       card.innerHTML = `
         <div class="torneo-card__media">
-          <img class="torneo-img" alt="Torneo de ${escapeHtml(torneo.sala || 'sala')}" data-src="${apiUrl(torneo.mediaUrl)}" loading="lazy">
+          <img class="torneo-img" alt="Torneo de ${escapeHtml(torneo.sala || 'sala')}" data-src="${apiUrl(torneo.mediaUrl)}" loading="lazy" role="button" tabindex="0" title="Tocar para ampliar">
         </div>
         <div class="torneo-card__body">
           <div class="torneo-row torneo-row--sala"><span>Sala</span><strong>${escapeHtml(torneo.sala || 'Sala')}</strong></div>
@@ -132,6 +158,15 @@
       setStatus(err?.message || 'No se pudieron cargar los torneos.', 'error');
     }
   }
+
+
+  lightboxClose?.addEventListener('click', closeImageLightbox);
+  lightbox?.addEventListener('click', (ev) => {
+    if (ev.target === lightbox) closeImageLightbox();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && lightbox && !lightbox.hidden) closeImageLightbox();
+  });
 
   document.addEventListener('DOMContentLoaded', loadTorneos);
 })();

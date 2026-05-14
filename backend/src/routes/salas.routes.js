@@ -87,6 +87,7 @@ module.exports = function createSalasRouter(deps = {}) {
       moneda: row.moneda || 'ARS',
       mediaType: row.media_type,
       mediaUrl: fileName ? `/pictures/torneos/sala/${encodeURIComponent(fileName)}` : '',
+      ubicacion: row.sala_ubicacion || row.ubicacion || '',
       updatedAt: row.updated_at,
       createdAt: row.created_at
     };
@@ -207,7 +208,8 @@ module.exports = function createSalasRouter(deps = {}) {
       `SELECT
          t.*,
          s.nombre AS sala_nombre,
-         s.slug AS sala_slug
+         s.slug AS sala_slug,
+         s.ubicacion AS sala_ubicacion
        FROM sala_torneos t
        JOIN salas s ON s.id = t.sala_id
        WHERE t.sala_id = $1
@@ -757,7 +759,8 @@ module.exports = function createSalasRouter(deps = {}) {
         `SELECT
            t.*,
            s.nombre AS sala_nombre,
-           s.slug AS sala_slug
+           s.slug AS sala_slug,
+           s.ubicacion AS sala_ubicacion
          FROM sala_torneos t
          JOIN salas s ON s.id = t.sala_id
          WHERE t.fecha_hora >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') AT TIME ZONE 'America/Argentina/Buenos_Aires'

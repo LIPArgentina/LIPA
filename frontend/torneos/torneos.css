@@ -50,3 +50,60 @@ header img{height:34px;width:auto;display:block;}
   filter:brightness(1.06);
   transform:translateY(-1px);
 }
+
+
+.no-scroll{
+  overflow:hidden;
+}
+
+.torneo-img{
+  cursor:zoom-in;
+}
+
+.image-lightbox{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(0,0,0,.94);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+}
+
+.image-lightbox[hidden]{
+  display:none;
+}
+
+.image-lightbox__img{
+  max-width:96vw;
+  max-height:94vh;
+  width:auto;
+  height:auto;
+  object-fit:contain;
+  display:block;
+  box-shadow:0 10px 30px #000;
+}
+
+.image-lightbox__close{
+  position:fixed;
+  top:12px;
+  right:14px;
+  width:42px;
+  height:42px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.35);
+  background:#111;
+  color:#fff;
+  font-size:30px;
+  line-height:1;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10000;
+}
+
+.image-lightbox__close:hover{
+  filter:brightness(1.2);
+}
