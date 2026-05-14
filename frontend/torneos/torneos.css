@@ -60,6 +60,10 @@ header img{height:34px;width:auto;display:block;}
   cursor:zoom-in;
 }
 
+.torneo-img.is-broken{
+  opacity:.45;
+}
+
 .image-lightbox{
   position:fixed;
   inset:0;

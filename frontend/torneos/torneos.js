@@ -8,7 +8,11 @@
   const lightboxImg = document.getElementById('imageLightboxImg');
   const lightboxClose = document.getElementById('imageLightboxClose');
 
-  function apiUrl(path){ return `${API_BASE}${path}`; }
+  function apiUrl(path){
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    return `${API_BASE}${path}`;
+  }
 
   function setStatus(text, type = 'info'){
     if (!statusBox) return;
@@ -84,34 +88,50 @@
   async function loadImageAsDataUrl(url){
     const response = await fetch(url, {
       cache: 'no-store',
-      credentials: 'omit'
+      credentials: 'omit',
+      mode: 'cors'
     });
 
     if (!response.ok) {
-      throw new Error('No se pudo cargar la imagen');
+      throw new Error(`No se pudo cargar la imagen: HTTP ${response.status}`);
     }
 
     const blob = await response.blob();
     return blobToDataUrl(blob);
   }
 
+  function wireImageLightbox(img){
+    img.addEventListener('click', () => {
+      const src = img.currentSrc || img.src || img.dataset.src;
+      openImageLightbox(src, img.alt);
+    });
+
+    img.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        const src = img.currentSrc || img.src || img.dataset.src;
+        openImageLightbox(src, img.alt);
+      }
+    });
+  }
+
   async function hydrateTournamentImages(){
     const images = document.querySelectorAll('.torneo-img[data-src]');
 
     for (const img of images) {
-      try {
-        const dataUrl = await loadImageAsDataUrl(img.dataset.src);
-        img.src = dataUrl;
+      wireImageLightbox(img);
 
-        img.addEventListener('click', () => openImageLightbox(img.src, img.alt));
-        img.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter' || ev.key === ' ') {
-            ev.preventDefault();
-            openImageLightbox(img.src, img.alt);
-          }
-        });
+      try {
+        const url = img.dataset.src;
+        if (!url) continue;
+
+        const dataUrl = await loadImageAsDataUrl(url);
+        img.src = dataUrl;
+        img.classList.remove('is-broken');
       } catch (err) {
         console.error(err);
+        img.classList.add('is-broken');
+        img.alt = `${img.alt || 'Imagen del torneo'} - no se pudo cargar`;
       }
     }
   }
@@ -127,11 +147,12 @@
 
     setStatus('', 'info');
     torneos.forEach((torneo) => {
+      const imageUrl = apiUrl(torneo.mediaUrl);
       const card = document.createElement('article');
       card.className = 'torneo-card';
       card.innerHTML = `
         <div class="torneo-card__media">
-          <img class="torneo-img" alt="Torneo de ${escapeHtml(torneo.sala || 'sala')}" data-src="${apiUrl(torneo.mediaUrl)}" loading="lazy" role="button" tabindex="0" title="Tocar para ampliar">
+          <img class="torneo-img" alt="Torneo de ${escapeHtml(torneo.sala || 'sala')}" data-src="${escapeHtml(imageUrl)}" loading="lazy" role="button" tabindex="0" title="Tocar para ampliar">
         </div>
         <div class="torneo-card__body">
           <div class="torneo-row torneo-row--sala"><span>Sala</span><strong>${escapeHtml(torneo.sala || 'Sala')}</strong></div>
@@ -169,8 +190,8 @@
             }))
           : []
       );
-      hydrateTournamentImages();
 
+      await hydrateTournamentImages();
     } catch (err) {
       console.error(err);
       render([]);

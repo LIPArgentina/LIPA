@@ -54,6 +54,26 @@ module.exports = function createSalasRouter(deps = {}) {
     await fs.promises.mkdir(dir, { recursive: true });
   }
 
+  function setImageCorsHeaders(req, res) {
+    const allowedOrigins = new Set([
+      'https://lipa.ar',
+      'https://www.lipa.ar',
+      'https://lipa-frontend-staging.onrender.com'
+    ]);
+
+    const origin = req.get('Origin');
+    if (origin && allowedOrigins.has(origin)) {
+      res.set('Access-Control-Allow-Origin', origin);
+      res.set('Vary', 'Origin');
+    } else {
+      res.set('Access-Control-Allow-Origin', '*');
+    }
+
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+
   function normalizeCurrency(value) {
     const v = String(value || 'ARS').trim().toUpperCase();
     return v === 'USD' ? 'USD' : 'ARS';
@@ -780,6 +800,12 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
+  // OPTIONS /api/sala-torneos/media/:id
+  router.options('/sala-torneos/media/:id', async (req, res) => {
+    setImageCorsHeaders(req, res);
+    return res.status(204).end();
+  });
+
   // GET /api/sala-torneos/media/:id
   router.get('/sala-torneos/media/:id', async (req, res) => {
     try {
@@ -801,8 +827,7 @@ module.exports = function createSalasRouter(deps = {}) {
       }
 
       res.set('Cache-Control', 'public, max-age=86400');
-      res.set('Access-Control-Allow-Origin', 'https://lipa-frontend-staging.onrender.com');
-      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+      setImageCorsHeaders(req, res);
 
       if (row.media_type) res.type(row.media_type);
 
