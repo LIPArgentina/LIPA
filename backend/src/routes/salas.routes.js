@@ -438,7 +438,7 @@ module.exports = function createSalasRouter(deps = {}) {
              password_hash, must_change_password, password_updated_at, updated_at
            )
            VALUES ($1, $2, $3, $4, $5, $6, false, NOW(), NOW())
-           ON CONFLICT (slug)
+           ON CONFLICT (slug) WHERE slug IS NOT NULL AND slug <> ''
            DO UPDATE SET
              nombre = EXCLUDED.nombre,
              direccion = EXCLUDED.direccion,
