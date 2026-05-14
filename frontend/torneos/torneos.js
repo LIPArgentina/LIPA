@@ -61,6 +61,24 @@
       .replaceAll('"','&quot;');
   }
 
+  function normalizeWhatsappUrl(value){
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    if (/^https?:\/\/(chat\.whatsapp\.com|wa\.me|api\.whatsapp\.com|web\.whatsapp\.com)\//i.test(raw)) {
+      return raw;
+    }
+
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return '';
+
+    if (digits.length <= 10) {
+      return `https://wa.me/549${digits}`;
+    }
+
+    return `https://wa.me/${digits}`;
+  }
+
   function openImageLightbox(src, alt){
     if (!lightbox || !lightboxImg || !src) return;
     lightboxImg.src = src;
@@ -159,6 +177,16 @@
           <div class="torneo-row"><span>Categoría</span><strong>${escapeHtml(torneo.categoria || '—')}</strong></div>
           <div class="torneo-row"><span>Fecha y hora</span><strong>${formatDateTime(torneo.fechaHora)}</strong></div>
           <div class="torneo-row"><span>Valor</span><strong>${formatValor(torneo.valor, torneo.moneda)}</strong></div>
+          ${normalizeWhatsappUrl(torneo.contacto) ? `
+            <a 
+              class="btn-contacto" 
+              href="${escapeHtml(normalizeWhatsappUrl(torneo.contacto))}" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              CONTACTO
+            </a>
+          ` : ''}
           ${torneo.ubicacion ? `
             <a 
               class="btn-ver-ubicacion" 
@@ -186,7 +214,8 @@
         Array.isArray(data.torneos)
           ? data.torneos.map(t => ({
               ...t,
-              ubicacion: t.ubicacion || t.salaUbicacion || ''
+              ubicacion: t.ubicacion || t.salaUbicacion || '',
+              contacto: t.contacto || t.salaContacto || ''
             }))
           : []
       );

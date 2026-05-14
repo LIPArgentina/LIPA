@@ -506,6 +506,7 @@ function normalizeSala(item){
     nombre: String(item?.nombre || item?.name || item?.sala || item?.room || '').trim(),
     direccion: String(item?.direccion || item?.address || '').trim(),
     ubicacion: String(item?.ubicacion || item?.location || item?.maps || '').trim(),
+    contacto: String(item?.contacto || item?.whatsapp || item?.phone_contact || '').trim(),
   };
 }
 
@@ -516,7 +517,7 @@ function renderSalasRows(salas){
   const rows = Array.isArray(salas) ? salas.map(normalizeSala).slice(0, SALAS_SLOTS) : [];
 
   for (let i = 0; i < SALAS_SLOTS; i++){
-    const sala = rows[i] || { id: null, nombre: '', direccion: '', ubicacion: '' };
+    const sala = rows[i] || { id: null, nombre: '', direccion: '', ubicacion: '', contacto: '' };
     const canReset = Boolean(sala.id);
     const tr = document.createElement('tr');
     if (sala.id) tr.dataset.salaId = String(sala.id);
@@ -526,6 +527,7 @@ function renderSalasRows(salas){
       <td><input class="input sala-name" type="text" value="${sala.nombre.replace(/"/g,'&quot;')}" placeholder="Nombre de sala" aria-label="Nombre de sala fila ${i + 1}"></td>
       <td><input class="input sala-address" type="text" value="${sala.direccion.replace(/"/g,'&quot;')}" placeholder="Dirección" aria-label="Dirección fila ${i + 1}"></td>
       <td><input class="input sala-location" type="url" value="${normalizeLocation(sala.ubicacion).replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación fila ${i + 1}"></td>
+      <td><input class="input sala-contact" type="text" value="${(sala.contacto || '').replace(/"/g,'&quot;')}" placeholder="WhatsApp o link de grupo" aria-label="Contacto WhatsApp fila ${i + 1}"></td>
       <td class="team-actions-cell">
         <button class="btn-reset-pass btn-reset-sala-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${sala.nombre || ('fila ' + (i + 1))}" ${canReset ? '' : 'disabled'}>🔑</button>
         <button class="btn-del-sala" type="button">Eliminar</button>
@@ -537,6 +539,7 @@ function renderSalasRows(salas){
       tr.querySelector('.sala-name').value = '';
       tr.querySelector('.sala-address').value = '';
       tr.querySelector('.sala-location').value = '';
+      tr.querySelector('.sala-contact').value = '';
       delete tr.dataset.salaId;
       const resetBtn = tr.querySelector('.btn-reset-sala-pass');
       if (resetBtn) resetBtn.disabled = true;
@@ -591,9 +594,10 @@ function collectSalasRows(){
     const nombre = tr.querySelector('.sala-name')?.value.trim() || '';
     const direccion = tr.querySelector('.sala-address')?.value.trim() || '';
     const ubicacion = tr.querySelector('.sala-location')?.value.trim() || '';
-    if (!nombre && !direccion && !ubicacion) return;
+    const contacto = tr.querySelector('.sala-contact')?.value.trim() || '';
+    if (!nombre && !direccion && !ubicacion && !contacto) return;
     const id = tr.dataset.salaId || null;
-    rows.push({ id, nombre, direccion, ubicacion });
+    rows.push({ id, nombre, direccion, ubicacion, contacto });
   });
   return rows;
 }
@@ -682,7 +686,8 @@ function exportSalasTable(){
   const salas = collectSalasRows().map(item => ({
     nombre: item.nombre || '',
     direccion: item.direccion || '',
-    ubicacion: item.ubicacion || ''
+    ubicacion: item.ubicacion || '',
+    contacto: item.contacto || ''
   }));
 
   downloadJson(makeExportFilename('salas'), {
@@ -736,7 +741,8 @@ function importSalasTable(items){
     id: item?.id || null,
     nombre: item?.nombre || item?.name || item?.sala || item?.room || '',
     direccion: item?.direccion || item?.address || '',
-    ubicacion: item?.ubicacion || item?.location || item?.maps || ''
+    ubicacion: item?.ubicacion || item?.location || item?.maps || '',
+    contacto: item?.contacto || item?.whatsapp || item?.phone_contact || ''
   }));
   renderSalasRows(salas);
   toast('Tabla importada. Revisá y guardá para actualizar la DB.');

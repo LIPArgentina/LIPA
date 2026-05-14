@@ -115,6 +115,7 @@ module.exports = function createSalasRouter(deps = {}) {
       mediaType: row.media_type,
       mediaUrl: row.id ? `/api/sala-torneos/media/${encodeURIComponent(row.id)}` : '',
       ubicacion: row.sala_ubicacion || row.ubicacion || '',
+      contacto: row.sala_contacto || row.contacto || '',
       updatedAt: row.updated_at,
       createdAt: row.created_at
     };
@@ -127,6 +128,7 @@ module.exports = function createSalasRouter(deps = {}) {
         nombre TEXT NOT NULL,
         direccion TEXT DEFAULT '',
         ubicacion TEXT DEFAULT '',
+        contacto TEXT DEFAULT '',
         orden INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -135,6 +137,7 @@ module.exports = function createSalasRouter(deps = {}) {
 
     await pool.query(`
       ALTER TABLE salas
+      ADD COLUMN IF NOT EXISTS contacto TEXT DEFAULT '',
       ADD COLUMN IF NOT EXISTS slug TEXT,
       ADD COLUMN IF NOT EXISTS password_hash TEXT,
       ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false,
@@ -188,7 +191,7 @@ module.exports = function createSalasRouter(deps = {}) {
               password_updated_at = COALESCE(password_updated_at, NOW()),
               updated_at = NOW()
         WHERE id = $2
-        RETURNING id, nombre, direccion, ubicacion, orden, slug, password_hash,
+        RETURNING id, nombre, direccion, ubicacion, contacto, orden, slug, password_hash,
                   must_change_password, password_updated_at`,
       [hash, sala.id]
     );
@@ -204,7 +207,7 @@ module.exports = function createSalasRouter(deps = {}) {
 
     if (Number.isFinite(numericId) && numericId > 0) {
       const byId = await pool.query(
-        `SELECT id, nombre, direccion, ubicacion, orden, slug, password_hash,
+        `SELECT id, nombre, direccion, ubicacion, contacto, orden, slug, password_hash,
                 must_change_password, password_updated_at
            FROM salas
           WHERE id = $1
@@ -216,7 +219,7 @@ module.exports = function createSalasRouter(deps = {}) {
 
     if (cleanSlug) {
       const bySlug = await pool.query(
-        `SELECT id, nombre, direccion, ubicacion, orden, slug, password_hash,
+        `SELECT id, nombre, direccion, ubicacion, contacto, orden, slug, password_hash,
                 must_change_password, password_updated_at
            FROM salas
           WHERE LOWER(slug) = $1
@@ -236,7 +239,8 @@ module.exports = function createSalasRouter(deps = {}) {
          t.*,
          s.nombre AS sala_nombre,
          s.slug AS sala_slug,
-         s.ubicacion AS sala_ubicacion
+         s.ubicacion AS sala_ubicacion,
+         s.contacto AS sala_contacto
        FROM sala_torneos t
        JOIN salas s ON s.id = t.sala_id
        WHERE t.sala_id = $1
@@ -420,6 +424,7 @@ module.exports = function createSalasRouter(deps = {}) {
           nombre,
           direccion,
           ubicacion,
+          contacto,
           orden,
           COALESCE(slug, '') AS slug,
           COALESCE(must_change_password, false) AS must_change_password
@@ -447,11 +452,12 @@ module.exports = function createSalasRouter(deps = {}) {
           const nombre = String(sala?.nombre || '').trim();
           const direccion = String(sala?.direccion || '').trim();
           const ubicacion = String(sala?.ubicacion || '').trim();
+          const contacto = String(sala?.contacto || '').trim();
           const slug = buildSlug(sala?.slug || nombre);
           const id = Number(sala?.id || 0) || null;
 
           if (!nombre || !slug) return null;
-          return { id, nombre, direccion, ubicacion, slug, orden: idx + 1 };
+          return { id, nombre, direccion, ubicacion, contacto, slug, orden: idx + 1 };
         })
         .filter(Boolean);
 
@@ -463,21 +469,22 @@ module.exports = function createSalasRouter(deps = {}) {
       for (const sala of processed) {
         await client.query(
           `INSERT INTO salas (
-             nombre, direccion, ubicacion, slug, orden,
+             nombre, direccion, ubicacion, contacto, slug, orden,
              password_hash, must_change_password, password_updated_at, updated_at
            )
-           VALUES ($1, $2, $3, $4, $5, $6, false, NOW(), NOW())
+           VALUES ($1, $2, $3, $4, $5, $6, $7, false, NOW(), NOW())
            ON CONFLICT (slug) WHERE slug IS NOT NULL AND slug <> ''
            DO UPDATE SET
              nombre = EXCLUDED.nombre,
              direccion = EXCLUDED.direccion,
              ubicacion = EXCLUDED.ubicacion,
+             contacto = EXCLUDED.contacto,
              orden = EXCLUDED.orden,
              password_hash = COALESCE(salas.password_hash, EXCLUDED.password_hash),
              must_change_password = COALESCE(salas.must_change_password, false),
              password_updated_at = COALESCE(salas.password_updated_at, EXCLUDED.password_updated_at),
              updated_at = NOW()`,
-          [sala.nombre, sala.direccion, sala.ubicacion, sala.slug, sala.orden, defaultHash]
+          [sala.nombre, sala.direccion, sala.ubicacion, sala.contacto, sala.slug, sala.orden, defaultHash]
         );
       }
 
@@ -787,7 +794,8 @@ module.exports = function createSalasRouter(deps = {}) {
            t.*,
            s.nombre AS sala_nombre,
            s.slug AS sala_slug,
-           s.ubicacion AS sala_ubicacion
+           s.ubicacion AS sala_ubicacion,
+           s.contacto AS sala_contacto
          FROM sala_torneos t
          JOIN salas s ON s.id = t.sala_id
          WHERE t.fecha_hora >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') AT TIME ZONE 'America/Argentina/Buenos_Aires'

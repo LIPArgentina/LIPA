@@ -111,3 +111,10 @@ header img{height:34px;width:auto;display:block;}
 .image-lightbox__close:hover{
   filter:brightness(1.2);
 }
+
+.btn-contacto{
+  display:flex;align-items:center;justify-content:center;width:100%;padding:12px 10px;
+  border-radius:10px;background:#25d366;color:#07140b;font-weight:900;text-decoration:none;
+  letter-spacing:.05em;font-size:13px;transition:all .15s ease;border:1px solid #159947;
+}
+.btn-contacto:hover{filter:brightness(1.06);transform:translateY(-1px);}
