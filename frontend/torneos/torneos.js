@@ -93,6 +93,16 @@
           <div class="torneo-row"><span>Categoría</span><strong>${escapeHtml(torneo.categoria || '—')}</strong></div>
           <div class="torneo-row"><span>Fecha y hora</span><strong>${formatDateTime(torneo.fechaHora)}</strong></div>
           <div class="torneo-row"><span>Valor</span><strong>${formatValor(torneo.valor, torneo.moneda)}</strong></div>
+          ${torneo.ubicacion ? `
+            <a 
+              class="btn-ver-ubicacion" 
+              href="${escapeHtml(torneo.ubicacion)}" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              VER UBICACIÓN
+            </a>
+          ` : ''}
         </div>
       `;
       grid.appendChild(card);
@@ -106,7 +116,14 @@
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || data.ok === false) throw new Error(data.error || `HTTP ${resp.status}`);
 
-      render(Array.isArray(data.torneos) ? data.torneos : []);
+      render(
+        Array.isArray(data.torneos)
+          ? data.torneos.map(t => ({
+              ...t,
+              ubicacion: t.ubicacion || t.salaUbicacion || ''
+            }))
+          : []
+      );
       hydrateTournamentImages();
 
     } catch (err) {

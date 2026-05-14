@@ -27,3 +27,26 @@ header img{height:34px;width:auto;display:block;}
 .torneo-row--sala strong{color:var(--gold);font-size:18px;text-transform:uppercase;}
 @media(max-width:900px){.torneos-grid{grid-template-columns:repeat(2, minmax(0,1fr));}.torneo-card__media{height:230px;}}
 @media(max-width:620px){.container{padding:8px 6px;}header{grid-template-columns:auto 1fr auto;}header img{height:32px;}.btn{padding:6px 8px;font-size:11px;}.torneos-grid{grid-template-columns:1fr;}.torneo-card__media{height:240px;}}
+
+
+.btn-ver-ubicacion{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  padding:12px 10px;
+  border-radius:10px;
+  background:var(--gold);
+  color:#000;
+  font-weight:900;
+  text-decoration:none;
+  letter-spacing:.05em;
+  font-size:13px;
+  transition:all .15s ease;
+  border:1px solid #d4aa00;
+}
+
+.btn-ver-ubicacion:hover{
+  filter:brightness(1.06);
+  transform:translateY(-1px);
+}
