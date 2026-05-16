@@ -245,6 +245,34 @@
     const triangulosContraTotal = matches.reduce((acc, item) => acc + (Number(item.triangulosContra || 0) || 0), 0);
     const efectividad = Number(data.total || 0) > 0 ? Math.round((ganados / Number(data.total || 0)) * 100) : 0;
 
+    const played = Number(data.total || 0);
+    const wins = ganados;
+
+    const effectiveness =
+      played > 0
+        ? (wins / played) * 100
+        : 0;
+
+    const maxPlayed = Number(data.radContext?.maxPlayed || played);
+    const avgPlayed = Number(data.radContext?.avgPlayed || played);
+
+    const spread =
+      maxPlayed > 0
+        ? (maxPlayed - avgPlayed) / maxPlayed
+        : 0;
+
+    const force = 1 + spread;
+
+    const penalty =
+      maxPlayed > 0
+        ? 1 + ((maxPlayed - played) / maxPlayed) * force
+        : 1;
+
+    const rad =
+      penalty > 0
+        ? effectiveness / penalty
+        : 0;
+
     $summary.hidden = false;
     $summary.innerHTML = `
       <div>
@@ -275,6 +303,10 @@
         <div class="summary-count summary-eff">
           <strong>${efectividad}%</strong>
           <span>efectividad</span>
+        </div>
+        <div class="summary-count summary-rad">
+          <strong>${rad.toFixed(1)}</strong>
+          <span>RAD</span>
         </div>
       </div>
     `;

@@ -268,3 +268,13 @@ body.modal-open{
   .modal-card{ padding:18px 14px; }
   .modal-card h2{ font-size:17px; }
 }
+
+
+.summary-rad{
+  border-color:rgba(60,207,78,.5);
+  background:rgba(60,207,78,.08);
+}
+
+.summary-rad strong{
+  color:var(--ok);
+}
