@@ -1986,7 +1986,9 @@ router.get('/player-ranking', async (req, res) => {
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
     const rawLimit = Number(req.query.limit || 10);
-    const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
+    // Player ranking necesita aceptar límites amplios porque el frontend calcula RAD
+    // sobre toda la categoría y recién después recorta visualmente Top 10/20/50.
+    const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 10, 1), 1000);
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });

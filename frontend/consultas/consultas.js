@@ -546,44 +546,20 @@
       return;
     }
 
-    const requestedLimit = Number(limit || 10);
-
     $rankingButtons.forEach((btn) => {
-      const btnLimit = Number(btn.getAttribute('data-ranking-limit') || btn.dataset.rankingLimit || 0);
-      btn.classList.toggle('active', btnLimit === requestedLimit);
+      btn.classList.toggle('active', String(btn.dataset.rankingLimit || '') === String(limit));
     });
 
     try {
       const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
-
-      /*
-        Para jugadores pedimos una base amplia y después recortamos en pantalla.
-        Así el Top 50 puede mostrar 50 y, además, el RAD se calcula usando el
-        contexto completo de la categoría. El ranking por equipos no se toca.
-      */
-      const fetchLimit = currentRankingTab === 'teams'
-        ? requestedLimit
-        : Math.max(1000, requestedLimit);
-
-      const data = await fetchJson(apiUrl(withCacheBust(
-        endpoint +
-        '?category=' + encodeURIComponent(category) +
-        '&limit=' + encodeURIComponent(fetchLimit)
-      )));
+      const requestedLimit = Number(limit || 10);
+      const fetchLimit = currentRankingTab === 'teams' ? requestedLimit : 1000;
+      const data = await fetchJson(apiUrl(withCacheBust(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit))));
 
       setStatus('', 'info');
       lastRankingData = data;
-      lastRankingLimit = requestedLimit;
+      lastRankingLimit = limit;
       lastRankingMode = currentRankingTab;
-
-      const receivedCount = Array.isArray(data?.ranking) ? data.ranking.length : 0;
-      if (currentRankingTab !== 'teams' && receivedCount < requestedLimit) {
-        console.warn(
-          'El backend devolvió menos jugadores que los solicitados.',
-          { requestedLimit, fetchLimit, receivedCount, responseLimit: data?.limit, total: data?.total }
-        );
-      }
-
       renderRankingSwitch();
     } catch (err) {
       console.error(err);
@@ -653,12 +629,8 @@
     scheduleSuggestions();
     scheduleTeamSuggestions();
   });
-  document.addEventListener('click', (ev) => {
-    const btn = ev.target?.closest?.('[data-ranking-limit]');
-    if (!btn) return;
-    const fromAttr = btn.getAttribute('data-ranking-limit') || btn.dataset.rankingLimit || '';
-    const fromText = String(btn.textContent || '').match(/\d+/)?.[0] || '10';
-    loadRanking(Number(fromAttr || fromText || 10));
+  $rankingButtons.forEach((btn) => {
+    btn.addEventListener('click', () => loadRanking(Number(btn.getAttribute('data-ranking-limit') || btn.dataset.rankingLimit || 10)));
   });
   $rankingTabs.forEach((btn) => {
     btn.addEventListener('click', () => {
