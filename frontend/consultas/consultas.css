@@ -270,11 +270,65 @@ body.modal-open{
 }
 
 
+/* Consulta individual: RAD y estadísticas en una sola línea */
+.summary-box{
+  grid-template-columns:minmax(180px,260px) minmax(0,1fr);
+}
+
+.summary-player{
+  min-width:0;
+}
+
+.summary-stats{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:7px;
+  width:100%;
+}
+
+.summary-count{
+  min-width:0;
+  padding:7px 6px;
+}
+
+.summary-count strong{
+  font-size:24px;
+}
+
+.summary-count span{
+  max-width:none;
+}
+
 .summary-rad{
-  border-color:rgba(60,207,78,.5);
-  background:rgba(60,207,78,.08);
+  border-color:rgba(60,207,78,.65);
+  background:rgba(60,207,78,.12);
 }
 
 .summary-rad strong{
   color:var(--ok);
+}
+
+@media (max-width:760px){
+  .summary-box{
+    grid-template-columns:1fr;
+  }
+
+  .summary-stats{
+    grid-template-columns:repeat(7,minmax(0,1fr));
+    gap:4px;
+  }
+
+  .summary-count{
+    padding:6px 3px;
+    border-radius:8px;
+  }
+
+  .summary-count strong{
+    font-size:clamp(16px,5.2vw,22px);
+  }
+
+  .summary-count span{
+    font-size:6px;
+    line-height:1;
+  }
 }

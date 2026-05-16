@@ -1870,6 +1870,12 @@ router.get('/player-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions, player: null, total: 0, matches: [] });
     }
 
+    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
+    const playerRadRow = categoryRanking.find((item) =>
+      sameNormalizedName(item.name, exact.name) &&
+      samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
+    ) || null;
+
     const matches = [];
     for (const item of results) {
       const localPlayers = getIndividualPlayers(item.localPlanilla);
@@ -1932,7 +1938,10 @@ router.get('/player-query', async (req, res) => {
       category,
       q,
       suggestions,
-      player: exact,
+      player: playerRadRow ? { ...exact, ...playerRadRow } : exact,
+      rad: playerRadRow?.rad ?? null,
+      radPenalty: playerRadRow?.radPenalty ?? null,
+      radContext,
       total: matches.length,
       matches
     });
@@ -1963,14 +1972,19 @@ function ensureRankingRow(map, playerName, teamSlug, teamName) {
   return map.get(key);
 }
 
-function roundRanking1(value) {
+
+function radNumber(value) {
   const n = Number(value || 0);
-  return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
+  return Number.isFinite(n) ? n : 0;
 }
 
-function buildRadRankingContext(items = []) {
-  const playedValues = items
-    .map((item) => Number(item.played || 0))
+function radRound1(value) {
+  return Math.round(radNumber(value) * 10) / 10;
+}
+
+function buildRadContextFromRows(rows = []) {
+  const playedValues = rows
+    .map((item) => radNumber(item.played))
     .filter((played) => played > 0);
 
   const maxPlayed = playedValues.length ? Math.max(...playedValues) : 0;
@@ -1981,40 +1995,97 @@ function buildRadRankingContext(items = []) {
   const force = 1 + spread;
 
   return {
-    maxPlayed: roundRanking1(maxPlayed),
-    avgPlayed: roundRanking1(avgPlayed),
-    spread: roundRanking1(spread),
-    force: roundRanking1(force)
+    maxPlayed: radRound1(maxPlayed),
+    avgPlayed: radRound1(avgPlayed),
+    spread: radRound1(spread),
+    force: radRound1(force)
   };
 }
 
-function applyRadToRankingItem(item = {}, context = {}) {
-  const played = Number(item.played || 0);
-  const wins = Number(item.wins || 0);
-  const maxPlayed = Number(context.maxPlayed || 0);
-  const force = Number(context.force || 1);
-  const effectivenessRaw = played > 0 ? (wins / played) * 100 : 0;
+function applyRadToPlayerRow(item = {}, context = null) {
+  const played = radNumber(item.played);
+  const wins = radNumber(item.wins);
+  const effectiveness = played > 0 ? (wins / played) * 100 : 0;
+  const maxPlayed = radNumber(context?.maxPlayed);
+  const force = radNumber(context?.force) || 1;
   const penalty = maxPlayed > 0 && played > 0
     ? 1 + ((maxPlayed - played) / maxPlayed) * force
     : 1;
-  const rad = penalty > 0 ? effectivenessRaw / penalty : 0;
+  const rad = penalty > 0 ? effectiveness / penalty : 0;
 
   return {
     ...item,
-    diff: Number(item.diff || 0),
-    effectiveness: roundRanking1(effectivenessRaw),
-    rad: roundRanking1(rad),
-    radPenalty: roundRanking1(penalty)
+    diff: radNumber(item.triangulosFavor) - radNumber(item.triangulosContra),
+    effectiveness: radRound1(effectiveness),
+    rad: radRound1(rad),
+    radPenalty: radRound1(penalty)
   };
 }
 
-function sortPlayerStatsRowsRad(a, b) {
-  if (Number(b.rad || 0) !== Number(a.rad || 0)) return Number(b.rad || 0) - Number(a.rad || 0);
-  if (Number(b.diff || 0) !== Number(a.diff || 0)) return Number(b.diff || 0) - Number(a.diff || 0);
-  if (Number(b.triangulosFavor || 0) !== Number(a.triangulosFavor || 0)) return Number(b.triangulosFavor || 0) - Number(a.triangulosFavor || 0);
-  if (Number(b.wins || 0) !== Number(a.wins || 0)) return Number(b.wins || 0) - Number(a.wins || 0);
+function sortPlayerRadRows(a, b) {
+  if (radNumber(b.rad) !== radNumber(a.rad)) return radNumber(b.rad) - radNumber(a.rad);
+  if (radNumber(b.diff) !== radNumber(a.diff)) return radNumber(b.diff) - radNumber(a.diff);
+  if (radNumber(b.triangulosFavor) !== radNumber(a.triangulosFavor)) return radNumber(b.triangulosFavor) - radNumber(a.triangulosFavor);
+  if (radNumber(b.wins) !== radNumber(a.wins)) return radNumber(b.wins) - radNumber(a.wins);
   return String(a.name || '').localeCompare(String(b.name || ''), 'es');
 }
+
+function buildPlayerRowsFromResults(results = []) {
+  const rankingMap = new Map();
+
+  for (const item of results) {
+    const localPlayers = getIndividualPlayers(item.localPlanilla);
+    const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+    const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+    const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+    const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
+
+    for (let idx = 0; idx < max; idx++) {
+      const localPlayer = String(localPlayers[idx] || '').trim();
+      const visitantePlayer = String(visitantePlayers[idx] || '').trim();
+      const localScore = Number(localScores[idx] ?? 0) || 0;
+      const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
+
+      if (localPlayer) {
+        const row = ensureRankingRow(rankingMap, localPlayer, item.localSlug, item.localName);
+        row.played += 1;
+        row.triangulosFavor += localScore;
+        row.triangulosContra += visitanteScore;
+        if (localScore > visitanteScore) row.wins += 1;
+        else if (localScore < visitanteScore) row.losses += 1;
+        else row.draws += 1;
+      }
+
+      if (visitantePlayer) {
+        const row = ensureRankingRow(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
+        row.played += 1;
+        row.triangulosFavor += visitanteScore;
+        row.triangulosContra += localScore;
+        if (visitanteScore > localScore) row.wins += 1;
+        else if (visitanteScore < localScore) row.losses += 1;
+        else row.draws += 1;
+      }
+    }
+  }
+
+  return Array.from(rankingMap.values())
+    .map((item) => ({
+      ...item,
+      diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
+      effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
+    }));
+}
+
+function buildRadRankingFromResults(results = []) {
+  const baseRows = buildPlayerRowsFromResults(results);
+  const radContext = buildRadContextFromRows(baseRows);
+  const ranking = baseRows
+    .map((item) => applyRadToPlayerRow(item, radContext))
+    .sort(sortPlayerRadRows);
+
+  return { ranking, radContext };
+}
+
 
 async function countRegisteredIndividualPlayersByCategory(category = '') {
   const division = String(category || '').trim().toLowerCase();
@@ -2088,16 +2159,19 @@ router.get('/player-ranking', async (req, res) => {
       }
     }
 
-    const baseRanking = Array.from(rankingMap.values())
+    const fullRanking = Array.from(rankingMap.values())
       .map((item) => ({
         ...item,
-        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0)
-      }));
-
-    const radContext = buildRadRankingContext(baseRanking);
-    const fullRanking = baseRanking
-      .map((item) => applyRadToRankingItem(item, radContext))
-      .sort(sortPlayerStatsRowsRad);
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
+        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
+      }))
+      .sort((a, b) => {
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.diff !== a.diff) return b.diff - a.diff;
+        if (a.losses !== b.losses) return a.losses - b.losses;
+        if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+      });
 
     const totalActivePlayers = fullRanking.length;
     const ranking = fullRanking.slice(0, limit);
@@ -2109,7 +2183,6 @@ router.get('/player-ranking', async (req, res) => {
       total: ranking.length,
       totalRegisteredPlayers,
       totalActivePlayers,
-      radContext,
       ranking
     });
   } catch (err) {
@@ -2276,7 +2349,11 @@ function teamInfoMatchesSide(teamInfo = {}, sideSlug = '', sideName = '') {
 }
 
 function sortPlayerStatsRows(a, b) {
-  return sortPlayerStatsRowsRad(a, b);
+  if (b.wins !== a.wins) return b.wins - a.wins;
+  if (b.diff !== a.diff) return b.diff - a.diff;
+  if (a.losses !== b.losses) return a.losses - b.losses;
+  if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
+  return String(a.name || '').localeCompare(String(b.name || ''), 'es');
 }
 
 router.get('/team-query', async (req, res) => {
@@ -2324,12 +2401,20 @@ router.get('/team-query', async (req, res) => {
       buildAllValidatedCrucesForPlayerQuery(category)
     ]);
 
+    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
+    const categoryPlayersByKey = new Map();
+    categoryRanking.forEach((item) => {
+      categoryPlayersByKey.set(`${normalizeText(item.name)}::${canonicalPlayerTeamSlug(item.teamSlug)}`, item);
+    });
+
     const playersMap = new Map();
     const ensureTeamPlayer = (playerName) => {
       const key = normalizeText(playerName);
       if (!key) return null;
       if (!playersMap.has(key)) {
-        playersMap.set(key, {
+        const categoryKey = `${key}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
+        const categoryRow = categoryPlayersByKey.get(categoryKey) || null;
+        playersMap.set(key, categoryRow ? { ...categoryRow } : {
           name: String(playerName || '').trim(),
           teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
           teamName: exactTeam.display_name,
@@ -2340,7 +2425,9 @@ router.get('/team-query', async (req, res) => {
           triangulosFavor: 0,
           triangulosContra: 0,
           diff: 0,
-          effectiveness: 0
+          effectiveness: 0,
+          rad: 0,
+          radPenalty: 0
         });
       }
       return playersMap.get(key);
@@ -2348,100 +2435,8 @@ router.get('/team-query', async (req, res) => {
 
     registeredPlayers.forEach(ensureTeamPlayer);
 
-    for (const item of results) {
-      const localPlayers = getIndividualPlayers(item.localPlanilla);
-      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
-      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
-      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
-
-      const scan = [
-        {
-          players: localPlayers,
-          scoreRows: localScores,
-          opponentScoreRows: visitanteScores,
-          teamSlug: item.localSlug,
-          teamName: item.localName
-        },
-        {
-          players: visitantePlayers,
-          scoreRows: visitanteScores,
-          opponentScoreRows: localScores,
-          teamSlug: item.visitanteSlug,
-          teamName: item.visitanteName
-        }
-      ];
-
-      for (const side of scan) {
-        if (!teamInfoMatchesSide(exactTeam, side.teamSlug, side.teamName)) continue;
-        side.players.forEach((playerName, idx) => {
-          const cleanName = String(playerName || '').trim();
-          if (!cleanName) return;
-          const row = ensureTeamPlayer(cleanName);
-          if (!row) return;
-
-          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
-          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
-          row.played += 1;
-          row.triangulosFavor += triangulosFavor;
-          row.triangulosContra += triangulosContra;
-          if (triangulosFavor > triangulosContra) row.wins += 1;
-          else if (triangulosFavor < triangulosContra) row.losses += 1;
-          else row.draws += 1;
-        });
-      }
-    }
-
-    const basePlayers = Array.from(playersMap.values())
-      .map((item) => ({
-        ...item,
-        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0)
-      }));
-
-    const categoryRankingMap = new Map();
-    for (const item of results) {
-      const localPlayers = getIndividualPlayers(item.localPlanilla);
-      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
-      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
-      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
-      const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
-
-      for (let idx = 0; idx < max; idx++) {
-        const localPlayer = String(localPlayers[idx] || '').trim();
-        const visitantePlayer = String(visitantePlayers[idx] || '').trim();
-        const localScore = Number(localScores[idx] ?? 0) || 0;
-        const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
-
-        if (localPlayer) {
-          const row = ensureRankingRow(categoryRankingMap, localPlayer, item.localSlug, item.localName);
-          row.played += 1;
-          row.triangulosFavor += localScore;
-          row.triangulosContra += visitanteScore;
-          if (localScore > visitanteScore) row.wins += 1;
-          else if (localScore < visitanteScore) row.losses += 1;
-          else row.draws += 1;
-        }
-
-        if (visitantePlayer) {
-          const row = ensureRankingRow(categoryRankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
-          row.played += 1;
-          row.triangulosFavor += visitanteScore;
-          row.triangulosContra += localScore;
-          if (visitanteScore > localScore) row.wins += 1;
-          else if (visitanteScore < localScore) row.losses += 1;
-          else row.draws += 1;
-        }
-      }
-    }
-
-    const categoryBaseRanking = Array.from(categoryRankingMap.values())
-      .map((item) => ({
-        ...item,
-        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0)
-      }));
-    const radContext = buildRadRankingContext(categoryBaseRanking);
-    const players = basePlayers
-      .map((item) => applyRadToRankingItem(item, radContext))
-      .sort(sortPlayerStatsRowsRad);
+    const players = Array.from(playersMap.values())
+      .sort(sortPlayerRadRows);
 
     const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
 
