@@ -141,3 +141,118 @@ header img{ height:34px; width:auto; display:block; }
   .hero-reload{ min-height:auto; }
   .reload-btn{ width:100%; }
 }
+
+/* Sistema RAD LIPA */
+.hero-buttons{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.rad-info-btn{
+  min-width:150px;
+  min-height:38px;
+  font-size:12px;
+  border-color:rgba(60,207,78,.75);
+  color:var(--ok);
+}
+.rad-info-btn:hover{
+  background:rgba(60,207,78,.12);
+}
+.ranking-table .rad-head{
+  color:var(--ok);
+}
+.ranking-table .rad-score{
+  color:var(--ok);
+  font-weight:900;
+  background:rgba(60,207,78,.1);
+  border-left:1px solid rgba(60,207,78,.28);
+  border-right:1px solid rgba(60,207,78,.28);
+}
+body.modal-open{
+  overflow:hidden;
+}
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  z-index:999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(4px);
+}
+.modal-overlay[hidden]{
+  display:none;
+}
+.modal-card{
+  position:relative;
+  width:min(720px,100%);
+  max-height:88vh;
+  overflow:auto;
+  background:linear-gradient(180deg,#191a1d 0%, #101113 100%);
+  border:1px solid rgba(255,204,0,.45);
+  border-radius:16px;
+  box-shadow:0 18px 40px rgba(0,0,0,.7);
+  padding:22px;
+}
+.modal-card h2{
+  margin:0 34px 10px 0;
+  color:var(--gold);
+  font-size:20px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.modal-card h3{
+  margin:16px 0 8px;
+  color:var(--ok);
+  font-size:14px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.modal-card p,
+.modal-card li{
+  color:#f1f1f1;
+  font-size:13px;
+  line-height:1.45;
+}
+.modal-card ol{
+  margin:8px 0 0 20px;
+  padding:0;
+}
+.formula-box{
+  background:#050505;
+  border:1px solid rgba(60,207,78,.3);
+  border-radius:12px;
+  padding:10px 12px;
+}
+.formula-box p{
+  margin:6px 0;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12px;
+}
+.modal-close{
+  position:absolute;
+  top:12px;
+  right:12px;
+  width:32px;
+  height:32px;
+  border-radius:999px;
+  border:1px solid rgba(255,204,0,.5);
+  background:#000;
+  color:var(--gold);
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+}
+.modal-close:hover{
+  filter:brightness(1.2);
+}
+
+@media (max-width:760px){
+  .hero-buttons{ width:100%; }
+  .rad-info-btn{ width:100%; }
+  .modal-card{ padding:18px 14px; }
+  .modal-card h2{ font-size:17px; }
+}

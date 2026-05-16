@@ -22,7 +22,10 @@
   <main class="consultas-page">
     <section class="consultas-hero">
       <div class="hero-copy hero-reload">
-        <button id="btnRecargar" class="btn btn-primary reload-btn" type="button">Recargar</button>
+        <div class="hero-buttons">
+          <button id="btnRecargar" class="btn btn-primary reload-btn" type="button">Recargar</button>
+          <button id="btnRadInfo" class="btn rad-info-btn" type="button">Sistema RAD LIPA</button>
+        </div>
       </div>
       <div class="ranking-actions" aria-label="Ranking por categoría">
         <div class="ranking-tabs" aria-label="Tipo de ranking">
@@ -66,6 +69,30 @@
     <section id="summaryBox" class="summary-box" hidden></section>
     <section id="resultsBox" class="results-list" aria-live="polite"></section>
   </main>
+  <div id="radModal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="radModalTitle">
+      <button id="btnRadClose" class="modal-close" type="button" aria-label="Cerrar">×</button>
+      <h2 id="radModalTitle">Sistema LIPA de Rendimiento — RAD</h2>
+      <p><strong>RAD</strong> significa <strong>Rendimiento Ajustado Dinámico</strong>. Es el sistema oficial de ranking de LIPA para calcular el rendimiento competitivo de cada jugador ajustando su efectividad según la cantidad de partidos disputados dentro de su categoría.</p>
+      <p>El sistema prioriza consistencia, rendimiento sostenido y confiabilidad estadística, evitando distorsiones generadas por muestras pequeñas.</p>
+
+      <h3>Cálculo del rendimiento</h3>
+      <div class="formula-box">
+        <p><strong>EFEC</strong> = (Partidos Ganados / Partidos Jugados) × 100</p>
+        <p><strong>SPREAD</strong> = (Máximo PJ de la categoría - Promedio PJ de la categoría) / Máximo PJ de la categoría</p>
+        <p><strong>FUERZA</strong> = 1 + SPREAD</p>
+        <p><strong>PENALIZACIÓN</strong> = 1 + ((Máximo PJ - PJ del jugador) / Máximo PJ) × FUERZA</p>
+        <p><strong>RAD</strong> = EFEC / PENALIZACIÓN</p>
+      </div>
+
+      <h3>Desempates</h3>
+      <ol>
+        <li>Diferencia de triángulos</li>
+        <li>Triángulos a favor</li>
+      </ol>
+    </div>
+  </div>
+
 </div>
 
 <script src="../config.js"></script>

@@ -17,6 +17,9 @@
   const $rankingButtons = Array.from(document.querySelectorAll('[data-ranking-limit]'));
   const $rankingTabs = Array.from(document.querySelectorAll('[data-ranking-tab]'));
   const $reload = document.getElementById('btnRecargar');
+  const $radInfo = document.getElementById('btnRadInfo');
+  const $radModal = document.getElementById('radModal');
+  const $radClose = document.getElementById('btnRadClose');
 
   let debounceTimer = null;
   let lastSuggestions = [];
@@ -39,6 +42,74 @@
       throw new Error(data?.error || data?.message || 'No se pudo consultar.');
     }
     return data;
+  }
+
+
+  function toNumber(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function round1(value) {
+    return Math.round(toNumber(value) * 10) / 10;
+  }
+
+  function buildRadContext(items = []) {
+    const playedValues = items
+      .map((item) => toNumber(item.played))
+      .filter((played) => played > 0);
+
+    const maxPlayed = playedValues.length ? Math.max(...playedValues) : 0;
+    const avgPlayed = playedValues.length
+      ? playedValues.reduce((acc, played) => acc + played, 0) / playedValues.length
+      : 0;
+    const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
+    const force = 1 + spread;
+
+    return { maxPlayed, avgPlayed, spread, force };
+  }
+
+  function calculateRad(item, context) {
+    const played = toNumber(item?.played);
+    const wins = toNumber(item?.wins);
+    const effectiveness = played > 0 ? (wins / played) * 100 : 0;
+    const maxPlayed = toNumber(context?.maxPlayed);
+    const force = toNumber(context?.force) || 1;
+    const penalty = maxPlayed > 0 && played > 0
+      ? 1 + ((maxPlayed - played) / maxPlayed) * force
+      : 1;
+    const rad = penalty > 0 ? effectiveness / penalty : 0;
+
+    return {
+      ...item,
+      effectiveness: round1(effectiveness),
+      rad: round1(rad),
+      radPenalty: round1(penalty),
+    };
+  }
+
+  function sortPlayersByRad(items = [], context = null) {
+    const radContext = context || buildRadContext(items);
+    return items
+      .map((item) => calculateRad(item, radContext))
+      .sort((a, b) =>
+        toNumber(b.rad) - toNumber(a.rad) ||
+        toNumber(b.diff) - toNumber(a.diff) ||
+        toNumber(b.triangulosFavor) - toNumber(a.triangulosFavor) ||
+        toNumber(b.wins) - toNumber(a.wins)
+      );
+  }
+
+  function openRadModal() {
+    if (!$radModal) return;
+    $radModal.hidden = false;
+    document.body.classList.add('modal-open');
+  }
+
+  function closeRadModal() {
+    if (!$radModal) return;
+    $radModal.hidden = true;
+    document.body.classList.remove('modal-open');
   }
 
   function formatDate(iso) {
@@ -227,7 +298,8 @@
   }
 
   function renderRanking(data, limit) {
-    const items = Array.isArray(data?.ranking) ? data.ranking : [];
+    const rawItems = Array.isArray(data?.ranking) ? data.ranking : [];
+    const items = sortPlayersByRad(rawItems).slice(0, limit);
     if (!$ranking) return;
 
     $ranking.hidden = false;
@@ -245,12 +317,13 @@
           <td class="player-name">${item.name || ''}</td>
           <td class="team-name">${item.teamName || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
+          <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
+          <td class="num">${Number(item.effectiveness || 0).toFixed(1)}%</td>
           <td class="num ok">${Number(item.wins || 0)}</td>
           <td class="num bad">${Number(item.losses || 0)}</td>
+          <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
           <td class="num">${Number(item.triangulosFavor || 0)}</td>
           <td class="num">${Number(item.triangulosContra || 0)}</td>
-          <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
-          <td class="num">${Number(item.effectiveness || 0)}%</td>
         </tr>
       `;
     }).join('');
@@ -259,7 +332,7 @@
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Ranking Top ${limit}</h2>
-          <p class="ranking-meta">Ordenado por partidos ganados. Desempate: diferencia de triángulos. Ranking realizado sobre una base de ${Number(data?.totalRegisteredPlayers || 0)} jugadores registrados y ${Number(data?.totalActivePlayers || 0)} jugadores activos.</p>
+          <p class="ranking-meta">Ordenado por RAD: rendimiento ajustado por efectividad y cantidad de partidos jugados. Desempate: diferencia de triángulos y triángulos a favor. Ranking realizado sobre una base de ${Number(data?.totalRegisteredPlayers || 0)} jugadores registrados y ${Number(data?.totalActivePlayers || 0)} jugadores activos.</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
@@ -270,12 +343,13 @@
               <th>Jugador</th>
               <th>Equipo</th>
               <th class="num">PJ</th>
+              <th class="num rad-head" title="Rendimiento Ajustado Dinámico">RAD</th>
+              <th class="num">EFEC</th>
               <th class="num">PG</th>
               <th class="num">PP</th>
+              <th class="num">DIF</th>
               <th class="num">TF</th>
               <th class="num">TC</th>
-              <th class="num">DIF</th>
-              <th class="num">EFEC</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -357,8 +431,10 @@
 
 
   function renderTeamSearchResults(data) {
-    const items = Array.isArray(data?.players) ? data.players : [];
+    const rawItems = Array.isArray(data?.players) ? data.players : [];
     const team = data?.team || {};
+    const radContext = data?.radContext || buildRadContext(rawItems);
+    const items = sortPlayersByRad(rawItems, radContext);
     if (!$ranking) return;
 
     $ranking.hidden = false;
@@ -376,12 +452,13 @@
           <td class="player-name">${item.name || ''}</td>
           <td class="team-name">${item.teamName || team.name || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
+          <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
+          <td class="num">${Number(item.effectiveness || 0).toFixed(1)}%</td>
           <td class="num ok">${Number(item.wins || 0)}</td>
           <td class="num bad">${Number(item.losses || 0)}</td>
+          <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
           <td class="num">${Number(item.triangulosFavor || 0)}</td>
           <td class="num">${Number(item.triangulosContra || 0)}</td>
-          <td class="num ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
-          <td class="num">${Number(item.effectiveness || 0)}%</td>
         </tr>
       `;
     }).join('');
@@ -390,7 +467,7 @@
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Jugadores de ${team.name || 'equipo'}</h2>
-          <p class="ranking-meta">Ordenado por partidos ganados. Desempate: diferencia de triángulos. ${Number(data?.totalActivePlayers || 0)} jugadores activos sobre ${Number(data?.totalRegisteredPlayers || 0)} registrados.</p>
+          <p class="ranking-meta">Ordenado por RAD. Desempate: diferencia de triángulos y triángulos a favor. ${Number(data?.totalActivePlayers || 0)} jugadores activos sobre ${Number(data?.totalRegisteredPlayers || 0)} registrados.</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
@@ -401,12 +478,13 @@
               <th>Jugador</th>
               <th>Equipo</th>
               <th class="num">PJ</th>
+              <th class="num rad-head" title="Rendimiento Ajustado Dinámico">RAD</th>
+              <th class="num">EFEC</th>
               <th class="num">PG</th>
               <th class="num">PP</th>
+              <th class="num">DIF</th>
               <th class="num">TF</th>
               <th class="num">TC</th>
-              <th class="num">DIF</th>
-              <th class="num">EFEC</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -438,6 +516,13 @@
         return;
       }
 
+      try {
+        const categoryRanking = await fetchJson(apiUrl('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=1000'));
+        data.radContext = buildRadContext(Array.isArray(categoryRanking?.ranking) ? categoryRanking.ranking : []);
+      } catch (err) {
+        console.warn('No se pudo obtener el contexto RAD de la categoría. Se usa el equipo como referencia.', err);
+      }
+
       setStatus('', 'info');
       renderTeamSearchResults(data);
     } catch (err) {
@@ -461,7 +546,7 @@
     });
 
     try {
-      const fetchLimit = limit;
+      const fetchLimit = currentRankingTab === 'teams' ? limit : 1000;
       const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
       const data = await fetchJson(apiUrl(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
       setStatus('', 'info');
@@ -546,6 +631,14 @@
       $rankingTabs.forEach((item) => item.classList.toggle('active', item === btn));
       renderRankingSwitch();
     });
+  });
+  $radInfo?.addEventListener('click', openRadModal);
+  $radClose?.addEventListener('click', closeRadModal);
+  $radModal?.addEventListener('click', (ev) => {
+    if (ev.target === $radModal) closeRadModal();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeRadModal();
   });
   $reload?.addEventListener('click', () => window.location.reload());
   $form?.addEventListener('submit', searchPlayer);
