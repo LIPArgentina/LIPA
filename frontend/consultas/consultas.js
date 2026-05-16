@@ -34,6 +34,11 @@
     return API_BASE + path;
   }
 
+  function withCacheBust(path) {
+    const sep = path.includes('?') ? '&' : '?';
+    return path + sep + '_=' + Date.now();
+  }
+
   async function fetchJson(url) {
     const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
     let data = null;
@@ -517,7 +522,7 @@
       }
 
       try {
-        const categoryRanking = await fetchJson(apiUrl('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=1000'));
+        const categoryRanking = await fetchJson(apiUrl(withCacheBust('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=1000')));
         data.radContext = buildRadContext(Array.isArray(categoryRanking?.ranking) ? categoryRanking.ranking : []);
       } catch (err) {
         console.warn('No se pudo obtener el contexto RAD de la categoría. Se usa el equipo como referencia.', err);
@@ -548,15 +553,15 @@
     try {
       const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
       const requestedLimit = Number(limit || 10);
-      let fetchLimit = currentRankingTab === 'teams' ? requestedLimit : Math.max(requestedLimit, 1000);
-      let data = await fetchJson(apiUrl(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
+      let fetchLimit = requestedLimit;
+      let data = await fetchJson(apiUrl(withCacheBust(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit))));
 
       if (currentRankingTab !== 'teams') {
         const currentCount = Array.isArray(data?.ranking) ? data.ranking.length : 0;
         const totalActive = Number(data?.totalActivePlayers || 0);
-        if (currentCount < requestedLimit && totalActive > currentCount) {
-          fetchLimit = Math.max(requestedLimit, totalActive);
-          data = await fetchJson(apiUrl(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
+        if (totalActive > currentCount && totalActive > requestedLimit) {
+          fetchLimit = totalActive;
+          data = await fetchJson(apiUrl(withCacheBust(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit))));
         }
       }
 
@@ -634,7 +639,7 @@
     scheduleTeamSuggestions();
   });
   $rankingButtons.forEach((btn) => {
-    btn.addEventListener('click', () => loadRanking(Number(btn.dataset.rankingLimit || 10)));
+    btn.addEventListener('click', () => loadRanking(Number(btn.getAttribute('data-ranking-limit') || btn.dataset.rankingLimit || 10)));
   });
   $rankingTabs.forEach((btn) => {
     btn.addEventListener('click', () => {
