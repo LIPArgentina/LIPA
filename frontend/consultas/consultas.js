@@ -75,6 +75,14 @@
   }
 
   function calculateRad(item, context) {
+    if (item && item.rad !== undefined) {
+      return {
+        ...item,
+        effectiveness: round1(item.effectiveness),
+        rad: round1(item.rad),
+        radPenalty: round1(item.radPenalty || 1),
+      };
+    }
     const played = toNumber(item?.played);
     const wins = toNumber(item?.wins);
     const effectiveness = played > 0 ? (wins / played) * 100 : 0;
@@ -522,8 +530,7 @@
       }
 
       try {
-        const categoryRanking = await fetchJson(apiUrl(withCacheBust('/api/cruces/player-ranking?category=' + encodeURIComponent(category) + '&limit=1000')));
-        data.radContext = buildRadContext(Array.isArray(categoryRanking?.ranking) ? categoryRanking.ranking : []);
+        data.radContext = data?.radContext || null;
       } catch (err) {
         console.warn('No se pudo obtener el contexto RAD de la categoría. Se usa el equipo como referencia.', err);
       }
@@ -553,7 +560,7 @@
     try {
       const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
       const requestedLimit = Number(limit || 10);
-      const fetchLimit = currentRankingTab === 'teams' ? requestedLimit : 1000;
+      const fetchLimit = requestedLimit;
       const data = await fetchJson(apiUrl(withCacheBust(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit))));
 
       setStatus('', 'info');

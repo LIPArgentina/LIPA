@@ -1963,6 +1963,59 @@ function ensureRankingRow(map, playerName, teamSlug, teamName) {
   return map.get(key);
 }
 
+function roundRanking1(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
+}
+
+function buildRadRankingContext(items = []) {
+  const playedValues = items
+    .map((item) => Number(item.played || 0))
+    .filter((played) => played > 0);
+
+  const maxPlayed = playedValues.length ? Math.max(...playedValues) : 0;
+  const avgPlayed = playedValues.length
+    ? playedValues.reduce((acc, played) => acc + played, 0) / playedValues.length
+    : 0;
+  const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
+  const force = 1 + spread;
+
+  return {
+    maxPlayed: roundRanking1(maxPlayed),
+    avgPlayed: roundRanking1(avgPlayed),
+    spread: roundRanking1(spread),
+    force: roundRanking1(force)
+  };
+}
+
+function applyRadToRankingItem(item = {}, context = {}) {
+  const played = Number(item.played || 0);
+  const wins = Number(item.wins || 0);
+  const maxPlayed = Number(context.maxPlayed || 0);
+  const force = Number(context.force || 1);
+  const effectivenessRaw = played > 0 ? (wins / played) * 100 : 0;
+  const penalty = maxPlayed > 0 && played > 0
+    ? 1 + ((maxPlayed - played) / maxPlayed) * force
+    : 1;
+  const rad = penalty > 0 ? effectivenessRaw / penalty : 0;
+
+  return {
+    ...item,
+    diff: Number(item.diff || 0),
+    effectiveness: roundRanking1(effectivenessRaw),
+    rad: roundRanking1(rad),
+    radPenalty: roundRanking1(penalty)
+  };
+}
+
+function sortPlayerStatsRowsRad(a, b) {
+  if (Number(b.rad || 0) !== Number(a.rad || 0)) return Number(b.rad || 0) - Number(a.rad || 0);
+  if (Number(b.diff || 0) !== Number(a.diff || 0)) return Number(b.diff || 0) - Number(a.diff || 0);
+  if (Number(b.triangulosFavor || 0) !== Number(a.triangulosFavor || 0)) return Number(b.triangulosFavor || 0) - Number(a.triangulosFavor || 0);
+  if (Number(b.wins || 0) !== Number(a.wins || 0)) return Number(b.wins || 0) - Number(a.wins || 0);
+  return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+}
+
 async function countRegisteredIndividualPlayersByCategory(category = '') {
   const division = String(category || '').trim().toLowerCase();
   if (!division) return 0;
@@ -2035,19 +2088,16 @@ router.get('/player-ranking', async (req, res) => {
       }
     }
 
-    const fullRanking = Array.from(rankingMap.values())
+    const baseRanking = Array.from(rankingMap.values())
       .map((item) => ({
         ...item,
-        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
-        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
-      }))
-      .sort((a, b) => {
-        if (b.wins !== a.wins) return b.wins - a.wins;
-        if (b.diff !== a.diff) return b.diff - a.diff;
-        if (a.losses !== b.losses) return a.losses - b.losses;
-        if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
-        return String(a.name || '').localeCompare(String(b.name || ''), 'es');
-      });
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0)
+      }));
+
+    const radContext = buildRadRankingContext(baseRanking);
+    const fullRanking = baseRanking
+      .map((item) => applyRadToRankingItem(item, radContext))
+      .sort(sortPlayerStatsRowsRad);
 
     const totalActivePlayers = fullRanking.length;
     const ranking = fullRanking.slice(0, limit);
@@ -2059,6 +2109,7 @@ router.get('/player-ranking', async (req, res) => {
       total: ranking.length,
       totalRegisteredPlayers,
       totalActivePlayers,
+      radContext,
       ranking
     });
   } catch (err) {
@@ -2225,11 +2276,7 @@ function teamInfoMatchesSide(teamInfo = {}, sideSlug = '', sideName = '') {
 }
 
 function sortPlayerStatsRows(a, b) {
-  if (b.wins !== a.wins) return b.wins - a.wins;
-  if (b.diff !== a.diff) return b.diff - a.diff;
-  if (a.losses !== b.losses) return a.losses - b.losses;
-  if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
-  return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+  return sortPlayerStatsRowsRad(a, b);
 }
 
 router.get('/team-query', async (req, res) => {
@@ -2344,13 +2391,57 @@ router.get('/team-query', async (req, res) => {
       }
     }
 
-    const players = Array.from(playersMap.values())
+    const basePlayers = Array.from(playersMap.values())
       .map((item) => ({
         ...item,
-        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
-        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
-      }))
-      .sort(sortPlayerStatsRows);
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0)
+      }));
+
+    const categoryRankingMap = new Map();
+    for (const item of results) {
+      const localPlayers = getIndividualPlayers(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+      const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
+
+      for (let idx = 0; idx < max; idx++) {
+        const localPlayer = String(localPlayers[idx] || '').trim();
+        const visitantePlayer = String(visitantePlayers[idx] || '').trim();
+        const localScore = Number(localScores[idx] ?? 0) || 0;
+        const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
+
+        if (localPlayer) {
+          const row = ensureRankingRow(categoryRankingMap, localPlayer, item.localSlug, item.localName);
+          row.played += 1;
+          row.triangulosFavor += localScore;
+          row.triangulosContra += visitanteScore;
+          if (localScore > visitanteScore) row.wins += 1;
+          else if (localScore < visitanteScore) row.losses += 1;
+          else row.draws += 1;
+        }
+
+        if (visitantePlayer) {
+          const row = ensureRankingRow(categoryRankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
+          row.played += 1;
+          row.triangulosFavor += visitanteScore;
+          row.triangulosContra += localScore;
+          if (visitanteScore > localScore) row.wins += 1;
+          else if (visitanteScore < localScore) row.losses += 1;
+          else row.draws += 1;
+        }
+      }
+    }
+
+    const categoryBaseRanking = Array.from(categoryRankingMap.values())
+      .map((item) => ({
+        ...item,
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0)
+      }));
+    const radContext = buildRadRankingContext(categoryBaseRanking);
+    const players = basePlayers
+      .map((item) => applyRadToRankingItem(item, radContext))
+      .sort(sortPlayerStatsRowsRad);
 
     const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
 
@@ -2367,6 +2458,7 @@ router.get('/team-query', async (req, res) => {
       },
       totalRegisteredPlayers: registeredPlayers.length,
       totalActivePlayers,
+      radContext,
       players
     });
   } catch (err) {
