@@ -332,7 +332,7 @@
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Ranking Top ${limit}</h2>
-          <p class="ranking-meta">Ordenado por RAD: rendimiento ajustado por efectividad y cantidad de partidos jugados. Desempate: diferencia de triángulos y triángulos a favor. Ranking realizado sobre una base de ${Number(data?.totalRegisteredPlayers || 0)} jugadores registrados y ${Number(data?.totalActivePlayers || 0)} jugadores activos.</p>
+          <p class="ranking-meta">Ranking realizado sobre una base de ${Number(data?.totalRegisteredPlayers || 0)} jugadores registrados y ${Number(data?.totalActivePlayers || 0)} jugadores activos.</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
@@ -467,7 +467,7 @@
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Jugadores de ${team.name || 'equipo'}</h2>
-          <p class="ranking-meta">Ordenado por RAD. Desempate: diferencia de triángulos y triángulos a favor. ${Number(data?.totalActivePlayers || 0)} jugadores activos sobre ${Number(data?.totalRegisteredPlayers || 0)} registrados.</p>
+          <p class="ranking-meta">${Number(data?.totalActivePlayers || 0)} jugadores activos sobre ${Number(data?.totalRegisteredPlayers || 0)} registrados.</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
@@ -546,9 +546,20 @@
     });
 
     try {
-      const fetchLimit = currentRankingTab === 'teams' ? limit : 1000;
       const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
-      const data = await fetchJson(apiUrl(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
+      const requestedLimit = Number(limit || 10);
+      let fetchLimit = currentRankingTab === 'teams' ? requestedLimit : Math.max(requestedLimit, 1000);
+      let data = await fetchJson(apiUrl(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
+
+      if (currentRankingTab !== 'teams') {
+        const currentCount = Array.isArray(data?.ranking) ? data.ranking.length : 0;
+        const totalActive = Number(data?.totalActivePlayers || 0);
+        if (currentCount < requestedLimit && totalActive > currentCount) {
+          fetchLimit = Math.max(requestedLimit, totalActive);
+          data = await fetchJson(apiUrl(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit)));
+        }
+      }
+
       setStatus('', 'info');
       lastRankingData = data;
       lastRankingLimit = limit;
