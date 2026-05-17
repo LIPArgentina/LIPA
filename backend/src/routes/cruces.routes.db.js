@@ -1870,12 +1870,6 @@ router.get('/player-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions, player: null, total: 0, matches: [] });
     }
 
-    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
-    const playerRadRow = categoryRanking.find((item) =>
-      sameNormalizedName(item.name, exact.name) &&
-      samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
-    ) || null;
-
     const matches = [];
     for (const item of results) {
       const localPlayers = getIndividualPlayers(item.localPlanilla);
@@ -1938,10 +1932,7 @@ router.get('/player-query', async (req, res) => {
       category,
       q,
       suggestions,
-      player: playerRadRow ? { ...exact, ...playerRadRow } : exact,
-      rad: playerRadRow?.rad ?? null,
-      radPenalty: playerRadRow?.radPenalty ?? null,
-      radContext,
+      player: exact,
       total: matches.length,
       matches
     });
@@ -1994,28 +1985,32 @@ function buildRadContextFromRows(rows = []) {
   const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
   const force = 1 + spread;
 
-  return {
-    maxPlayed: radRound1(maxPlayed),
-    avgPlayed: radRound1(avgPlayed),
-    spread: radRound1(spread),
-    force: radRound1(force)
-  };
+  return { maxPlayed, avgPlayed, spread, force };
 }
 
 function applyRadToPlayerRow(item = {}, context = null) {
   const played = radNumber(item.played);
   const wins = radNumber(item.wins);
+  const triangulosFavor = radNumber(item.triangulosFavor);
+  const triangulosContra = radNumber(item.triangulosContra);
   const effectiveness = played > 0 ? (wins / played) * 100 : 0;
+
   const maxPlayed = radNumber(context?.maxPlayed);
-  const force = radNumber(context?.force) || 1;
+  const avgPlayed = radNumber(context?.avgPlayed);
+  const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
+  const force = 1 + spread;
+
   const penalty = maxPlayed > 0 && played > 0
     ? 1 + ((maxPlayed - played) / maxPlayed) * force
     : 1;
+
   const rad = penalty > 0 ? effectiveness / penalty : 0;
 
   return {
     ...item,
-    diff: radNumber(item.triangulosFavor) - radNumber(item.triangulosContra),
+    triangulosFavor,
+    triangulosContra,
+    diff: triangulosFavor - triangulosContra,
     effectiveness: radRound1(effectiveness),
     rad: radRound1(rad),
     radPenalty: radRound1(penalty)
@@ -2026,8 +2021,6 @@ function sortPlayerRadRows(a, b) {
   const aPlayed = radNumber(a.played);
   const bPlayed = radNumber(b.played);
 
-  // En consultas por equipo, los jugadores registrados sin partidos
-  // deben quedar siempre debajo de cualquier jugador que sí jugó.
   if (aPlayed === 0 && bPlayed > 0) return 1;
   if (bPlayed === 0 && aPlayed > 0) return -1;
 
@@ -2087,12 +2080,24 @@ function buildPlayerRowsFromResults(results = []) {
 
 function buildRadRankingFromResults(results = []) {
   const baseRows = buildPlayerRowsFromResults(results);
-  const radContext = buildRadContextFromRows(baseRows);
+
+  // Contexto global: solo jugadores activos de toda la categoría.
+  const activeRows = baseRows.filter((item) => radNumber(item.played) > 0);
+  const rawContext = buildRadContextFromRows(activeRows);
+
   const ranking = baseRows
-    .map((item) => applyRadToPlayerRow(item, radContext))
+    .map((item) => applyRadToPlayerRow(item, rawContext))
     .sort(sortPlayerRadRows);
 
-  return { ranking, radContext };
+  return {
+    ranking,
+    radContext: {
+      maxPlayed: radRound1(rawContext.maxPlayed),
+      avgPlayed: radRound1(rawContext.avgPlayed),
+      spread: radRound1(rawContext.spread),
+      force: radRound1(rawContext.force)
+    }
+  };
 }
 
 
@@ -2410,20 +2415,12 @@ router.get('/team-query', async (req, res) => {
       buildAllValidatedCrucesForPlayerQuery(category)
     ]);
 
-    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
-    const categoryPlayersByKey = new Map();
-    categoryRanking.forEach((item) => {
-      categoryPlayersByKey.set(`${normalizeText(item.name)}::${canonicalPlayerTeamSlug(item.teamSlug)}`, item);
-    });
-
     const playersMap = new Map();
     const ensureTeamPlayer = (playerName) => {
       const key = normalizeText(playerName);
       if (!key) return null;
       if (!playersMap.has(key)) {
-        const categoryKey = `${key}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
-        const categoryRow = categoryPlayersByKey.get(categoryKey) || null;
-        playersMap.set(key, categoryRow ? { ...categoryRow } : {
+        playersMap.set(key, {
           name: String(playerName || '').trim(),
           teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
           teamName: exactTeam.display_name,
@@ -2434,9 +2431,7 @@ router.get('/team-query', async (req, res) => {
           triangulosFavor: 0,
           triangulosContra: 0,
           diff: 0,
-          effectiveness: 0,
-          rad: 0,
-          radPenalty: 0
+          effectiveness: 0
         });
       }
       return playersMap.get(key);
@@ -2444,8 +2439,56 @@ router.get('/team-query', async (req, res) => {
 
     registeredPlayers.forEach(ensureTeamPlayer);
 
+    for (const item of results) {
+      const localPlayers = getIndividualPlayers(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+
+      const scan = [
+        {
+          players: localPlayers,
+          scoreRows: localScores,
+          opponentScoreRows: visitanteScores,
+          teamSlug: item.localSlug,
+          teamName: item.localName
+        },
+        {
+          players: visitantePlayers,
+          scoreRows: visitanteScores,
+          opponentScoreRows: localScores,
+          teamSlug: item.visitanteSlug,
+          teamName: item.visitanteName
+        }
+      ];
+
+      for (const side of scan) {
+        if (!teamInfoMatchesSide(exactTeam, side.teamSlug, side.teamName)) continue;
+        side.players.forEach((playerName, idx) => {
+          const cleanName = String(playerName || '').trim();
+          if (!cleanName) return;
+          const row = ensureTeamPlayer(cleanName);
+          if (!row) return;
+
+          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
+          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
+          row.played += 1;
+          row.triangulosFavor += triangulosFavor;
+          row.triangulosContra += triangulosContra;
+          if (triangulosFavor > triangulosContra) row.wins += 1;
+          else if (triangulosFavor < triangulosContra) row.losses += 1;
+          else row.draws += 1;
+        });
+      }
+    }
+
     const players = Array.from(playersMap.values())
-      .sort(sortPlayerRadRows);
+      .map((item) => ({
+        ...item,
+        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
+        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
+      }))
+      .sort(sortPlayerStatsRows);
 
     const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
 
@@ -2462,7 +2505,6 @@ router.get('/team-query', async (req, res) => {
       },
       totalRegisteredPlayers: registeredPlayers.length,
       totalActivePlayers,
-      radContext,
       players
     });
   } catch (err) {

@@ -105,19 +105,12 @@
     const radContext = context || buildRadContext(items);
     return items
       .map((item) => calculateRad(item, radContext))
-      .sort((a, b) => {
-        const aPlayed = toNumber(a.played);
-        const bPlayed = toNumber(b.played);
-
-        if (aPlayed === 0 && bPlayed > 0) return 1;
-        if (bPlayed === 0 && aPlayed > 0) return -1;
-
-        return toNumber(b.rad) - toNumber(a.rad) ||
-          toNumber(b.diff) - toNumber(a.diff) ||
-          toNumber(b.triangulosFavor) - toNumber(a.triangulosFavor) ||
-          toNumber(b.wins) - toNumber(a.wins) ||
-          bPlayed - aPlayed;
-      });
+      .sort((a, b) =>
+        toNumber(b.rad) - toNumber(a.rad) ||
+        toNumber(b.diff) - toNumber(a.diff) ||
+        toNumber(b.triangulosFavor) - toNumber(a.triangulosFavor) ||
+        toNumber(b.wins) - toNumber(a.wins)
+      );
   }
 
   function openRadModal() {
@@ -250,33 +243,17 @@
     const perdidos = matches.filter((item) => item.result === 'perdido').length;
     const triangulosFavorTotal = matches.reduce((acc, item) => acc + (Number(item.triangulosFavor || 0) || 0), 0);
     const triangulosContraTotal = matches.reduce((acc, item) => acc + (Number(item.triangulosContra || 0) || 0), 0);
-    const played = Number(data.total || matches.length || 0);
-    const efectividad = played > 0 ? Math.round((ganados / played) * 100) : 0;
-
-    const radValue =
-      data?.rad !== undefined && data?.rad !== null
-        ? Number(data.rad || 0)
-        : player?.rad !== undefined && player?.rad !== null
-          ? Number(player.rad || 0)
-          : calculateRad({
-              played,
-              wins: ganados,
-              losses: perdidos,
-              triangulosFavor: triangulosFavorTotal,
-              triangulosContra: triangulosContraTotal,
-              diff: triangulosFavorTotal - triangulosContraTotal,
-              effectiveness: efectividad
-            }, data?.radContext || null).rad;
+    const efectividad = Number(data.total || 0) > 0 ? Math.round((ganados / Number(data.total || 0)) * 100) : 0;
 
     $summary.hidden = false;
     $summary.innerHTML = `
-      <div class="summary-player">
+      <div>
         <h2 class="summary-title">${player.name || 'Jugador'}</h2>
         <p class="summary-meta">${player.teamName || ''} · Categoría ${(data.category || '').toUpperCase()}</p>
       </div>
       <div class="summary-stats">
         <div class="summary-count">
-          <strong>${played}</strong>
+          <strong>${Number(data.total || 0)}</strong>
           <span>partidos jugados</span>
         </div>
         <div class="summary-count summary-win">
@@ -298,10 +275,6 @@
         <div class="summary-count summary-eff">
           <strong>${efectividad}%</strong>
           <span>efectividad</span>
-        </div>
-        <div class="summary-count summary-rad">
-          <strong>${Number(radValue || 0).toFixed(1)}</strong>
-          <span>RAD</span>
         </div>
       </div>
     `;
@@ -339,7 +312,7 @@
 
   function renderRanking(data, limit) {
     const rawItems = Array.isArray(data?.ranking) ? data.ranking : [];
-    const items = rawItems.slice(0, limit).map((item) => calculateRad(item));
+    const items = sortPlayersByRad(rawItems).slice(0, limit);
     if (!$ranking) return;
 
     $ranking.hidden = false;
@@ -474,7 +447,7 @@
     const rawItems = Array.isArray(data?.players) ? data.players : [];
     const team = data?.team || {};
     const radContext = data?.radContext || buildRadContext(rawItems);
-    const items = rawItems.map((item) => calculateRad(item, radContext));
+    const items = sortPlayersByRad(rawItems, radContext);
     if (!$ranking) return;
 
     $ranking.hidden = false;
