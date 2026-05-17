@@ -312,7 +312,7 @@
 
   function renderRanking(data, limit) {
     const rawItems = Array.isArray(data?.ranking) ? data.ranking : [];
-    const items = sortPlayersByRad(rawItems).slice(0, limit);
+    const items = rawItems.slice(0, limit);
     if (!$ranking) return;
 
     $ranking.hidden = false;
@@ -446,8 +446,7 @@
   function renderTeamSearchResults(data) {
     const rawItems = Array.isArray(data?.players) ? data.players : [];
     const team = data?.team || {};
-    const radContext = data?.radContext || buildRadContext(rawItems);
-    const items = sortPlayersByRad(rawItems, radContext);
+    const items = rawItems;
     if (!$ranking) return;
 
     $ranking.hidden = false;

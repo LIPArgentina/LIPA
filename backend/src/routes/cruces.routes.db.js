@@ -1870,6 +1870,12 @@ router.get('/player-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions, player: null, total: 0, matches: [] });
     }
 
+    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
+    const playerRadRow = categoryRanking.find((item) =>
+      sameNormalizedName(item.name, exact.name) &&
+      samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
+    ) || null;
+
     const matches = [];
     for (const item of results) {
       const localPlayers = getIndividualPlayers(item.localPlanilla);
@@ -1932,7 +1938,10 @@ router.get('/player-query', async (req, res) => {
       category,
       q,
       suggestions,
-      player: exact,
+      player: playerRadRow ? { ...exact, ...playerRadRow } : exact,
+      rad: playerRadRow?.rad ?? null,
+      radPenalty: playerRadRow?.radPenalty ?? null,
+      radContext,
       total: matches.length,
       matches
     });
@@ -1962,6 +1971,8 @@ function ensureRankingRow(map, playerName, teamSlug, teamName) {
   }
   return map.get(key);
 }
+
+
 
 
 function radNumber(value) {
@@ -2080,8 +2091,6 @@ function buildPlayerRowsFromResults(results = []) {
 
 function buildRadRankingFromResults(results = []) {
   const baseRows = buildPlayerRowsFromResults(results);
-
-  // Contexto global: solo jugadores activos de toda la categoría.
   const activeRows = baseRows.filter((item) => radNumber(item.played) > 0);
   const rawContext = buildRadContextFromRows(activeRows);
 
@@ -2124,9 +2133,7 @@ router.get('/player-ranking', async (req, res) => {
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
     const rawLimit = Number(req.query.limit || 10);
-    // Player ranking necesita aceptar límites amplios porque el frontend calcula RAD
-    // sobre toda la categoría y recién después recorta visualmente Top 10/20/50.
-    const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 10, 1), 1000);
+    const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
@@ -2136,58 +2143,10 @@ router.get('/player-ranking', async (req, res) => {
       buildAllValidatedCrucesForPlayerQuery(category),
       countRegisteredIndividualPlayersByCategory(category)
     ]);
-    const rankingMap = new Map();
 
-    for (const item of results) {
-      const localPlayers = getIndividualPlayers(item.localPlanilla);
-      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
-      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
-      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
-      const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
-
-      for (let idx = 0; idx < max; idx++) {
-        const localPlayer = String(localPlayers[idx] || '').trim();
-        const visitantePlayer = String(visitantePlayers[idx] || '').trim();
-        const localScore = Number(localScores[idx] ?? 0) || 0;
-        const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
-
-        if (localPlayer) {
-          const row = ensureRankingRow(rankingMap, localPlayer, item.localSlug, item.localName);
-          row.played += 1;
-          row.triangulosFavor += localScore;
-          row.triangulosContra += visitanteScore;
-          if (localScore > visitanteScore) row.wins += 1;
-          else if (localScore < visitanteScore) row.losses += 1;
-          else row.draws += 1;
-        }
-
-        if (visitantePlayer) {
-          const row = ensureRankingRow(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
-          row.played += 1;
-          row.triangulosFavor += visitanteScore;
-          row.triangulosContra += localScore;
-          if (visitanteScore > localScore) row.wins += 1;
-          else if (visitanteScore < localScore) row.losses += 1;
-          else row.draws += 1;
-        }
-      }
-    }
-
-    const fullRanking = Array.from(rankingMap.values())
-      .map((item) => ({
-        ...item,
-        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
-        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
-      }))
-      .sort((a, b) => {
-        if (b.wins !== a.wins) return b.wins - a.wins;
-        if (b.diff !== a.diff) return b.diff - a.diff;
-        if (a.losses !== b.losses) return a.losses - b.losses;
-        if (b.triangulosFavor !== a.triangulosFavor) return b.triangulosFavor - a.triangulosFavor;
-        return String(a.name || '').localeCompare(String(b.name || ''), 'es');
-      });
-
-    const totalActivePlayers = fullRanking.length;
+    // Primero calcula RAD usando TODA la categoría; recién después corta Top 10/20/50.
+    const { ranking: fullRanking, radContext } = buildRadRankingFromResults(results);
+    const totalActivePlayers = fullRanking.filter((item) => Number(item.played || 0) > 0).length;
     const ranking = fullRanking.slice(0, limit);
 
     return res.json({
@@ -2197,6 +2156,7 @@ router.get('/player-ranking', async (req, res) => {
       total: ranking.length,
       totalRegisteredPlayers,
       totalActivePlayers,
+      radContext,
       ranking
     });
   } catch (err) {
@@ -2415,12 +2375,21 @@ router.get('/team-query', async (req, res) => {
       buildAllValidatedCrucesForPlayerQuery(category)
     ]);
 
+    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
+    const categoryPlayersByKey = new Map();
+
+    categoryRanking.forEach((item) => {
+      categoryPlayersByKey.set(`${normalizeText(item.name)}::${canonicalPlayerTeamSlug(item.teamSlug)}`, item);
+    });
+
     const playersMap = new Map();
     const ensureTeamPlayer = (playerName) => {
       const key = normalizeText(playerName);
       if (!key) return null;
       if (!playersMap.has(key)) {
-        playersMap.set(key, {
+        const categoryKey = `${key}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
+        const categoryRow = categoryPlayersByKey.get(categoryKey) || null;
+        playersMap.set(key, categoryRow ? { ...categoryRow } : {
           name: String(playerName || '').trim(),
           teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
           teamName: exactTeam.display_name,
@@ -2431,7 +2400,9 @@ router.get('/team-query', async (req, res) => {
           triangulosFavor: 0,
           triangulosContra: 0,
           diff: 0,
-          effectiveness: 0
+          effectiveness: 0,
+          rad: 0,
+          radPenalty: 0
         });
       }
       return playersMap.get(key);
@@ -2439,57 +2410,7 @@ router.get('/team-query', async (req, res) => {
 
     registeredPlayers.forEach(ensureTeamPlayer);
 
-    for (const item of results) {
-      const localPlayers = getIndividualPlayers(item.localPlanilla);
-      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
-      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
-      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
-
-      const scan = [
-        {
-          players: localPlayers,
-          scoreRows: localScores,
-          opponentScoreRows: visitanteScores,
-          teamSlug: item.localSlug,
-          teamName: item.localName
-        },
-        {
-          players: visitantePlayers,
-          scoreRows: visitanteScores,
-          opponentScoreRows: localScores,
-          teamSlug: item.visitanteSlug,
-          teamName: item.visitanteName
-        }
-      ];
-
-      for (const side of scan) {
-        if (!teamInfoMatchesSide(exactTeam, side.teamSlug, side.teamName)) continue;
-        side.players.forEach((playerName, idx) => {
-          const cleanName = String(playerName || '').trim();
-          if (!cleanName) return;
-          const row = ensureTeamPlayer(cleanName);
-          if (!row) return;
-
-          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
-          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
-          row.played += 1;
-          row.triangulosFavor += triangulosFavor;
-          row.triangulosContra += triangulosContra;
-          if (triangulosFavor > triangulosContra) row.wins += 1;
-          else if (triangulosFavor < triangulosContra) row.losses += 1;
-          else row.draws += 1;
-        });
-      }
-    }
-
-    const players = Array.from(playersMap.values())
-      .map((item) => ({
-        ...item,
-        diff: Number(item.triangulosFavor || 0) - Number(item.triangulosContra || 0),
-        effectiveness: Number(item.played || 0) > 0 ? Math.round((Number(item.wins || 0) / Number(item.played || 0)) * 100) : 0
-      }))
-      .sort(sortPlayerStatsRows);
-
+    const players = Array.from(playersMap.values()).sort(sortPlayerRadRows);
     const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
 
     return res.json({
@@ -2505,6 +2426,7 @@ router.get('/team-query', async (req, res) => {
       },
       totalRegisteredPlayers: registeredPlayers.length,
       totalActivePlayers,
+      radContext,
       players
     });
   } catch (err) {
