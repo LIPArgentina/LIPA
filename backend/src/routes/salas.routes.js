@@ -6,6 +6,7 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db');
+const adminFirebase = require('../../firebase');
 const { requireSala, requireAdmin } = require('../middleware/auth');
 
 const DEFAULT_SALA_PASSWORD = '1234';
@@ -119,6 +120,43 @@ module.exports = function createSalasRouter(deps = {}) {
       updatedAt: row.updated_at,
       createdAt: row.created_at
     };
+  }
+
+
+  async function sendTorneoPushNotification({ salaId, action = 'created', categoria = '' } = {}) {
+    if (!adminFirebase || typeof adminFirebase.messaging !== 'function') return;
+
+    try {
+      const sala = await findSala({ id: salaId });
+      const salaNombre = String(sala?.nombre || 'Una sala').trim() || 'Una sala';
+      const verbo = action === 'updated' ? 'modificó' : 'publicó';
+      const body = `${salaNombre} ${verbo} un nuevo torneo`;
+
+      await adminFirebase.messaging().send({
+        topic: 'torneos',
+        notification: {
+          title: 'RANKING LIPA',
+          body
+        },
+        data: {
+          type: 'torneo',
+          action: String(action || 'created'),
+          salaId: String(salaId || ''),
+          sala: salaNombre,
+          categoria: String(categoria || ''),
+          url: 'https://lipa.ar/torneos/torneos.html?app=true'
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'torneos',
+            clickAction: 'OPEN_TORNEOS'
+          }
+        }
+      });
+    } catch (err) {
+      console.error('FCM torneo notification error:', err?.message || err);
+    }
   }
 
   async function ensureTable() {
@@ -272,7 +310,7 @@ module.exports = function createSalasRouter(deps = {}) {
       await client.query('BEGIN');
 
       const old = await client.query(
-        `SELECT media_path FROM sala_torneos WHERE sala_id = $1 AND slot = $2 LIMIT 1`,
+        `SELECT id, media_path FROM sala_torneos WHERE sala_id = $1 AND slot = $2 LIMIT 1`,
         [salaId, slot]
       );
 
@@ -301,6 +339,12 @@ module.exports = function createSalasRouter(deps = {}) {
       if (old.rows[0]?.media_path && old.rows[0].media_path !== file.path) {
         await removeFileIfExists(old.rows[0].media_path);
       }
+
+      await sendTorneoPushNotification({
+        salaId,
+        action: old.rowCount ? 'updated' : 'created',
+        categoria
+      });
 
       const rows = await getTorneosBySala(salaId);
       return rows.map(toPublicTorneo);
@@ -665,7 +709,7 @@ module.exports = function createSalasRouter(deps = {}) {
       await client.query('BEGIN');
 
       const old = await client.query(
-        `SELECT media_path FROM sala_torneos WHERE sala_id = $1 AND slot = $2 LIMIT 1`,
+        `SELECT id, media_path FROM sala_torneos WHERE sala_id = $1 AND slot = $2 LIMIT 1`,
         [salaId, slot]
       );
 
