@@ -105,12 +105,19 @@
     const radContext = context || buildRadContext(items);
     return items
       .map((item) => calculateRad(item, radContext))
-      .sort((a, b) =>
-        toNumber(b.rad) - toNumber(a.rad) ||
-        toNumber(b.diff) - toNumber(a.diff) ||
-        toNumber(b.triangulosFavor) - toNumber(a.triangulosFavor) ||
-        toNumber(b.wins) - toNumber(a.wins)
-      );
+      .sort((a, b) => {
+        const aPlayed = toNumber(a.played);
+        const bPlayed = toNumber(b.played);
+
+        if (aPlayed === 0 && bPlayed > 0) return 1;
+        if (bPlayed === 0 && aPlayed > 0) return -1;
+
+        return toNumber(b.rad) - toNumber(a.rad) ||
+          toNumber(b.diff) - toNumber(a.diff) ||
+          toNumber(b.triangulosFavor) - toNumber(a.triangulosFavor) ||
+          toNumber(b.wins) - toNumber(a.wins) ||
+          bPlayed - aPlayed;
+      });
   }
 
   function openRadModal() {
@@ -247,9 +254,9 @@
     const efectividad = played > 0 ? Math.round((ganados / played) * 100) : 0;
 
     const radValue =
-      data?.rad !== undefined
+      data?.rad !== undefined && data?.rad !== null
         ? Number(data.rad || 0)
-        : player?.rad !== undefined
+        : player?.rad !== undefined && player?.rad !== null
           ? Number(player.rad || 0)
           : calculateRad({
               played,
@@ -332,7 +339,7 @@
 
   function renderRanking(data, limit) {
     const rawItems = Array.isArray(data?.ranking) ? data.ranking : [];
-    const items = sortPlayersByRad(rawItems).slice(0, limit);
+    const items = rawItems.slice(0, limit).map((item) => calculateRad(item));
     if (!$ranking) return;
 
     $ranking.hidden = false;
@@ -467,7 +474,7 @@
     const rawItems = Array.isArray(data?.players) ? data.players : [];
     const team = data?.team || {};
     const radContext = data?.radContext || buildRadContext(rawItems);
-    const items = sortPlayersByRad(rawItems, radContext);
+    const items = rawItems.map((item) => calculateRad(item, radContext));
     if (!$ranking) return;
 
     $ranking.hidden = false;

@@ -2023,10 +2023,19 @@ function applyRadToPlayerRow(item = {}, context = null) {
 }
 
 function sortPlayerRadRows(a, b) {
+  const aPlayed = radNumber(a.played);
+  const bPlayed = radNumber(b.played);
+
+  // En consultas por equipo, los jugadores registrados sin partidos
+  // deben quedar siempre debajo de cualquier jugador que sí jugó.
+  if (aPlayed === 0 && bPlayed > 0) return 1;
+  if (bPlayed === 0 && aPlayed > 0) return -1;
+
   if (radNumber(b.rad) !== radNumber(a.rad)) return radNumber(b.rad) - radNumber(a.rad);
   if (radNumber(b.diff) !== radNumber(a.diff)) return radNumber(b.diff) - radNumber(a.diff);
   if (radNumber(b.triangulosFavor) !== radNumber(a.triangulosFavor)) return radNumber(b.triangulosFavor) - radNumber(a.triangulosFavor);
   if (radNumber(b.wins) !== radNumber(a.wins)) return radNumber(b.wins) - radNumber(a.wins);
+  if (bPlayed !== aPlayed) return bPlayed - aPlayed;
   return String(a.name || '').localeCompare(String(b.name || ''), 'es');
 }
 
