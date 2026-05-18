@@ -9,6 +9,7 @@ const adminPlanillas = require('./admin.planillas');
 const createPicturesRouter = require('./pictures.routes');
 const createStatsRouter = require('./stats.routes');
 const createLlavesRouter = require('./llaves.routes');
+const reglamentoRouter = require('./reglamento.routes');
 
 module.exports = function createApiRouter(deps) {
   const { DATA_DIR } = deps;
@@ -49,6 +50,9 @@ module.exports = function createApiRouter(deps) {
 
   // Llaves públicas/admin: /api/llaves y /api/llaves/proximo-cruce
   router.use('/', createLlavesRouter(deps));
+
+  // Asistente IA del Reglamento CPB: /api/reglamento/ask
+  router.use('/', reglamentoRouter);
 
   return router;
 };

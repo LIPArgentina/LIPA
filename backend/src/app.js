@@ -115,6 +115,8 @@ const PICTURES_DIR = process.env.PICTURES_DIR
   ? path.resolve(process.env.PICTURES_DIR)
   : path.join(ROOT, 'backend', 'data', 'pictures');
 
+app.locals.FRONTEND_DIR = FRONTEND_DIR;
+
 /* =========================================================
    ASEGURAR DIRECTORIOS
 ========================================================= */
