@@ -142,5 +142,54 @@
     }
   });
 
+
+  // Lightbox para ampliar imágenes del reglamento
+  const figureButtons = $$('.rule-figure__button');
+  let lightbox = null;
+
+  function ensureLightbox() {
+    if (lightbox) return lightbox;
+    lightbox = document.createElement('div');
+    lightbox.className = 'image-lightbox';
+    lightbox.hidden = true;
+    lightbox.innerHTML = `
+      <div class="image-lightbox__panel" role="dialog" aria-modal="true" aria-label="Imagen ampliada">
+        <button class="image-lightbox__close" type="button" aria-label="Cerrar">×</button>
+        <img alt="">
+      </div>
+    `;
+    document.body.appendChild(lightbox);
+    lightbox.addEventListener('click', (ev) => {
+      if (ev.target === lightbox || ev.target.closest('.image-lightbox__close')) closeLightbox();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') closeLightbox();
+    });
+    return lightbox;
+  }
+
+  function openLightbox(img) {
+    const lb = ensureLightbox();
+    const target = lb.querySelector('img');
+    target.src = img.src;
+    target.alt = img.alt || 'Imagen del reglamento';
+    lb.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLightbox() {
+    if (!lightbox) return;
+    lightbox.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  figureButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const img = btn.querySelector('img');
+      if (img) openLightbox(img);
+    });
+  });
+
+
   setActive();
 })();
