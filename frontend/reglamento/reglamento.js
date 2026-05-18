@@ -105,7 +105,8 @@
         .map((item) => {
           const page = Number(item.page || item.pagina || 0);
           if (!page) return '';
-          return `<a href="#page-${page}">Página ${page}</a>`;
+          const title = item.title ? String(item.title) + ' — ' : '';
+          return `<a href="#page-${page}">${title}Página ${page}</a>`;
         })
         .filter(Boolean)
         .join(' · ');
