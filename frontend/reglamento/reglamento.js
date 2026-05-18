@@ -81,5 +81,50 @@
     noResults.hidden = count !== 0;
   });
 
+
+
+  const aiForm = $('#aiAskForm');
+  const aiQuestion = $('#aiQuestion');
+  const aiAnswer = $('#aiAnswer');
+
+  function apiBase() {
+    return String(window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  }
+
+  function showAiAnswer(text, type = '') {
+    if (!aiAnswer) return;
+    aiAnswer.hidden = false;
+    aiAnswer.className = 'ai-answer' + (type ? ' ' + type : '');
+    aiAnswer.textContent = text;
+  }
+
+  aiForm?.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const question = String(aiQuestion?.value || '').trim();
+    if (question.length < 4) {
+      showAiAnswer('Escribí una pregunta un poco más completa.', 'error');
+      return;
+    }
+
+    const btn = aiForm.querySelector('button');
+    if (btn) btn.disabled = true;
+    showAiAnswer('Consultando el reglamento…', 'loading');
+
+    try {
+      const res = await fetch(apiBase() + '/api/reglamento/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) throw new Error(data?.error || 'No se pudo consultar la IA.');
+      showAiAnswer(data.answer || 'No encontré una respuesta clara en el reglamento.');
+    } catch (err) {
+      showAiAnswer(err.message || 'No se pudo consultar la IA.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
   setActive();
 })();
