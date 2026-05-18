@@ -91,11 +91,26 @@
     return String(window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   }
 
-  function showAiAnswer(text, type = '') {
+  function showAiAnswer(text, type = '', citations = []) {
     if (!aiAnswer) return;
     aiAnswer.hidden = false;
     aiAnswer.className = 'ai-answer' + (type ? ' ' + type : '');
     aiAnswer.textContent = text;
+
+    if (Array.isArray(citations) && citations.length) {
+      const refs = document.createElement('div');
+      refs.className = 'ai-citations';
+      refs.innerHTML = '<strong>Fuentes:</strong> ' + citations
+        .slice(0, 4)
+        .map((item) => {
+          const page = Number(item.page || item.pagina || 0);
+          if (!page) return '';
+          return `<a href="#page-${page}">Página ${page}</a>`;
+        })
+        .filter(Boolean)
+        .join(' · ');
+      aiAnswer.appendChild(refs);
+    }
   }
 
   aiForm?.addEventListener('submit', async (ev) => {
@@ -118,7 +133,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'No se pudo consultar la IA.');
-      showAiAnswer(data.answer || 'No encontré una respuesta clara en el reglamento.');
+      showAiAnswer(data.answer || 'No encontré una respuesta clara en el reglamento.', '', data.citations || []);
     } catch (err) {
       showAiAnswer(err.message || 'No se pudo consultar la IA.', 'error');
     } finally {
