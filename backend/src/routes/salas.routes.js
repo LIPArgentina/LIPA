@@ -149,7 +149,7 @@ module.exports = function createSalasRouter(deps = {}) {
         android: {
           priority: 'high',
           notification: {
-            channelId: 'torneos',
+            channelId: 'lipa_torneos',
             clickAction: 'OPEN_TORNEOS'
           }
         }
@@ -686,7 +686,6 @@ module.exports = function createSalasRouter(deps = {}) {
 
   // POST /api/sala/torneos/:slot
   router.post('/sala/torneos/:slot', requireSala, uploadTorneoImage.single('imagen'), async (req, res) => {
-    const client = await pool.connect();
     try {
       await ensureTable();
 
@@ -706,48 +705,21 @@ module.exports = function createSalasRouter(deps = {}) {
       if (valor === null) return res.status(400).json({ ok: false, error: 'Falta valor' });
       if (!req.file) return res.status(400).json({ ok: false, error: 'Falta imagen' });
 
-      await client.query('BEGIN');
+      const torneos = await saveTorneoForSala({
+        salaId,
+        slot,
+        categoria,
+        fechaHora,
+        valor,
+        moneda,
+        file: req.file
+      });
 
-      const old = await client.query(
-        `SELECT id, media_path FROM sala_torneos WHERE sala_id = $1 AND slot = $2 LIMIT 1`,
-        [salaId, slot]
-      );
-
-      await client.query(
-        `INSERT INTO sala_torneos (
-           sala_id, slot, categoria, fecha_hora, valor, moneda,
-           media_type, media_path, original_name, created_at, updated_at
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-         ON CONFLICT (sala_id, slot)
-         DO UPDATE SET
-           categoria = EXCLUDED.categoria,
-           fecha_hora = EXCLUDED.fecha_hora,
-           valor = EXCLUDED.valor,
-           moneda = EXCLUDED.moneda,
-           media_type = EXCLUDED.media_type,
-           media_path = EXCLUDED.media_path,
-           original_name = EXCLUDED.original_name,
-           updated_at = NOW()`,
-        [salaId, slot, categoria, fechaHora, valor, moneda, req.file.mimetype, req.file.path, req.file.originalname || '']
-      );
-
-      await reorderSalaTorneos(salaId, client);
-      await client.query('COMMIT');
-
-      if (old.rows[0]?.media_path && old.rows[0].media_path !== req.file.path) {
-        await removeFileIfExists(old.rows[0].media_path);
-      }
-
-      const rows = await getTorneosBySala(salaId);
-      return res.json({ ok: true, torneos: rows.map(toPublicTorneo) });
+      return res.json({ ok: true, torneos });
     } catch (err) {
-      await client.query('ROLLBACK');
       if (req.file?.path) await removeFileIfExists(req.file.path);
       console.error('POST /api/sala/torneos/:slot', err);
       return res.status(500).json({ ok: false, error: err?.message || 'No se pudo guardar el torneo' });
-    } finally {
-      client.release();
     }
   });
 
