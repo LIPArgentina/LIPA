@@ -57,6 +57,22 @@ const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
 const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 
+function readAppSession(){
+  for (const key of ['lpi.session', 'lpi_team_session']) {
+    try {
+      const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (!raw) continue;
+      const sess = JSON.parse(raw);
+      if (sess && sess.token) return sess;
+    } catch {}
+  }
+  return null;
+}
+function authHeaders(extra = {}){
+  const sess = readAppSession();
+  return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
+}
+
 /* ====== Helpers ====== */
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -199,7 +215,7 @@ async function impersonateTeam(team, target){
 
     const resp = await fetch(`${API_BASE}/api/admin/impersonate-team`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify(payload)
     });
@@ -313,6 +329,7 @@ function renderRows(users){
 
         const resp = await fetch(`${API_BASE}/api/admin/reset-team-password/${encodeURIComponent(teamId)}`, {
           method: 'POST',
+          headers: authHeaders(),
           credentials: 'include'
         });
 
@@ -648,6 +665,7 @@ function renderSalasRows(salas){
 
         const resp = await fetch(`${API_BASE}/api/admin/reset-sala-password/${encodeURIComponent(salaId)}`, {
           method: 'POST',
+          headers: authHeaders(),
           credentials: 'include'
         });
 
@@ -983,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
     var slug = getTeamSlug();
     fetch(`${API_BASE}/api/admin/change-password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ slug: slug, oldPassword: oldPass, newPassword: newPass })
     })
