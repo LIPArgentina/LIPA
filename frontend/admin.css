@@ -83,7 +83,7 @@ select{ width:100%; background:#0f1116; color:var(--white); border:1px solid var
 
 .team-actions-cell{
   white-space:nowrap;
-  width:90px;
+  width:190px;
 }
 .btn-reset-pass{
   display:inline-flex;
@@ -108,6 +108,11 @@ select{ width:100%; background:#0f1116; color:var(--white); border:1px solid var
 .btn-reset-pass:disabled{
   opacity:.35;
   cursor:not-allowed;
+}
+.btn-team-planilla,
+.btn-team-cruces{
+  border-color:rgba(255,255,255,.22);
+  color:#fff;
 }
 
 /* ===== Header ===== */

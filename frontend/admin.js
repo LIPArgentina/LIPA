@@ -61,6 +61,9 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 function toast(msg){ const t=$('#toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 1800); }
+function escapeHtml(value){
+  return String(value || '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
 function normalizeLocation(p){ return String(p||'').trim(); }
 function slugify(s){
   return String(s||'').toLowerCase()
@@ -172,6 +175,70 @@ function openResetPassModal(teamName, password, copied = false){
     ui.passValue?.focus();
     ui.passValue?.select();
   }, 30);
+
+}
+
+async function impersonateTeam(team, target){
+  const teamId = team?.id ? Number(team.id) : NaN;
+  const slug = String(team?.slug || '').trim();
+  const name = String(team?.name || slug || 'equipo').trim();
+  const category = String(team?.category || _activeDiv || '').trim();
+
+  if ((!Number.isFinite(teamId) || teamId <= 0) && !slug) {
+    alert('Ese equipo todavía no tiene ID ni slug válido. Guardá la tabla primero y volvé a probar.');
+    return;
+  }
+
+  const ok = confirm(`Vas a ingresar como "${name}".\n\nLos cambios que hagas se van a guardar como si los hiciera ese capitán. ¿Continuar?`);
+  if (!ok) return;
+
+  try {
+    const payload = {};
+    if (Number.isFinite(teamId) && teamId > 0) payload.teamId = teamId;
+    if (slug) payload.slug = slug;
+
+    const resp = await fetch(`${API_BASE}/api/admin/impersonate-team`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok || !data.session) {
+      throw new Error(data.error || data.msg || `HTTP ${resp.status}`);
+    }
+
+    const previousSession = localStorage.getItem('lpi.session');
+    if (previousSession) localStorage.setItem('lpi.admin.session.backup', previousSession);
+
+    const session = data.session;
+    localStorage.setItem('lpi.session', JSON.stringify(session));
+    sessionStorage.setItem('lpi.session', JSON.stringify(session));
+    localStorage.setItem('lpi_team_session', JSON.stringify(session));
+    sessionStorage.setItem('lpi_team_session', JSON.stringify(session));
+    if (session.slug || session.team) {
+      const sessionSlug = session.slug || session.team;
+      localStorage.setItem('teamSlug', sessionSlug);
+      sessionStorage.setItem('teamSlug', sessionSlug);
+      sessionStorage.setItem('lpi_cruces_team', sessionSlug);
+    }
+    if (session.category || category) {
+      localStorage.setItem('lpi.lastCategory', session.category || category);
+    }
+
+    const sessionSlug = encodeURIComponent(session.slug || session.team || slug);
+    const sessionCategory = encodeURIComponent(session.category || category || 'primera');
+    const url = target === 'cruces'
+      ? `cruces/cruces_fecha.html?cat=${sessionCategory}&team=${sessionSlug}`
+      : `templates/plantilla.html?team=${sessionSlug}`;
+
+    window.open(url, '_blank');
+    toast(`Sesión generada: ${name}`);
+  } catch (err) {
+    console.error('impersonate-team', err);
+    alert(err?.message || 'No se pudo ingresar como ese capitán');
+  }
 }
 
 /* ====== Tabla izquierda (equipos de liga) ====== */
@@ -195,11 +262,13 @@ function renderRows(users){
 
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
-      <td><input class="input team" type="text" value="${name.replace(/"/g,'&quot;')}" aria-label="Nombre del equipo fila ${i+1}"></td>
-      <td><input class="input sala" type="text" value="${(by.sala.get(name)||'').replace(/"/g,'&quot;')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
-      <td><input class="input location" type="url" value="${normalizeLocation(by.ubicacion.get(name)||'').replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
+      <td><input class="input team" type="text" value="${escapeHtml(name)}" aria-label="Nombre del equipo fila ${i+1}"></td>
+      <td><input class="input sala" type="text" value="${escapeHtml(by.sala.get(name)||'')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
+      <td><input class="input location" type="url" value="${escapeHtml(normalizeLocation(by.ubicacion.get(name)||''))}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
       <td class="team-actions-cell">
-        <button class="btn-reset-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${name || ('fila ' + (i+1))}" ${canReset ? '' : 'disabled'}>🔑</button>
+        <button class="btn-reset-pass btn-team-planilla" type="button" title="Ingresar como capitán y abrir planilla" aria-label="Ingresar como capitán y abrir planilla de ${escapeHtml(name || ('fila ' + (i+1)))}" ${name ? '' : 'disabled'}>📋</button>
+        <button class="btn-reset-pass btn-team-cruces" type="button" title="Ingresar como capitán y abrir cruces" aria-label="Ingresar como capitán y abrir cruces de ${escapeHtml(name || ('fila ' + (i+1)))}" ${name ? '' : 'disabled'}>⚔️</button>
+        <button class="btn-reset-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${escapeHtml(name || ('fila ' + (i+1)))}" ${canReset ? '' : 'disabled'}>🔑</button>
         <button class="btn-del-team" type="button">Eliminar</button>
       </td>`;
 
@@ -210,7 +279,22 @@ function renderRows(users){
       tr.remove();
     });
 
-    const resetBtn = tr.querySelector('.btn-reset-pass');
+    const getTeamForImpersonation = () => ({
+      id: tr.dataset.teamId || '',
+      slug: slugify(tr.querySelector('.team')?.value?.trim() || ''),
+      name: tr.querySelector('.team')?.value?.trim() || `fila ${i+1}`,
+      category: _activeDiv
+    });
+
+    tr.querySelector('.btn-team-planilla')?.addEventListener('click', () => {
+      impersonateTeam(getTeamForImpersonation(), 'planilla');
+    });
+
+    tr.querySelector('.btn-team-cruces')?.addEventListener('click', () => {
+      impersonateTeam(getTeamForImpersonation(), 'cruces');
+    });
+
+    const resetBtn = tr.querySelector('.btn-reset-pass:not(.btn-team-planilla):not(.btn-team-cruces)');
     resetBtn?.addEventListener('click', async () => {
       const teamName = tr.querySelector('.team')?.value?.trim() || `fila ${i+1}`;
       const rawId = tr.dataset.teamId;
