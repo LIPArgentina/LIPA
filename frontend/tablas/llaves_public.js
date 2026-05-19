@@ -62,11 +62,19 @@ function setTwoLegTie(data,roundId,firstPlaceTeam,secondPlaceTeam){ const round=
 async function applyAutomaticEntrants(data,category){ const [ida,vuelta]=await Promise.all([fetchFixtureData('ida',category),fetchFixtureData('vuelta',category)]); const standings=computeStandings(category,ida,vuelta); const team=(group,pos)=>standings[group]?.find(row=>row.pos===pos)?.equipo||'WO'; if(category==='tercera'){ setTwoLegTie(data,'q1',team('A',1),team('B',2)); setTwoLegTie(data,'q2',team('C',1),team('D',2)); setTwoLegTie(data,'q3',team('B',1),team('A',2)); setTwoLegTie(data,'q4',team('D',1),team('C',2)); }else{ setTwoLegTie(data,'s1',team('A',1),team('B',2)); setTwoLegTie(data,'s2',team('B',1),team('A',2)); } return standings; }
 function escapeHtml(value){ return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function formatDate(value){ if(!value) return ''; const s=String(value); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?`${m[3]}/${m[2]}/${m[1]}`:s; }
+function getFallbackLegDate(roundId, legIndex){
+  if (currentCategory === 'segunda' && ['s1','s2'].includes(String(roundId))) {
+    if (Number(legIndex) === 0) return '2026-05-26';
+    if (Number(legIndex) === 1) return '2026-06-02';
+  }
+  return '';
+}
+
 function buildEncuentrosUrl(date, tipo = '', localTeam = '', visitanteTeam = ''){ const params=new URLSearchParams({category:currentCategory,date:String(date||'')}); if(tipo) params.set('tipo', String(tipo)); if(localTeam) params.set('local', normalizeTeamName(localTeam)); if(visitanteTeam) params.set('visitante', normalizeTeamName(visitanteTeam)); return `../encuentros/encuentros.html?${params.toString()}`; }
 function createLegMarkup(roundId,legIndex,legData,totalLegs){
   const isExtra=legIndex===2;
   const label=isExtra?'Desempate':(totalLegs===1?'Partido':(legIndex===0?'Ida':'Vuelta'));
-  const rawDate=String(legData.date||'');
+  const rawDate=String(legData.date || getFallbackLegDate(roundId, legIndex) || '');
   const linkTipo=isExtra?'desempate':'cruce';
   const dateHtml=rawDate?`<a class="llaves-encuentros-btn" href="${escapeHtml(buildEncuentrosUrl(rawDate, linkTipo, legData.home?.team, legData.away?.team))}" aria-label="Ver ${isExtra ? 'desempate' : 'encuentro'} del ${escapeHtml(formatDate(rawDate))}">ENCUENTROS</a>`:'';
   const rowHtml = isExtra
