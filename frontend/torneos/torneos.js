@@ -79,6 +79,33 @@
     return `https://wa.me/${digits}`;
   }
 
+  function buildWhatsappMessage(torneo){
+    const fecha = formatDateTime(torneo?.fechaHora);
+    const categoria = String(torneo?.categoria || '').trim();
+
+    return `Hola, quiero inscribirme al torneo del ${fecha}. Categoría: ${categoria || '—'}.`;
+  }
+
+  function addWhatsappMessage(url, message){
+    if (!url || !message) return url || '';
+
+    try {
+      const parsed = new URL(url);
+      parsed.searchParams.set('text', message);
+      return parsed.toString();
+    } catch (err) {
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}text=${encodeURIComponent(message)}`;
+    }
+  }
+
+  function buildWhatsappUrl(torneo){
+    const baseUrl = normalizeWhatsappUrl(torneo?.contacto);
+    if (!baseUrl) return '';
+
+    return addWhatsappMessage(baseUrl, buildWhatsappMessage(torneo));
+  }
+
   function openImageLightbox(src, alt){
     if (!lightbox || !lightboxImg || !src) return;
     lightboxImg.src = src;
@@ -177,10 +204,10 @@
           <div class="torneo-row"><span>Categoría</span><strong>${escapeHtml(torneo.categoria || '—')}</strong></div>
           <div class="torneo-row"><span>Fecha y hora</span><strong>${formatDateTime(torneo.fechaHora)}</strong></div>
           <div class="torneo-row"><span>Valor</span><strong>${formatValor(torneo.valor, torneo.moneda)}</strong></div>
-          ${normalizeWhatsappUrl(torneo.contacto) ? `
+          ${buildWhatsappUrl(torneo) ? `
             <a 
               class="btn-contacto" 
-              href="${escapeHtml(normalizeWhatsappUrl(torneo.contacto))}" 
+              href="${escapeHtml(buildWhatsappUrl(torneo))}" 
               target="_blank" 
               rel="noopener noreferrer"
             >
