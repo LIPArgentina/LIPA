@@ -620,6 +620,8 @@ function resetCategoryHeaderIndicators(){
     const possibleDate = node.date || node.fecha || node.fechaISO || node.fechaKey || node.scheduledAt;
     const hasMatchShape = !!(
       node.local || node.visitante || node.localSlug || node.visitanteSlug ||
+      // llaves.js guarda cada partido como leg.home / leg.away
+      node.home || node.away ||
       node.teamA || node.teamB || node.equipoA || node.equipoB ||
       node.player1 || node.player2
     );
