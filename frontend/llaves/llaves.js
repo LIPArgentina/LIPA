@@ -49,22 +49,32 @@ let currentCategory = 'tercera';
 let TEAM_OPTIONS = ['WO'];
 let CURRENT_STANDINGS = null;
 
-function normalizeTeamName(name, category = currentCategory){
+function normalizeTeamName(name){
   const raw = String(name || '').trim().replace(/\s+/g, ' ');
   if (!raw) return '';
-
   const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
-  // Ojo: ANEXO existe en Tercera, y ANEXO 2DA existe en Segunda.
-  // Antes se normalizaba ANEXO como ANEXO 2DA para todas las categorías,
-  // por eso en la llave de Tercera aparecía mal.
-  if (category === 'segunda') {
+  // ANEXO y ANEXO 2DA son equipos distintos según la categoría.
+  // La normalización tiene que respetar la categoría actual.
+  if (currentCategory === 'segunda') {
     const aliasesSegunda = {
       'ANEXO': 'ANEXO 2DA',
       'ANEXO 2DA': 'ANEXO 2DA',
-      'ANEXO 2DA.': 'ANEXO 2DA'
+      'ANEXO 2DA.': 'ANEXO 2DA',
+      'ANEXO 2DA ': 'ANEXO 2DA',
+      'ANEXO 2da': 'ANEXO 2DA'
     };
-    return aliasesSegunda[upper] || raw;
+    return aliasesSegunda[raw] || aliasesSegunda[upper] || raw;
+  }
+
+  if (currentCategory === 'tercera') {
+    const aliasesTercera = {
+      'ANEXO 2DA': 'ANEXO',
+      'ANEXO 2DA.': 'ANEXO',
+      'ANEXO 2DA ': 'ANEXO',
+      'ANEXO 2da': 'ANEXO'
+    };
+    return aliasesTercera[raw] || aliasesTercera[upper] || raw;
   }
 
   return raw;
