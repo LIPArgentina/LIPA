@@ -1339,6 +1339,451 @@ function llavesTeamMatches(teamName, candidates = []) {
   return !!key && candidates.includes(key);
 }
 
+
+function llavesAutoCleanTeamName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function llavesAutoIsRealTeam(value) {
+  const team = llavesAutoCleanTeamName(value);
+  return !!team && normalizeLlavesTeamKey(team) !== 'WO';
+}
+
+function llavesAutoGetRound(data, id) {
+  return (data?.rounds || []).find(round => round?.id === id);
+}
+
+function llavesAutoSetLegTeams(round, legIndex, homeTeam, awayTeam) {
+  if (!round || !Array.isArray(round.legs) || !round.legs[legIndex]) return;
+  round.legs[legIndex].home = round.legs[legIndex].home || {};
+  round.legs[legIndex].away = round.legs[legIndex].away || {};
+  round.legs[legIndex].home.team = llavesAutoCleanTeamName(homeTeam) || 'WO';
+  round.legs[legIndex].away.team = llavesAutoCleanTeamName(awayTeam) || 'WO';
+}
+
+function llavesAutoSingleWinner(round) {
+  const leg = round?.legs?.[0];
+  if (!leg || !llavesAutoIsRealTeam(leg.home?.team) || !llavesAutoIsRealTeam(leg.away?.team) || !legHasAnyScore(leg)) {
+    return { winner: 'WO', loser: 'WO', decided: false };
+  }
+
+  const hp = Number(leg.home?.puntos || 0);
+  const ap = Number(leg.away?.puntos || 0);
+  const ht = Number(leg.home?.puntosExtra || 0);
+  const at = Number(leg.away?.puntosExtra || 0);
+
+  if (hp > ap) return { winner: leg.home.team, loser: leg.away.team, decided: true };
+  if (ap > hp) return { winner: leg.away.team, loser: leg.home.team, decided: true };
+  if (ht > at) return { winner: leg.home.team, loser: leg.away.team, decided: true };
+  if (at > ht) return { winner: leg.away.team, loser: leg.home.team, decided: true };
+
+  return { winner: 'WO', loser: 'WO', decided: false };
+}
+
+function llavesAutoSeriesWinner(round) {
+  if (!round || !Array.isArray(round.legs) || !round.legs.length) {
+    return { winner: 'WO', loser: 'WO', decided: false, needsExtra: false };
+  }
+
+  if (round.legs.length === 1) return llavesAutoSingleWinner(round);
+
+  const ida = round.legs[0];
+  const vuelta = round.legs[1];
+
+  if (!ida || !vuelta || !legHasAnyScore(ida) || !legHasAnyScore(vuelta)) {
+    return { winner: 'WO', loser: 'WO', decided: false, needsExtra: false };
+  }
+
+  const firstTeam = llavesAutoCleanTeamName(vuelta.home?.team || ida.away?.team);
+  const secondTeam = llavesAutoCleanTeamName(ida.home?.team || vuelta.away?.team);
+
+  if (!llavesAutoIsRealTeam(firstTeam) || !llavesAutoIsRealTeam(secondTeam)) {
+    return { winner: 'WO', loser: 'WO', decided: false, needsExtra: false };
+  }
+
+  const acc = {};
+  [firstTeam, secondTeam].forEach(team => {
+    acc[normalizeLlavesTeamKey(team)] = { team, pts: 0, tri: 0 };
+  });
+
+  [ida, vuelta].forEach(leg => {
+    const hKey = normalizeLlavesTeamKey(leg.home?.team);
+    const aKey = normalizeLlavesTeamKey(leg.away?.team);
+    if (acc[hKey]) {
+      acc[hKey].pts += Number(leg.home?.puntos || 0);
+      acc[hKey].tri += Number(leg.home?.puntosExtra || 0);
+    }
+    if (acc[aKey]) {
+      acc[aKey].pts += Number(leg.away?.puntos || 0);
+      acc[aKey].tri += Number(leg.away?.puntosExtra || 0);
+    }
+  });
+
+  const a = acc[normalizeLlavesTeamKey(firstTeam)];
+  const b = acc[normalizeLlavesTeamKey(secondTeam)];
+
+  if (a.pts > b.pts) return { winner: a.team, loser: b.team, decided: true, needsExtra: false };
+  if (b.pts > a.pts) return { winner: b.team, loser: a.team, decided: true, needsExtra: false };
+  if (a.tri > b.tri) return { winner: a.team, loser: b.team, decided: true, needsExtra: false };
+  if (b.tri > a.tri) return { winner: b.team, loser: a.team, decided: true, needsExtra: false };
+
+  const extra = round.legs[2];
+  if (extra && legHasAnyScore(extra)) {
+    const hp = Number(extra.home?.puntos || 0);
+    const ap = Number(extra.away?.puntos || 0);
+    const ht = Number(extra.home?.puntosExtra || 0);
+    const at = Number(extra.away?.puntosExtra || 0);
+    if (hp > ap) return { winner: extra.home.team, loser: extra.away.team, decided: true, needsExtra: false };
+    if (ap > hp) return { winner: extra.away.team, loser: extra.home.team, decided: true, needsExtra: false };
+    if (ht > at) return { winner: extra.home.team, loser: extra.away.team, decided: true, needsExtra: false };
+    if (at > ht) return { winner: extra.away.team, loser: extra.home.team, decided: true, needsExtra: false };
+  }
+
+  return { winner: 'WO', loser: 'WO', decided: false, needsExtra: true };
+}
+
+function llavesAutoSetSeriesTeams(round, teamA, teamB) {
+  if (!round || !Array.isArray(round.legs)) return;
+
+  if (round.legs.length === 1) {
+    llavesAutoSetLegTeams(round, 0, teamA, teamB);
+    return;
+  }
+
+  // El mejor posicionado (teamA) arranca visitante y define la vuelta de local.
+  llavesAutoSetLegTeams(round, 0, teamB, teamA);
+  llavesAutoSetLegTeams(round, 1, teamA, teamB);
+
+  if (round.legs[2]) {
+    llavesAutoSetLegTeams(round, 2, teamA, teamB);
+  }
+}
+
+function llavesAutoParseScore(value) {
+  const n = parseInt(value ?? 0, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function llavesAutoFetchFixtureData(kind, category) {
+  try {
+    const result = await pool.query(
+      `SELECT data FROM fixtures WHERE kind = $1 AND category = $2 ORDER BY id DESC LIMIT 1`,
+      [kind, category]
+    );
+    return result.rows[0]?.data || null;
+  } catch (err) {
+    console.warn('No se pudo cargar fixture para sincronizar llaves', { kind, category, err: err?.message });
+    return null;
+  }
+}
+
+function llavesAutoCollectFixtureEntries(ida, vuelta) {
+  const entries = [];
+  [
+    { kind: 'ida', data: ida },
+    { kind: 'vuelta', data: vuelta }
+  ].forEach(feed => {
+    (feed.data?.fechas || []).forEach((fecha, idx) => {
+      entries.push({ kind: feed.kind, fechaIndex: idx + 1, fecha });
+    });
+  });
+  return entries;
+}
+
+function llavesAutoIterateGroupMatches(entries, callback) {
+  (entries || []).forEach(entry => {
+    (entry.fecha?.tablas || []).forEach(tabla => {
+      const group = String(tabla?.grupo || '').toUpperCase();
+      const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+
+      for (let i = 0; i < equipos.length; i += 2) {
+        const home = equipos[i];
+        const away = equipos[i + 1];
+        if (!home || !away) continue;
+
+        const homeName = llavesAutoCleanTeamName(home.equipo);
+        const awayName = llavesAutoCleanTeamName(away.equipo);
+        if (!homeName || !awayName) continue;
+        if (normalizeLlavesTeamKey(homeName) === 'WO' || normalizeLlavesTeamKey(awayName) === 'WO') continue;
+
+        callback({
+          group,
+          home: {
+            team: homeName,
+            key: normalizeLlavesTeamKey(homeName),
+            puntos: llavesAutoParseScore(home.puntos),
+            puntosExtra: llavesAutoParseScore(home.puntosExtra)
+          },
+          away: {
+            team: awayName,
+            key: normalizeLlavesTeamKey(awayName),
+            puntos: llavesAutoParseScore(away.puntos),
+            puntosExtra: llavesAutoParseScore(away.puntosExtra)
+          }
+        });
+      }
+    });
+  });
+}
+
+function llavesAutoComputeHeadToHead(group, tiedKeys, entries) {
+  const tied = new Set(tiedKeys);
+  const table = Object.create(null);
+
+  tiedKeys.forEach(key => {
+    table[key] = { pts: 0, tr: 0 };
+  });
+
+  llavesAutoIterateGroupMatches(entries, match => {
+    if (match.group !== group) return;
+    if (!tied.has(match.home.key) || !tied.has(match.away.key)) return;
+
+    table[match.home.key].pts += match.home.puntos;
+    table[match.home.key].tr += match.home.puntosExtra;
+    table[match.away.key].pts += match.away.puntos;
+    table[match.away.key].tr += match.away.puntosExtra;
+  });
+
+  return table;
+}
+
+function llavesAutoGetGroupsForCategory(category) {
+  return category === 'segunda' ? ['A', 'B'] : ['A', 'B', 'C', 'D'];
+}
+
+function llavesAutoComputeStandings(category, ida, vuelta) {
+  const groups = llavesAutoGetGroupsForCategory(category);
+  const entries = llavesAutoCollectFixtureEntries(ida, vuelta);
+  const stats = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
+
+  llavesAutoIterateGroupMatches(entries, match => {
+    if (!groups.includes(match.group)) return;
+
+    [match.home, match.away].forEach(team => {
+      if (!stats[match.group][team.key]) {
+        stats[match.group][team.key] = {
+          key: team.key,
+          equipo: team.team,
+          pts: 0,
+          tr: 0,
+          ju: 0
+        };
+      }
+    });
+
+    const played = (
+      match.home.puntos > 0 ||
+      match.away.puntos > 0 ||
+      match.home.puntosExtra > 0 ||
+      match.away.puntosExtra > 0
+    );
+
+    stats[match.group][match.home.key].pts += match.home.puntos;
+    stats[match.group][match.home.key].tr += match.home.puntosExtra;
+    stats[match.group][match.away.key].pts += match.away.puntos;
+    stats[match.group][match.away.key].tr += match.away.puntosExtra;
+
+    if (played) {
+      stats[match.group][match.home.key].ju += 1;
+      stats[match.group][match.away.key].ju += 1;
+    }
+  });
+
+  const result = {};
+
+  groups.forEach(group => {
+    const rows = Object.values(stats[group]);
+    const buckets = new Map();
+
+    rows.forEach(row => {
+      const bucketKey = `${row.pts}|${row.tr}`;
+      if (!buckets.has(bucketKey)) buckets.set(bucketKey, []);
+      buckets.get(bucketKey).push(row);
+    });
+
+    const bucketKeys = Array.from(buckets.keys()).sort((a, b) => {
+      const [ap, at] = a.split('|').map(Number);
+      const [bp, bt] = b.split('|').map(Number);
+      return (bp - ap) || (bt - at);
+    });
+
+    const ordered = [];
+
+    bucketKeys.forEach(bucketKey => {
+      const bucket = buckets.get(bucketKey);
+      if (bucket.length <= 1) {
+        ordered.push(...bucket);
+        return;
+      }
+
+      const tiedKeys = bucket.map(row => row.key);
+      const h2h = llavesAutoComputeHeadToHead(group, tiedKeys, entries);
+
+      bucket.sort((a, b) => {
+        const hA = h2h[a.key] || { pts: 0, tr: 0 };
+        const hB = h2h[b.key] || { pts: 0, tr: 0 };
+        return (hB.pts - hA.pts) ||
+               (hB.tr - hA.tr) ||
+               String(a.equipo).localeCompare(String(b.equipo), 'es', { sensitivity: 'base' });
+      });
+
+      ordered.push(...bucket);
+    });
+
+    result[group] = ordered.map((row, idx) => ({
+      ...row,
+      pos: idx + 1
+    }));
+  });
+
+  return result;
+}
+
+function llavesAutoFlattenStandings(standings) {
+  const flat = {};
+  Object.values(standings || {}).forEach(rows => {
+    (rows || []).forEach(row => {
+      const key = normalizeLlavesTeamKey(row?.equipo || row?.team || '');
+      if (!key) return;
+      flat[key] = {
+        equipo: row.equipo || row.team || '',
+        pts: Number(row.pts || 0),
+        tr: Number(row.tr || 0),
+        pos: Number(row.pos || 0)
+      };
+    });
+  });
+  return flat;
+}
+
+function llavesAutoCollectQuarterStats(data) {
+  const stats = {};
+  ['q1', 'q2', 'q3', 'q4'].forEach(roundId => {
+    const round = llavesAutoGetRound(data, roundId);
+    const legs = Array.isArray(round?.legs) ? round.legs.slice(0, 2) : [];
+    legs.forEach(leg => {
+      [
+        { team: leg?.home?.team, pts: leg?.home?.puntos, tr: leg?.home?.puntosExtra },
+        { team: leg?.away?.team, pts: leg?.away?.puntos, tr: leg?.away?.puntosExtra }
+      ].forEach(item => {
+        const key = normalizeLlavesTeamKey(item.team || '');
+        if (!key || key === 'WO') return;
+        if (!stats[key]) stats[key] = { pts: 0, tr: 0 };
+        stats[key].pts += Number(item.pts || 0);
+        stats[key].tr += Number(item.tr || 0);
+      });
+    });
+  });
+  return stats;
+}
+
+function llavesAutoStableTieSeed(value) {
+  const text = normalizeLlavesTeamKey(value || '');
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function llavesAutoCompareSportingAdvantage(teamA, teamB, data, standings) {
+  const a = llavesAutoCleanTeamName(teamA) || 'WO';
+  const b = llavesAutoCleanTeamName(teamB) || 'WO';
+  if (!llavesAutoIsRealTeam(a) || !llavesAutoIsRealTeam(b)) return [a, b];
+
+  const aKey = normalizeLlavesTeamKey(a);
+  const bKey = normalizeLlavesTeamKey(b);
+  const standingStats = llavesAutoFlattenStandings(standings || {});
+  const quarterStats = llavesAutoCollectQuarterStats(data);
+  const sA = standingStats[aKey] || { pts: 0, tr: 0 };
+  const sB = standingStats[bKey] || { pts: 0, tr: 0 };
+  const qA = quarterStats[aKey] || { pts: 0, tr: 0 };
+  const qB = quarterStats[bKey] || { pts: 0, tr: 0 };
+
+  const checks = [
+    [Number(sA.pts || 0), Number(sB.pts || 0)],
+    [Number(sA.tr || 0), Number(sB.tr || 0)],
+    [Number(qA.pts || 0), Number(qB.pts || 0)],
+    [Number(qA.tr || 0), Number(qB.tr || 0)]
+  ];
+
+  for (const [va, vb] of checks) {
+    if (va > vb) return [a, b];
+    if (vb > va) return [b, a];
+  }
+
+  return llavesAutoStableTieSeed(a) <= llavesAutoStableTieSeed(b) ? [a, b] : [b, a];
+}
+
+function llavesAutoApplyAutomaticAdvance(data, category, standings) {
+  if (!data || !Array.isArray(data.rounds)) return data;
+
+  if (category === 'tercera') {
+    const q1 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q1'));
+    const q2 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q2'));
+    const q3 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q3'));
+    const q4 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q4'));
+
+    const [s1Best, s1Other] = llavesAutoCompareSportingAdvantage(q1.winner, q2.winner, data, standings);
+    const [s2Best, s2Other] = llavesAutoCompareSportingAdvantage(q3.winner, q4.winner, data, standings);
+
+    llavesAutoSetSeriesTeams(llavesAutoGetRound(data, 's1'), s1Best, s1Other);
+    llavesAutoSetSeriesTeams(llavesAutoGetRound(data, 's2'), s2Best, s2Other);
+  }
+
+  const s1 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 's1'));
+  const s2 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 's2'));
+
+  llavesAutoSetSeriesTeams(llavesAutoGetRound(data, 'final'), s1.winner, s2.winner);
+  llavesAutoSetSeriesTeams(llavesAutoGetRound(data, 'third'), s1.loser, s2.loser);
+
+  return data;
+}
+
+async function buildLlavesAutoData(data, category) {
+  const autoData = JSON.parse(JSON.stringify(data || {}));
+  if (!autoData || !Array.isArray(autoData.rounds)) return null;
+
+  const [ida, vuelta] = await Promise.all([
+    llavesAutoFetchFixtureData('ida', category),
+    llavesAutoFetchFixtureData('vuelta', category)
+  ]);
+  const standings = llavesAutoComputeStandings(category, ida, vuelta);
+  return llavesAutoApplyAutomaticAdvance(autoData, category, standings);
+}
+
+function findLlavesLegInData(data, { dateKey, localCandidates, visitanteCandidates }) {
+  const rounds = Array.isArray(data?.rounds) ? data.rounds : [];
+
+  for (const round of rounds) {
+    const legs = Array.isArray(round?.legs) ? round.legs : [];
+
+    for (let legIndex = 0; legIndex < legs.length; legIndex++) {
+      const leg = legs[legIndex];
+      if (!leg || normalizeDateOnly(leg?.date) !== dateKey) continue;
+
+      const homeIsLocal = llavesTeamMatches(leg?.home?.team, localCandidates);
+      const awayIsVisitante = llavesTeamMatches(leg?.away?.team, visitanteCandidates);
+      const homeIsVisitante = llavesTeamMatches(leg?.home?.team, visitanteCandidates);
+      const awayIsLocal = llavesTeamMatches(leg?.away?.team, localCandidates);
+
+      if (homeIsLocal && awayIsVisitante) {
+        return { found: true, roundId: round?.id || null, legIndex, leg, orientation: 'direct' };
+      }
+
+      if (homeIsVisitante && awayIsLocal) {
+        return { found: true, roundId: round?.id || null, legIndex, leg, orientation: 'swapped' };
+      }
+    }
+  }
+
+  return { found: false };
+}
+
+function findLlavesRoundById(data, roundId) {
+  return (data?.rounds || []).find(round => round?.id === roundId) || null;
+}
+
 async function syncValidatedMatchIntoLlaves({
   fechaISO,
   localSlug,
@@ -1442,9 +1887,35 @@ async function syncValidatedMatchIntoLlaves({
     }
   }
 
-  // 2) Fallback para fases avanzadas generadas dinámicamente en frontend.
-  // Si la DB todavía tiene WO/WO o un solo equipo real, sincronizamos por fecha
-  // solo sobre partidos sin resultado para no pisar cruces ya guardados.
+  // 2) Camino correcto para fases que el frontend arma dinámicamente.
+  // Recalculamos una copia en memoria con la misma lógica de /api/llaves/proximo-cruce,
+  // buscamos allí el cruce exacto por equipos, y recién entonces escribimos en el round/leg
+  // equivalente de la DB. Esto evita meter un resultado en el primer hueco de la fecha.
+  const autoData = await buildLlavesAutoData(data, category);
+  const autoFound = findLlavesLegInData(autoData, { dateKey, localCandidates, visitanteCandidates });
+
+  if (autoFound.found && autoFound.roundId) {
+    const round = findLlavesRoundById(data, autoFound.roundId);
+    const legs = Array.isArray(round?.legs) ? round.legs : [];
+    const leg = legs[autoFound.legIndex];
+
+    if (round && leg) {
+      if (!leg.home) leg.home = { team: 'WO', puntos: 0, puntosExtra: 0 };
+      if (!leg.away) leg.away = { team: 'WO', puntos: 0, puntosExtra: 0 };
+
+      // Copiamos el orden de equipos calculado en memoria para mantener la llave igual
+      // a lo que ve el frontend, pero no reconstruimos toda la llave.
+      leg.home.team = autoFound.leg?.home?.team || leg.home.team || 'WO';
+      leg.away.team = autoFound.leg?.away?.team || leg.away.team || 'WO';
+      applyLlavesScore(leg, autoFound.orientation || 'direct');
+      return persistLlavesSync({ round, legIndex: autoFound.legIndex, mode: 'auto_exact' });
+    }
+  }
+
+  // 3) Fallback final y seguro: solo por fecha si existe un único candidato posible.
+  // Si hay dos semifinales en la misma fecha, no se sincroniza por fecha para no cruzar resultados.
+  const fallbackCandidates = [];
+
   for (const round of rounds) {
     const legs = Array.isArray(round?.legs) ? round.legs : [];
 
@@ -1454,37 +1925,61 @@ async function syncValidatedMatchIntoLlaves({
       if (legIndex >= 2) continue;
       if (legHasAnyScore(leg)) continue;
 
-      if (!leg.home) leg.home = { team: 'WO', puntos: 0, puntosExtra: 0 };
-      if (!leg.away) leg.away = { team: 'WO', puntos: 0, puntosExtra: 0 };
-
-      const homeKey = normalizeLlavesTeamKey(leg.home.team || '');
-      const awayKey = normalizeLlavesTeamKey(leg.away.team || '');
+      const homeKey = normalizeLlavesTeamKey(leg?.home?.team || '');
+      const awayKey = normalizeLlavesTeamKey(leg?.away?.team || '');
       const homeIsReal = !!homeKey && homeKey !== 'WO';
       const awayIsReal = !!awayKey && awayKey !== 'WO';
 
       // No pisar un partido real distinto.
       if (homeIsReal && awayIsReal) continue;
 
-      // Si hay un solo equipo real, respetamos la orientación cuando coincide.
-      const homeIsLocal = llavesTeamMatches(leg.home.team, localCandidates);
-      const awayIsVisitante = llavesTeamMatches(leg.away.team, visitanteCandidates);
-      const homeIsVisitante = llavesTeamMatches(leg.home.team, visitanteCandidates);
-      const awayIsLocal = llavesTeamMatches(leg.away.team, localCandidates);
+      const homeIsLocal = llavesTeamMatches(leg?.home?.team, localCandidates);
+      const awayIsVisitante = llavesTeamMatches(leg?.away?.team, visitanteCandidates);
+      const homeIsVisitante = llavesTeamMatches(leg?.home?.team, visitanteCandidates);
+      const awayIsLocal = llavesTeamMatches(leg?.away?.team, localCandidates);
 
-      if (homeIsLocal || awayIsVisitante || (!homeIsReal && !awayIsReal)) {
-        leg.home.team = localDisplayName;
-        leg.away.team = visitanteDisplayName;
-        applyLlavesScore(leg, 'direct');
-        return persistLlavesSync({ round, legIndex, mode: 'date_fallback' });
-      }
+      let orientation = null;
+      if (homeIsLocal || awayIsVisitante) orientation = 'direct';
+      if (homeIsVisitante || awayIsLocal) orientation = 'swapped';
+      if (!homeIsReal && !awayIsReal) orientation = 'direct';
 
-      if (homeIsVisitante || awayIsLocal) {
-        leg.home.team = visitanteDisplayName;
-        leg.away.team = localDisplayName;
-        applyLlavesScore(leg, 'swapped');
-        return persistLlavesSync({ round, legIndex, mode: 'date_fallback_swapped' });
+      if (orientation) {
+        fallbackCandidates.push({ round, legIndex, leg, orientation });
       }
     }
+  }
+
+  if (fallbackCandidates.length === 1) {
+    const candidate = fallbackCandidates[0];
+    const { round, legIndex, leg, orientation } = candidate;
+
+    if (!leg.home) leg.home = { team: 'WO', puntos: 0, puntosExtra: 0 };
+    if (!leg.away) leg.away = { team: 'WO', puntos: 0, puntosExtra: 0 };
+
+    if (orientation === 'swapped') {
+      leg.home.team = visitanteDisplayName;
+      leg.away.team = localDisplayName;
+      applyLlavesScore(leg, 'swapped');
+      return persistLlavesSync({ round, legIndex, mode: 'single_date_fallback_swapped' });
+    }
+
+    leg.home.team = localDisplayName;
+    leg.away.team = visitanteDisplayName;
+    applyLlavesScore(leg, 'direct');
+    return persistLlavesSync({ round, legIndex, mode: 'single_date_fallback' });
+  }
+
+  if (fallbackCandidates.length > 1) {
+    return {
+      updated: false,
+      reason: 'ambiguous_date_fallback',
+      category,
+      date: dateKey,
+      candidates: fallbackCandidates.map(item => ({
+        roundId: item.round?.id || null,
+        legIndex: item.legIndex
+      }))
+    };
   }
 
   return { updated: false, reason: 'match_not_found', category, date: dateKey };
