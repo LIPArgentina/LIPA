@@ -41,8 +41,31 @@ function normalizeTeamName(name){
   const raw = String(name || '').trim().replace(/\s+/g, ' ');
   if (!raw) return '';
   const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const aliases = {'ANEXO 2DA':'ANEXO 2DA','ANEXO 2DA.':'ANEXO 2DA','ANEXO 2DA ':'ANEXO 2DA','ANEXO 2da':'ANEXO 2DA'};
-  return aliases[raw] || aliases[upper] || raw;
+
+  // Ojo: ANEXO existe en Tercera y ANEXO 2DA existe en Segunda.
+  // No hay que convertir ANEXO -> ANEXO 2DA salvo que la llave sea de Segunda.
+  if (currentCategory === 'segunda') {
+    const aliasesSegunda = {
+      'ANEXO': 'ANEXO 2DA',
+      'ANEXO 2DA': 'ANEXO 2DA',
+      'ANEXO 2DA.': 'ANEXO 2DA',
+      'ANEXO 2DA ': 'ANEXO 2DA',
+      'ANEXO 2da': 'ANEXO 2DA'
+    };
+    return aliasesSegunda[raw] || aliasesSegunda[upper] || raw;
+  }
+
+  if (currentCategory === 'tercera') {
+    const aliasesTercera = {
+      'ANEXO 2DA': 'ANEXO',
+      'ANEXO 2DA.': 'ANEXO',
+      'ANEXO 2DA ': 'ANEXO',
+      'ANEXO 2da': 'ANEXO'
+    };
+    return aliasesTercera[raw] || aliasesTercera[upper] || raw;
+  }
+
+  return raw;
 }
 function unique(list){ return Array.from(new Set(list.filter(Boolean))); }
 function getCategoryConfig(category=currentCategory){ return CATEGORY_CONFIG[category] || CATEGORY_CONFIG.tercera; }
