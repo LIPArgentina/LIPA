@@ -13,10 +13,10 @@ const CATEGORY_CONFIG = {
     rounds:[
       {id:'q1',slot:'slot-q1',title:'Cuartos de final',subtitle:'Cuartos de final',legs:2,helper:'Serie ida y vuelta'},
       {id:'q2',slot:'slot-q2',title:'Cuartos de final',subtitle:'Cuartos de final',legs:2,helper:'Serie ida y vuelta'},
-      {id:'s1',slot:'slot-s1',title:'Semifinal',subtitle:'Semifinal',legs:2,helper:'Serie ida y vuelta'},
+      {id:'s1',slot:'slot-s1',title:'Semifinal 1',subtitle:'Semifinal',legs:2,helper:'Serie ida y vuelta'},
       {id:'final',slot:'slot-final',title:'Final',subtitle:'Final única',legs:1,helper:'Partido único'},
       {id:'third',slot:'slot-third',title:'3er y 4to puesto',subtitle:'Partido por el podio',legs:1,helper:'Partido único'},
-      {id:'s2',slot:'slot-s2',title:'Semifinal',subtitle:'Semifinal',legs:2,helper:'Serie ida y vuelta'},
+      {id:'s2',slot:'slot-s2',title:'Semifinal 2',subtitle:'Semifinal',legs:2,helper:'Serie ida y vuelta'},
       {id:'q3',slot:'slot-q3',title:'Cuartos de final',subtitle:'Cuartos de final',legs:2,helper:'Serie ida y vuelta'},
       {id:'q4',slot:'slot-q4',title:'Cuartos de final',subtitle:'Cuartos de final',legs:2,helper:'Serie ida y vuelta'}
     ],
@@ -25,10 +25,10 @@ const CATEGORY_CONFIG = {
   segunda: {
     subtitle:'SEGUNDA', layoutClass:'bracket-segunda', teamSource:'segunda',
     rounds:[
-      {id:'s1',slot:'slot-s1',title:'Semifinal',subtitle:'Semifinal',legs:2,helper:'Serie ida y vuelta'},
+      {id:'s1',slot:'slot-s1',title:'Semifinal 1',subtitle:'Semifinal',legs:2,helper:'Serie ida y vuelta'},
       {id:'final',slot:'slot-final',title:'Final',subtitle:'Final única',legs:1,helper:'Partido único'},
       {id:'third',slot:'slot-third',title:'3er y 4to puesto',subtitle:'Partido por el podio',legs:1,helper:'Partido único'},
-      {id:'s2',slot:'slot-s2',title:'Semifinal',subtitle:'Semifinal',legs:2,helper:'Serie ida y vuelta'}
+      {id:'s2',slot:'slot-s2',title:'Semifinal 2',subtitle:'Semifinal',legs:2,helper:'Serie ida y vuelta'}
     ],
     slots:['slot-s1','slot-final','slot-third','slot-s2']
   }
