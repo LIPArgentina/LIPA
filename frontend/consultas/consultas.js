@@ -300,34 +300,55 @@
     `;
   }
 
-  function renderMatches(matches = []) {
+  function renderMatchCard(item, { pair = false } = {}) {
+    const cls = resultClass(item.result);
+    const card = document.createElement('article');
+    card.className = 'match-card ' + cls;
+
+    const rivalText = pair
+      ? `en pareja con ${item.companionName || 'Sin compañero'} vs ${(Array.isArray(item.opponentPairPlayers) ? item.opponentPairPlayers.filter(Boolean).join(' - ') : '') || 'Rivales'} · ${item.opponentName || ''}`
+      : `vs ${item.opponentPlayerName || 'Rival'} · ${item.opponentName || ''}`;
+
+    card.innerHTML = `
+      <div class="match-head">
+        <div>
+          <h3 class="match-title">${item.teamName || ''}</h3>
+          <p class="match-rival">${rivalText}</p>
+          <span class="result-pill ${cls}">${item.result || ''}</span>
+        </div>
+        <time class="match-date">${formatDate(item.fechaISO)}</time>
+      </div>
+      <div class="match-stats">
+        <div class="stat ${cls === 'win' ? 'win' : ''}">
+          <span>Triángulos a favor</span>
+          <strong>${Number(item.triangulosFavor || 0)}</strong>
+        </div>
+        <div class="stat ${cls === 'loss' ? 'loss' : ''}">
+          <span>Triángulos en contra</span>
+          <strong>${Number(item.triangulosContra || 0)}</strong>
+        </div>
+      </div>
+    `;
+    return card;
+  }
+
+  function renderMatches(matches = [], pairMatches = []) {
     $results.innerHTML = '';
+
     matches.forEach((item) => {
-      const cls = resultClass(item.result);
-      const card = document.createElement('article');
-      card.className = 'match-card ' + cls;
-      card.innerHTML = `
-        <div class="match-head">
-          <div>
-            <h3 class="match-title">${item.teamName || ''}</h3>
-            <p class="match-rival">vs ${item.opponentPlayerName || 'Rival'} · ${item.opponentName || ''}</p>
-            <span class="result-pill ${cls}">${item.result || ''}</span>
-          </div>
-          <time class="match-date">${formatDate(item.fechaISO)}</time>
-        </div>
-        <div class="match-stats">
-          <div class="stat ${cls === 'win' ? 'win' : ''}">
-            <span>Triángulos a favor</span>
-            <strong>${Number(item.triangulosFavor || 0)}</strong>
-          </div>
-          <div class="stat ${cls === 'loss' ? 'loss' : ''}">
-            <span>Triángulos en contra</span>
-            <strong>${Number(item.triangulosContra || 0)}</strong>
-          </div>
-        </div>
-      `;
-      $results.appendChild(card);
+      $results.appendChild(renderMatchCard(item));
     });
+
+    if (pairMatches.length) {
+      const pairTitle = document.createElement('h2');
+      pairTitle.className = 'matches-section-title';
+      pairTitle.textContent = 'PARTIDOS EN PAREJA';
+      $results.appendChild(pairTitle);
+
+      pairMatches.forEach((item) => {
+        $results.appendChild(renderMatchCard(item, { pair: true }));
+      });
+    }
   }
 
   function renderRanking(data, limit) {
@@ -627,7 +648,7 @@
 
       setStatus('', 'info');
       renderSummary(data);
-      renderMatches(Array.isArray(data?.matches) ? data.matches : []);
+      renderMatches(Array.isArray(data?.matches) ? data.matches : [], Array.isArray(data?.pairMatches) ? data.pairMatches : []);
     } catch (err) {
       console.error(err);
       setStatus(err?.message || 'No se pudo consultar el jugador.', 'error');

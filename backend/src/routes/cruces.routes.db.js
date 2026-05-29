@@ -2224,6 +2224,47 @@ function getIndividualPlayers(planilla = {}) {
     : [];
 }
 
+function uniquePlayerNames(names = []) {
+  const seen = new Set();
+  const out = [];
+  names.forEach((name) => {
+    const clean = String(name || '').trim();
+    if (!clean) return;
+    const key = normalizeText(clean);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(clean);
+  });
+  return out;
+}
+
+function getPairPlayers(planilla = {}, pairIndex = 0) {
+  const key = pairIndex === 0 ? 'pareja1' : 'pareja2';
+  return Array.isArray(planilla?.[key])
+    ? planilla[key].map((name) => String(name || '').trim())
+    : [];
+}
+
+function getSearchablePlayers(planilla = {}) {
+  return uniquePlayerNames([
+    ...getIndividualPlayers(planilla),
+    ...getPairPlayers(planilla, 0),
+    ...getPairPlayers(planilla, 1)
+  ]);
+}
+
+function getPairScore(scoreRows = [], planilla = {}, pairIndex = 0) {
+  const scoreIndex = 7 + pairIndex;
+  const fromScoreRows = Array.isArray(scoreRows) ? scoreRows[scoreIndex] : undefined;
+  if (fromScoreRows !== undefined && fromScoreRows !== null && fromScoreRows !== '') {
+    return Number(fromScoreRows) || 0;
+  }
+
+  const ptsKey = pairIndex === 0 ? 'pareja1Pts' : 'pareja2Pts';
+  const fromPlanilla = Array.isArray(planilla?.[ptsKey]) ? planilla[ptsKey][0] : undefined;
+  return Number(fromPlanilla ?? 0) || 0;
+}
+
 async function buildAllValidatedCrucesForPlayerQuery(category = '') {
   const { rows } = await pool.query(
     `
@@ -2328,7 +2369,7 @@ router.get('/player-query', async (req, res) => {
     }
 
     if (!q || normalizeText(q).length < 2) {
-      return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, matches: [] });
+      return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
     const results = await buildAllValidatedCrucesForPlayerQuery(category);
@@ -2336,8 +2377,8 @@ router.get('/player-query', async (req, res) => {
 
     for (const item of results) {
       const sides = [
-        { teamSlug: item.localSlug, teamName: item.localName, players: getIndividualPlayers(item.localPlanilla) },
-        { teamSlug: item.visitanteSlug, teamName: item.visitanteName, players: getIndividualPlayers(item.visitantePlanilla) }
+        { teamSlug: item.localSlug, teamName: item.localName, players: getSearchablePlayers(item.localPlanilla) },
+        { teamSlug: item.visitanteSlug, teamName: item.visitanteName, players: getSearchablePlayers(item.visitantePlanilla) }
       ];
 
       for (const side of sides) {
@@ -2362,7 +2403,7 @@ router.get('/player-query', async (req, res) => {
 
     const exact = suggestions.find((item) => sameNormalizedName(item.name, q));
     if (!exact) {
-      return res.json({ ok: true, category, q, suggestions, player: null, total: 0, matches: [] });
+      return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
     const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
@@ -2372,6 +2413,8 @@ router.get('/player-query', async (req, res) => {
     ) || null;
 
     const matches = [];
+    const pairMatches = [];
+
     for (const item of results) {
       const localPlayers = getIndividualPlayers(item.localPlanilla);
       const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
@@ -2424,9 +2467,69 @@ router.get('/player-query', async (req, res) => {
           });
         });
       }
+
+      const pairScan = [
+        {
+          planilla: item.localPlanilla,
+          scoreRows: localScores,
+          opponentPlanilla: item.visitantePlanilla,
+          opponentScoreRows: visitanteScores,
+          teamSlug: item.localSlug,
+          teamName: item.localName,
+          opponentSlug: item.visitanteSlug,
+          opponentName: item.visitanteName
+        },
+        {
+          planilla: item.visitantePlanilla,
+          scoreRows: visitanteScores,
+          opponentPlanilla: item.localPlanilla,
+          opponentScoreRows: localScores,
+          teamSlug: item.visitanteSlug,
+          teamName: item.visitanteName,
+          opponentSlug: item.localSlug,
+          opponentName: item.localName
+        }
+      ];
+
+      for (const side of pairScan) {
+        if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
+
+        for (let pairIndex = 0; pairIndex < 2; pairIndex++) {
+          const pairPlayers = getPairPlayers(side.planilla, pairIndex);
+          const matchedIndex = pairPlayers.findIndex((playerName) => sameNormalizedName(playerName, exact.name));
+          if (matchedIndex === -1) continue;
+
+          const playerName = String(pairPlayers[matchedIndex] || exact.name || '').trim();
+          const companionName = String(pairPlayers[matchedIndex === 0 ? 1 : 0] || '').trim();
+          const opponentPairPlayers = getPairPlayers(side.opponentPlanilla, pairIndex);
+          const triangulosFavor = getPairScore(side.scoreRows, side.planilla, pairIndex);
+          const triangulosContra = getPairScore(side.opponentScoreRows, side.opponentPlanilla, pairIndex);
+
+          pairMatches.push({
+            fechaISO: item.fechaISO,
+            category: item.category || category,
+            playerName,
+            companionName,
+            teamSlug: side.teamSlug,
+            teamName: side.teamName,
+            opponentSlug: side.opponentSlug,
+            opponentName: side.opponentName,
+            opponentPairPlayers,
+            pairNumber: pairIndex + 1,
+            triangulosFavor,
+            triangulosContra,
+            result: triangulosFavor > triangulosContra ? 'ganado' : (triangulosFavor < triangulosContra ? 'perdido' : 'empatado')
+          });
+        }
+      }
     }
 
-    matches.sort((a, b) => String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')));
+    const sortByDateAndRow = (a, b) =>
+      String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
+      Number(a.row || a.pairNumber || 0) - Number(b.row || b.pairNumber || 0);
+
+    matches.sort(sortByDateAndRow);
+    pairMatches.sort(sortByDateAndRow);
 
     return res.json({
       ok: true,
@@ -2438,7 +2541,9 @@ router.get('/player-query', async (req, res) => {
       radPenalty: playerRadRow?.radPenalty ?? null,
       radContext,
       total: matches.length,
-      matches
+      pairTotal: pairMatches.length,
+      matches,
+      pairMatches
     });
   } catch (err) {
     console.error('GET /player-query', err);
