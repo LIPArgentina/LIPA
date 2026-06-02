@@ -86,10 +86,20 @@ async function applyAutomaticEntrants(data,category){ const [ida,vuelta]=await P
 function escapeHtml(value){ return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function formatDate(value){ if(!value) return ''; const s=String(value); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?`${m[3]}/${m[2]}/${m[1]}`:s; }
 function getFallbackLegDate(roundId, legIndex){
-  if (currentCategory === 'segunda' && ['s1','s2'].includes(String(roundId))) {
-    if (Number(legIndex) === 0) return '2026-05-26';
-    if (Number(legIndex) === 1) return '2026-06-02';
+  const round = String(roundId || '');
+  const index = Number(legIndex);
+  if (!['s1','s2'].includes(round)) return '';
+
+  if (currentCategory === 'segunda') {
+    if (index === 0) return '2026-05-25';
+    if (index === 1) return '2026-06-01';
   }
+
+  if (currentCategory === 'tercera') {
+    if (index === 0) return '2026-05-26';
+    if (index === 1) return '2026-06-02';
+  }
+
   return '';
 }
 

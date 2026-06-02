@@ -230,22 +230,69 @@
   }
 
 
+  function addISODateFromValue(dates, value) {
+    const raw = String(value || '').trim();
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) dates.add(match[1]);
+  }
+
+  function getLlavesFallbackDate(category, roundId, legIndex) {
+    const cat = String(category || '').trim().toLowerCase();
+    const round = String(roundId || '').trim().toLowerCase();
+    const index = Number(legIndex);
+
+    if (!['s1', 's2'].includes(round)) return '';
+
+    // Fechas de semifinales 2026 por categoría cuando la llave todavía no trae fecha guardada.
+    if (cat === 'segunda') {
+      if (index === 0) return '2026-05-25';
+      if (index === 1) return '2026-06-01';
+    }
+
+    if (cat === 'tercera') {
+      if (index === 0) return '2026-05-26';
+      if (index === 1) return '2026-06-02';
+    }
+
+    return '';
+  }
+
+  async function fetchLlavesDatesFromData(category, dates) {
+    const data = await fetchJson(API_BASE + '/api/llaves?category=' + encodeURIComponent(category));
+    const rounds = Array.isArray(data?.data?.rounds) ? data.data.rounds : [];
+
+    rounds.forEach((round) => {
+      const legs = Array.isArray(round?.legs) ? round.legs : [];
+      legs.forEach((leg, legIndex) => {
+        addISODateFromValue(dates, leg?.date || leg?.fecha || leg?.fechaISO);
+        addISODateFromValue(dates, getLlavesFallbackDate(category, round?.id, legIndex));
+      });
+    });
+  }
+
   async function fetchLlavesDates(teams = []) {
     const categories = ['segunda', 'tercera'];
     const dates = new Set();
     const teamSlugs = unique((teams || []).map((team) => team?.slug || team?.teamSlug || team?.team || team?.nombre || team?.displayName));
 
-    if (!teamSlugs.length) return [];
-
-    await Promise.all(categories.flatMap(category => teamSlugs.map(async (team) => {
+    // Primero leemos la llave completa: así no dependemos de "proximo-cruce", que devuelve
+    // un solo partido por equipo y puede dejar afuera fechas ya jugadas, como 2026-05-25 en Segunda.
+    await Promise.all(categories.map(async (category) => {
       try {
-        const qs = new URLSearchParams({ category, team });
-        const data = await fetchJson(API_BASE + '/api/llaves/proximo-cruce?' + qs.toString());
-        const raw = String(data?.match?.date || data?.match?.fecha || data?.match?.fechaISO || '').trim();
-        const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-        if (match) dates.add(match[1]);
+        await fetchLlavesDatesFromData(category, dates);
       } catch {}
-    })));
+    }));
+
+    // Mantenemos proximo-cruce como respaldo porque algunas llaves se calculan en memoria.
+    if (teamSlugs.length) {
+      await Promise.all(categories.flatMap(category => teamSlugs.map(async (team) => {
+        try {
+          const qs = new URLSearchParams({ category, team });
+          const data = await fetchJson(API_BASE + '/api/llaves/proximo-cruce?' + qs.toString());
+          addISODateFromValue(dates, data?.match?.date || data?.match?.fecha || data?.match?.fechaISO);
+        } catch {}
+      })));
+    }
 
     return [...dates].sort(compareDateDesc);
   }
