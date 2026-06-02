@@ -5,6 +5,7 @@
   const btnReload = document.getElementById('btnReload');
   const btnManualUpload = document.getElementById('btnManualUpload');
   const fechaFilter = document.getElementById('fechaFilter');
+  const categoryFilter = document.getElementById('categoryFilter');
   const modal = document.getElementById('manualUploadModal');
   const btnCloseManualUpload = document.getElementById('btnCloseManualUpload');
   const btnCancelManualUpload = document.getElementById('btnCancelManualUpload');
@@ -21,6 +22,7 @@
   let allGroups = [];
   let availableDates = [];
   let availableTeams = [];
+  let selectedCategory = '';
 
   function getToken() {
     try {
@@ -91,6 +93,52 @@
   function compareDateDesc(a, b) {
     return String(b || '').localeCompare(String(a || ''));
   }
+
+  function normalizeCategory(value) {
+    const v = String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    if (v === 'segunda' || v === '2da' || v === '2' || v === 'segunda categoria') return 'segunda';
+    if (v === 'tercera' || v === '3ra' || v === '3' || v === 'tercera categoria') return 'tercera';
+    if (v === 'torneos' || v === 'torneo') return 'torneos';
+    return '';
+  }
+
+  function categoryLabel(value) {
+    const category = normalizeCategory(value);
+    if (category === 'segunda') return '2DA';
+    if (category === 'tercera') return '3RA';
+    if (category === 'torneos') return 'TORNEOS';
+    return '';
+  }
+
+  function getGroupCategory(group) {
+    const direct = normalizeCategory(group?.category || group?.division || group?.categoria || group?.kind);
+    if (direct) return direct;
+
+    const fecha = String(group?.fechaISO || '').trim().toLowerCase();
+    if (fecha && !/^\d{4}-\d{2}-\d{2}/.test(fecha)) return 'torneos';
+
+    const text = `${group?.teamSlug || ''} ${group?.teamName || ''}`
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (/(^|[^a-z0-9])(2da|segunda)([^a-z0-9]|$)/.test(text)) return 'segunda';
+    if (/(^|[^a-z0-9])(3ra|tercera)([^a-z0-9]|$)/.test(text)) return 'tercera';
+    return '';
+  }
+
+  function setCategoryFilterUI() {
+    if (!categoryFilter) return;
+    categoryFilter.querySelectorAll('[data-category]').forEach((button) => {
+      const value = normalizeCategory(button.dataset.category || '');
+      button.classList.toggle('active', value === selectedCategory);
+    });
+  }
+
 
   function buildImageCandidates(item, card) {
     const fechaISO = card?.dataset?.fecha || '';
@@ -365,12 +413,16 @@
         `;
       }).join('');
 
+      const resolvedCategory = getGroupCategory(group);
+      const resolvedCategoryLabel = categoryLabel(resolvedCategory);
+      const categoryText = resolvedCategoryLabel ? ` · ${resolvedCategoryLabel}` : '';
+
       return `
-        <div class="group-card" data-fecha="${escapeHtml(group.fechaISO)}" data-team="${escapeHtml(group.teamSlug)}" data-zipname="${escapeHtml(group.zipFilename || 'pictures.zip')}">
+        <div class="group-card" data-fecha="${escapeHtml(group.fechaISO)}" data-team="${escapeHtml(group.teamSlug)}" data-category="${escapeHtml(resolvedCategory)}" data-zipname="${escapeHtml(group.zipFilename || 'pictures.zip')}">
           <div class="group-header group-header-stack">
             <div>
               <h3>${escapeHtml(group.teamName || group.teamSlug)}</h3>
-              <div class="muted">${escapeHtml(group.teamSlug)} · ${escapeHtml(group.fechaISO)}</div>
+              <div class="muted">${escapeHtml(group.teamSlug)} · ${escapeHtml(group.fechaISO)}${escapeHtml(categoryText)}</div>
               <div class="muted">${itemCount} foto${itemCount === 1 ? '' : 's'}</div>
             </div>
             <div class="group-actions">
@@ -401,8 +453,12 @@
 
   function getFilteredGroups() {
     const selectedDate = String(fechaFilter?.value || '').trim();
-    if (!selectedDate) return allGroups.slice();
-    return allGroups.filter(group => String(group?.fechaISO || '').slice(0, 10) === selectedDate);
+    return allGroups.filter((group) => {
+      const groupDate = String(group?.fechaISO || '').slice(0, 10);
+      if (selectedDate && groupDate !== selectedDate) return false;
+      if (selectedCategory && getGroupCategory(group) !== selectedCategory) return false;
+      return true;
+    });
   }
 
   async function renderCurrentGroups() {
@@ -617,6 +673,14 @@
     await renderCurrentGroups();
   });
 
+  categoryFilter?.addEventListener('click', async (ev) => {
+    const button = ev.target.closest('[data-category]');
+    if (!button) return;
+    selectedCategory = normalizeCategory(button.dataset.category || '');
+    setCategoryFilterUI();
+    await renderCurrentGroups();
+  });
+
   btnReload?.addEventListener('click', load);
   btnManualUpload?.addEventListener('click', () => {
     resetManualForm();
@@ -657,6 +721,7 @@
   });
 
   btnSubmitManualUpload?.addEventListener('click', submitManualUpload);
+  setCategoryFilterUI();
   window.addEventListener('beforeunload', revokeBlobCache);
   load();
 })();

@@ -97,20 +97,68 @@ module.exports = function createPicturesRouter(deps) {
     await fs.promises.mkdir(dir, { recursive: true });
   }
 
+  function normalizeCategory(value = '') {
+    const v = String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    if (v === 'segunda' || v === '2da' || v === '2' || v === 'segunda categoria') return 'segunda';
+    if (v === 'tercera' || v === '3ra' || v === '3' || v === 'tercera categoria') return 'tercera';
+    if (v === 'torneos' || v === 'torneo') return 'torneos';
+    return '';
+  }
+
+  function inferPicturesGroupCategory(fechaISO, teamInfo = {}, teamSlug = '') {
+    const fecha = String(fechaISO || '').trim().toLowerCase();
+    if (fecha && !/^\d{4}-\d{2}-\d{2}/.test(fecha)) return 'torneos';
+
+    const division = normalizeCategory(teamInfo?.division);
+    if (division) return division;
+
+    const text = `${teamSlug || ''} ${teamInfo?.displayName || ''}`
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (/(^|[^a-z0-9])(2da|segunda)([^a-z0-9]|$)/.test(text)) return 'segunda';
+    if (/(^|[^a-z0-9])(3ra|tercera)([^a-z0-9]|$)/.test(text)) return 'tercera';
+    return '';
+  }
+
+  async function getTeamInfoBySlug(slug) {
+    const safeSlug = normalizeSlug(slug);
+    if (!safeSlug) return { displayName: slug, division: '' };
+
+    const result = await pool.query(
+      `SELECT display_name, division
+         FROM equipos
+        WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1
+        ORDER BY CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END, id ASC
+        LIMIT 1`,
+      [safeSlug]
+    );
+
+    return {
+      displayName: result.rows[0]?.display_name || slug,
+      division: result.rows[0]?.division || ''
+    };
+  }
+
   async function getDisplayNameBySlug(slug) {
-    const result = await pool.query(`SELECT display_name FROM equipos WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1 ORDER BY id ASC LIMIT 1`, [normalizeSlug(slug)]);
-    return result.rows[0]?.display_name || slug;
+    const teamInfo = await getTeamInfoBySlug(slug);
+    return teamInfo.displayName || slug;
   }
 
   async function getTeamOptions() {
-    const { rows } = await pool.query(`SELECT display_name, slug_uid, slug_base FROM equipos WHERE COALESCE(display_name, '') <> '' AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '') ORDER BY display_name ASC, id ASC`);
+    const { rows } = await pool.query(`SELECT display_name, slug_uid, slug_base, division FROM equipos WHERE COALESCE(display_name, '') <> '' AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '') ORDER BY display_name ASC, id ASC`);
     const seen = new Set();
     const options = [];
     for (const row of rows) {
       const slug = normalizeSlug(row.slug_uid || row.slug_base || '');
       if (!slug || seen.has(slug)) continue;
       seen.add(slug);
-      options.push({ slug, displayName: String(row.display_name || slug).trim() });
+      options.push({ slug, displayName: String(row.display_name || slug).trim(), category: normalizeCategory(row.division) });
     }
     return options;
   }
@@ -418,7 +466,9 @@ module.exports = function createPicturesRouter(deps) {
           if (!teamDir.isDirectory()) continue;
           const teamSlug = teamDir.name;
           const teamPath = path.join(fechaPath, teamSlug);
-          const teamDisplayName = await getDisplayNameBySlug(teamSlug);
+          const teamInfo = await getTeamInfoBySlug(teamSlug);
+          const teamDisplayName = teamInfo.displayName || teamSlug;
+          const category = inferPicturesGroupCategory(fechaISO, teamInfo, teamSlug);
           const files = await fs.promises.readdir(teamPath, { withFileTypes: true });
           const items = [];
           for (const file of files) {
@@ -431,7 +481,7 @@ module.exports = function createPicturesRouter(deps) {
           }
           items.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
           if (!items.length) continue;
-          groups.push({ fechaISO, teamSlug, teamName: teamDisplayName, zipFilename: getZipName(fechaISO, teamSlug), items });
+          groups.push({ fechaISO, teamSlug, teamName: teamDisplayName, category, zipFilename: getZipName(fechaISO, teamSlug), items });
         }
       }
       groups.sort((a, b) => `${b.fechaISO} ${b.items[0]?.modifiedAt || ''}`.localeCompare(`${a.fechaISO} ${a.items[0]?.modifiedAt || ''}`));

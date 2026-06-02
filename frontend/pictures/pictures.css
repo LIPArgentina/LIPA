@@ -79,6 +79,23 @@ body.modal-open { overflow: hidden; }
   border-radius: 12px;
   border: 1px solid var(--border);
 }
+.category-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.category-filter-btn {
+  min-height: 42px;
+  padding: 0 13px;
+  border-color: var(--border);
+  background: #10151c;
+  font-weight: 700;
+}
+.category-filter-btn.active {
+  border-color: var(--accent);
+  background: rgba(214, 164, 70, 0.18);
+}
 .filter-chip {
   display: inline-flex;
   align-items: center;
@@ -201,6 +218,8 @@ body.modal-open { overflow: hidden; }
   .group-actions .btn { flex: 1 1 auto; }
   .topbar-actions { margin-left: 0; width: 100%; }
   .topbar-actions > * { flex: 1 1 100%; }
+  .category-filter { width: 100%; }
+  .category-filter-btn { flex: 1 1 45%; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .modal-dialog { width: calc(100vw - 20px); margin: 10px auto; max-height: calc(100vh - 20px); }
 }
