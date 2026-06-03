@@ -90,6 +90,8 @@
 #bannerMessage {
   position: relative;
   overflow: hidden;
+  white-space: pre-line; /* respeta los saltos de línea cargados en el textarea */
+  line-height: 1.45;
 }
 
 .banner-slide {
