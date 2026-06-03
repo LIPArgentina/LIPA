@@ -490,6 +490,41 @@ function setupBannerAdmin() {
 }
 
 
+
+function setupFinalEventPopup() {
+  const popup = document.getElementById("finalEventPopup");
+  const closeBtn = document.getElementById("closeFinalEventPopup");
+  if (!popup) return;
+
+  function closePopup() {
+    if (typeof popup.close === "function") {
+      popup.close();
+      return;
+    }
+    popup.classList.remove("is-open");
+    popup.removeAttribute("open");
+  }
+
+  closeBtn?.addEventListener("click", closePopup);
+
+  popup.addEventListener("click", (event) => {
+    if (event.target === popup) closePopup();
+  });
+
+  setTimeout(() => {
+    try {
+      if (typeof popup.showModal === "function" && !popup.open) {
+        popup.showModal();
+      } else {
+        popup.setAttribute("open", "");
+        popup.classList.add("is-open");
+      }
+    } catch (error) {
+      console.error("No se pudo abrir el popup de la final", error);
+    }
+  }, 450);
+}
+
 const VISITOR_ID_KEY = "lipa.visitorId";
 const VISITOR_PING_MS = 60000;
 let visitorPingId = null;
@@ -564,4 +599,5 @@ document.addEventListener("DOMContentLoaded", () => {
   setupBannerAdmin();
   loadBannerForHome();
   startPublicStats();
+  setupFinalEventPopup();
 });
