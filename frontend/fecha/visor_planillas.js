@@ -601,10 +601,20 @@ function resetCategoryHeaderIndicators(){
     return y + '-' + m + '-' + day;
   }
 
+  function addDaysToDateKey(dateKey, days){
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return '';
+    const [year, month, day] = String(dateKey).split('-').map(Number);
+    const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    d.setUTCDate(d.getUTCDate() + Number(days || 0));
+    return d.toISOString().slice(0, 10);
+  }
+
   function scheduledAtFromDateKey(dateKey){
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return '';
-    // La habilitación automática se muestra a las 20:00 hs AR, igual que el texto actual del visor.
-    return dateKey + 'T20:00:00-03:00';
+    // La fecha que viene de fixture/llaves es la fecha del encuentro.
+    // Los cruces deben liberarse un día antes a las 20:00 hs AR.
+    const releaseDateKey = addDaysToDateKey(dateKey, -1);
+    return releaseDateKey ? (releaseDateKey + 'T20:00:00-03:00') : '';
   }
 
   function collectLlavesDateKeys(node, out){
@@ -632,7 +642,7 @@ function resetCategoryHeaderIndicators(){
     Object.values(node).forEach(value => collectLlavesDateKeys(value, out));
   }
 
-  async function loadNextScheduledAtFromLlaves(category){
+  async function loadNextScheduleFromLlaves(category){
     if (llavesScheduleCache[category] !== undefined) return llavesScheduleCache[category];
 
     try {
@@ -646,18 +656,21 @@ function resetCategoryHeaderIndicators(){
 
       const uniqueDates = Array.from(new Set(dates)).sort();
       if (!uniqueDates.length) {
-        llavesScheduleCache[category] = '';
-        return '';
+        llavesScheduleCache[category] = null;
+        return null;
       }
 
       const today = fechaKeyActual();
       const nextDate = uniqueDates.find(dateKey => dateKey >= today) || uniqueDates[uniqueDates.length - 1];
-      llavesScheduleCache[category] = scheduledAtFromDateKey(nextDate);
+      llavesScheduleCache[category] = {
+        fixtureDate: nextDate,
+        scheduledAt: scheduledAtFromDateKey(nextDate)
+      };
       return llavesScheduleCache[category];
     } catch (e) {
       console.warn('No se pudo obtener próxima fecha de llaves para ' + category, e);
-      llavesScheduleCache[category] = '';
-      return '';
+      llavesScheduleCache[category] = null;
+      return null;
     }
   }
 
@@ -768,14 +781,14 @@ function resetCategoryHeaderIndicators(){
     const status = await r.json();
 
     // Si el backend trae una fecha vieja de fixture, el visor prefiere la próxima fecha de llaves.
-    // Esto evita mostrar/programar una fecha anterior cuando ya estamos en fase de cruces.
-    const llavesScheduledAt = await loadNextScheduledAtFromLlaves(category);
-    if (llavesScheduledAt) {
-      const statusDate = parseDateKeyFromValue(status?.scheduledAt);
-      const llavesDate = parseDateKeyFromValue(llavesScheduledAt);
-      if (!status?.scheduledAt || (llavesDate && (!statusDate || llavesDate > statusDate))) {
-        status.scheduledAt = llavesScheduledAt;
-        status.nextFixtureDate = llavesDate || status.nextFixtureDate;
+    // La fecha de llaves es la fecha del encuentro; la habilitación se muestra un día antes a las 20:00 hs.
+    const llavesSchedule = await loadNextScheduleFromLlaves(category);
+    if (llavesSchedule?.scheduledAt) {
+      const statusFixtureDate = parseDateKeyFromValue(status?.nextFixtureDate);
+      const llavesFixtureDate = parseDateKeyFromValue(llavesSchedule.fixtureDate);
+      if (!status?.scheduledAt || (llavesFixtureDate && (!statusFixtureDate || llavesFixtureDate > statusFixtureDate))) {
+        status.scheduledAt = llavesSchedule.scheduledAt;
+        status.nextFixtureDate = llavesFixtureDate || status.nextFixtureDate;
         status.scheduleSource = 'llaves';
       }
     }
