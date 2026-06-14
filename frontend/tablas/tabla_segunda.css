@@ -137,6 +137,34 @@ header{ align-items:center; }
 
 header .logo-link{ display:inline-block; line-height:0; }
 
+.podio-superliga-mount{
+  width:min(1200px, 100%);
+  margin:18px auto 12px;
+}
+
+.podio-superliga-mount[hidden]{
+  display:none !important;
+}
+
+.podio-superliga-mount img{
+  display:block;
+  width:100%;
+  height:auto;
+  border:1px solid rgba(255,204,0,.34);
+  border-radius:14px;
+  box-shadow:0 14px 34px rgba(0,0,0,.42);
+}
+
+@media (max-width:640px){
+  .podio-superliga-mount{
+    margin:14px auto 10px;
+  }
+
+  .podio-superliga-mount img{
+    border-radius:10px;
+  }
+}
+
 /* ===== Ajustes finales de POSICIONES (desktop + responsive) ===== */
 #posiciones{
   padding: 22px 12px 40px;

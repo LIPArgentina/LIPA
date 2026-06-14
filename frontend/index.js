@@ -1,3 +1,5 @@
+import { loadSuperligaPodiums } from './tablas/podio_superliga.js';
+
 function readSession() {
   try {
     const raw = localStorage.getItem("lpi.session") || sessionStorage.getItem("lpi.session");
@@ -490,8 +492,32 @@ function setupBannerAdmin() {
 }
 
 
+function setupLiveButtons() {
+  document.querySelectorAll("[data-live-url]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const url = button.getAttribute("data-live-url");
+      if (!url) return;
 
-function setupFinalEventPopup() {
+      const name = button.getAttribute("data-live-name") || "lipaLive";
+      const popup = window.open(
+        url,
+        name,
+        "popup=yes,width=520,height=820,left=120,top=80,resizable=yes,scrollbars=yes"
+      );
+
+      if (!popup || popup.closed || typeof popup.closed === "undefined") {
+        window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      popup.focus();
+    });
+  });
+}
+
+
+
+async function setupFinalEventPopup() {
   const popup = document.getElementById("finalEventPopup");
   const closeBtn = document.getElementById("closeFinalEventPopup");
   if (!popup) return;
@@ -510,6 +536,28 @@ function setupFinalEventPopup() {
   popup.addEventListener("click", (event) => {
     if (event.target === popup) closePopup();
   });
+
+  let podiums = null;
+  try {
+    podiums = await loadSuperligaPodiums();
+  } catch (err) {
+    console.error("No se pudieron cargar los podios de campeones", err);
+  }
+
+  const title = document.getElementById("finalEventPopupTitle");
+  const body = popup.querySelector(".event-popup__body");
+  if (podiums && title) {
+    title.textContent = `FELICITACIONES A ${podiums.segunda.champion.toUpperCase()} Y ${podiums.tercera.champion.toUpperCase()}, GANADORES DE LA 5TA EDICIÓN DE LA SUPERLIGA`;
+  }
+
+  if (podiums && body) {
+    body.innerHTML = `
+      <div class="event-popup__podiums">
+        <img src="${podiums.segunda.imageSrc}" alt="${podiums.segunda.imageAlt}" loading="eager">
+        <img src="${podiums.tercera.imageSrc}" alt="${podiums.tercera.imageAlt}" loading="eager">
+      </div>
+    `;
+  }
 
   setTimeout(() => {
     try {
@@ -597,7 +645,10 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureConsultasButton();
   setupAuthBridge();
   setupBannerAdmin();
+  setupLiveButtons();
   loadBannerForHome();
   startPublicStats();
-  setupFinalEventPopup();
+  setupFinalEventPopup().catch((err) => {
+    console.error("No se pudo cargar el popup de campeones", err);
+  });
 });
