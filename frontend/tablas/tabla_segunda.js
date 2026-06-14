@@ -1,3 +1,5 @@
+import { loadPodiumResult } from './podio_superliga.js';
+
 function debounce(fn, wait = 100){
   let t;
   return (...args) => {
@@ -27,6 +29,7 @@ const cache = { ida: null, vuelta: null };
 let selectedKind = 'ida';
 let standingsSteps = [];
 let selectedStandingsIndex = -1;
+let podiumRefreshId = null;
 
 function normalizeName(s){
   const raw = (s || '').toString().trim().replace(/\s+/g, ' ');
@@ -356,6 +359,27 @@ function setActive(kind){
   });
 }
 
+async function renderPodium(){
+  const mount = document.getElementById('podioSuperligaMount');
+  if (!mount) return;
+
+  const result = await loadPodiumResult('segunda').catch(() => null);
+  if (!result) {
+    mount.hidden = true;
+    mount.innerHTML = '';
+    return;
+  }
+
+  mount.innerHTML = `<img src="${result.imageSrc}" alt="${result.imageAlt}" loading="eager">`;
+  mount.hidden = false;
+}
+
+function startPodiumRefresh(){
+  renderPodium();
+  if (podiumRefreshId) clearInterval(podiumRefreshId);
+  podiumRefreshId = setInterval(renderPodium, 30000);
+}
+
 async function switchFixture(kind){
   selectedKind = kind;
   try { localStorage.setItem('fixture_kind_segunda', kind); } catch(_) {}
@@ -392,6 +416,7 @@ async function init(){
 
   try {
     await Promise.all([fetchFixture('ida'), fetchFixture('vuelta')]);
+    startPodiumRefresh();
     buildStandingsSteps();
     populateStandingsControls();
     renderStandings();
