@@ -547,7 +547,12 @@ async function setupFinalEventPopup() {
   const title = document.getElementById("finalEventPopupTitle");
   const body = popup.querySelector(".event-popup__body");
   if (podiums && title) {
-    title.textContent = `FELICITACIONES A ${podiums.segunda.champion.toUpperCase()} Y ${podiums.tercera.champion.toUpperCase()}, GANADORES DE LA 5TA EDICIÓN DE LA SUPERLIGA`;
+    const championSegunda = podiums.segunda.champion.toUpperCase();
+    const championTercera = podiums.tercera.champion.toUpperCase();
+    const winnersText = championSegunda === championTercera
+      ? `${championSegunda} 2DA Y ${championTercera} 3RA`
+      : `${championSegunda} Y ${championTercera}`;
+    title.textContent = `FELICITACIONES A ${winnersText}, GANADORES DE LA 5TA EDICIÓN DE LA SUPERLIGA`;
   }
 
   if (podiums && body) {
