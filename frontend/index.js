@@ -491,32 +491,6 @@ function setupBannerAdmin() {
   window.addEventListener("logout:success", updateVisibility);
 }
 
-
-function setupLiveButtons() {
-  document.querySelectorAll("[data-live-url]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const url = button.getAttribute("data-live-url");
-      if (!url) return;
-
-      const name = button.getAttribute("data-live-name") || "lipaLive";
-      const popup = window.open(
-        url,
-        name,
-        "popup=yes,width=520,height=820,left=120,top=80,resizable=yes,scrollbars=yes"
-      );
-
-      if (!popup || popup.closed || typeof popup.closed === "undefined") {
-        window.open(url, "_blank", "noopener,noreferrer");
-        return;
-      }
-
-      popup.focus();
-    });
-  });
-}
-
-
-
 async function setupFinalEventPopup() {
   const popup = document.getElementById("finalEventPopup");
   const closeBtn = document.getElementById("closeFinalEventPopup");
@@ -650,7 +624,6 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureConsultasButton();
   setupAuthBridge();
   setupBannerAdmin();
-  setupLiveButtons();
   loadBannerForHome();
   startPublicStats();
   setupFinalEventPopup().catch((err) => {
