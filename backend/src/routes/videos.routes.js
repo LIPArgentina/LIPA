@@ -82,7 +82,7 @@ module.exports = function createVideosRouter(deps = {}) {
 
   const upload = multer({
     storage,
-    limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 4 },
+    limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 1 },
     fileFilter: (_req, file, cb) => {
       const mimetype = String(file.mimetype || '').toLowerCase();
       const ext = path.extname(file.originalname || '').toLowerCase();
@@ -94,7 +94,9 @@ module.exports = function createVideosRouter(deps = {}) {
   });
 
   router.post('/videos/admin/upload', requireAdmin, (req, res) => {
-    upload.array('videos', 4)(req, res, (err) => {
+    req.setTimeout(60 * 60 * 1000);
+    res.setTimeout(60 * 60 * 1000);
+    upload.array('videos', 1)(req, res, (err) => {
       if (err) return res.status(400).json({ ok: false, error: err.message || 'No se pudieron subir los videos' });
       const files = Array.isArray(req.files) ? req.files : [];
       if (!files.length) return res.status(400).json({ ok: false, error: 'No se recibieron videos' });

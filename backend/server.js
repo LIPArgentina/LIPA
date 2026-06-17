@@ -88,7 +88,10 @@ app.post("/api/admin/reset-team-password/:id", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`LPI listo en http://localhost:${PORT}`);
   console.log("Static FRONTEND -> /frontend/**");
 });
+
+server.requestTimeout = 60 * 60 * 1000;
+server.headersTimeout = 60 * 60 * 1000 + 5000;
