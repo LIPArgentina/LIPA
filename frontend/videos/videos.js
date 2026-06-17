@@ -39,12 +39,19 @@
   }
 
   async function toggleFullscreen(card, video) {
-    const target = card || video;
-    if (!target) return;
+    if (!video && !card) return;
+
+    if (video && typeof video.webkitEnterFullscreen === 'function') {
+      video.webkitEnterFullscreen();
+      return;
+    }
+
     if (document.fullscreenElement) {
       await document.exitFullscreen();
       return;
     }
+
+    const target = video?.requestFullscreen ? video : card;
     if (target.requestFullscreen) await target.requestFullscreen();
   }
 
