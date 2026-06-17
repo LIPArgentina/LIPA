@@ -1,0 +1,231 @@
+:root{
+  --bg:#0a0a0a;
+  --ink:#ffffff;
+  --gold:#ffcc00;
+  --gold-soft:#ffd966;
+  --line:#ffffff22;
+  --panel:#16171a;
+  --panel-2:#0f0f11;
+  --muted:#d0d0d0;
+  --err:#ff6767;
+}
+
+*{box-sizing:border-box;}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+}
+
+.container{
+  max-width:2000px;
+  margin:0 auto;
+  padding:9px 8px;
+}
+
+header{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:7px;
+  border-bottom:1px solid var(--line);
+  padding-bottom:5px;
+}
+
+header img{
+  height:34px;
+  width:auto;
+  display:block;
+}
+
+.header-center{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+}
+
+.title{
+  font-weight:900;
+  letter-spacing:.06em;
+  color:var(--gold);
+  font-size:clamp(16px,2.5vw,24px);
+  text-align:center;
+}
+
+.actions{
+  margin-left:auto;
+  display:flex;
+  gap:6px;
+}
+
+.btn{
+  border:1px solid #b28900;
+  background:transparent;
+  color:var(--gold);
+  font-weight:800;
+  padding:7px 10px;
+  border-radius:8px;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  font:inherit;
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+.btn:hover{filter:brightness(1.08);}
+
+.videos-page{
+  max-width:1400px;
+  margin:0 auto;
+  padding:18px 0 34px;
+}
+
+.upload-panel{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:10px;
+  align-items:center;
+  margin:8px 0 14px;
+  padding:12px;
+  border:1px solid rgba(255,204,0,.45);
+  border-radius:14px;
+  background:var(--panel);
+  box-shadow:0 5px 12px #0006;
+}
+
+.upload-label{
+  color:var(--gold);
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  grid-column:1 / -1;
+}
+
+.upload-input{
+  width:100%;
+  min-width:0;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#090b10;
+  color:#fff;
+  font:inherit;
+  font-size:12px;
+}
+
+.upload-btn{
+  min-height:42px;
+  background:linear-gradient(180deg, #ffd86a 0%, #e8b127 100%);
+  color:#111;
+}
+
+.upload-btn:disabled{
+  opacity:.6;
+  cursor:wait;
+}
+
+.status-box{
+  background:var(--panel);
+  border:1px solid rgba(255,204,0,.45);
+  border-radius:12px;
+  box-shadow:0 5px 12px #0006;
+  padding:10px 12px;
+  margin:8px 0 14px;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.status-box.error{
+  border-color:rgba(255,103,103,.6);
+  color:#ffb3b3;
+}
+
+.videos-grid{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:18px;
+  align-items:start;
+}
+
+.video-card{
+  min-width:0;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--panel);
+  box-shadow:0 5px 12px #0006;
+}
+
+.video-card__title{
+  margin:0;
+  padding:12px 12px 10px;
+  color:var(--gold);
+  font-size:15px;
+  line-height:1.2;
+  font-weight:900;
+  text-transform:uppercase;
+  overflow-wrap:anywhere;
+  border-bottom:1px solid var(--line);
+}
+
+.video-card__stage{
+  background:#050505;
+  aspect-ratio:16 / 9;
+}
+
+.video-card video{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:contain;
+  background:#050505;
+}
+
+.video-controls{
+  display:grid;
+  grid-template-columns:repeat(5, minmax(0, 1fr));
+  gap:7px;
+  padding:10px;
+  background:var(--panel-2);
+  border-top:1px solid var(--line);
+}
+
+.video-control{
+  min-height:36px;
+  border:1px solid #b28900;
+  border-radius:8px;
+  background:linear-gradient(180deg, #ffd86a 0%, #e8b127 100%);
+  color:#111;
+  font:inherit;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+
+.video-control:hover{filter:brightness(1.06);}
+.video-control:active{transform:translateY(1px);}
+
+@media(max-width:1000px){
+  .videos-grid{grid-template-columns:repeat(2, minmax(0,1fr));}
+}
+
+@media(max-width:680px){
+  .container{padding:8px 6px;}
+  header{grid-template-columns:auto 1fr auto;}
+  header img{height:32px;}
+  .btn{padding:6px 8px;font-size:11px;}
+  .videos-grid{grid-template-columns:1fr;}
+  .upload-panel{grid-template-columns:1fr;}
+  .video-controls{grid-template-columns:repeat(5, minmax(0, 1fr));gap:5px;padding:8px;}
+  .video-control{min-height:34px;font-size:10px;padding:5px 3px;}
+}

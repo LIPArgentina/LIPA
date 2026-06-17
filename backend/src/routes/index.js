@@ -10,6 +10,7 @@ const createPicturesRouter = require('./pictures.routes');
 const createStatsRouter = require('./stats.routes');
 const createLlavesRouter = require('./llaves.routes');
 const reglamentoRouter = require('./reglamento.routes');
+const createVideosRouter = require('./videos.routes');
 
 module.exports = function createApiRouter(deps) {
   const { DATA_DIR } = deps;
@@ -44,6 +45,9 @@ module.exports = function createApiRouter(deps) {
 
   // Pictures
   router.use('/pictures', createPicturesRouter(deps));
+
+  // Videos públicos guardados junto a las fotos/flyers
+  router.use('/', createVideosRouter(deps));
 
   // Stats públicas: /api/track-visit y /api/public-stats
   router.use('/', createStatsRouter(deps));

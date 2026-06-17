@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Carga de videos | Liga Independiente de Pool</title>
+  <link rel="icon" href="../logo_liga.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./videos.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="../admin.html" title="Admin"><img alt="LPI" src="../logo_liga.png" /></a>
+      <div class="header-center">
+        <div class="title">CARGA DE VIDEOS</div>
+      </div>
+      <nav class="actions">
+        <a class="btn" href="../admin.html">VOLVER</a>
+      </nav>
+    </header>
+
+    <main class="videos-page">
+      <section class="upload-panel">
+        <label class="upload-label" for="videosInput">Elegí videos MP4, WebM, MOV o M4V</label>
+        <input id="videosInput" class="upload-input" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v" multiple />
+        <button id="uploadBtn" class="btn upload-btn" type="button">SUBIR VIDEOS</button>
+      </section>
+      <section id="statusBox" class="status-box" hidden></section>
+      <section id="videosGrid" class="videos-grid" aria-label="Videos cargados"></section>
+    </main>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="./videos.js" defer></script>
+  <script src="./videos_admin.js" defer></script>
+</body>
+</html>
