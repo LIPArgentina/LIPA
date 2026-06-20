@@ -5,8 +5,8 @@
 }
 
 .hero__logo--bandera{
-  width: clamp(150px, 15vw, 210px);
-  max-height: 210px;
+  width: clamp(180px, 18vw, 252px);
+  max-height: 252px;
   object-fit: contain;
   margin-bottom: 6px;
 }
