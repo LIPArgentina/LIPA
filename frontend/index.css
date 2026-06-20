@@ -4,6 +4,13 @@
   height: auto;
 }
 
+.hero__logo--bandera{
+  width: clamp(150px, 15vw, 210px);
+  max-height: 210px;
+  object-fit: contain;
+  margin-bottom: 6px;
+}
+
 /* Tamaño más grande del modal de Banner */
 #bannerModal .modal__panel {
   width: min(1000px, 96vw);
