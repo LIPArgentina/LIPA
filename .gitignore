@@ -1,7 +1,15 @@
 node_modules/
+backend/node_modules/
+
 .env
 .env.*
+!.env.example
+
 npm-debug.log
 .DS_Store
-backend/node_modules/
 backend/data/pictures/
+
+*.log
+dist/
+build/
+.cache/

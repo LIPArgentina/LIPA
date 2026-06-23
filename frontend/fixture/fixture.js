@@ -22,6 +22,20 @@ const API_BASE = (() => {
 })();
 let PERSIST_WARNED = false;
 
+function readSession(){
+  try {
+    const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function authHeaders(extra = {}){
+  const sess = readSession();
+  return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
+}
+
 function getStored(key, fallback){
   try { return localStorage.getItem(key) || fallback; }
   catch(_) { return fallback; }
@@ -544,7 +558,8 @@ async function saveFixtureJSONOnServer(){
 
   const resp = await fetch(`${API_BASE}/fixture`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       kind,
       category: cat,

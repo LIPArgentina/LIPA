@@ -12,6 +12,11 @@ function isAdmin() {
   return (sess?.role || "").toLowerCase() === "admin";
 }
 
+function authHeaders(extra = {}) {
+  const sess = readSession();
+  return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
+}
+
 function getSlug() {
   const sess = readSession();
   if (sess?.slug) return String(sess.slug);
@@ -432,7 +437,8 @@ function setupBannerAdmin() {
     try {
       const res = await fetch(apiUrl("/api/save-banner"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("POST /api/save-banner failed");

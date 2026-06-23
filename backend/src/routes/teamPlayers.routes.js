@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireTeam } = require('../middleware/auth');
+const { requireTeam, requireAdmin } = require('../middleware/auth');
 const pool = require('../../db');
 
 module.exports = function createTeamPlayersRouter() {
@@ -89,7 +89,7 @@ module.exports = function createTeamPlayersRouter() {
     }
   });
 
-  router.post('/save-team-assets', async (req, res) => {
+  router.post('/save-team-assets', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
     try {

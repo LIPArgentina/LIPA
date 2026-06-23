@@ -16,7 +16,13 @@ module.exports = function createAdminRouter(deps) {
 
   // ----- Admin password store -----
   const ADMIN_STORE = path.join(DATA_DIR, 'admin_password.json');
-  let adminPassword = readJSON(ADMIN_STORE, { hash: bcrypt.hashSync('admin123', 10) });
+  let adminPassword = readJSON(ADMIN_STORE, null);
+  if (!adminPassword?.hash) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Falta configurar la contraseña admin inicial.');
+    }
+    adminPassword = { hash: bcrypt.hashSync(process.env.ADMIN_DEFAULT_PASSWORD || 'admin123', 10) };
+  }
 
   async function findTeamBySlug(slug) {
     const safeSlug = String(slug || '').trim().toLowerCase();
@@ -96,7 +102,7 @@ module.exports = function createAdminRouter(deps) {
     return res.json({ ok: true, token });
   });
 
-  router.post('/admin/change-password', async (req, res) => {
+  router.post('/admin/change-password', requireAdmin, async (req, res) => {
     const { oldPassword, newPassword } = req.body || {};
     if (!oldPassword || !newPassword) {
       return res.status(400).json({ ok: false, msg: 'faltan campos' });

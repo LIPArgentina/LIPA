@@ -32,6 +32,20 @@
     return (API_BASE || '') + path;
   }
 
+  function readSession(){
+    try {
+      const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function authHeaders(extra = {}){
+    const sess = readSession();
+    return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
+  }
+
   function setStatus(html, cls = ''){
     const node = $('#status');
     if (!node) return;
@@ -568,7 +582,8 @@
   async function postJson(path, body){
     const res = await fetch(apiUrl(path), {
       method:'POST',
-      headers:{ 'Content-Type':'application/json' },
+      credentials: 'include',
+      headers: authHeaders({ 'Content-Type':'application/json' }),
       body: JSON.stringify(body)
     });
     const data = await res.json().catch(() => ({}));

@@ -5,8 +5,20 @@ const express = require("express");
 const bcrypt = require('bcryptjs');
 const pool = require("./db");
 const app = require("./src/app");
+const { requireAdmin } = require("./src/middleware/auth");
 
 const PORT = process.env.PORT || 3000;
+
+if (process.env.NODE_ENV === "production") {
+  const jwtSecret = String(process.env.JWT_SECRET || "");
+  const looksWeak =
+    jwtSecret.length < 32 ||
+    /changeme|change-me|secret|admin123|password/i.test(jwtSecret);
+
+  if (looksWeak) {
+    throw new Error("JWT_SECRET inseguro o no configurado para producción");
+  }
+}
 
 const PICTURES_DIR = process.env.PICTURES_DIR || "/opt/render/project/src/persistent/pictures";
 app.use("/pictures", express.static(PICTURES_DIR, {
@@ -31,7 +43,7 @@ app.use("/pictures", express.static(PICTURES_DIR, {
   }
 })();
 
-app.get("/test-db", async (req, res) => {
+app.get("/test-db", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
     res.json({ ok: true, now: result.rows[0].now });
@@ -41,7 +53,7 @@ app.get("/test-db", async (req, res) => {
   }
 });
 
-app.post("/api/admin/reset-team-password/:id", async (req, res) => {
+app.post("/api/admin/reset-team-password/:id", requireAdmin, async (req, res) => {
   const teamId = req.params.id;
 
   if (!teamId) {

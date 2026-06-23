@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../../db');
+const { requireAdmin } = require('../middleware/auth');
 
 module.exports = function createLlavesRouter() {
   const router = express.Router();
@@ -665,12 +666,12 @@ module.exports = function createLlavesRouter() {
   router.get('/proximo-cruce', getProximoCruce);
 
   router.get('/llaves', getLlaves);
-  router.post('/llaves', saveLlaves);
-  router.delete('/llaves/desempate', deleteDesempate);
+  router.post('/llaves', requireAdmin, saveLlaves);
+  router.delete('/llaves/desempate', requireAdmin, deleteDesempate);
 
   router.get('/', getLlaves);
-  router.post('/', saveLlaves);
-  router.delete('/desempate', deleteDesempate);
+  router.post('/', requireAdmin, saveLlaves);
+  router.delete('/desempate', requireAdmin, deleteDesempate);
 
   return router;
 };

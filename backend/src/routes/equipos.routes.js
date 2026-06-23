@@ -2,6 +2,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../../db');
+const { requireAdmin } = require('../middleware/auth');
 
 const DEFAULT_TEAM_PASSWORD = '1234';
 
@@ -16,7 +17,7 @@ module.exports = function createEquiposRouter() {
       .replace(/[^a-z0-9]/g, '');
   }
 
-  router.post('/save-teams', async (req, res) => {
+  router.post('/save-teams', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
     try {

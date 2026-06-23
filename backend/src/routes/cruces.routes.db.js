@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
+const { requireAdmin } = require('../middleware/auth');
 
 // ===== ADMIN CRUCES (persistido + automatización por fixture) =====
 
@@ -301,7 +302,7 @@ router.get('/status', async (req, res) => {
   }
 });
 
-router.post('/enable', async (req, res) => {
+router.post('/enable', requireAdmin, async (req, res) => {
   try {
     const { team } = req.body || {};
     if (!team) {
@@ -316,7 +317,7 @@ router.post('/enable', async (req, res) => {
   }
 });
 
-router.post('/disable', async (req, res) => {
+router.post('/disable', requireAdmin, async (req, res) => {
   try {
     const { team } = req.body || {};
     if (!team) {
@@ -331,7 +332,7 @@ router.post('/disable', async (req, res) => {
   }
 });
 
-router.post('/automation', async (req, res) => {
+router.post('/automation', requireAdmin, async (req, res) => {
   try {
     const { team, enabled } = req.body || {};
     if (!team || typeof enabled !== 'boolean') {

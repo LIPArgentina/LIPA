@@ -2,6 +2,7 @@
 
 const express = require("express");
 const { getBanner, saveBanner } = require("../services/banner.service");
+const { requireAdmin } = require("../middleware/auth");
 
 module.exports = function createBannerRouter() {
 
@@ -29,7 +30,7 @@ module.exports = function createBannerRouter() {
   });
 
   // SAVE banner
-  router.post("/save-banner", async (req, res) => {
+  router.post("/save-banner", requireAdmin, async (req, res) => {
 
     try {
 

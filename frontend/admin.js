@@ -374,7 +374,7 @@ async function saveTeams(){
   try{
     const resp = await fetch(`${API_BASE}/api/save-teams`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ division: _activeDiv, teams })
     });
@@ -552,7 +552,7 @@ async function saveRoster(){
   try{
     const resp = await fetch(`${API_BASE}/api/save-team-assets`, {
       method:'POST',
-      headers:{ 'Content-Type':'application/json' },
+      headers: authHeaders({ 'Content-Type':'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ slug: teamSlug, teamName, players })
     });
@@ -730,7 +730,7 @@ async function saveSalas(){
   try{
     const resp = await fetch(`${API_BASE}/api/save-salas`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ salas })
     });

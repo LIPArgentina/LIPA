@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { requireTeam } = require('../middleware/auth');
+const { requireTeam, requireAdmin } = require('../middleware/auth');
 const pool = require('../../db');
 
 module.exports = function createFechasRouter(deps) {
@@ -193,7 +193,7 @@ module.exports = function createFechasRouter(deps) {
     }
   });
 
-  router.post('/fixture', async (req, res) => {
+  router.post('/fixture', requireAdmin, async (req, res) => {
     try {
       const kind = String(req.body?.kind || '').trim().toLowerCase();
       const category = String(req.body?.category || '').trim().toLowerCase();

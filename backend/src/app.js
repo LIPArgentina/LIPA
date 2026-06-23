@@ -14,6 +14,7 @@ const rateLimit = require('express-rate-limit');
 const createApiRouter = require('./routes/index');
 const crucesDbRouter = require('./routes/cruces.routes.db');
 const { ensureSiteStatsTable } = require('./routes/stats.routes');
+const { requireAdmin } = require('./middleware/auth');
 
 const app = express();
 
@@ -180,7 +181,7 @@ app.use('/pictures', express.static(PICTURES_DIR, {
    TEST DB
 ========================================================= */
 
-app.get("/test-db", async (req, res) => {
+app.get("/test-db", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
     res.json({
@@ -200,7 +201,7 @@ app.get("/test-db", async (req, res) => {
    INIT DB (TEMPORAL / LEGACY)
 ========================================================= */
 
-app.get("/init-db", async (req, res) => {
+app.get("/init-db", requireAdmin, async (req, res) => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS equipos (

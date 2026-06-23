@@ -49,6 +49,20 @@ let currentCategory = 'tercera';
 let TEAM_OPTIONS = ['WO'];
 let CURRENT_STANDINGS = null;
 
+function readSession(){
+  try {
+    const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function authHeaders(extra = {}){
+  const sess = readSession();
+  return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
+}
+
 function normalizeTeamName(name){
   const raw = String(name || '').trim().replace(/\s+/g, ' ');
   if (!raw) return '';
@@ -555,7 +569,7 @@ async function deleteDesempate(roundId){
     const resp = await fetch(`${API_BASE}/llaves/desempate`, {
       method: 'DELETE',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         category: currentCategory,
         roundId
@@ -615,7 +629,7 @@ async function saveOnServer(){
   const resp = await fetch(`${API_BASE}/llaves`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       category: currentCategory,
       data

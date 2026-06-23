@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
+const { requireAdmin } = require('../middleware/auth');
 
 function normalizeSlug(value = '') {
   return String(value || '').trim().toLowerCase();
@@ -520,7 +521,7 @@ router.get('/status', async (req, res) => {
 });
 
 
-router.post('/enable', (req, res) => {
+router.post('/enable', requireAdmin, (req, res) => {
   const team = req.body?.team;
   const fechaKey = req.body?.fechaKey;
 
@@ -542,7 +543,7 @@ router.post('/enable', (req, res) => {
   });
 });
 
-router.post('/disable', (req, res) => {
+router.post('/disable', requireAdmin, (req, res) => {
   const team = req.body?.team;
   const fechaKey = req.body?.fechaKey;
 

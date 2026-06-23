@@ -484,7 +484,7 @@ module.exports = function createSalasRouter(deps = {}) {
   });
 
   // POST /api/save-salas
-  router.post('/save-salas', async (req, res) => {
+  router.post('/save-salas', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
     try {
@@ -634,7 +634,7 @@ module.exports = function createSalasRouter(deps = {}) {
   });
 
   // POST /api/admin/reset-sala-password/:id
-  router.post('/admin/reset-sala-password/:id', async (req, res) => {
+  router.post('/admin/reset-sala-password/:id', requireAdmin, async (req, res) => {
     try {
       const salaId = Number(req.params.id);
       if (!Number.isFinite(salaId) || salaId <= 0) {

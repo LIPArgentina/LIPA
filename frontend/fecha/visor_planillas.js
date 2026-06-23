@@ -26,6 +26,20 @@ const API_BASE = (() => {
     }
   };
 
+  function readSession(){
+    try {
+      const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function authHeaders(extra = {}){
+    const sess = readSession();
+    return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
+  }
+
 
   function showAlert(msg){
     const a = $('#alert');
@@ -823,7 +837,8 @@ function resetCategoryHeaderIndicators(){
     try {
       const r = await fetch(`${API_BASE}/api/cruces/automation`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           team: CATEGORY_KEYS[category],
           enabled: nextEnabled
@@ -881,7 +896,8 @@ function resetCategoryHeaderIndicators(){
 
         const r = await fetch(`${API_BASE}${endpoint}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             team: CATEGORY_KEYS[category],
             fechaKey: fechaKeyActual()
