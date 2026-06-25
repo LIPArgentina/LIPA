@@ -562,6 +562,28 @@ function startPublicStats() {
   });
 }
 
+function setupSocialFollowModal() {
+  const dlg = document.getElementById("socialFollowModal");
+  if (!dlg) return;
+
+  const closeBtn = dlg.querySelector(".social-follow-modal__close");
+  const closeModal = () => dlg.close?.();
+
+  closeBtn?.addEventListener("click", closeModal);
+
+  dlg.addEventListener("click", (event) => {
+    if (event.target === dlg) closeModal();
+  });
+
+  dlg.addEventListener("cancel", () => closeModal());
+
+  requestAnimationFrame(() => {
+    if (typeof dlg.showModal === "function" && !dlg.open) {
+      dlg.showModal();
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   ensureManageTeamButton();
   ensureConsultasButton();
@@ -569,4 +591,5 @@ document.addEventListener("DOMContentLoaded", () => {
   setupBannerAdmin();
   loadBannerForHome();
   startPublicStats();
+  setupSocialFollowModal();
 });
