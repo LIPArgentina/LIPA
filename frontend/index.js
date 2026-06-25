@@ -211,6 +211,15 @@ function normalizeBannersConfig(config) {
   return [];
 }
 
+function isFlyerAldoHref(href) {
+  try {
+    const url = new URL(href, location.origin);
+    return url.searchParams.get("popup") === "aldo";
+  } catch {
+    return false;
+  }
+}
+
 function buildBannerHTML(item) {
   const text = item?.text || "";
   const link = item?.link;
@@ -218,12 +227,15 @@ function buildBannerHTML(item) {
   let html = text || "";
 
   if (link && typeof link === "object" && link.href && link.label) {
+    const linkAttrs = isFlyerAldoHref(link.href)
+      ? 'data-popup="aldo"'
+      : 'target="_blank" rel="noopener noreferrer"';
+
     html += `
       <a 
         href="${link.href}" 
-        target="_blank" 
-        rel="noopener noreferrer"
         class="banner-link"
+        ${linkAttrs}
       >
         ${link.label}
       </a>
@@ -562,6 +574,20 @@ function startPublicStats() {
   });
 }
 
+function openFlyerAldoModal() {
+  const dlg = document.getElementById("flyerAldoModal");
+  if (!dlg) return;
+
+  const socialDlg = document.getElementById("socialFollowModal");
+  if (socialDlg?.open) socialDlg.close();
+
+  requestAnimationFrame(() => {
+    if (typeof dlg.showModal === "function" && !dlg.open) {
+      dlg.showModal();
+    }
+  });
+}
+
 function setupSocialFollowModal() {
   const dlg = document.getElementById("socialFollowModal");
   if (!dlg) return;
@@ -587,8 +613,6 @@ function setupSocialFollowModal() {
 
 function setupFlyerAldoModal() {
   const params = new URLSearchParams(location.search);
-  if (params.get("popup") !== "aldo") return;
-
   const dlg = document.getElementById("flyerAldoModal");
   if (!dlg) return;
 
@@ -603,10 +627,19 @@ function setupFlyerAldoModal() {
 
   dlg.addEventListener("cancel", () => closeModal());
 
-  requestAnimationFrame(() => {
-    if (typeof dlg.showModal === "function" && !dlg.open) {
-      dlg.showModal();
-    }
+  if (params.get("popup") === "aldo") openFlyerAldoModal();
+}
+
+function setupBannerPopupLinks() {
+  const bannerEl = document.getElementById("bannerMessage");
+  if (!bannerEl) return;
+
+  bannerEl.addEventListener("click", (event) => {
+    const link = event.target.closest('a.banner-link[data-popup="aldo"]');
+    if (!link) return;
+
+    event.preventDefault();
+    openFlyerAldoModal();
   });
 }
 
@@ -618,5 +651,6 @@ document.addEventListener("DOMContentLoaded", () => {
   loadBannerForHome();
   startPublicStats();
   setupFlyerAldoModal();
+  setupBannerPopupLinks();
   setupSocialFollowModal();
 });
