@@ -565,8 +565,34 @@ function startPublicStats() {
 function setupSocialFollowModal() {
   const dlg = document.getElementById("socialFollowModal");
   if (!dlg) return;
+  if (new URLSearchParams(location.search).get("popup") === "aldo") return;
 
   const closeBtn = dlg.querySelector(".social-follow-modal__close");
+  const closeModal = () => dlg.close?.();
+
+  closeBtn?.addEventListener("click", closeModal);
+
+  dlg.addEventListener("click", (event) => {
+    if (event.target === dlg) closeModal();
+  });
+
+  dlg.addEventListener("cancel", () => closeModal());
+
+  requestAnimationFrame(() => {
+    if (typeof dlg.showModal === "function" && !dlg.open) {
+      dlg.showModal();
+    }
+  });
+}
+
+function setupFlyerAldoModal() {
+  const params = new URLSearchParams(location.search);
+  if (params.get("popup") !== "aldo") return;
+
+  const dlg = document.getElementById("flyerAldoModal");
+  if (!dlg) return;
+
+  const closeBtn = dlg.querySelector(".flyer-popup__close");
   const closeModal = () => dlg.close?.();
 
   closeBtn?.addEventListener("click", closeModal);
@@ -591,5 +617,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setupBannerAdmin();
   loadBannerForHome();
   startPublicStats();
+  setupFlyerAldoModal();
   setupSocialFollowModal();
 });
