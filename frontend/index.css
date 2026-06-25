@@ -250,10 +250,8 @@
 .social-follow-button{
   min-height:140px;
   display:flex;
-  flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:12px;
   border-radius:18px;
   border:1px solid #8e6a12;
   background:linear-gradient(180deg, #ffe07a 0%, #f2bd36 52%, #d79b12 100%);
@@ -291,9 +289,9 @@
 }
 
 .social-follow-button__icon{
-  width:62px;
-  height:62px;
-  fill:#111;
+  width:min(210px, 88%);
+  height:72px;
+  object-fit:contain;
   filter:drop-shadow(0 1px 1px rgba(255,255,255,.38));
 }
 
@@ -482,13 +480,11 @@
   .social-follow-button{
     min-height:104px;
     border-radius:14px;
-    gap:8px;
-    font-size:.96rem;
   }
 
   .social-follow-button__icon{
-    width:50px;
-    height:50px;
+    width:min(220px, 88%);
+    height:58px;
   }
 
   .cta-grid .btn {
