@@ -241,6 +241,8 @@ function renderRows(users){
   const by = {
     sala: new Map(teams.map(u => [u.username, u.sala || u.email || ''])),
     ubicacion: new Map(teams.map(u => [u.username, u.ubicacion || u.location || u.phone || ''])),
+    captain: new Map(teams.map(u => [u.username, u.captain || u.capitan || ''])),
+    subcaptain: new Map(teams.map(u => [u.username, u.subcaptain || u.subcapitan || ''])),
     id:   new Map(teams.map(u => [u.username, u.id || null])),
   };
   const names = teams.map(u => u.username);
@@ -255,6 +257,8 @@ function renderRows(users){
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${escapeHtml(name)}" aria-label="Nombre del equipo fila ${i+1}"></td>
+      <td><input class="input captain" type="text" value="${escapeHtml(by.captain.get(name)||'')}" placeholder="Capitán" aria-label="Capitán fila ${i+1}"></td>
+      <td><input class="input subcaptain" type="text" value="${escapeHtml(by.subcaptain.get(name)||'')}" placeholder="Subcapitán" aria-label="Subcapitán fila ${i+1}"></td>
       <td><input class="input sala" type="text" value="${escapeHtml(by.sala.get(name)||'')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
       <td><input class="input location" type="url" value="${escapeHtml(normalizeLocation(by.ubicacion.get(name)||''))}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
       <td class="team-actions-cell">
@@ -332,12 +336,14 @@ function collectRows(){
   const rows = [];
   $$('#tbodyTeams tr').forEach(tr => {
     const name    = tr.querySelector('.team')?.value.trim()     || '';
+    const captain = tr.querySelector('.captain')?.value.trim()  || '';
+    const subcaptain = tr.querySelector('.subcaptain')?.value.trim() || '';
     const sala      = tr.querySelector('.sala')?.value.trim()      || '';
     const ubicacion = tr.querySelector('.location')?.value.trim()  || '';
     if(!name) return;
     // Se mantienen las claves email/phone porque el backend/DB anterior guarda esos campos.
     // Ahora email = SALA y phone = UBICACIÓN (link de Google Maps o texto de ubicación).
-    rows.push({ username:name, role:'team', email:sala, phone:ubicacion });
+    rows.push({ username:name, role:'team', captain, subcaptain, email:sala, phone:ubicacion });
   });
   return rows;
 }
@@ -609,6 +615,8 @@ async function loadTeamsForDivision(div){
         id: u.id || null,
         username: u.username || u.name || '',
         role: 'team',
+        captain: u.captain || u.capitan || '',
+        subcaptain: u.subcaptain || u.subcapitan || '',
         email: u.sala || u.email || '',
         phone: u.ubicacion || u.location || u.phone || '',
         slug: u.slug || slugify(u.username || u.name || '')
@@ -793,6 +801,8 @@ function downloadJson(filename, payload){
 function exportTeamsTable(){
   const teams = collectRows().map(item => ({
     nombre: item.username || '',
+    capitan: item.captain || '',
+    subcapitan: item.subcaptain || '',
     sala: item.email || '',
     ubicacion: item.phone || ''
   }));
@@ -841,6 +851,8 @@ function importTeamsTable(items){
     id: item?.id || null,
     username: item?.username || item?.nombre || item?.name || item?.equipo || '',
     role: 'team',
+    captain: item?.captain || item?.capitan || '',
+    subcaptain: item?.subcaptain || item?.subcapitan || '',
     email: item?.email || item?.sala || item?.room || '',
     phone: item?.phone || item?.ubicacion || item?.location || item?.maps || '',
     slug: item?.slug || slugify(item?.username || item?.nombre || item?.name || item?.equipo || '')

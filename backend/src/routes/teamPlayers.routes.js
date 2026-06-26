@@ -1,9 +1,13 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { requireTeam, requireAdmin } = require('../middleware/auth');
 const pool = require('../../db');
 
-module.exports = function createTeamPlayersRouter() {
+module.exports = function createTeamPlayersRouter(deps = {}) {
   const router = express.Router();
+  const playersRoot = path.join(deps.PICTURES_DIR || path.resolve(__dirname, '../../data/pictures'), 'players');
   let schemaReady = false;
 
   function normalizeText(value) {
@@ -22,6 +26,15 @@ module.exports = function createTeamPlayersRouter() {
   function normalizeBirthDate(value) {
     const text = String(value || '').trim();
     return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+  }
+
+  function safeName(value = '') {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9._-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 120) || 'jugador';
   }
 
   async function ensurePlayerSchema(client = pool) {
@@ -153,9 +166,11 @@ module.exports = function createTeamPlayersRouter() {
     const lower = value.toLowerCase();
     if (!lower) return null;
 
+    await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS subcaptain TEXT`);
+
     const result = await pool.query(
       `
-      SELECT DISTINCT e.id, e.slug_uid, e.slug_base, e.display_name, e.division
+      SELECT DISTINCT e.id, e.slug_uid, e.slug_base, e.display_name, e.division, e.captain, e.subcaptain
       FROM equipos e
       LEFT JOIN equipo_slug_aliases a
         ON a.equipo_id = e.id
@@ -314,10 +329,43 @@ module.exports = function createTeamPlayersRouter() {
       slug_uid: team.slug_uid,
       teamName: team.display_name,
       division: team.division,
+      captain: team.captain || '',
+      subcaptain: team.subcaptain || '',
+      captains: [team.captain || '', team.subcaptain || ''].filter(Boolean),
       players: details.map(item => item.name || item.nombre).filter(Boolean),
       playerDetails: details,
     };
   }
+
+  const storage = multer.diskStorage({
+    destination: async (_req, _file, cb) => {
+      try {
+        await fs.promises.mkdir(playersRoot, { recursive: true });
+        cb(null, playersRoot);
+      } catch (err) {
+        cb(err);
+      }
+    },
+    filename: (req, file, cb) => {
+      const dni = normalizeDni(req.body?.dni);
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+      const base = safeName(`${dni || 'jugador'}_${Date.now()}`);
+      cb(null, `${base}${ext}`);
+    }
+  });
+
+  const upload = multer({
+    storage,
+    limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+    fileFilter: (_req, file, cb) => {
+      const mimetype = String(file.mimetype || '').toLowerCase();
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      const allowedByMime = mimetype.startsWith('image/');
+      const allowedByExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext);
+      if (!allowedByMime && !allowedByExt) return cb(new Error('Solo se permiten imágenes JPG, PNG o WebP'));
+      cb(null, true);
+    }
+  });
 
   router.get('/team-assets', async (req, res) => {
     try {
@@ -391,6 +439,70 @@ module.exports = function createTeamPlayersRouter() {
       console.error(err);
       return res.status(500).json({ ok: false });
     }
+  });
+
+  router.post('/team/player-profile', requireTeam, (req, res) => {
+    upload.single('foto')(req, res, async (err) => {
+      if (err) return res.status(400).json({ ok: false, error: err.message || 'No se pudo subir la foto' });
+
+      try {
+        await ensurePlayerSchema();
+        const playerId = Number(req.body?.id);
+        const dni = normalizeDni(req.body?.dni);
+        const fechaNacimiento = normalizeBirthDate(req.body?.fechaNacimiento || req.body?.fecha_nacimiento);
+
+        if (!Number.isFinite(playerId) || playerId <= 0) {
+          return res.status(400).json({ ok: false, error: 'Jugador inválido' });
+        }
+        if (!dni) return res.status(400).json({ ok: false, error: 'El DNI es obligatorio' });
+        if (!fechaNacimiento) return res.status(400).json({ ok: false, error: 'La fecha de nacimiento es obligatoria' });
+
+        const team = await resolveTeam(req.user.slug);
+        if (!team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
+
+        const belongs = await pool.query(
+          `SELECT 1
+             FROM jugador_equipos
+            WHERE jugador_id = $1
+              AND equipo_id = $2
+              AND activo = true
+            LIMIT 1`,
+          [playerId, team.id]
+        );
+        if (!belongs.rows.length) {
+          return res.status(403).json({ ok: false, error: 'Ese jugador no pertenece a tu equipo' });
+        }
+
+        const dniOwner = await pool.query(
+          `SELECT id FROM jugadores WHERE dni = $1 AND id <> $2 LIMIT 1`,
+          [dni, playerId]
+        );
+        if (dniOwner.rows.length) {
+          return res.status(400).json({ ok: false, error: 'Ese DNI ya pertenece a otro jugador' });
+        }
+
+        const fotoPath = req.file?.filename || null;
+        await pool.query(
+          `UPDATE jugadores
+              SET dni = $1,
+                  fecha_nacimiento = $2::date,
+                  foto_path = COALESCE($3, foto_path),
+                  updated_at = NOW()
+            WHERE id = $4`,
+          [dni, fechaNacimiento, fotoPath, playerId]
+        );
+
+        const players = await fetchPlayerDetailsForTeam(team.id);
+        const player = players.find(item => Number(item.id) === playerId) || null;
+        return res.json({ ok: true, player, players, ...buildResponse(team, players) });
+      } catch (saveErr) {
+        if (req.file?.path) {
+          try { await fs.promises.unlink(req.file.path); } catch (_) {}
+        }
+        console.error('POST /team/player-profile', saveErr);
+        return res.status(400).json({ ok: false, error: saveErr.message || 'No se pudo guardar la ficha' });
+      }
+    });
   });
 
   return router;

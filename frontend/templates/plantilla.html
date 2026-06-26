@@ -25,6 +25,9 @@
 <div class="main-container">
 <!-- Tabla Jugadores (ORIGINALES) -->
 <div class="jugadores-container">
+<h2>CAPITANES</h2>
+<div class="fila fila-capitan" draggable="true"><div class="numero">C1</div><div class="jugador"></div></div>
+<div class="fila fila-capitan" draggable="true"><div class="numero">C2</div><div class="jugador"></div></div>
 <h2>JUGADORES</h2>
 <div class="fila" draggable="true"><div class="numero">1</div><div class="jugador"></div></div>
 <div class="fila" draggable="true"><div class="numero">2</div><div class="jugador"></div></div>
@@ -46,8 +49,6 @@
 <div class="fila" draggable="true"><div class="numero">18</div><div class="jugador"></div></div>
 <div class="fila" draggable="true"><div class="numero">19</div><div class="jugador"></div></div>
 <div class="fila" draggable="true"><div class="numero">20</div><div class="jugador"></div></div>
-<div class="fila" draggable="true"><div class="numero">21</div><div class="jugador"></div></div>
-<div class="fila" draggable="true"><div class="numero">22</div><div class="jugador"></div></div>
 </div>
 <!-- Planilla Liga (ORIGINAL) -->
 <div class="extra-column">
@@ -120,6 +121,31 @@
 <div class="modal__footer">
 <button class="btn btn-ghost" value="cancel">Cancelar</button>
 <button class="btn btn-primary" id="submitPass" value="confirm">Guardar</button>
+</div>
+</form>
+</dialog>
+
+<!-- ===== Modal Ficha de jugador ===== -->
+<dialog class="modal" id="playerCardModal">
+<form autocomplete="off" class="modal__panel player-card-modal" id="playerCardForm" method="dialog">
+<div class="modal__header"><h3>Jugador</h3></div>
+<div class="modal__body">
+<input id="playerCardId" type="hidden">
+<div class="player-card-photo"><img id="playerCardPreview" src="../logo_liga.png" alt="Foto del jugador"></div>
+<label class="field__label">Nombre y apellido</label>
+<input class="field__control" id="playerCardName" type="text" readonly>
+<label class="field__label">DNI</label>
+<input class="field__control" id="playerCardDni" type="text" inputmode="numeric">
+<label class="field__label">Fecha de nacimiento</label>
+<input class="field__control" id="playerCardBirth" type="date">
+<label class="field__label">Foto carnet</label>
+<input class="field__control" id="playerCardPhoto" type="file" accept="image/png,image/jpeg,image/webp">
+<p class="error" id="playerCardError" style="display:none;"></p>
+<p class="success" id="playerCardSuccess" style="display:none;">Ficha actualizada</p>
+</div>
+<div class="modal__footer">
+<button class="btn btn-ghost" id="btnCancelPlayerCard" type="button" value="cancel">Cancelar</button>
+<button class="btn btn-primary" id="btnSavePlayerCard" type="submit" value="confirm">Guardar</button>
 </div>
 </form>
 </dialog>

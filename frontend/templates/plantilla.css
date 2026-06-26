@@ -72,6 +72,26 @@ body {
   .fila { display: flex; align-items: center; cursor: grab; }
   .numero { width: 20px; height: 20px; background-color: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-right: 5px; flex-shrink: 0; color: black; }
   .jugador { background-color: #ffef5e; border-radius: 5px; height: 20px; min-width: 220px; padding: 0 10px; display: flex; align-items: center; font-size: 12px; overflow: hidden; white-space: nowrap; color: black; }
+  .fila-capitan .numero{ width:28px; background:#ffd966; font-weight:900; }
+  .fila-capitan .jugador{ background:#f5d36b; font-weight:800; }
+  .player-edit-btn{
+    width:24px;
+    height:22px;
+    margin-left:6px;
+    border-radius:6px;
+    border:1px solid #b28900;
+    background:#151518;
+    color:#ffd966;
+    font-size:12px;
+    font-weight:900;
+    cursor:pointer;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+  }
+  .fila.has-player .player-edit-btn{ display:inline-flex; }
+  .player-edit-btn:hover{ background:#222; }
   .extra-column { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .group-container { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 250px; }
   .fila-extra { display: flex; align-items: center; margin-bottom: 1px; }
@@ -234,6 +254,25 @@ dialog.modal { padding: 0 !important; }
 /* Centrar y limitar tamaño del modal */
   dialog#passModal { position: fixed; inset: 0; margin: auto; transform: none; max-height: 90vh; overflow: auto; }
   dialog#passModal::backdrop { background: rgba(0,0,0,.55); }
+  dialog#playerCardModal { position: fixed; inset: 0; margin: auto; transform: none; max-height: 92vh; overflow: auto; }
+  dialog#playerCardModal::backdrop { background: rgba(0,0,0,.62); }
+  .player-card-modal{ width:min(94vw, 440px) !important; }
+  .player-card-photo{
+    width:130px;
+    height:130px;
+    border-radius:10px;
+    border:1px solid #ffffff22;
+    background:#11141b;
+    overflow:hidden;
+    display:grid;
+    place-items:center;
+    margin-bottom:14px;
+  }
+  .player-card-photo img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
 
 .field__toggle input[type="checkbox"]{
   accent-color: #d4af37;  /* dorado en vez de rojo */

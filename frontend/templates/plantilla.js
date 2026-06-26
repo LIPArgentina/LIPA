@@ -92,7 +92,14 @@ async function fetchWithAuth(url, options = {}) {
   }
 
   function applyPlayersPayload(data){
-    window.LPI_PLAYERS = normalizePlayersPayload(data);
+    window.LPI_PLAYER_DETAILS = Array.isArray(data && data.playerDetails) ? data.playerDetails : [];
+    window.LPI_PLAYERS = window.LPI_PLAYER_DETAILS.length
+      ? window.LPI_PLAYER_DETAILS.map(function(player){ return player.name || player.nombre || ''; }).filter(Boolean)
+      : normalizePlayersPayload(data);
+    window.LPI_CAPTAINS = [
+      data && (data.captain || data.capitan),
+      data && (data.subcaptain || data.subcapitan)
+    ].filter(function(name){ return String(name || '').trim(); });
     if (data && data.teamName) {
       window.LPI_TEAM_NAME = window.LPI_TEAM_NAME || {};
       window.LPI_TEAM_NAME[slug] = data.teamName;
@@ -137,6 +144,129 @@ async function fetchWithAuth(url, options = {}) {
       history.replaceState({}, '', url.pathname + url.search + url.hash);
     }
   }catch(_){ }
+})();
+
+// ===== Ficha editable de jugador desde plantilla =====
+(function(){
+  function getHeadersForFormData(){
+    var headers = {};
+    try {
+      headers = LPI_getAuthHeaders ? LPI_getAuthHeaders() : {};
+      delete headers["Content-Type"];
+      delete headers["content-type"];
+    } catch(_) {}
+    return headers;
+  }
+
+  function playerPhotoSrc(player){
+    if (player && player.fotoUrl) return LPI_apiUrl(player.fotoUrl);
+    return '../logo_liga.png';
+  }
+
+  function findPlayer(playerId, fallbackName){
+    var id = String(playerId || '');
+    var name = String(fallbackName || '').trim();
+    var list = Array.isArray(window.LPI_PLAYER_DETAILS) ? window.LPI_PLAYER_DETAILS : [];
+    return list.find(function(player){ return String(player.id || '') === id; }) ||
+      list.find(function(player){ return String(player.name || player.nombre || '').trim() === name; }) ||
+      null;
+  }
+
+  function showPlayerCardError(message){
+    var err = document.getElementById('playerCardError');
+    var ok = document.getElementById('playerCardSuccess');
+    if (ok) ok.style.display = 'none';
+    if (!err) return;
+    err.textContent = message || 'No se pudo guardar';
+    err.style.display = 'block';
+  }
+
+  function showPlayerCardSuccess(){
+    var err = document.getElementById('playerCardError');
+    var ok = document.getElementById('playerCardSuccess');
+    if (err) err.style.display = 'none';
+    if (ok) ok.style.display = 'block';
+  }
+
+  function resetPlayerCardMessages(){
+    var err = document.getElementById('playerCardError');
+    var ok = document.getElementById('playerCardSuccess');
+    if (err) {
+      err.textContent = '';
+      err.style.display = 'none';
+    }
+    if (ok) ok.style.display = 'none';
+  }
+
+  function openPlayerCardEditor(playerId, fallbackName){
+    var player = findPlayer(playerId, fallbackName);
+    if (!player || !player.id) {
+      if (typeof showAlert === 'function') showAlert('Ese jugador todavía no tiene ficha editable.');
+      return;
+    }
+
+    resetPlayerCardMessages();
+    document.getElementById('playerCardId').value = player.id || '';
+    document.getElementById('playerCardName').value = player.name || player.nombre || '';
+    document.getElementById('playerCardDni').value = player.dni || '';
+    document.getElementById('playerCardBirth').value = player.fechaNacimiento || player.fecha_nacimiento || player.birthDate || '';
+    document.getElementById('playerCardPhoto').value = '';
+    document.getElementById('playerCardPreview').src = playerPhotoSrc(player);
+    document.getElementById('playerCardModal')?.showModal();
+  }
+
+  async function savePlayerCard(ev){
+    ev?.preventDefault();
+    var id = document.getElementById('playerCardId')?.value || '';
+    var dni = document.getElementById('playerCardDni')?.value || '';
+    var birth = document.getElementById('playerCardBirth')?.value || '';
+    var photo = document.getElementById('playerCardPhoto')?.files?.[0] || null;
+    if (!id) return showPlayerCardError('Jugador inválido');
+    if (!dni.trim()) return showPlayerCardError('El DNI es obligatorio');
+    if (!birth) return showPlayerCardError('La fecha de nacimiento es obligatoria');
+
+    var form = new FormData();
+    form.set('id', id);
+    form.set('dni', dni);
+    form.set('fechaNacimiento', birth);
+    if (photo) form.set('foto', photo);
+
+    try {
+      var res = await fetchWithAuth(LPI_apiUrl('/api/team/player-profile'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: getHeadersForFormData(),
+        body: form
+      });
+      var data = await res.json().catch(function(){ return {}; });
+      if (!res.ok || data.ok === false) throw new Error(data.error || 'No se pudo guardar');
+
+      window.LPI_PLAYER_DETAILS = Array.isArray(data.playerDetails) ? data.playerDetails : (Array.isArray(data.players) ? data.players : window.LPI_PLAYER_DETAILS);
+      if (Array.isArray(data.playerDetails)) {
+        window.LPI_PLAYERS = data.playerDetails.map(function(player){ return player.name || player.nombre || ''; }).filter(Boolean);
+      }
+      if (typeof window.fillJugadores === 'function') window.fillJugadores();
+
+      var updated = findPlayer(id, '');
+      document.getElementById('playerCardPreview').src = playerPhotoSrc(updated || data.player || null);
+      showPlayerCardSuccess();
+    } catch (err) {
+      showPlayerCardError(err.message || 'No se pudo guardar');
+    }
+  }
+
+  window.openPlayerCardEditor = openPlayerCardEditor;
+
+  document.addEventListener('DOMContentLoaded', function(){
+    document.getElementById('playerCardPhoto')?.addEventListener('change', function(){
+      var file = this.files?.[0];
+      if (file) document.getElementById('playerCardPreview').src = URL.createObjectURL(file);
+    });
+    document.getElementById('btnCancelPlayerCard')?.addEventListener('click', function(){
+      document.getElementById('playerCardModal')?.close();
+    });
+    document.getElementById('playerCardForm')?.addEventListener('submit', savePlayerCard);
+  });
 })();
 
 // === LPI Auth helper ===
@@ -564,6 +694,7 @@ trash.addEventListener('drop', e => {
 // Carga de nombres hacia la columna "JUGADORES" (robusta, espera a que estén listos)
 (function() {
   function selectPlayers() {
+    if (Array.isArray(window.LPI_PLAYER_DETAILS) && window.LPI_PLAYER_DETAILS.length) return window.LPI_PLAYER_DETAILS;
     if (Array.isArray(window.LPI_PLAYERS)) return window.LPI_PLAYERS;
     if (Array.isArray(window.LPI_JUGADORES)) return window.LPI_JUGADORES;
     const map = window.LPI_TEAM_PLAYERS;
@@ -575,11 +706,53 @@ trash.addEventListener('drop', e => {
     }
     return [];
   }
-  function fillJugadores(){
-    const jugadores = selectPlayers().map(x => String(x||'').trim()).filter(Boolean);
-    const slots = document.querySelectorAll(".jugadores-container .fila .jugador");
-    slots.forEach((div, i) => { if (i < jugadores.length) div.textContent = jugadores[i]; });
+  function getPlayerName(player){
+    if (typeof player === 'string') return player;
+    return player && (player.name || player.nombre) || '';
   }
+  function ensureEditButton(row){
+    var existing = row.querySelector('.player-edit-btn');
+    if (existing) return existing;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'player-edit-btn';
+    btn.textContent = '✎';
+    btn.title = 'Editar ficha';
+    btn.setAttribute('aria-label', 'Editar ficha del jugador');
+    btn.addEventListener('click', function(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof window.openPlayerCardEditor === 'function') {
+        window.openPlayerCardEditor(row.dataset.playerId || '', row.querySelector('.jugador')?.textContent || '');
+      }
+    });
+    row.appendChild(btn);
+    return btn;
+  }
+  function fillCapitanes(){
+    var captains = Array.isArray(window.LPI_CAPTAINS) ? window.LPI_CAPTAINS : [];
+    var slots = document.querySelectorAll(".jugadores-container .fila-capitan .jugador");
+    slots.forEach(function(div, i){
+      div.textContent = captains[i] || '';
+      var row = div.closest('.fila');
+      if (row) row.classList.toggle('has-player', Boolean(captains[i]));
+    });
+  }
+  function fillJugadores(){
+    fillCapitanes();
+    const jugadores = selectPlayers().filter(Boolean).slice(0, 20);
+    const rows = document.querySelectorAll(".jugadores-container .fila:not(.fila-capitan)");
+    rows.forEach(function(row, i){
+      var player = jugadores[i];
+      var name = String(getPlayerName(player) || '').trim();
+      var div = row.querySelector('.jugador');
+      if (div) div.textContent = name;
+      row.dataset.playerId = player && typeof player === 'object' && player.id ? String(player.id) : '';
+      row.classList.toggle('has-player', Boolean(name));
+      ensureEditButton(row);
+    });
+  }
+  window.fillJugadores = fillJugadores;
   document.addEventListener("DOMContentLoaded", function () {
     let tries = 0;
     function tryFill(){

@@ -26,6 +26,8 @@ module.exports = function createEquiposRouter() {
         return res.status(400).json({ ok: false, error: 'division y teams son obligatorios' });
       }
 
+      await client.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS subcaptain TEXT`);
+
       const processed = teams.map(t => {
         const username = String(t.username || '').trim();
         if (!username) return null;
@@ -41,6 +43,7 @@ module.exports = function createEquiposRouter() {
           username,
           role: 'team',
           captain: t.captain || '',
+          subcaptain: t.subcaptain || t.subcapitan || '',
           phone: t.phone || '',
           email: t.email || ''
         };
@@ -54,9 +57,9 @@ module.exports = function createEquiposRouter() {
       for (const t of processed) {
         await client.query(
           `INSERT INTO equipos
-             (slug_uid, slug_base, division, display_name, username, role, captain, phone, email,
+             (slug_uid, slug_base, division, display_name, username, role, captain, subcaptain, phone, email,
               password_hash, must_change_password, password_updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,NOW())
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true,NOW())
            ON CONFLICT (slug_uid)
            DO UPDATE SET
              slug_base = EXCLUDED.slug_base,
@@ -65,6 +68,7 @@ module.exports = function createEquiposRouter() {
              username = EXCLUDED.username,
              role = EXCLUDED.role,
              captain = EXCLUDED.captain,
+             subcaptain = EXCLUDED.subcaptain,
              phone = EXCLUDED.phone,
              email = EXCLUDED.email`,
           [
@@ -75,6 +79,7 @@ module.exports = function createEquiposRouter() {
             t.username,
             t.role,
             t.captain,
+            t.subcaptain,
             t.phone,
             t.email,
             defaultHash,
@@ -108,9 +113,10 @@ module.exports = function createEquiposRouter() {
   router.get('/teams', async (req, res) => {
     try {
       const { division } = req.query;
+      await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS subcaptain TEXT`);
 
       const result = await pool.query(
-        `SELECT id, slug_uid, username, role, captain, email, phone
+        `SELECT id, slug_uid, username, role, captain, subcaptain, email, phone
            FROM equipos
           WHERE division = $1
           ORDER BY username`,
@@ -125,6 +131,7 @@ module.exports = function createEquiposRouter() {
           slug: r.slug_uid,
           role: r.role || 'team',
           captain: r.captain || '',
+          subcaptain: r.subcaptain || '',
           email: r.email || '',
           phone: r.phone || ''
         }))
