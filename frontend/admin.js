@@ -1,30 +1,3 @@
-(function(){
-  try{
-    const params = new URLSearchParams(location.search);
-    const isAdmin = params.get('admin') === '1' || params.get('mode') === 'admin';
-    const withMode = (url) => {
-      if(!isAdmin) return url;
-      const u = new URL(url, location.origin);
-      u.searchParams.set('admin','1');
-      return u.pathname + u.search;
-    };
-    const btnFixture = document.getElementById('btnFixture');
-    const btnLlaves = document.getElementById('btnLlaves');
-    const btnCrucesManual = document.getElementById('btnCrucesManual');
-    const btnFecha   = document.getElementById('btnFecha');
-    const btnPictures = document.getElementById('btnPictures');
-    const btnCargaManualTorneo = document.getElementById('btnCargaManualTorneo');
-    const btnVideosAdmin = document.getElementById('btnVideosAdmin');
-    if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
-    if(btnLlaves) btnLlaves.href = withMode(btnLlaves.getAttribute('href') || 'llaves/llaves.html');
-    if(btnCrucesManual) btnCrucesManual.href = withMode(btnCrucesManual.getAttribute('href') || 'cruces/cruces_manuales.html');
-    if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
-    if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
-    if(btnCargaManualTorneo) btnCargaManualTorneo.href = withMode(btnCargaManualTorneo.getAttribute('href') || 'torneos/carga_manual_torneo.html');
-    if(btnVideosAdmin) btnVideosAdmin.href = withMode(btnVideosAdmin.getAttribute('href') || 'videos/videos_admin.html');
-  }catch(e){ console.warn('Nav admin patch:', e); }
-})();
-
 /* ====== Header: mantener ?admin=1 en enlaces ====== */
 (function(){
   try{
@@ -36,20 +9,19 @@
       u.searchParams.set('admin','1');
       return u.pathname + u.search;
     };
-    const btnFixture = document.getElementById('btnFixture');
-    const btnLlaves = document.getElementById('btnLlaves');
-    const btnCrucesManual = document.getElementById('btnCrucesManual');
-    const btnFecha   = document.getElementById('btnFecha');
-    const btnPictures = document.getElementById('btnPictures');
-    const btnCargaManualTorneo = document.getElementById('btnCargaManualTorneo');
-    const btnVideosAdmin = document.getElementById('btnVideosAdmin');
-    if(btnFixture) btnFixture.href = withMode(btnFixture.getAttribute('href') || 'fixture/fixture.html');
-    if(btnLlaves) btnLlaves.href = withMode(btnLlaves.getAttribute('href') || 'llaves/llaves.html');
-    if(btnCrucesManual) btnCrucesManual.href = withMode(btnCrucesManual.getAttribute('href') || 'cruces/cruces_manuales.html');
-    if(btnFecha)   btnFecha.href   = withMode(btnFecha.getAttribute('href')   || 'visor_planillas.html');
-    if(btnPictures) btnPictures.href = withMode(btnPictures.getAttribute('href') || 'pictures/pictures_admin.html');
-    if(btnCargaManualTorneo) btnCargaManualTorneo.href = withMode(btnCargaManualTorneo.getAttribute('href') || 'torneos/carga_manual_torneo.html');
-    if(btnVideosAdmin) btnVideosAdmin.href = withMode(btnVideosAdmin.getAttribute('href') || 'videos/videos_admin.html');
+    [
+      ['btnJugadoresAdmin', 'jugadores/jugadores_admin.html'],
+      ['btnFixture', 'fixture/fixture.html'],
+      ['btnLlaves', 'llaves/llaves.html'],
+      ['btnCrucesManual', 'cruces/cruces_manuales.html'],
+      ['btnFecha', 'fecha/visor_planillas.html'],
+      ['btnPictures', 'pictures/pictures_admin.html'],
+      ['btnCargaManualTorneo', 'torneos/carga_manual_torneo.html'],
+      ['btnVideosAdmin', 'videos/videos_admin.html'],
+    ].forEach(([id, fallback]) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.href = withMode(btn.getAttribute('href') || fallback);
+    });
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 

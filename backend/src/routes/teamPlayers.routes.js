@@ -33,6 +33,7 @@ module.exports = function createTeamPlayersRouter() {
         nombre TEXT NOT NULL,
         dni TEXT,
         fecha_nacimiento DATE,
+        foto_path TEXT,
         nombre_normalizado TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
@@ -45,6 +46,7 @@ module.exports = function createTeamPlayersRouter() {
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS orden INTEGER`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS dni TEXT`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS fecha_nacimiento DATE`);
+    await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS foto_path TEXT`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS nombre_normalizado TEXT`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`);
 
@@ -180,6 +182,7 @@ module.exports = function createTeamPlayersRouter() {
         j.nombre,
         j.dni,
         TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
+        j.foto_path,
         je.orden
       FROM jugador_equipos je
       JOIN jugadores j ON j.id = je.jugador_id
@@ -198,6 +201,8 @@ module.exports = function createTeamPlayersRouter() {
       birthDate: r.fecha_nacimiento || '',
       fechaNacimiento: r.fecha_nacimiento || '',
       fecha_nacimiento: r.fecha_nacimiento || '',
+      fotoPath: r.foto_path || '',
+      fotoUrl: r.foto_path ? `/api/players-admin/photo/${encodeURIComponent(r.foto_path)}` : '',
       orden: r.orden || null,
     }));
   }

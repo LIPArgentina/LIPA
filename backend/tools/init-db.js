@@ -20,6 +20,7 @@ async function initDB() {
         nombre TEXT NOT NULL,
         dni TEXT,
         fecha_nacimiento DATE,
+        foto_path TEXT,
         nombre_normalizado TEXT,
         equipo_id INTEGER REFERENCES equipos(id) ON DELETE SET NULL,
         dorsal TEXT,

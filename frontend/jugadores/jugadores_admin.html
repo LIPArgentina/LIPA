@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Administración de jugadores</title>
+  <link rel="stylesheet" href="../admin.css">
+  <link rel="stylesheet" href="jugadores_admin.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" title="Inicio">
+      <img src="../logo_liga.png" alt="LIPA">
+    </a>
+
+    <div class="top-right-actions">
+      <a id="btnChangePassword" class="btn" href="../admin.html" aria-label="Administración">ADMIN</a>
+      <a class="btn" href="../admin.html" aria-label="Volver">VOLVER</a>
+    </div>
+  </header>
+
+  <main class="players-admin">
+    <section class="players-toolbar" aria-label="Búsquedas">
+      <form id="playerSearchForm" class="search-box">
+        <label for="playerSearch">Buscar por jugador o DNI</label>
+        <div class="search-line">
+          <input id="playerSearch" class="input" type="search" placeholder="Nombre, apellido o DNI" autocomplete="off">
+          <button class="btn btn-gold" type="submit">Buscar</button>
+        </div>
+      </form>
+
+      <form id="teamSearchForm" class="search-box">
+        <label for="teamSearch">Buscar por equipo activo</label>
+        <div class="search-line search-line--team">
+          <select id="teamCategory" class="input" aria-label="Categoría">
+            <option value="tercera">3ra</option>
+            <option value="segunda">2da</option>
+            <option value="primera">1ra</option>
+          </select>
+          <input id="teamSearch" class="input" type="search" placeholder="Nombre del equipo" autocomplete="off">
+          <button class="btn btn-gold" type="submit">Ver equipo</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="players-layout">
+      <form id="playerForm" class="card player-form" enctype="multipart/form-data">
+        <div class="card-header">
+          <h1 class="title">Jugador</h1>
+        </div>
+        <div class="player-form__body">
+          <input id="playerId" type="hidden">
+          <input id="associationId" type="hidden">
+
+          <div class="photo-box">
+            <img id="photoPreview" src="../logo_liga.png" alt="Foto del jugador">
+          </div>
+
+          <label>Nombre y apellido</label>
+          <input id="playerName" class="input" type="text" required>
+
+          <label>DNI</label>
+          <input id="playerDni" class="input" type="text" inputmode="numeric" required>
+
+          <label>Fecha de nacimiento</label>
+          <input id="playerBirth" class="input" type="date" required>
+
+          <label>Foto carnet</label>
+          <input id="playerPhoto" class="input" type="file" accept="image/png,image/jpeg,image/webp">
+
+          <div class="form-grid">
+            <div>
+              <label>Categoría</label>
+              <select id="playerCategory" class="input" required>
+                <option value="tercera">3ra</option>
+                <option value="segunda">2da</option>
+                <option value="primera">1ra</option>
+              </select>
+            </div>
+            <div>
+              <label>Equipo</label>
+              <input id="playerTeam" class="input" type="text" required>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button id="btnClearForm" class="btn" type="button">Nuevo</button>
+            <button class="btn btn-gold" type="submit">Guardar jugador</button>
+          </div>
+
+          <p id="formStatus" class="form-status"></p>
+        </div>
+      </form>
+
+      <section class="card results-card">
+        <div class="card-header">
+          <h2 class="title">Resultados</h2>
+        </div>
+        <div id="results" class="results"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="historyDialog" class="modal">
+    <div class="modal__panel history-panel">
+      <div class="modal__header">
+        <h3>Historial del jugador</h3>
+      </div>
+      <div id="historyBody" class="modal__body"></div>
+      <div class="modal__footer">
+        <button id="btnCloseHistory" class="btn btn-ghost" type="button">Cerrar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="../config.js"></script>
+  <script src="jugadores_admin.js"></script>
+</body>
+</html>

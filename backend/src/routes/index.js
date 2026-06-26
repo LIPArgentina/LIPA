@@ -11,6 +11,7 @@ const createStatsRouter = require('./stats.routes');
 const createLlavesRouter = require('./llaves.routes');
 const reglamentoRouter = require('./reglamento.routes');
 const createVideosRouter = require('./videos.routes');
+const createPlayersAdminRouter = require('./playersAdmin.routes');
 
 module.exports = function createApiRouter(deps) {
   const { DATA_DIR } = deps;
@@ -42,6 +43,7 @@ module.exports = function createApiRouter(deps) {
 
   // Players
   router.use('/', createTeamPlayersRouter(deps));
+  router.use('/', createPlayersAdminRouter(deps));
 
   // Pictures
   router.use('/pictures', createPicturesRouter(deps));

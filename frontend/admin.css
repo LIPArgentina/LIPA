@@ -125,10 +125,6 @@ header.site-header{
 }
 header.site-header img{ height:60px; }
 
-.top-actions{
-  position:absolute; left:50%; top:50%; transform:translate(-50%, -50%);
-  display:flex; gap:10px; align-items:center; justify-content:center;
-}
  .btn{ border:1px solid #b28900; background:transparent; color:var(--gold); font-weight:800; padding:5px 5px; border-radius:10px; text-decoration:none; display:inline-flex; align-items:center; justify-content:center;
 }
 .btn:hover{ background:#1b1e22 }
@@ -139,11 +135,21 @@ header.site-header img{ height:60px; }
 .btn-gold:hover{ filter:brightness(1.05); }
 
 header.site-header{ flex-direction:column; align-items:flex-start; }
+.admin-shortcuts{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(160px, 1fr));
+  gap:10px;
+  margin:0 0 16px;
+}
+.admin-shortcuts .btn{
+  min-height:42px;
+  text-align:center;
+  padding:8px 10px;
+}
 
 /* ====== Responsive Header Buttons – Admin ====== */
 @media (max-width: 768px) {
-  header .btn-group,
-  .top-actions {
+  header .btn-group {
     display: flex;
     align-items: center;
     gap: 0.35rem;
@@ -171,16 +177,6 @@ header.site-header{ flex-direction:column; align-items:flex-start; }
     flex-shrink: 0;
   }
 
-  .top-actions {
-    position: static;
-    transform: none;
-    margin: 0 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 1;
-  }
-
   .top-right-actions {
     position: static;
     margin-left: auto;
@@ -189,7 +185,6 @@ header.site-header{ flex-direction:column; align-items:flex-start; }
     gap: 4px;
   }
 
-  .top-actions .btn,
   .top-right-actions .btn {
     font-size: 0.65rem;
     padding: 3px 8px;
@@ -207,7 +202,6 @@ header.site-header{ flex-direction:column; align-items:flex-start; }
     padding: 4px 4px;
   }
 
-  .top-actions .btn,
   .top-right-actions .btn {
     font-size: 0.58rem;
     padding: 2px 6px;
@@ -237,6 +231,18 @@ header.site-header{ flex-direction:column; align-items:flex-start; }
     content: "Cambiar Contraseña";
     font-size: 0.58rem;
     line-height: 1;
+  }
+}
+
+@media (max-width: 900px){
+  .admin-shortcuts{
+    grid-template-columns:repeat(2, minmax(130px, 1fr));
+  }
+}
+
+@media (max-width: 520px){
+  .admin-shortcuts{
+    grid-template-columns:1fr;
   }
 }
 

@@ -1,0 +1,172 @@
+.players-admin{
+  max-width:1500px;
+  margin:26px auto;
+  padding:0 14px 40px;
+}
+
+.players-toolbar{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-bottom:16px;
+}
+
+.search-box{
+  border:1px solid var(--border);
+  background:var(--panel);
+  border-radius:12px;
+  padding:14px;
+}
+
+.search-box label,
+.player-form label{
+  display:block;
+  margin:0 0 7px;
+  color:var(--gold);
+  font-weight:900;
+  text-transform:uppercase;
+  font-size:12px;
+}
+
+.search-line{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:10px;
+}
+
+.search-line--team{
+  grid-template-columns:110px 1fr auto;
+}
+
+.players-layout{
+  display:grid;
+  grid-template-columns:minmax(340px, 440px) 1fr;
+  gap:16px;
+  align-items:start;
+}
+
+.player-form__body{
+  padding:16px;
+  display:grid;
+  gap:12px;
+}
+
+.photo-box{
+  width:132px;
+  aspect-ratio:1;
+  border:1px solid var(--border-2);
+  border-radius:10px;
+  background:#0c0d10;
+  overflow:hidden;
+}
+
+.photo-box img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.form-grid{
+  display:grid;
+  grid-template-columns:130px 1fr;
+  gap:10px;
+}
+
+.form-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.form-status{
+  min-height:18px;
+  margin:0;
+  color:#f6d66b;
+  font-weight:800;
+}
+
+.results{
+  padding:12px;
+  display:grid;
+  gap:10px;
+}
+
+.player-card{
+  display:grid;
+  grid-template-columns:64px 1fr auto;
+  gap:12px;
+  align-items:center;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#14161c;
+}
+
+.player-card img{
+  width:64px;
+  height:64px;
+  border-radius:8px;
+  object-fit:cover;
+  background:#0c0d10;
+}
+
+.player-card h3{
+  margin:0;
+  color:#fff;
+  font-size:17px;
+  text-transform:uppercase;
+}
+
+.player-card p{
+  margin:4px 0 0;
+  color:#c9ced8;
+  font-size:13px;
+}
+
+.player-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.history-panel{
+  max-width:min(92vw, 760px);
+}
+
+.history-table{
+  width:100%;
+  min-width:0;
+}
+
+.history-table th,
+.history-table td{
+  padding:9px;
+}
+
+@media (max-width: 900px){
+  .players-toolbar,
+  .players-layout{
+    grid-template-columns:1fr;
+  }
+
+  .search-line,
+  .search-line--team,
+  .form-grid{
+    grid-template-columns:1fr;
+  }
+
+  .player-card{
+    grid-template-columns:54px 1fr;
+  }
+
+  .player-actions{
+    grid-column:1 / -1;
+    justify-content:stretch;
+  }
+
+  .player-actions .btn{
+    flex:1;
+  }
+}
