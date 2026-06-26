@@ -322,6 +322,11 @@
   color:var(--text);
 }
 
+.flyer-popup.is-zoomed{
+  width:min(1120px, calc(100vw - 24px));
+  max-width:1120px;
+}
+
 .flyer-popup::backdrop{
   background:rgba(0, 0, 0, .78);
   backdrop-filter:blur(3px);
@@ -330,6 +335,7 @@
 .flyer-popup__panel{
   position:relative;
   overflow:hidden;
+  max-height:calc(100vh - 28px);
   border-radius:18px;
   border:1px solid rgba(255, 217, 102, .34);
   background:#0d0f14;
@@ -379,6 +385,28 @@
   max-height:min(78vh, 760px);
   object-fit:contain;
   background:#0d0f14;
+}
+
+.flyer-popup--zoomable .flyer-popup__image{
+  cursor:zoom-in;
+}
+
+.flyer-popup.is-zoomed .flyer-popup__panel{
+  overflow:auto;
+}
+
+.flyer-popup.is-zoomed .flyer-popup__close{
+  position:fixed;
+  top:22px;
+  right:calc((100vw - min(1120px, calc(100vw - 24px))) / 2 + 22px);
+}
+
+.flyer-popup.is-zoomed .flyer-popup__image{
+  width:min(1024px, 100%);
+  max-width:none;
+  max-height:none;
+  margin:0 auto;
+  cursor:zoom-out;
 }
 
 .flyer-popup__whatsapp{

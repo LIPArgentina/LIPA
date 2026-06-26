@@ -618,6 +618,23 @@ function setupDialogOpener(dialogId, openButtonId) {
   return openModal;
 }
 
+function setupFlyerImageZoom() {
+  const zoomableDialogs = document.querySelectorAll(".flyer-popup--zoomable");
+
+  zoomableDialogs.forEach((dlg) => {
+    const image = dlg.querySelector(".flyer-popup__image");
+    if (!image) return;
+
+    image.addEventListener("click", () => {
+      dlg.classList.toggle("is-zoomed");
+    });
+
+    dlg.addEventListener("close", () => {
+      dlg.classList.remove("is-zoomed");
+    });
+  });
+}
+
 function setupSocialFollowModal() {
   const dlg = document.getElementById("socialFollowModal");
   if (!dlg) return;
@@ -676,6 +693,7 @@ document.addEventListener("DOMContentLoaded", () => {
   startPublicStats();
   setupFlyerAldoModal();
   setupInscripcionSuperligaModal();
+  setupFlyerImageZoom();
   setupBannerPopupLinks();
   setupSocialFollowModal();
 });
