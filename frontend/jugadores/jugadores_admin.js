@@ -31,6 +31,14 @@ function escapeHtml(value){
   return String(value || '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
 }
 
+function slugify(value){
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function apiUrl(path){
   return `${API_BASE}${path}`;
 }
@@ -46,6 +54,68 @@ function setStatus(message, isError = false){
   node.style.color = isError ? '#ff6b6b' : '#f6d66b';
 }
 
+const teamsCache = new Map();
+
+async function loadTeams(category){
+  if (teamsCache.has(category)) return teamsCache.get(category);
+  const data = await fetchJson(`/api/teams?division=${encodeURIComponent(category)}`);
+  const teams = (data.teams || data.equipos || [])
+    .map(team => {
+      const name = team.username || team.nombre || team.name || team.equipo || '';
+      const slug = team.slug || team.slug_uid || team.slug_base || slugify(name);
+      return { name, slug };
+    })
+    .filter(team => team.name && team.slug);
+
+  teamsCache.set(category, teams);
+  return teams;
+}
+
+function selectExistingOption(select, selected){
+  const value = String(selected || '').trim();
+  if (!value) {
+    select.value = '';
+    return;
+  }
+
+  const normalized = slugify(value);
+  const match = Array.from(select.options).find(option =>
+    option.value === value ||
+    option.value === normalized ||
+    slugify(option.textContent) === normalized
+  );
+  select.value = match?.value || '';
+}
+
+async function fillTeamDropdown(selector, category, selected = ''){
+  const select = $(selector);
+  if (!select) return;
+  const current = selected || select.value;
+  select.innerHTML = '<option value="">Seleccionar equipo</option>';
+
+  try {
+    const teams = await loadTeams(category);
+    teams.forEach(team => {
+      const option = document.createElement('option');
+      option.value = team.slug;
+      option.textContent = team.name;
+      select.appendChild(option);
+    });
+    selectExistingOption(select, current);
+  } catch (err) {
+    select.innerHTML = '<option value="">No se pudieron cargar equipos</option>';
+    toast(err.message || 'No se pudieron cargar equipos');
+  }
+}
+
+async function refreshPlayerTeams(selected = ''){
+  await fillTeamDropdown('#playerTeam', $('#playerCategory')?.value || 'tercera', selected);
+}
+
+async function refreshSearchTeams(selected = ''){
+  await fillTeamDropdown('#teamSearch', $('#teamCategory')?.value || 'tercera', selected);
+}
+
 function clearForm(){
   $('#playerId').value = '';
   $('#associationId').value = '';
@@ -54,19 +124,19 @@ function clearForm(){
   $('#playerBirth').value = '';
   $('#playerPhoto').value = '';
   $('#playerCategory').value = 'tercera';
-  $('#playerTeam').value = '';
+  refreshPlayerTeams();
   $('#photoPreview').src = '../logo_liga.png';
   setStatus('');
 }
 
-function fillForm(player){
+async function fillForm(player){
   $('#playerId').value = player?.id || '';
   $('#associationId').value = player?.associationId || '';
   $('#playerName').value = player?.nombre || player?.name || '';
   $('#playerDni').value = player?.dni || '';
   $('#playerBirth').value = player?.fechaNacimiento || player?.fecha_nacimiento || '';
   $('#playerCategory').value = player?.categoria || 'tercera';
-  $('#playerTeam').value = player?.teamSlug || player?.equipo || '';
+  await refreshPlayerTeams(player?.teamSlug || player?.equipo || '');
   $('#playerPhoto').value = '';
   $('#photoPreview').src = photoSrc(player);
   setStatus(`Editando ${player?.nombre || player?.name || 'jugador'}`);
@@ -139,7 +209,7 @@ async function searchByTeam(ev){
   const category = $('#teamCategory').value;
   const team = $('#teamSearch').value.trim();
   if (!team) {
-    toast('Ingresá un equipo');
+    toast('Elegí un equipo');
     return;
   }
   try {
@@ -171,7 +241,7 @@ async function savePlayer(ev){
       body: form,
     });
     const player = data.player || {};
-    fillForm(player);
+    await fillForm(player);
     renderPlayers(data.associations || (player.id ? [player] : []));
     toast('Jugador guardado');
   } catch (err) {
@@ -244,6 +314,9 @@ $('#teamSearchForm')?.addEventListener('submit', searchByTeam);
 $('#playerForm')?.addEventListener('submit', savePlayer);
 $('#btnClearForm')?.addEventListener('click', clearForm);
 $('#btnCloseHistory')?.addEventListener('click', () => $('#historyDialog')?.close());
+$('#playerCategory')?.addEventListener('change', () => refreshPlayerTeams());
+$('#teamCategory')?.addEventListener('change', () => refreshSearchTeams());
 
 clearForm();
+refreshSearchTeams();
 renderPlayers([]);

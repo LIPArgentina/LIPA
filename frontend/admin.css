@@ -42,6 +42,7 @@ body{ margin:0; background:var(--bg); color:var(--text);
 /* Layout de dos columnas */
 .grid-2{ display:grid; grid-template-columns: 1fr minmax(520px, 640px); gap:16px; align-items:start; }
 @media (max-width: 1000px){ .grid-2{ grid-template-columns: 1fr; } }
+.teams-admin-layout{ display:block; }
 
 .card{ background:var(--panel); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
 .card-header{ padding:16px 18px; border-bottom:1px solid var(--border-2); }

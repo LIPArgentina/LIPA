@@ -377,7 +377,9 @@ function normalizePlayerFormValue(value){
 }
 
 function buildPlayersUI(values){
-  const cont = $('#players'); cont.innerHTML = '';
+  const cont = $('#players');
+  if (!cont) return;
+  cont.innerHTML = '';
   const arr = (values || []).map(normalizePlayerFormValue).slice(0,SLOTS);
   while(arr.length < SLOTS) arr.push({ name: '', dni: '', fechaNacimiento: '' });
 
@@ -430,7 +432,9 @@ function setCurrentValues(arr){
 function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
 function fillTeamSelect(){
-  const sel = $('#teamSelect'); sel.innerHTML = '';
+  const sel = $('#teamSelect');
+  if (!sel) return;
+  sel.innerHTML = '';
   teamsInDiv.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t.slug; opt.textContent = t.name;
@@ -846,13 +850,6 @@ function importTeamsTable(items){
   teamsInDiv = users
     .filter(item => item.username)
     .map(item => ({ id: item.id, name: item.username, slug: item.slug || slugify(item.username) }));
-  fillTeamSelect();
-  if (teamsInDiv[0]?.slug) {
-    $('#teamSelect').value = teamsInDiv[0].slug;
-    changeTeam();
-  } else {
-    buildPlayersUI(Array(SLOTS).fill(''));
-  }
   toast('Tabla importada. Revisá y guardá para actualizar la DB.');
 }
 
@@ -921,17 +918,19 @@ async function loadDivision(div){
     slug: u.slug || slugify(u.username)
   }));
 
-  fillTeamSelect();
+  if ($('#teamSelect')) {
+    fillTeamSelect();
 
-  const last = getLast();
-  const fallback = teamsInDiv[0]?.slug || '';
-  const wantSlug = (last.division === div && last.team) ? last.team : fallback;
+    const last = getLast();
+    const fallback = teamsInDiv[0]?.slug || '';
+    const wantSlug = (last.division === div && last.team) ? last.team : fallback;
 
-  if (wantSlug) {
-    $('#teamSelect').value = wantSlug;
-    await changeTeam();
-  } else {
-    buildPlayersUI(Array(SLOTS).fill(''));
+    if (wantSlug) {
+      $('#teamSelect').value = wantSlug;
+      await changeTeam();
+    } else {
+      buildPlayersUI(Array(SLOTS).fill(''));
+    }
   }
 }
 
