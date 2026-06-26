@@ -588,10 +588,40 @@ function openFlyerAldoModal() {
   });
 }
 
+function setupDialogOpener(dialogId, openButtonId) {
+  const dlg = document.getElementById(dialogId);
+  if (!dlg) return;
+
+  const openBtn = openButtonId ? document.getElementById(openButtonId) : null;
+  const closeBtn = dlg.querySelector(".flyer-popup__close");
+  const closeModal = () => dlg.close?.();
+  const openModal = () => {
+    const socialDlg = document.getElementById("socialFollowModal");
+    if (socialDlg?.open) socialDlg.close();
+
+    requestAnimationFrame(() => {
+      if (typeof dlg.showModal === "function" && !dlg.open) {
+        dlg.showModal();
+      }
+    });
+  };
+
+  openBtn?.addEventListener("click", openModal);
+  closeBtn?.addEventListener("click", closeModal);
+
+  dlg.addEventListener("click", (event) => {
+    if (event.target === dlg) closeModal();
+  });
+
+  dlg.addEventListener("cancel", () => closeModal());
+
+  return openModal;
+}
+
 function setupSocialFollowModal() {
   const dlg = document.getElementById("socialFollowModal");
   if (!dlg) return;
-  if (new URLSearchParams(location.search).get("popup") === "aldo") return;
+  if (new URLSearchParams(location.search).has("popup")) return;
 
   const closeBtn = dlg.querySelector(".social-follow-modal__close");
   const closeModal = () => dlg.close?.();
@@ -613,21 +643,15 @@ function setupSocialFollowModal() {
 
 function setupFlyerAldoModal() {
   const params = new URLSearchParams(location.search);
-  const dlg = document.getElementById("flyerAldoModal");
-  if (!dlg) return;
-
-  const closeBtn = dlg.querySelector(".flyer-popup__close");
-  const closeModal = () => dlg.close?.();
-
-  closeBtn?.addEventListener("click", closeModal);
-
-  dlg.addEventListener("click", (event) => {
-    if (event.target === dlg) closeModal();
-  });
-
-  dlg.addEventListener("cancel", () => closeModal());
+  setupDialogOpener("flyerAldoModal");
 
   if (params.get("popup") === "aldo") openFlyerAldoModal();
+}
+
+function setupInscripcionSuperligaModal() {
+  const params = new URLSearchParams(location.search);
+  const openModal = setupDialogOpener("inscripcionSuperligaModal", "btnInscripcionSuperliga");
+  if (params.get("popup") === "inscripcion" && openModal) openModal();
 }
 
 function setupBannerPopupLinks() {
@@ -651,6 +675,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadBannerForHome();
   startPublicStats();
   setupFlyerAldoModal();
+  setupInscripcionSuperligaModal();
   setupBannerPopupLinks();
   setupSocialFollowModal();
 });

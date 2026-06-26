@@ -50,10 +50,16 @@
 
     <div id="bannerDots" class="banner-dots"></div>
 
-    <a class="btn btn-lg btn-video-replay" href="./videos/videos.html">
-      <img class="btn-video-replay__icon" src="./assets/live-tv-icon.png" alt="" aria-hidden="true">
-      <span>Reviví los encuentros del live de la Gran Final Única</span>
-    </a>
+    <div class="featured-actions">
+      <a class="btn btn-lg btn-video-replay" href="./videos/videos.html">
+        <img class="btn-video-replay__icon" src="./assets/live-tv-icon.png" alt="" aria-hidden="true">
+        <span>Reviví los encuentros del live de la Gran Final Única</span>
+      </a>
+
+      <button id="btnInscripcionSuperliga" class="btn btn-lg btn-video-replay" type="button">
+        <span>Inscripción de equipos para la 6ta edición de la Superliga</span>
+      </button>
+    </div>
 
     <div class="cta-grid">
       <a class="btn btn-lg btn-cta" href="./primera.html">Primera</a>
@@ -173,6 +179,19 @@
       >
         Consultas y reservas por WhatsApp
       </a>
+    </div>
+  </dialog>
+
+  <dialog id="inscripcionSuperligaModal" class="flyer-popup" aria-labelledby="inscripcionSuperligaTitle">
+    <div class="flyer-popup__panel">
+      <button type="button" class="flyer-popup__close" aria-label="Cerrar comunicado">&times;</button>
+
+      <h2 id="inscripcionSuperligaTitle" class="flyer-popup__title">Inscripción de equipos para la 6ta edición de la Superliga</h2>
+      <img
+        class="flyer-popup__image"
+        src="./assets/comunicado-inscripcion.png"
+        alt="Comunicado oficial sobre inscripción de equipos para la 6ta edición de la Superliga."
+      >
     </div>
   </dialog>
 

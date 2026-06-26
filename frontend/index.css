@@ -111,10 +111,18 @@
 }
 
 /* ====== Home – botones de categorías con look admin ====== */
-.btn-video-replay{
+.featured-actions{
   width:min(980px, 100%);
-  min-height:62px;
   margin:1.35rem auto 0;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:14px;
+}
+
+.btn-video-replay{
+  width:100%;
+  min-height:62px;
+  margin:0;
   padding:13px 22px;
   border-radius:14px;
   border:1px solid #8e6a12;
@@ -556,6 +564,13 @@
   .btn-video-replay__icon{
     width:26px;
     height:26px;
+  }
+
+  .featured-actions{
+    width:100%;
+    grid-template-columns:1fr;
+    gap:.6rem;
+    margin-top:1rem;
   }
 
   .social-follow-modal{
