@@ -65,33 +65,16 @@ body {
   }
   .btn-logout:hover{ background: rgba(255,255,255,.08); }
 
-  .main-container { display: flex; gap: 50px; }
+  .main-container { display: grid; grid-template-columns: minmax(260px, 320px) minmax(250px, auto) minmax(250px, auto); gap: 24px; align-items:start; }
   h2 { text-align: center; margin-bottom: 10px; color: #ffef5e; }
   .group-title { text-align: center; margin: 0px 0 0px; color: #ffef5e; font-weight: bold; }
   .jugadores-container { display: flex; flex-direction: column; gap: 6px; }
   .fila { display: flex; align-items: center; cursor: grab; }
+  .fila.is-selected .jugador{ outline:2px solid #4cd964; box-shadow:0 0 0 3px rgba(76,217,100,.18); }
   .numero { width: 20px; height: 20px; background-color: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-right: 5px; flex-shrink: 0; color: black; }
   .jugador { background-color: #ffef5e; border-radius: 5px; height: 20px; min-width: 220px; padding: 0 10px; display: flex; align-items: center; font-size: 12px; overflow: hidden; white-space: nowrap; color: black; }
   .fila-capitan .numero{ width:28px; background:#ffd966; font-weight:900; }
   .fila-capitan .jugador{ background:#f5d36b; font-weight:800; }
-  .player-edit-btn{
-    width:24px;
-    height:22px;
-    margin-left:6px;
-    border-radius:6px;
-    border:1px solid #b28900;
-    background:#151518;
-    color:#ffd966;
-    font-size:12px;
-    font-weight:900;
-    cursor:pointer;
-    display:none;
-    align-items:center;
-    justify-content:center;
-    flex-shrink:0;
-  }
-  .fila.has-player .player-edit-btn{ display:inline-flex; }
-  .player-edit-btn:hover{ background:#222; }
   .extra-column { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .group-container { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 250px; }
   .fila-extra { display: flex; align-items: center; margin-bottom: 1px; }
@@ -140,12 +123,33 @@ body {
   #trash.over { transform: scale(1.1); box-shadow: 0 0 10px #fff; }
 
 /* --- Recuadre de columnas y botón abajo --- */
-.jugadores-container, .extra-column{
+.jugadores-container, .extra-column, .player-card-panel{
   border:1px solid #ffffff22;
   border-radius:12px;
   padding:12px;
   background:#0f0f11;
   box-shadow:0 10px 24px rgba(0,0,0,.35);
+}
+.player-card-panel{
+  position:sticky;
+  top:12px;
+}
+.player-card-form{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.player-card-form h2{
+  margin-top:0;
+}
+.player-card-save{
+  width:100%;
+  margin-top:12px;
+}
+.player-card-save:disabled,
+.field__control:disabled{
+  opacity:.55;
+  cursor:not-allowed;
 }
 .extra-column .send-wrap{ margin-top:16px; display:flex; justify-content:center; }
 .btn-enviar{
@@ -254,9 +258,6 @@ dialog.modal { padding: 0 !important; }
 /* Centrar y limitar tamaño del modal */
   dialog#passModal { position: fixed; inset: 0; margin: auto; transform: none; max-height: 90vh; overflow: auto; }
   dialog#passModal::backdrop { background: rgba(0,0,0,.55); }
-  dialog#playerCardModal { position: fixed; inset: 0; margin: auto; transform: none; max-height: 92vh; overflow: auto; }
-  dialog#playerCardModal::backdrop { background: rgba(0,0,0,.62); }
-  .player-card-modal{ width:min(94vw, 440px) !important; }
   .player-card-photo{
     width:130px;
     height:130px;
@@ -267,6 +268,7 @@ dialog.modal { padding: 0 !important; }
     display:grid;
     place-items:center;
     margin-bottom:14px;
+    align-self:center;
   }
   .player-card-photo img{
     width:100%;
@@ -308,15 +310,20 @@ dialog.modal { padding: 0 !important; }
 
   .main-container{
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 1fr;
     gap: 8px;
     align-items: start;
     padding-inline: 8px;
     padding-bottom: 8px;
   }
 
+  .player-card-panel{
+    position:static;
+  }
+
   .jugadores-container,
-  .extra-column{
+  .extra-column,
+  .player-card-panel{
     min-width: 0;
     width: 100%;
     padding: 8px;
@@ -324,7 +331,8 @@ dialog.modal { padding: 0 !important; }
   }
 
   .jugadores-container h2,
-  .extra-column h2{
+  .extra-column h2,
+  .player-card-panel h2{
     font-size: 14px;
     margin: 0 0 8px;
   }

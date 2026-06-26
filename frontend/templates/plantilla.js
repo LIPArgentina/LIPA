@@ -198,21 +198,44 @@ async function fetchWithAuth(url, options = {}) {
     if (ok) ok.style.display = 'none';
   }
 
+  function setPlayerCardEnabled(enabled){
+    ['playerCardDni', 'playerCardBirth', 'playerCardPhoto', 'btnSavePlayerCard'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) el.disabled = !enabled;
+    });
+  }
+
+  function markSelectedPlayer(playerId){
+    document.querySelectorAll('.jugadores-container .fila').forEach(function(row){
+      row.classList.toggle('is-selected', Boolean(playerId) && String(row.dataset.playerId || '') === String(playerId));
+    });
+  }
+
   function openPlayerCardEditor(playerId, fallbackName){
     var player = findPlayer(playerId, fallbackName);
+    resetPlayerCardMessages();
+
     if (!player || !player.id) {
-      if (typeof showAlert === 'function') showAlert('Ese jugador todavía no tiene ficha editable.');
+      document.getElementById('playerCardId').value = '';
+      document.getElementById('playerCardName').value = fallbackName || '';
+      document.getElementById('playerCardDni').value = '';
+      document.getElementById('playerCardBirth').value = '';
+      document.getElementById('playerCardPhoto').value = '';
+      document.getElementById('playerCardPreview').src = '../logo_liga.png';
+      setPlayerCardEnabled(false);
+      markSelectedPlayer('');
+      showPlayerCardError('Ese jugador todavía no tiene ficha editable en la base.');
       return;
     }
 
-    resetPlayerCardMessages();
     document.getElementById('playerCardId').value = player.id || '';
     document.getElementById('playerCardName').value = player.name || player.nombre || '';
     document.getElementById('playerCardDni').value = player.dni || '';
     document.getElementById('playerCardBirth').value = player.fechaNacimiento || player.fecha_nacimiento || player.birthDate || '';
     document.getElementById('playerCardPhoto').value = '';
     document.getElementById('playerCardPreview').src = playerPhotoSrc(player);
-    document.getElementById('playerCardModal')?.showModal();
+    setPlayerCardEnabled(true);
+    markSelectedPlayer(player.id || '');
   }
 
   async function savePlayerCard(ev){
@@ -249,6 +272,7 @@ async function fetchWithAuth(url, options = {}) {
 
       var updated = findPlayer(id, '');
       document.getElementById('playerCardPreview').src = playerPhotoSrc(updated || data.player || null);
+      if (updated || data.player) openPlayerCardEditor(id, '');
       showPlayerCardSuccess();
     } catch (err) {
       showPlayerCardError(err.message || 'No se pudo guardar');
@@ -262,10 +286,8 @@ async function fetchWithAuth(url, options = {}) {
       var file = this.files?.[0];
       if (file) document.getElementById('playerCardPreview').src = URL.createObjectURL(file);
     });
-    document.getElementById('btnCancelPlayerCard')?.addEventListener('click', function(){
-      document.getElementById('playerCardModal')?.close();
-    });
     document.getElementById('playerCardForm')?.addEventListener('submit', savePlayerCard);
+    setPlayerCardEnabled(false);
   });
 })();
 
@@ -710,24 +732,16 @@ trash.addEventListener('drop', e => {
     if (typeof player === 'string') return player;
     return player && (player.name || player.nombre) || '';
   }
-  function ensureEditButton(row){
-    var existing = row.querySelector('.player-edit-btn');
-    if (existing) return existing;
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'player-edit-btn';
-    btn.textContent = '✎';
-    btn.title = 'Editar ficha';
-    btn.setAttribute('aria-label', 'Editar ficha del jugador');
-    btn.addEventListener('click', function(ev){
-      ev.preventDefault();
-      ev.stopPropagation();
+  function wirePlayerSelection(row){
+    if (row.dataset.selectionReady === '1') return;
+    row.dataset.selectionReady = '1';
+    row.addEventListener('click', function(ev){
+      var name = row.querySelector('.jugador')?.textContent || '';
+      if (!name.trim()) return;
       if (typeof window.openPlayerCardEditor === 'function') {
-        window.openPlayerCardEditor(row.dataset.playerId || '', row.querySelector('.jugador')?.textContent || '');
+        window.openPlayerCardEditor(row.dataset.playerId || '', name);
       }
     });
-    row.appendChild(btn);
-    return btn;
   }
   function fillCapitanes(){
     var captains = Array.isArray(window.LPI_CAPTAINS) ? window.LPI_CAPTAINS : [];
@@ -749,7 +763,7 @@ trash.addEventListener('drop', e => {
       if (div) div.textContent = name;
       row.dataset.playerId = player && typeof player === 'object' && player.id ? String(player.id) : '';
       row.classList.toggle('has-player', Boolean(name));
-      ensureEditButton(row);
+      wirePlayerSelection(row);
     });
   }
   window.fillJugadores = fillJugadores;
