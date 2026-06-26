@@ -40,6 +40,7 @@ module.exports = function createTeamPlayersRouter() {
     `);
 
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS equipo_id INTEGER`);
+    await client.query(`ALTER TABLE jugadores ALTER COLUMN equipo_id DROP NOT NULL`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS dorsal TEXT`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS orden INTEGER`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS dni TEXT`);
