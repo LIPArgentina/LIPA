@@ -391,27 +391,43 @@ async function saveTeams(){
 /* ====== Panel derecho (plantel) ====== */
 let teamsInDiv = []; // [{ id, name, slug }]
 
+function normalizePlayerFormValue(value){
+  if (typeof value === 'string') {
+    return { name: value.trim(), dni: '', fechaNacimiento: '' };
+  }
+
+  return {
+    id: value?.id || null,
+    name: String(value?.name || value?.nombre || '').trim(),
+    dni: String(value?.dni || '').replace(/\D/g, ''),
+    fechaNacimiento: String(value?.fechaNacimiento || value?.birthDate || value?.fecha_nacimiento || '').slice(0, 10)
+  };
+}
+
 function buildPlayersUI(values){
   const cont = $('#players'); cont.innerHTML = '';
-  const arr = (values || []).slice(0,SLOTS);
-  while(arr.length < SLOTS) arr.push('');
+  const arr = (values || []).map(normalizePlayerFormValue).slice(0,SLOTS);
+  while(arr.length < SLOTS) arr.push({ name: '', dni: '', fechaNacimiento: '' });
 
   arr.forEach((val, idx) => {
+    const player = normalizePlayerFormValue(val);
     const row = document.createElement('div');
     row.className = 'player-row';
     row.innerHTML = `
       <div class="pill">${idx+1}</div>
-      <input class="input" type="text" placeholder="Nombre y apellido" value="${(val||'').replace(/"/g,'&quot;')}" />
+      <input class="input player-name" type="text" placeholder="Nombre y apellido" value="${escapeHtml(player.name)}" />
+      <input class="input player-dni" type="text" inputmode="numeric" placeholder="DNI" value="${escapeHtml(player.dni)}" />
+      <input class="input player-birth" type="date" value="${escapeHtml(player.fechaNacimiento)}" />
       <button class="btn-del" type="button">Eliminar</button>
     `;
-    const input = row.querySelector('.input');
+    const inputs = row.querySelectorAll('.input');
     const del   = row.querySelector('.btn-del');
 
-    input.addEventListener('input', debounce(saveDraftNow, 150));
+    inputs.forEach(input => input.addEventListener('input', debounce(saveDraftNow, 150)));
     del.addEventListener('click', () => {
       const vals = getCurrentValues();
       vals.splice(idx,1);
-      while(vals.length < SLOTS) vals.push('');
+      while(vals.length < SLOTS) vals.push({ name: '', dni: '', fechaNacimiento: '' });
       setCurrentValues(vals);
       saveDraftNow();
     });
@@ -419,10 +435,25 @@ function buildPlayersUI(values){
     cont.appendChild(row);
   });
 }
-function getCurrentValues(){ return $$('#players .input').map(i => i.value.trim()); }
+function getCurrentValues(){
+  return $$('#players .player-row').map(row => ({
+    name: row.querySelector('.player-name')?.value.trim() || '',
+    dni: row.querySelector('.player-dni')?.value.replace(/\D/g, '').trim() || '',
+    fechaNacimiento: row.querySelector('.player-birth')?.value || ''
+  }));
+}
 function setCurrentValues(arr){
-  const inputs = $$('#players .input');
-  for(let i=0;i<inputs.length;i++){ inputs[i].value = (arr[i]||''); }
+  const rows = $$('#players .player-row');
+  for(let i=0;i<rows.length;i++){
+    const player = normalizePlayerFormValue(arr[i] || {});
+    const row = rows[i];
+    const name = row.querySelector('.player-name');
+    const dni = row.querySelector('.player-dni');
+    const birth = row.querySelector('.player-birth');
+    if (name) name.value = player.name || '';
+    if (dni) dni.value = player.dni || '';
+    if (birth) birth.value = player.fechaNacimiento || '';
+  }
 }
 function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
@@ -453,8 +484,9 @@ function importPlayersFromTextarea(){
     .split(/\r?\n|;/)
     .map(s => s.replace(/^\s*\d+[.)-]?\s*/, '').trim())
     .filter(Boolean)
+    .map(name => ({ name, dni: '', fechaNacimiento: '' }))
     .slice(0, SLOTS);
-  const vals = items.concat(Array(Math.max(0, SLOTS - items.length)).fill(''));
+  const vals = items.concat(Array(Math.max(0, SLOTS - items.length)).fill(null).map(() => ({ name: '', dni: '', fechaNacimiento: '' })));
   setCurrentValues(vals);
   saveDraftNow();
   refreshDraftButtons();
@@ -464,14 +496,20 @@ function importPlayersFromTextarea(){
 function exportRoster(){
   const teamSlug = getSelectedTeamSlug();
   const teamName = (teamsInDiv.find(t => t.slug === teamSlug)?.name) || teamSlug || 'equipo';
-  const players = getCurrentValues().filter(Boolean);
+  const players = getCurrentValues().filter(item => item.name);
 
   if (!players.length){
     toast('No hay jugadores para exportar');
     return;
   }
 
-  const lines = players.map((name, idx) => `${idx + 1}. ${name}`);
+  const lines = players.map((player, idx) => {
+    const extra = [
+      player.dni ? `DNI ${player.dni}` : '',
+      player.fechaNacimiento ? `Nac. ${player.fechaNacimiento}` : ''
+    ].filter(Boolean).join(' - ');
+    return `${idx + 1}. ${player.name}${extra ? ` (${extra})` : ''}`;
+  });
   const content = lines.join('\n');
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -521,21 +559,25 @@ async function loadPlayersForTeam(slug){
 
     const data = await r.json();
 
+    if (Array.isArray(data.playerDetails)) {
+      return data.playerDetails.map(normalizePlayerFormValue).slice(0, SLOTS);
+    }
+
     if (Array.isArray(data.players)) {
-      return data.players.slice(0, SLOTS);
+      return data.players.map(normalizePlayerFormValue).slice(0, SLOTS);
     }
   } catch (e) {
     console.warn('loadPlayersForTeam', e);
   }
 
-  return Array(SLOTS).fill('');
+  return Array(SLOTS).fill(null).map(() => ({ name: '', dni: '', fechaNacimiento: '' }));
 }
 
 /* === Cambio de equipo (async) === */
 async function changeTeam(){
   const teamSlug = $('#teamSelect').value;
   let vals = await loadPlayersForTeam(teamSlug);
-  while (vals.length < SLOTS) vals.push('');
+  while (vals.length < SLOTS) vals.push({ name: '', dni: '', fechaNacimiento: '' });
   buildPlayersUI(vals);
   refreshDraftButtons();
   setLast(_activeDiv, teamSlug);
@@ -548,7 +590,7 @@ function saveDraftNow(){
 async function saveRoster(){
   const teamSlug = $('#teamSelect').value;
   const teamName = (teamsInDiv.find(t=>t.slug===teamSlug)?.name) || teamSlug;
-  const players  = getCurrentValues().slice(0,SLOTS);
+  const players  = getCurrentValues().slice(0,SLOTS).filter(item => item.name);
   try{
     const resp = await fetch(`${API_BASE}/api/save-team-assets`, {
       method:'POST',

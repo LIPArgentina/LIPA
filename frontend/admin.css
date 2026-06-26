@@ -40,7 +40,7 @@ body{ margin:0; background:var(--bg); color:var(--text);
 .sw:active{ transform:translateY(1px); } .sw.active{ opacity:1; }
 
 /* Layout de dos columnas */
-.grid-2{ display:grid; grid-template-columns: 1fr 420px; gap:16px; align-items:start; }
+.grid-2{ display:grid; grid-template-columns: 1fr minmax(520px, 640px); gap:16px; align-items:start; }
 @media (max-width: 1000px){ .grid-2{ grid-template-columns: 1fr; } }
 
 .card{ background:var(--panel); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
@@ -69,7 +69,9 @@ thead th:nth-child(5), tbody td:nth-child(5){width:150px;}
 select{ width:100%; background:#0f1116; color:var(--white); border:1px solid var(--input-border);
         border-radius:10px; padding:10px 12px; font-weight:700; outline:none }
 .players{ margin-top:6px; display:flex; flex-direction:column; gap:10px }
-.player-row{ display:grid; grid-template-columns:42px 1fr 96px; align-items:center; gap:10px }
+.player-row{ display:grid; grid-template-columns:42px minmax(160px,1fr) 100px 142px 96px; align-items:center; gap:10px }
+.player-dni,
+.player-birth{ min-width:0; }
 .pill{ width:25px; height:25px; border-radius:5px; background:#fff; color:#000;
        display:grid; place-items:center; font-weight:900 }
 .btn-del{ border:1px solid var(--border-2); background:#1a1a1a; color:#d6d6d6; border-radius:18px;
@@ -379,6 +381,18 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
     grid-template-columns: 1fr;
   }
   .btn-copy-pass{
+    width:100%;
+  }
+  .player-row{
+    grid-template-columns:32px 1fr;
+  }
+  .player-row .player-name,
+  .player-row .player-dni,
+  .player-row .player-birth{
+    grid-column:2;
+  }
+  .player-row .btn-del{
+    grid-column:2;
     width:100%;
   }
 }
