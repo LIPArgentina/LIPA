@@ -97,7 +97,53 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_equipos_equipo ON jugador_equipos (equipo_id, categoria, activo)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_equipos_jugador ON jugador_equipos (jugador_id)`);
 
+    await migrateLegacyPlayers(client);
     schemaReady = true;
+  }
+
+  async function migrateLegacyPlayers(client) {
+    const legacy = await client.query(`
+      SELECT
+        j.id,
+        j.equipo_id,
+        j.nombre,
+        j.dni,
+        j.fecha_nacimiento,
+        j.orden,
+        e.division
+      FROM jugadores j
+      JOIN equipos e ON e.id = j.equipo_id
+      WHERE j.equipo_id IS NOT NULL
+      ORDER BY j.id ASC
+    `);
+
+    for (const row of legacy.rows) {
+      const name = String(row.nombre || '').trim();
+      const normalizedName = normalizeText(name);
+      if (!row.id || !row.equipo_id || !name || !normalizedName) continue;
+
+      await client.query(
+        `UPDATE jugadores
+            SET nombre_normalizado = COALESCE(NULLIF(nombre_normalizado, ''), $1),
+                updated_at = NOW()
+          WHERE id = $2`,
+        [normalizedName, row.id]
+      );
+
+      await client.query(
+        `INSERT INTO jugador_equipos
+           (jugador_id, equipo_id, categoria, activo, orden, created_at, updated_at)
+         SELECT $1, $2, $3, true, $4, NOW(), NOW()
+         WHERE NOT EXISTS (
+           SELECT 1
+             FROM jugador_equipos
+            WHERE jugador_id = $1
+              AND equipo_id = $2
+              AND categoria = $3
+         )`,
+        [row.id, row.equipo_id, row.division || 'sin_categoria', row.orden]
+      );
+    }
   }
 
   async function resolveTeam(rawValue, category = '') {
