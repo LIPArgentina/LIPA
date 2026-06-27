@@ -490,6 +490,25 @@ function showAlert(msg) {
   setTimeout(() => alertBox.style.display = 'none', 2000);
 }
 
+function showSendError(msg) {
+  const dialog = document.getElementById('sendErrorDialog');
+  const message = document.getElementById('sendErrorMessage');
+  const accept = document.getElementById('sendErrorAccept');
+  const text = msg || 'Hubo un error al enviar la planilla. Intentá nuevamente.';
+
+  if (!dialog || !message || !accept || typeof dialog.showModal !== 'function') {
+    if (typeof showAlert === 'function') showAlert(text);
+    return;
+  }
+
+  message.textContent = text;
+  accept.onclick = function(){
+    dialog.close();
+  };
+
+  if (!dialog.open) dialog.showModal();
+}
+
 function showToastOK(msg){
 const prevBg = alertBox.style.background;
 const prevBorder = alertBox.style.border;
@@ -1073,14 +1092,14 @@ function collectPlanillaPayload(){
 
 async function savePlanilla(){
     if (window.__LPI_PLANILLA_SEND_ENABLED__ === false) {
-      if (typeof showAlert === 'function') showAlert('La carga de planilla está cerrada mientras los cruces estén habilitados.');
+      if (typeof showSendError === 'function') showSendError('La carga de planilla está cerrada mientras los cruces estén habilitados.');
       return { ok:false, blocked:true };
     }
 
     const payloadObj = collectPlanillaPayload();
 
     if (!planillaHasAnyPlayer(payloadObj)) {
-      if (typeof showAlert === 'function') showAlert('No se puede enviar una planilla totalmente vacía.');
+      if (typeof showSendError === 'function') showSendError('No se puede enviar una planilla totalmente vacía.');
       return { ok:false, empty:true };
     }
 
@@ -1095,18 +1114,18 @@ async function savePlanilla(){
         const t = await r.text().catch(()=> '');
         let msg = t || ('HTTP ' + r.status);
         try { const j = JSON.parse(t); if (j && (j.msg || j.error)) msg = j.msg || j.error; } catch(_) {}
-        if (typeof showAlert === 'function') showAlert('No se pudo guardar la planilla: ' + msg);
+        if (typeof showSendError === 'function') showSendError('No se pudo enviar la planilla: ' + msg);
         return { ok:false };
       }
       const json = await r.json().catch(() => ({}));
       if (json && json.ok) {
         if (typeof showToastOK === 'function') showToastOK('Enviada correctamente');
       } else {
-        if (typeof showAlert === 'function') showAlert('No se pudo guardar la planilla.');
+        if (typeof showSendError === 'function') showSendError('No se pudo enviar la planilla. Intentá nuevamente.');
       }
       return json;
     } catch (e) {
-      if (typeof showAlert === 'function') showAlert('Error de red al guardar la planilla.');
+      if (typeof showSendError === 'function') showSendError('Error de red al enviar la planilla. Revisá la conexión e intentá nuevamente.');
       return { ok:false, error: String((e && e.message) || e) };
     }
   }
@@ -2130,8 +2149,8 @@ document.addEventListener("DOMContentLoaded", function () {
       if (btnEnviar.disabled || window.__LPI_PLANILLA_SEND_ENABLED__ === false){
         ev.preventDefault();
         ev.stopPropagation();
-        if (typeof showAlert === 'function') {
-          showAlert('La carga de planilla está deshabilitada por el administrador.');
+        if (typeof showSendError === 'function') {
+          showSendError('La carga de planilla está deshabilitada por el administrador.');
         }
       }
     }, true);

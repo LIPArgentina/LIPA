@@ -22,6 +22,16 @@
 <div class="header-actions" id="headerActions"></div>
 </header>
 <div id="alert"></div>
+<dialog class="send-error-dialog" id="sendErrorDialog" aria-labelledby="sendErrorTitle">
+<div class="send-error-panel">
+<div class="send-error-icon" aria-hidden="true">!</div>
+<div class="send-error-copy">
+<h3 id="sendErrorTitle">Error al enviar</h3>
+<p id="sendErrorMessage">Hubo un error al enviar la planilla. Intentá nuevamente.</p>
+</div>
+<button class="send-error-accept" id="sendErrorAccept" type="button">Aceptar</button>
+</div>
+</dialog>
 <div class="main-container">
 <!-- Ficha editable del jugador seleccionado -->
 <aside class="player-card-panel" aria-label="Ficha del jugador seleccionado">
