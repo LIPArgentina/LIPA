@@ -101,6 +101,23 @@ function ensureConsultasButton() {
   btn.removeAttribute("href");
 }
 
+function ensureJugadoresViewButton() {
+  const btn = document.getElementById("btnJugadoresView");
+  if (!btn) return;
+
+  btn.classList.add("btn", "btn-outline", "btn-sm");
+  btn.style.textDecoration = "none";
+
+  if (isAdmin()) {
+    btn.href = "./jugadores/jugadores_view.html";
+    btn.classList.remove("hidden");
+    return;
+  }
+
+  btn.classList.add("hidden");
+  btn.removeAttribute("href");
+}
+
 function redirectAfterLogin() {
   const sess = readSession();
   const role = (sess?.role || "").toLowerCase();
@@ -134,6 +151,7 @@ function setupAuthBridge() {
     if (data.type === "lpi:auth-success") {
       ensureManageTeamButton();
       ensureConsultasButton();
+      ensureJugadoresViewButton();
       redirectAfterLogin();
     }
   });
@@ -142,18 +160,21 @@ function setupAuthBridge() {
     if (event.key === "lpi.session" && event.newValue) {
       ensureManageTeamButton();
       ensureConsultasButton();
+      ensureJugadoresViewButton();
     }
   });
 
   window.addEventListener("login:success", () => {
     ensureManageTeamButton();
     ensureConsultasButton();
+    ensureJugadoresViewButton();
     redirectAfterLogin();
   });
 
   window.addEventListener("logout:success", () => {
     ensureManageTeamButton();
     ensureConsultasButton();
+    ensureJugadoresViewButton();
   });
 }
 
@@ -687,6 +708,7 @@ function setupBannerPopupLinks() {
 document.addEventListener("DOMContentLoaded", () => {
   ensureManageTeamButton();
   ensureConsultasButton();
+  ensureJugadoresViewButton();
   setupAuthBridge();
   setupBannerAdmin();
   loadBannerForHome();

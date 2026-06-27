@@ -1,0 +1,26 @@
+.players-view .player-readonly-card .input{
+  cursor:default;
+}
+
+.players-view .photo-box--large{
+  width:168px;
+}
+
+.players-view .player-card{
+  cursor:pointer;
+}
+
+.players-view .player-card.is-selected{
+  border-color:var(--gold-border);
+  box-shadow:0 0 0 2px rgba(255,217,102,.18);
+}
+
+.players-view .player-actions .btn{
+  white-space:nowrap;
+}
+
+@media (max-width: 900px){
+  .players-view .photo-box--large{
+    width:132px;
+  }
+}

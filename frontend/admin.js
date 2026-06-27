@@ -11,6 +11,7 @@
     };
     [
       ['btnJugadoresAdmin', 'jugadores/jugadores_admin.html'],
+      ['btnJugadoresView', 'jugadores/jugadores_view.html'],
       ['btnFixture', 'fixture/fixture.html'],
       ['btnLlaves', 'llaves/llaves.html'],
       ['btnCrucesManual', 'cruces/cruces_manuales.html'],

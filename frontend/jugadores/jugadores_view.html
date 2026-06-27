@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Consulta de jugadores</title>
+  <link rel="stylesheet" href="../admin.css">
+  <link rel="stylesheet" href="jugadores_admin.css">
+  <link rel="stylesheet" href="jugadores_view.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" title="Inicio">
+      <img src="../logo_liga.png" alt="LIPA">
+    </a>
+
+    <div class="top-right-actions">
+      <a class="btn" href="../admin.html" aria-label="Administración">ADMIN</a>
+      <a class="btn" href="../admin.html" aria-label="Volver">VOLVER</a>
+    </div>
+  </header>
+
+  <main class="players-admin players-view">
+    <section class="players-toolbar" aria-label="Búsquedas">
+      <form id="playerSearchForm" class="search-box">
+        <label for="playerSearch">Buscar por jugador o DNI</label>
+        <div class="search-line">
+          <input id="playerSearch" class="input" type="search" placeholder="Nombre, apellido o DNI" autocomplete="off">
+          <button class="btn btn-gold" type="submit">Buscar</button>
+        </div>
+      </form>
+
+      <form id="teamSearchForm" class="search-box">
+        <label for="teamSearch">Buscar por equipo activo</label>
+        <div class="search-line search-line--team">
+          <select id="teamCategory" class="input" aria-label="Categoría">
+            <option value="tercera">3ra</option>
+            <option value="segunda">2da</option>
+            <option value="primera">1ra</option>
+          </select>
+          <select id="teamSearch" class="input" required></select>
+          <button class="btn btn-gold" type="submit">Ver equipo</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="players-layout">
+      <section class="card player-form player-readonly-card">
+        <div class="card-header">
+          <h1 class="title">Ficha</h1>
+        </div>
+        <div class="player-form__body">
+          <div class="photo-box photo-box--large">
+            <img id="photoPreview" src="../logo_liga.png" alt="Foto del jugador">
+          </div>
+
+          <label>Nombre y apellido</label>
+          <input id="playerName" class="input" type="text" readonly>
+
+          <label>DNI</label>
+          <input id="playerDni" class="input" type="text" readonly>
+
+          <label>Fecha de nacimiento</label>
+          <input id="playerBirth" class="input" type="text" readonly>
+
+          <div class="form-grid">
+            <div>
+              <label>Categoría</label>
+              <input id="playerCategory" class="input" type="text" readonly>
+            </div>
+            <div>
+              <label>Equipo</label>
+              <input id="playerTeam" class="input" type="text" readonly>
+            </div>
+          </div>
+
+          <p id="formStatus" class="form-status">Seleccioná un jugador para ver su ficha.</p>
+        </div>
+      </section>
+
+      <section class="card results-card">
+        <div class="card-header">
+          <h2 class="title">Resultados</h2>
+        </div>
+        <div id="results" class="results"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="historyDialog" class="modal">
+    <div class="modal__panel history-panel">
+      <div class="modal__header">
+        <h3>Historial del jugador</h3>
+      </div>
+      <div id="historyBody" class="modal__body"></div>
+      <div class="modal__footer">
+        <button id="btnCloseHistory" class="btn btn-ghost" type="button">Cerrar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="../config.js"></script>
+  <script src="jugadores_view.js"></script>
+</body>
+</html>
