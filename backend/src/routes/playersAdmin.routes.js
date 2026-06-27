@@ -97,7 +97,53 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_equipos_equipo ON jugador_equipos (equipo_id, categoria, activo)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_equipos_jugador ON jugador_equipos (jugador_id)`);
 
+    await migrateLegacyPlayers(client);
     schemaReady = true;
+  }
+
+  async function migrateLegacyPlayers(client) {
+    const legacy = await client.query(`
+      SELECT
+        j.id,
+        j.equipo_id,
+        j.nombre,
+        j.dni,
+        j.fecha_nacimiento,
+        j.orden,
+        e.division
+      FROM jugadores j
+      JOIN equipos e ON e.id = j.equipo_id
+      WHERE j.equipo_id IS NOT NULL
+      ORDER BY j.id ASC
+    `);
+
+    for (const row of legacy.rows) {
+      const name = String(row.nombre || '').trim();
+      const normalizedName = normalizeText(name);
+      if (!row.id || !row.equipo_id || !name || !normalizedName) continue;
+
+      await client.query(
+        `UPDATE jugadores
+            SET nombre_normalizado = COALESCE(NULLIF(nombre_normalizado, ''), $1),
+                updated_at = NOW()
+          WHERE id = $2`,
+        [normalizedName, row.id]
+      );
+
+      await client.query(
+        `INSERT INTO jugador_equipos
+           (jugador_id, equipo_id, categoria, activo, orden, created_at, updated_at)
+         SELECT $1, $2, $3, true, $4, NOW(), NOW()
+         WHERE NOT EXISTS (
+           SELECT 1
+             FROM jugador_equipos
+            WHERE jugador_id = $1
+              AND equipo_id = $2
+              AND categoria = $3
+         )`,
+        [row.id, row.equipo_id, row.division || 'sin_categoria', row.orden]
+      );
+    }
   }
 
   async function resolveTeam(rawValue, category = '') {
@@ -290,6 +336,123 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       const allowedByExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext);
       if (!allowedByMime && !allowedByExt) return cb(new Error('Solo se permiten imágenes JPG, PNG o WebP'));
       cb(null, true);
+    }
+  });
+
+  router.get('/players-public/search', async (req, res) => {
+    try {
+      await ensureSchema();
+      const q = String(req.query.q || '').trim();
+      const dni = normalizeDni(q);
+      const name = normalizeText(q);
+      if (!q || q.length < 2) return res.json({ ok: true, players: [] });
+
+      const result = await pool.query(
+        `
+        SELECT
+          j.id,
+          j.nombre,
+          j.dni,
+          TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
+          j.foto_path,
+          je.id AS association_id,
+          je.categoria,
+          je.activo,
+          e.id AS equipo_id,
+          e.display_name AS equipo,
+          e.slug_uid
+        FROM jugadores j
+        LEFT JOIN jugador_equipos je
+          ON je.jugador_id = j.id
+         AND je.activo = true
+        LEFT JOIN equipos e ON e.id = je.equipo_id
+        WHERE
+          ($1 <> '' AND j.dni ILIKE $1 || '%')
+          OR ($2 <> '' AND j.nombre_normalizado ILIKE '%' || $2 || '%')
+          OR ($3 <> '' AND LOWER(j.nombre) ILIKE '%' || LOWER($3) || '%')
+        ORDER BY j.nombre ASC, je.categoria ASC NULLS LAST
+        LIMIT 80
+        `,
+        [dni, name, q]
+      );
+
+      return res.json({ ok: true, players: result.rows.map(mapPlayer) });
+    } catch (err) {
+      console.error('players-public/search', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  router.get('/players-public/by-team', async (req, res) => {
+    try {
+      await ensureSchema();
+      const category = normalizeCategory(req.query.category || '');
+      const rawTeam = String(req.query.team || '').trim();
+      const team = await resolveTeam(rawTeam, category);
+      if (!team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
+
+      const result = await pool.query(
+        `
+        SELECT
+          j.id,
+          j.nombre,
+          j.dni,
+          TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
+          j.foto_path,
+          je.id AS association_id,
+          je.categoria,
+          je.activo,
+          e.id AS equipo_id,
+          e.display_name AS equipo,
+          e.slug_uid
+        FROM jugador_equipos je
+        JOIN jugadores j ON j.id = je.jugador_id
+        JOIN equipos e ON e.id = je.equipo_id
+        WHERE je.activo = true
+          AND je.equipo_id = $1
+          AND ($2 = '' OR je.categoria = $2)
+        ORDER BY je.orden ASC NULLS LAST, j.nombre ASC
+        `,
+        [team.id, category]
+      );
+
+      return res.json({ ok: true, team, players: result.rows.map(mapPlayer) });
+    } catch (err) {
+      console.error('players-public/by-team', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  router.get('/players-public/history/:id', async (req, res) => {
+    try {
+      await ensureSchema();
+      const playerId = Number(req.params.id);
+      if (!Number.isFinite(playerId)) return res.status(400).json({ ok: false, error: 'ID inválido' });
+
+      const result = await pool.query(
+        `
+        SELECT
+          je.id,
+          je.categoria,
+          je.activo,
+          TO_CHAR(je.desde, 'YYYY-MM-DD') AS desde,
+          TO_CHAR(je.hasta, 'YYYY-MM-DD') AS hasta,
+          TO_CHAR(je.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
+          TO_CHAR(je.updated_at, 'YYYY-MM-DD HH24:MI') AS updated_at,
+          e.display_name AS equipo,
+          e.slug_uid
+        FROM jugador_equipos je
+        JOIN equipos e ON e.id = je.equipo_id
+        WHERE je.jugador_id = $1
+        ORDER BY je.activo DESC, je.desde DESC NULLS LAST, je.id DESC
+        `,
+        [playerId]
+      );
+
+      return res.json({ ok: true, history: result.rows });
+    } catch (err) {
+      console.error('players-public/history', err);
+      return res.status(500).json({ ok: false, error: err.message });
     }
   });
 

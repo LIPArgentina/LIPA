@@ -198,7 +198,7 @@ async function searchPlayers(ev){
     return;
   }
   try {
-    const data = await fetchJson(`/api/players-admin/search?q=${encodeURIComponent(q)}`);
+    const data = await fetchJson(`/api/players-public/search?q=${encodeURIComponent(q)}`);
     renderPlayers(data.players || []);
   } catch (err) {
     renderPlayers([]);
@@ -215,7 +215,7 @@ async function searchByTeam(ev){
     return;
   }
   try {
-    const data = await fetchJson(`/api/players-admin/by-team?category=${encodeURIComponent(category)}&team=${encodeURIComponent(team)}`);
+    const data = await fetchJson(`/api/players-public/by-team?category=${encodeURIComponent(category)}&team=${encodeURIComponent(team)}`);
     renderPlayers(data.players || []);
   } catch (err) {
     renderPlayers([]);
@@ -228,7 +228,7 @@ async function showHistory(player){
   const body = $('#historyBody');
   if (!dialog || !body || !player?.id) return;
   try {
-    const data = await fetchJson(`/api/players-admin/history/${encodeURIComponent(player.id)}`);
+    const data = await fetchJson(`/api/players-public/history/${encodeURIComponent(player.id)}`);
     const history = data.history || [];
     body.innerHTML = history.length ? `
       <table class="history-table">
