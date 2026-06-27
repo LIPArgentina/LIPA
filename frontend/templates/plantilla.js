@@ -163,6 +163,42 @@ async function fetchWithAuth(url, options = {}) {
     return '../logo_liga.png';
   }
 
+  function formatBirthForDisplay(value){
+    var raw = String(value || '').trim();
+    var iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return iso[3] + '/' + iso[2] + '/' + iso[1];
+    var display = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (display) return raw;
+    return '';
+  }
+
+  function formatBirthForApi(value){
+    var raw = String(value || '').trim();
+    var iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) {
+      var isoDate = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+      if (isoDate.getFullYear() === Number(iso[1]) && isoDate.getMonth() === Number(iso[2]) - 1 && isoDate.getDate() === Number(iso[3])) return raw;
+      return '';
+    }
+    var display = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!display) return '';
+    var day = Number(display[1]);
+    var month = Number(display[2]);
+    var year = Number(display[3]);
+    var date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return '';
+    return display[3] + '-' + display[2] + '-' + display[1];
+  }
+
+  function normalizeBirthTyping(input){
+    var digits = String(input.value || '').replace(/\D/g, '').slice(0, 8);
+    var parts = [];
+    if (digits.length > 0) parts.push(digits.slice(0, 2));
+    if (digits.length > 2) parts.push(digits.slice(2, 4));
+    if (digits.length > 4) parts.push(digits.slice(4, 8));
+    input.value = parts.join('/');
+  }
+
   function findPlayer(playerId, fallbackName){
     var id = String(playerId || '');
     var name = String(fallbackName || '').trim();
@@ -231,7 +267,7 @@ async function fetchWithAuth(url, options = {}) {
     document.getElementById('playerCardId').value = player.id || '';
     document.getElementById('playerCardName').value = player.name || player.nombre || '';
     document.getElementById('playerCardDni').value = player.dni || '';
-    document.getElementById('playerCardBirth').value = player.fechaNacimiento || player.fecha_nacimiento || player.birthDate || '';
+    document.getElementById('playerCardBirth').value = formatBirthForDisplay(player.fechaNacimiento || player.fecha_nacimiento || player.birthDate || '');
     document.getElementById('playerCardPhoto').value = '';
     document.getElementById('playerCardPreview').src = playerPhotoSrc(player);
     setPlayerCardEnabled(true);
@@ -242,11 +278,11 @@ async function fetchWithAuth(url, options = {}) {
     ev?.preventDefault();
     var id = document.getElementById('playerCardId')?.value || '';
     var dni = document.getElementById('playerCardDni')?.value || '';
-    var birth = document.getElementById('playerCardBirth')?.value || '';
+    var birth = formatBirthForApi(document.getElementById('playerCardBirth')?.value || '');
     var photo = document.getElementById('playerCardPhoto')?.files?.[0] || null;
     if (!id) return showPlayerCardError('Jugador inválido');
     if (!dni.trim()) return showPlayerCardError('El DNI es obligatorio');
-    if (!birth) return showPlayerCardError('La fecha de nacimiento es obligatoria');
+    if (!birth) return showPlayerCardError('Ingresá la fecha como DD/MM/AAAA');
 
     var form = new FormData();
     form.set('id', id);
@@ -285,6 +321,9 @@ async function fetchWithAuth(url, options = {}) {
     document.getElementById('playerCardPhoto')?.addEventListener('change', function(){
       var file = this.files?.[0];
       if (file) document.getElementById('playerCardPreview').src = URL.createObjectURL(file);
+    });
+    document.getElementById('playerCardBirth')?.addEventListener('input', function(){
+      normalizeBirthTyping(this);
     });
     document.getElementById('playerCardForm')?.addEventListener('submit', savePlayerCard);
     setPlayerCardEnabled(false);
