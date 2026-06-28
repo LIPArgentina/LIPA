@@ -692,6 +692,104 @@ function setupInscripcionSuperligaModal() {
   if (params.get("popup") === "inscripcion" && openModal) openModal();
 }
 
+function escapePdfText(value) {
+  return String(value)
+    .normalize("NFC")
+    .replace(/[\\()]/g, "\\$&")
+    .replace(/[^\x20-\xFF]/g, "");
+}
+
+function toLatin1Bytes(value) {
+  const bytes = new Uint8Array(value.length);
+  for (let i = 0; i < value.length; i += 1) {
+    bytes[i] = value.charCodeAt(i) & 0xff;
+  }
+  return bytes;
+}
+
+function buildSimplePdf(lines) {
+  const objects = [];
+  const content = [];
+
+  const addText = (text, x, y, size, font = "F1") => {
+    content.push(`BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(text)}) Tj ET\n`);
+  };
+
+  addText("ASCENSOS LIPA", 72, 780, 22, "F2");
+  addText("Liga Independiente de Pool Argentina", 72, 756, 11, "F1");
+
+  let y = 718;
+  lines.forEach((line) => {
+    if (line.type === "section") {
+      y -= 12;
+      addText(line.text, 72, y, 14, "F2");
+      y -= 22;
+      return;
+    }
+
+    addText(line.text, 88, y, 10.5, "F1");
+    y -= 16;
+  });
+
+  const stream = content.join("");
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  objects.push("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+  objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>");
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}endstream`);
+
+  let pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+  const offsets = [0];
+
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+
+  const xrefStart = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+
+  return toLatin1Bytes(pdf);
+}
+
+function downloadAscensosPdf() {
+  const sections = [...document.querySelectorAll("#ascensosLipaModal [data-ascensos-section]")];
+  const lines = [];
+
+  sections.forEach((section) => {
+    const title = section.querySelector(".ascensos-popup__subtitle")?.textContent?.trim();
+    if (title) lines.push({ type: "section", text: title });
+
+    section.querySelectorAll("li").forEach((item, index) => {
+      const text = item.textContent.trim();
+      lines.push({ type: "item", text: `${index + 1}. ${text}` });
+    });
+  });
+
+  const blob = new Blob([buildSimplePdf(lines)], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "ascensos-lipa.pdf";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function setupAscensosLipaModal() {
+  const params = new URLSearchParams(location.search);
+  const openModal = setupDialogOpener("ascensosLipaModal", "btnAscensosLipa");
+  document.getElementById("btnDownloadAscensosPdf")?.addEventListener("click", downloadAscensosPdf);
+  if (params.get("popup") === "ascensos" && openModal) openModal();
+}
+
 function setupBannerPopupLinks() {
   const bannerEl = document.getElementById("bannerMessage");
   if (!bannerEl) return;
@@ -715,6 +813,7 @@ document.addEventListener("DOMContentLoaded", () => {
   startPublicStats();
   setupFlyerAldoModal();
   setupInscripcionSuperligaModal();
+  setupAscensosLipaModal();
   setupFlyerImageZoom();
   setupBannerPopupLinks();
   setupSocialFollowModal();

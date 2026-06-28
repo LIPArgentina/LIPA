@@ -57,6 +57,10 @@
         <span>Reviví los encuentros del live de la Gran Final Única</span>
       </a>
 
+      <button id="btnAscensosLipa" class="btn btn-lg btn-video-replay" type="button">
+        <span>Ascensos LIPA</span>
+      </button>
+
       <button id="btnInscripcionSuperliga" class="btn btn-lg btn-video-replay" type="button">
         <span>Inscripción de equipos para la 6ta edición de la Superliga</span>
       </button>
@@ -193,6 +197,59 @@
         src="./assets/comunicado-inscripcion.png"
         alt="Comunicado oficial sobre inscripción de equipos para la 6ta edición de la Superliga."
       >
+    </div>
+  </dialog>
+
+  <dialog id="ascensosLipaModal" class="flyer-popup ascensos-popup" aria-labelledby="ascensosLipaTitle">
+    <div class="flyer-popup__panel ascensos-popup__panel">
+      <button type="button" class="flyer-popup__close" aria-label="Cerrar ascensos">&times;</button>
+
+      <h2 id="ascensosLipaTitle" class="ascensos-popup__title">Ascensos LIPA</h2>
+
+      <div class="ascensos-popup__content">
+        <section class="ascensos-popup__section" data-ascensos-section>
+          <h3 class="ascensos-popup__subtitle">Ascensos de 3ra a 2da</h3>
+          <ol class="ascensos-popup__list">
+            <li>DYLAN SIERRA, TRÉBOL PACHECO.</li>
+            <li>MAXIMILIANO SUAREZ, TRÉBOL MORENO.</li>
+            <li>PABLO FERNÁNDEZ, TRÉBOL MORENO.</li>
+            <li>NICOLAS CHAMORRO, TRÉBOL MORENO.</li>
+            <li>ABEL DORADO, LOS PATOS DEL TRÉBOL.</li>
+            <li>JOSÉ ARREGUI, THE CUEST.</li>
+            <li>DIEGO SOTELO, WHY NOT?</li>
+            <li>MIGUEL CRUZ, ANEXO.</li>
+            <li>EZEQUIEL ALCOCER, TRÉBOL MORENO.</li>
+            <li>MATEO VILLARROEL.</li>
+            <li>HECTOR AGUILAR.</li>
+            <li>JUAN CASTILLO (SAN JUAN).</li>
+          </ol>
+        </section>
+
+        <section class="ascensos-popup__section" data-ascensos-section>
+          <h3 class="ascensos-popup__subtitle">Ascensos de 2da a 1ra</h3>
+          <ol class="ascensos-popup__list">
+            <li>ROMAN MIR.</li>
+            <li>MATEO RUARTE (PAJARITO).</li>
+            <li>SERGIO SILVA (BUDY).</li>
+            <li>JULIO CABALLERO.</li>
+            <li>GABRIEL WILSON.</li>
+            <li>ALAN NUÑEZ.</li>
+            <li>CARLOS MANSILLA.</li>
+            <li>CRISTIAN MOYANO.</li>
+            <li>CHARLIE MUÑIZ.</li>
+            <li>GASTON MOLINARI.</li>
+            <li>YONATHAN SOSAYA (YOGURT).</li>
+            <li>ALEXIS SAYAS.</li>
+            <li>HUGO LLANOS.</li>
+            <li>RAMON ISNARDE.</li>
+            <li>WALTER LINARES.</li>
+          </ol>
+        </section>
+      </div>
+
+      <div class="ascensos-popup__footer">
+        <button id="btnDownloadAscensosPdf" class="btn btn-video-replay ascensos-popup__download" type="button">Descargar PDF</button>
+      </div>
     </div>
   </dialog>
 
