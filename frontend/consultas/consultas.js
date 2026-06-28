@@ -169,7 +169,7 @@
     $datalist.innerHTML = '';
     items.forEach((item) => {
       const option = document.createElement('option');
-      option.value = item.name || '';
+      option.value = item.label || item.name || '';
       option.label = item.label || item.name || '';
       $datalist.appendChild(option);
     });

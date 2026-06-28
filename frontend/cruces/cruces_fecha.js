@@ -712,7 +712,8 @@ function apiUrl(path){
             individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(7).fill(''),
             pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['', ''],
             pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['', ''],
-            suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', '']
+            suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', ''],
+            jugadorIds: plan.jugadorIds && typeof plan.jugadorIds === 'object' ? plan.jugadorIds : {}
           };
 
           const rawLookup = buildPlanillaLookupKeys(rawTeam);
@@ -775,7 +776,8 @@ function apiUrl(path){
           individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(7).fill(''),
           pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['', ''],
           pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['', ''],
-          suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', '']
+          suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', ''],
+          jugadorIds: plan.jugadorIds && typeof plan.jugadorIds === 'object' ? plan.jugadorIds : {}
         };
       } catch (e) {
         console.warn('No se pudo cargar planilla desde backend para', key, e);
@@ -803,7 +805,24 @@ function apiUrl(path){
     return wrap;
   }
 
-  function makeRow(num, text, side, includePoints = false, sectionKey = '') {
+  function sectionKeyToPlanKey(sectionKey = '') {
+    const section = String(sectionKey || '').toUpperCase();
+    if (section.includes('CAPIT')) return 'capitan';
+    if (section.includes('INDIVIDUALES')) return 'individuales';
+    if (section.includes('PAREJA 1')) return 'pareja1';
+    if (section.includes('PAREJA 2')) return 'pareja2';
+    if (section.includes('SUPLENTES')) return 'suplentes';
+    return '';
+  }
+
+  function playerIdFromPlanilla(planilla, sectionKey, index) {
+    const key = sectionKeyToPlanKey(sectionKey);
+    const raw = key ? planilla?.jugadorIds?.[key]?.[index] : null;
+    const id = Number(raw);
+    return Number.isFinite(id) && id > 0 ? String(id) : '';
+  }
+
+  function makeRow(num, text, side, includePoints = false, sectionKey = '', playerId = '') {
     const row = document.createElement('div');
     row.className = 'row';
     if (sectionKey) row.dataset.section = sectionKey;
@@ -817,6 +836,7 @@ function apiUrl(path){
     slot.className = 'slot' + (isEmpty ? ' is-empty' : '');
     if (sectionKey) slot.dataset.section = sectionKey;
     slot.dataset.side = side;
+    if (playerId) slot.dataset.playerId = String(playerId);
     if (!isEmpty) {
       slot.setAttribute('data-full', String(text).trim());
       slot.textContent = String(text).trim();
@@ -972,12 +992,12 @@ function apiUrl(path){
 
       const side = rootId.includes('left') ? 'left' : 'right';
       if (sec.includes('PAREJA') && items.length === 2) {
-        div.appendChild(makeRow(1, items[0], side, true, sec));
-        div.appendChild(makeRow(2, items[1], side, false, sec));
+        div.appendChild(makeRow(1, items[0], side, true, sec, playerIdFromPlanilla(planilla, sec, 0)));
+        div.appendChild(makeRow(2, items[1], side, false, sec, playerIdFromPlanilla(planilla, sec, 1)));
       } else {
         const includePts = sec === 'INDIVIDUALES';
         items.forEach((p, i) => {
-          div.appendChild(makeRow(i + 1, p, side, includePts, sec));
+          div.appendChild(makeRow(i + 1, p, side, includePts, sec, playerIdFromPlanilla(planilla, sec, i)));
         });
       }
 
@@ -1169,8 +1189,9 @@ function apiUrl(path){
     document.head.appendChild(style);
   }
 
-  function setSlotValue(slot, value){
+  function setSlotValue(slot, value, playerId = ''){
     const txt = String(value || '').trim();
+    const id = String(playerId || '').trim();
     if (txt) {
       slot.textContent = txt;
       slot.setAttribute('data-full', txt);
@@ -1180,10 +1201,16 @@ function apiUrl(path){
       slot.removeAttribute('data-full');
       slot.classList.add('is-empty');
     }
+    if (id) slot.dataset.playerId = id;
+    else delete slot.dataset.playerId;
   }
 
   function getSlotValue(slot){
     return (slot.getAttribute('data-full') || slot.textContent || '').trim();
+  }
+
+  function getSlotPlayerId(slot){
+    return String(slot?.dataset?.playerId || '').trim();
   }
 
   function lockValidatedMatchUI(){
@@ -1340,6 +1367,8 @@ function apiUrl(path){
 
         const currentFieldPlayer = getSlotValue(slot);
         const selectedSub = getSlotValue(selectedBenchSlot);
+        const currentFieldPlayerId = getSlotPlayerId(slot);
+        const selectedSubId = getSlotPlayerId(selectedBenchSlot);
         if (!currentFieldPlayer || !selectedSub) return;
 
         const duplicateSlots = findDuplicateFieldSlots(currentFieldPlayer, slot);
@@ -1365,19 +1394,19 @@ function apiUrl(path){
 
         const benchSlotToKeepSelected = selectedBenchSlot;
 
-        setSlotValue(slot, selectedSub);
+        setSlotValue(slot, selectedSub, selectedSubId);
         slot.classList.remove('slot-selected-sub');
         slot.classList.add('slot-sub-in');
 
         if (replaceAllOccurrences) {
           duplicateSlots.forEach(dupSlot => {
-            setSlotValue(dupSlot, selectedSub);
+            setSlotValue(dupSlot, selectedSub, selectedSubId);
             dupSlot.classList.remove('slot-selected-sub', 'slot-sub-out');
             dupSlot.classList.add('slot-sub-in');
           });
         }
 
-        setSlotValue(benchSlotToKeepSelected, currentFieldPlayer);
+        setSlotValue(benchSlotToKeepSelected, currentFieldPlayer, currentFieldPlayerId);
         benchSlotToKeepSelected.classList.remove('slot-selected-sub');
         benchSlotToKeepSelected.classList.add('slot-sub-out');
         benchSlotToKeepSelected.classList.add('slot-selected-sub');
@@ -1406,7 +1435,9 @@ function apiUrl(path){
       if (!values) return;
       const slots = sec.querySelectorAll('.slot');
       slots.forEach((slot, idx) => {
-        setSlotValue(slot, values[idx] || '');
+        const key = sectionKeyToPlanKey(title);
+        const playerId = key ? plan?.jugadorIds?.[key]?.[idx] : '';
+        setSlotValue(slot, values[idx] || '', playerId || '');
       });
     });
 
@@ -2385,7 +2416,14 @@ btn.onclick = async () => {
       individuales: [],
       pareja1: [],
       pareja2: [],
-      suplentes: []
+      suplentes: [],
+      jugadorIds: {
+        capitan: [],
+        individuales: [],
+        pareja1: [],
+        pareja2: [],
+        suplentes: []
+      }
     };
 
     root.querySelectorAll('.section').forEach(sec => {
@@ -2400,7 +2438,11 @@ btn.onclick = async () => {
 
       sec.querySelectorAll('.slot').forEach(slot => {
         const text = slot.getAttribute('data-full') || slot.textContent.trim();
-        if (text) plan[target].push(text);
+        if (text) {
+          plan[target].push(text);
+          const playerId = Number(slot.dataset.playerId || 0) || null;
+          plan.jugadorIds[target].push(playerId);
+        }
       });
 
       if (target === 'individuales' || target === 'pareja1' || target === 'pareja2') {

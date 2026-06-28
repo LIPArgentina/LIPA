@@ -2219,10 +2219,27 @@ function samePlayerTeamSlug(a, b) {
   return aa === bb || canonicalPlayerTeamSlug(aa) === canonicalPlayerTeamSlug(bb) || slugMatchesTeam(aa, bb);
 }
 
-function getIndividualPlayers(planilla = {}) {
-  return Array.isArray(planilla?.individuales)
-    ? planilla.individuales.map((name) => String(name || '').trim())
+function getPlanillaPlayerId(planilla = {}, section = '', index = 0) {
+  const raw = planilla?.jugadorIds?.[section]?.[index];
+  const id = Number(raw);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function getPlanillaPlayerRefs(planilla = {}, section = '') {
+  return Array.isArray(planilla?.[section])
+    ? planilla[section].map((name, index) => ({
+        id: getPlanillaPlayerId(planilla, section, index),
+        name: String(name || '').trim()
+      }))
     : [];
+}
+
+function getIndividualPlayerRefs(planilla = {}) {
+  return getPlanillaPlayerRefs(planilla, 'individuales');
+}
+
+function getIndividualPlayers(planilla = {}) {
+  return getIndividualPlayerRefs(planilla).map((player) => player.name);
 }
 
 function uniquePlayerNames(names = []) {
@@ -2241,9 +2258,12 @@ function uniquePlayerNames(names = []) {
 
 function getPairPlayers(planilla = {}, pairIndex = 0) {
   const key = pairIndex === 0 ? 'pareja1' : 'pareja2';
-  return Array.isArray(planilla?.[key])
-    ? planilla[key].map((name) => String(name || '').trim())
-    : [];
+  return getPlanillaPlayerRefs(planilla, key).map((player) => player.name);
+}
+
+function getPairPlayerRefs(planilla = {}, pairIndex = 0) {
+  const key = pairIndex === 0 ? 'pareja1' : 'pareja2';
+  return getPlanillaPlayerRefs(planilla, key);
 }
 
 function getSearchablePlayers(planilla = {}) {
@@ -2359,6 +2379,67 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
   return results;
 }
 
+async function findRegisteredPlayerSuggestionsByCategory(category = '', q = '') {
+  const division = String(category || '').trim().toLowerCase();
+  const query = parsePlayerQuery(q).name;
+  if (!division || normalizeText(query).length < 2) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT
+      j.id,
+      TRIM(j.nombre) AS name,
+      e.slug_uid,
+      e.slug_base,
+      e.display_name AS team_name
+    FROM jugadores j
+    INNER JOIN equipos e ON e.id = j.equipo_id
+    WHERE LOWER(e.division) = $1
+      AND TRIM(COALESCE(j.nombre, '')) <> ''
+    ORDER BY j.nombre ASC, e.display_name ASC, j.id ASC
+    `,
+    [division]
+  );
+
+  return rows
+    .filter((row) => includesNormalizedName(row.name, query))
+    .map((row) => ({
+      id: Number(row.id),
+      name: String(row.name || '').trim(),
+      teamSlug: row.slug_uid || row.slug_base,
+      teamName: row.team_name,
+      label: `${String(row.name || '').trim()} · ${row.team_name}`
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+    .slice(0, 12);
+}
+
+function parsePlayerQuery(value = '') {
+  const raw = String(value || '').trim();
+  const parts = raw.split(/\s+[·-]\s+/);
+  return {
+    raw,
+    name: String(parts[0] || raw).trim(),
+    team: String(parts.slice(1).join(' - ') || '').trim()
+  };
+}
+
+function suggestionMatchesQuery(item = {}, query = '') {
+  const parsed = parsePlayerQuery(query);
+  if (!parsed.team) return sameNormalizedName(item.name, parsed.name);
+  return sameNormalizedName(item.name, parsed.name) && (
+    sameNormalizedName(item.teamName, parsed.team) ||
+    samePlayerTeamSlug(item.teamSlug, parsed.team)
+  );
+}
+
+function samePlayerRef(player, exact, teamSlug = '') {
+  const playerId = Number(player?.id || 0) || null;
+  const exactId = Number(exact?.id || 0) || null;
+  if (playerId && exactId) return playerId === exactId;
+  return sameNormalizedName(player?.name, exact?.name) && samePlayerTeamSlug(teamSlug, exact?.teamSlug);
+}
+
 router.get('/player-query', async (req, res) => {
   setNoCache(res);
   try {
@@ -2373,52 +2454,28 @@ router.get('/player-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const results = await buildAllValidatedCrucesForPlayerQuery(category);
-    const suggestionsMap = new Map();
+    const [results, suggestions] = await Promise.all([
+      buildAllValidatedCrucesForPlayerQuery(category),
+      findRegisteredPlayerSuggestionsByCategory(category, q)
+    ]);
 
-    for (const item of results) {
-      const sides = [
-        { teamSlug: item.localSlug, teamName: item.localName, players: getSearchablePlayers(item.localPlanilla) },
-        { teamSlug: item.visitanteSlug, teamName: item.visitanteName, players: getSearchablePlayers(item.visitantePlanilla) }
-      ];
-
-      for (const side of sides) {
-        side.players.forEach((playerName) => {
-          if (!playerName || !includesNormalizedName(playerName, q)) return;
-          const key = `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(side.teamSlug)}`;
-          if (!suggestionsMap.has(key)) {
-            suggestionsMap.set(key, {
-              name: playerName,
-              teamSlug: side.teamSlug,
-              teamName: side.teamName,
-              label: `${playerName} · ${side.teamName}`
-            });
-          }
-        });
-      }
-    }
-
-    const suggestions = Array.from(suggestionsMap.values())
-      .sort((a, b) => a.label.localeCompare(b.label, 'es'))
-      .slice(0, 12);
-
-    const exact = suggestions.find((item) => sameNormalizedName(item.name, q));
+    const exact = suggestions.find((item) => suggestionMatchesQuery(item, q));
     if (!exact) {
       return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
     const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
     const playerRadRow = categoryRanking.find((item) =>
-      sameNormalizedName(item.name, exact.name) &&
-      samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
+      (Number(item.id || 0) && Number(item.id) === Number(exact.id)) ||
+      (sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug))
     ) || null;
 
     const matches = [];
     const pairMatches = [];
 
     for (const item of results) {
-      const localPlayers = getIndividualPlayers(item.localPlanilla);
-      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+      const localPlayers = getIndividualPlayerRefs(item.localPlanilla);
+      const visitantePlayers = getIndividualPlayerRefs(item.visitantePlanilla);
       const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
       const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
 
@@ -2447,15 +2504,16 @@ router.get('/player-query', async (req, res) => {
 
       for (const side of scan) {
         if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
-        side.players.forEach((playerName, idx) => {
-          if (!sameNormalizedName(playerName, exact.name)) return;
+        side.players.forEach((player, idx) => {
+          if (!samePlayerRef(player, exact, side.teamSlug)) return;
           const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
           const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
-          const opponentPlayerName = String(side.opponentPlayers?.[idx] || '').trim();
+          const opponentPlayerName = String(side.opponentPlayers?.[idx]?.name || '').trim();
           matches.push({
             fechaISO: item.fechaISO,
             category: item.category || category,
-            playerName,
+            playerId: player.id || exact.id || null,
+            playerName: player.name,
             teamSlug: side.teamSlug,
             teamName: side.teamName,
             opponentSlug: side.opponentSlug,
@@ -2496,12 +2554,14 @@ router.get('/player-query', async (req, res) => {
         if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
 
         for (let pairIndex = 0; pairIndex < 2; pairIndex++) {
-          const pairPlayers = getPairPlayers(side.planilla, pairIndex);
-          const matchedIndex = pairPlayers.findIndex((playerName) => sameNormalizedName(playerName, exact.name));
+          const pairPlayers = getPairPlayerRefs(side.planilla, pairIndex);
+          const matchedIndex = pairPlayers.findIndex((player) => samePlayerRef(player, exact, side.teamSlug));
           if (matchedIndex === -1) continue;
 
-          const playerName = String(pairPlayers[matchedIndex] || exact.name || '').trim();
-          const companionName = String(pairPlayers[matchedIndex === 0 ? 1 : 0] || '').trim();
+          const player = pairPlayers[matchedIndex] || {};
+          const companion = pairPlayers[matchedIndex === 0 ? 1 : 0] || {};
+          const playerName = String(player.name || exact.name || '').trim();
+          const companionName = String(companion.name || '').trim();
           const opponentPairPlayers = getPairPlayers(side.opponentPlanilla, pairIndex);
           const triangulosFavor = getPairScore(side.scoreRows, side.planilla, pairIndex);
           const triangulosContra = getPairScore(side.opponentScoreRows, side.opponentPlanilla, pairIndex);
@@ -2509,6 +2569,7 @@ router.get('/player-query', async (req, res) => {
           pairMatches.push({
             fechaISO: item.fechaISO,
             category: item.category || category,
+            playerId: player.id || exact.id || null,
             playerName,
             companionName,
             teamSlug: side.teamSlug,
@@ -2554,10 +2615,19 @@ router.get('/player-query', async (req, res) => {
 
 
 function ensureRankingRow(map, playerName, teamSlug, teamName) {
-  const key = `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`;
+  return ensureRankingRowForPlayer(map, { name: playerName, id: null }, teamSlug, teamName);
+}
+
+function ensureRankingRowForPlayer(map, player, teamSlug, teamName) {
+  const playerId = Number(player?.id || 0) || null;
+  const playerName = String(player?.name || '').trim();
+  const key = playerId
+    ? `id:${playerId}`
+    : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`;
   if (!map.has(key)) {
     map.set(key, {
-      name: String(playerName || '').trim(),
+      id: playerId,
+      name: playerName,
       teamSlug,
       teamName,
       played: 0,
@@ -2648,20 +2718,20 @@ function buildPlayerRowsFromResults(results = []) {
   const rankingMap = new Map();
 
   for (const item of results) {
-    const localPlayers = getIndividualPlayers(item.localPlanilla);
-    const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+    const localPlayers = getIndividualPlayerRefs(item.localPlanilla);
+    const visitantePlayers = getIndividualPlayerRefs(item.visitantePlanilla);
     const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
     const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
     const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
 
     for (let idx = 0; idx < max; idx++) {
-      const localPlayer = String(localPlayers[idx] || '').trim();
-      const visitantePlayer = String(visitantePlayers[idx] || '').trim();
+      const localPlayer = localPlayers[idx] || { id: null, name: '' };
+      const visitantePlayer = visitantePlayers[idx] || { id: null, name: '' };
       const localScore = Number(localScores[idx] ?? 0) || 0;
       const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
 
-      if (localPlayer) {
-        const row = ensureRankingRow(rankingMap, localPlayer, item.localSlug, item.localName);
+      if (localPlayer.name) {
+        const row = ensureRankingRowForPlayer(rankingMap, localPlayer, item.localSlug, item.localName);
         row.played += 1;
         row.triangulosFavor += localScore;
         row.triangulosContra += visitanteScore;
@@ -2670,8 +2740,8 @@ function buildPlayerRowsFromResults(results = []) {
         else row.draws += 1;
       }
 
-      if (visitantePlayer) {
-        const row = ensureRankingRow(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
+      if (visitantePlayer.name) {
+        const row = ensureRankingRowForPlayer(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
         row.played += 1;
         row.triangulosFavor += visitanteScore;
         row.triangulosContra += localScore;
@@ -2901,16 +2971,18 @@ async function getRegisteredPlayersForTeam(teamId) {
 
   const { rows } = await pool.query(
     `
-    SELECT TRIM(nombre) AS name
+    SELECT id, TRIM(nombre) AS name
     FROM jugadores
     WHERE equipo_id = $1
       AND TRIM(COALESCE(nombre, '')) <> ''
-    ORDER BY nombre ASC
+    ORDER BY orden ASC, nombre ASC, id ASC
     `,
     [teamId]
   );
 
-  return rows.map((row) => String(row.name || '').trim()).filter(Boolean);
+  return rows
+    .map((row) => ({ id: Number(row.id), name: String(row.name || '').trim() }))
+    .filter((row) => row.name);
 }
 
 function teamInfoMatchesSide(teamInfo = {}, sideSlug = '', sideName = '') {
@@ -2980,18 +3052,26 @@ router.get('/team-query', async (req, res) => {
     const categoryPlayersByKey = new Map();
 
     categoryRanking.forEach((item) => {
+      if (Number(item.id || 0)) {
+        categoryPlayersByKey.set(`id:${Number(item.id)}`, item);
+      }
       categoryPlayersByKey.set(`${normalizeText(item.name)}::${canonicalPlayerTeamSlug(item.teamSlug)}`, item);
     });
 
     const playersMap = new Map();
-    const ensureTeamPlayer = (playerName) => {
-      const key = normalizeText(playerName);
+    const ensureTeamPlayer = (playerInfo) => {
+      const playerId = Number(playerInfo?.id || 0) || null;
+      const playerName = String(playerInfo?.name || playerInfo || '').trim();
+      const key = playerId ? `id:${playerId}` : normalizeText(playerName);
       if (!key) return null;
       if (!playersMap.has(key)) {
-        const categoryKey = `${key}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
+        const categoryKey = playerId
+          ? `id:${playerId}`
+          : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
         const categoryRow = categoryPlayersByKey.get(categoryKey) || null;
         playersMap.set(key, categoryRow ? { ...categoryRow } : {
-          name: String(playerName || '').trim(),
+          id: playerId,
+          name: playerName,
           teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
           teamName: exactTeam.display_name,
           played: 0,
