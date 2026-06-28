@@ -2274,6 +2274,25 @@ function getSearchablePlayers(planilla = {}) {
   ]);
 }
 
+function getSearchablePlayerRefs(planilla = {}) {
+  const seen = new Set();
+  const out = [];
+  [
+    ...getIndividualPlayerRefs(planilla),
+    ...getPairPlayerRefs(planilla, 0),
+    ...getPairPlayerRefs(planilla, 1)
+  ].forEach((player) => {
+    const name = String(player?.name || '').trim();
+    if (!name) return;
+    const id = Number(player?.id || 0) || null;
+    const key = id ? `id:${id}` : `name:${normalizeText(name)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ id, name });
+  });
+  return out;
+}
+
 function getPairScore(scoreRows = [], planilla = {}, pairIndex = 0) {
   const scoreIndex = 7 + pairIndex;
   const fromScoreRows = Array.isArray(scoreRows) ? scoreRows[scoreIndex] : undefined;
@@ -2414,6 +2433,53 @@ async function findRegisteredPlayerSuggestionsByCategory(category = '', q = '') 
     .slice(0, 12);
 }
 
+function buildValidatedPlayerSuggestions(results = [], q = '') {
+  const parsed = parsePlayerQuery(q);
+  const suggestionsMap = new Map();
+
+  for (const item of results) {
+    const sides = [
+      { teamSlug: item.localSlug, teamName: item.localName, players: getSearchablePlayerRefs(item.localPlanilla) },
+      { teamSlug: item.visitanteSlug, teamName: item.visitanteName, players: getSearchablePlayerRefs(item.visitantePlanilla) }
+    ];
+
+    for (const side of sides) {
+      side.players.forEach((player) => {
+        if (!player?.name || !includesNormalizedName(player.name, parsed.name)) return;
+        if (parsed.team && !sameNormalizedName(side.teamName, parsed.team) && !samePlayerTeamSlug(side.teamSlug, parsed.team)) return;
+        const playerId = Number(player.id || 0) || null;
+        const key = playerId ? `id:${playerId}` : `${normalizeText(player.name)}::${canonicalPlayerTeamSlug(side.teamSlug)}`;
+        if (!suggestionsMap.has(key)) {
+          suggestionsMap.set(key, {
+            id: playerId,
+            name: player.name,
+            teamSlug: side.teamSlug,
+            teamName: side.teamName,
+            label: `${player.name} · ${side.teamName}`
+          });
+        }
+      });
+    }
+  }
+
+  return Array.from(suggestionsMap.values())
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+    .slice(0, 12);
+}
+
+function mergePlayerSuggestions(primary = [], fallback = []) {
+  const map = new Map();
+  [...primary, ...fallback].forEach((item) => {
+    const id = Number(item?.id || 0) || null;
+    const key = id ? `id:${id}` : `${normalizeText(item?.name)}::${canonicalPlayerTeamSlug(item?.teamSlug)}`;
+    if (!key || map.has(key)) return;
+    map.set(key, item);
+  });
+  return Array.from(map.values())
+    .sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'es'))
+    .slice(0, 12);
+}
+
 function parsePlayerQuery(value = '') {
   const raw = String(value || '').trim();
   const parts = raw.split(/\s+[·-]\s+/);
@@ -2454,10 +2520,12 @@ router.get('/player-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const [results, suggestions] = await Promise.all([
+    const [results, registeredSuggestions] = await Promise.all([
       buildAllValidatedCrucesForPlayerQuery(category),
       findRegisteredPlayerSuggestionsByCategory(category, q)
     ]);
+    const validatedSuggestions = buildValidatedPlayerSuggestions(results, q);
+    const suggestions = mergePlayerSuggestions(registeredSuggestions, validatedSuggestions);
 
     const exact = suggestions.find((item) => suggestionMatchesQuery(item, q));
     if (!exact) {
