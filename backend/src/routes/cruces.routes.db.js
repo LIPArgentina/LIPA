@@ -2492,11 +2492,20 @@ function parsePlayerQuery(value = '') {
 
 function suggestionMatchesQuery(item = {}, query = '') {
   const parsed = parsePlayerQuery(query);
+  if (sameNormalizedName(item.label, parsed.raw)) return true;
   if (!parsed.team) return sameNormalizedName(item.name, parsed.name);
   return sameNormalizedName(item.name, parsed.name) && (
     sameNormalizedName(item.teamName, parsed.team) ||
     samePlayerTeamSlug(item.teamSlug, parsed.team)
   );
+}
+
+function resolveExactPlayerSuggestion(suggestions = [], query = '') {
+  const parsed = parsePlayerQuery(query);
+  const exact = suggestions.find((item) => suggestionMatchesQuery(item, query));
+  if (exact) return exact;
+  if (parsed.team && suggestions.length === 1) return suggestions[0];
+  return null;
 }
 
 function samePlayerRef(player, exact, teamSlug = '') {
@@ -2511,6 +2520,7 @@ router.get('/player-query', async (req, res) => {
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
     const q = String(req.query.q || '').trim();
+    const suggestOnly = String(req.query.suggest || '') === '1';
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
@@ -2520,14 +2530,16 @@ router.get('/player-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const [results, registeredSuggestions] = await Promise.all([
-      buildAllValidatedCrucesForPlayerQuery(category),
-      findRegisteredPlayerSuggestionsByCategory(category, q)
-    ]);
+    const registeredSuggestions = await findRegisteredPlayerSuggestionsByCategory(category, q);
+    if (suggestOnly) {
+      return res.json({ ok: true, category, q, suggestions: registeredSuggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
+    }
+
+    const results = await buildAllValidatedCrucesForPlayerQuery(category);
     const validatedSuggestions = buildValidatedPlayerSuggestions(results, q);
     const suggestions = mergePlayerSuggestions(registeredSuggestions, validatedSuggestions);
 
-    const exact = suggestions.find((item) => suggestionMatchesQuery(item, q));
+    const exact = resolveExactPlayerSuggestion(suggestions, q);
     if (!exact) {
       return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
