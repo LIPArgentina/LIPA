@@ -14,10 +14,10 @@
 .btn-ascensos-badge{
   position:absolute;
   left:50%;
-  bottom:8px;
+  bottom:-18px;
   z-index:1;
   transform:translateX(-50%);
-  min-width:150px;
+  min-width:174px;
   min-height:34px;
   padding:8px 16px;
   border:1px solid rgba(255, 230, 120, .78);
@@ -31,6 +31,7 @@
   font-weight:950;
   letter-spacing:.08em;
   line-height:1;
+  white-space:nowrap;
   text-transform:uppercase;
   text-shadow:0 1px 0 rgba(255,255,255,.38);
   box-shadow:
@@ -731,8 +732,8 @@
   }
 
   .btn-ascensos-badge{
-    bottom:4px;
-    min-width:136px;
+    bottom:-16px;
+    min-width:158px;
     min-height:32px;
     padding:7px 14px;
     font-size:.7rem;
