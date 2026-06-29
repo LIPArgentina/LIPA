@@ -114,6 +114,16 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       FROM jugadores j
       JOIN equipos e ON e.id = j.equipo_id
       WHERE j.equipo_id IS NOT NULL
+        AND (
+          NULLIF(j.nombre_normalizado, '') IS NULL
+          OR NOT EXISTS (
+            SELECT 1
+              FROM jugador_equipos je
+             WHERE je.jugador_id = j.id
+               AND je.equipo_id = j.equipo_id
+               AND je.categoria = COALESCE(e.division, 'sin_categoria')
+          )
+        )
       ORDER BY j.id ASC
     `);
 
@@ -197,6 +207,106 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       associationId: row.association_id || null,
       activo: row.activo !== false,
     };
+  }
+
+  function canonicalPersonKey(row = {}) {
+    const name = normalizeText(row.nombre_normalizado || row.nombre || '');
+    if (name) return `name:${name}`;
+    const dni = normalizeDni(row.dni || '');
+    return dni ? `dni:${dni}` : `id:${row.id}`;
+  }
+
+  function associationSortValue(row = {}) {
+    const desde = row.desde ? new Date(row.desde).getTime() : 0;
+    return [
+      row.activo === true ? 1 : 0,
+      Number.isFinite(desde) ? desde : 0,
+      Number(row.association_id || 0),
+      Number(row.id || 0)
+    ];
+  }
+
+  function compareAssociationRows(a = {}, b = {}) {
+    const aa = associationSortValue(a);
+    const bb = associationSortValue(b);
+    for (let i = 0; i < aa.length; i++) {
+      if (bb[i] !== aa[i]) return bb[i] - aa[i];
+    }
+    return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+  }
+
+  function compareRepresentativeRows(a = {}, b = {}) {
+    const score = (row) => [
+      normalizeDni(row.dni) ? 1 : 0,
+      row.foto_path ? 1 : 0,
+      row.fecha_nacimiento ? 1 : 0,
+      -(Number(row.id || 0))
+    ];
+    const aa = score(a);
+    const bb = score(b);
+    for (let i = 0; i < aa.length; i++) {
+      if (bb[i] !== aa[i]) return bb[i] - aa[i];
+    }
+    return 0;
+  }
+
+  function canonicalizePlayerRows(rows = [], { category = '', teamId = null, currentByCategory = false } = {}) {
+    const groups = new Map();
+    rows.forEach((row) => {
+      const key = canonicalPersonKey(row);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    });
+
+    const out = [];
+    for (const groupRows of groups.values()) {
+      const representative = [...groupRows].sort(compareRepresentativeRows)[0] || groupRows[0];
+      const activeRows = groupRows
+        .filter((row) => row.association_id && row.activo !== false)
+        .sort(compareAssociationRows);
+
+      let displayAssociation = activeRows[0] || groupRows.find((row) => row.association_id) || representative;
+
+      if (currentByCategory) {
+        const normalizedCategory = normalizeCategory(category);
+        const current = activeRows
+          .filter((row) => normalizeCategory(row.categoria) === normalizedCategory)
+          .sort(compareAssociationRows)[0] || null;
+        if (!current || (teamId && Number(current.equipo_id) !== Number(teamId))) continue;
+        displayAssociation = current;
+      }
+
+      out.push(mapPlayer({
+        ...representative,
+        association_id: displayAssociation.association_id,
+        categoria: displayAssociation.categoria,
+        activo: displayAssociation.activo,
+        equipo_id: displayAssociation.equipo_id,
+        equipo: displayAssociation.equipo,
+        slug_uid: displayAssociation.slug_uid
+      }));
+    }
+
+    return out.sort((a, b) =>
+      String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es') ||
+      String(a.equipo || '').localeCompare(String(b.equipo || ''), 'es')
+    );
+  }
+
+  function dedupeHistoryRows(rows = []) {
+    const map = new Map();
+    rows.forEach((row) => {
+      const key = [
+        normalizeCategory(row.categoria),
+        String(row.slug_uid || row.equipo || '').toLowerCase(),
+        row.activo ? '1' : '0'
+      ].join('::');
+      const existing = map.get(key);
+      if (!existing || compareAssociationRows(row, existing) < 0) {
+        map.set(key, row);
+      }
+    });
+    return Array.from(map.values()).sort(compareAssociationRows);
   }
 
   async function validateAssociation(client, { playerId, category, teamId, associationId = null }) {
@@ -355,9 +465,12 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           j.dni,
           TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
           j.foto_path,
+          j.nombre_normalizado,
           je.id AS association_id,
           je.categoria,
           je.activo,
+          je.desde,
+          je.hasta,
           e.id AS equipo_id,
           e.display_name AS equipo,
           e.slug_uid
@@ -376,7 +489,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         [dni, name, q]
       );
 
-      return res.json({ ok: true, players: result.rows.map(mapPlayer) });
+      return res.json({ ok: true, players: canonicalizePlayerRows(result.rows) });
     } catch (err) {
       console.error('players-public/search', err);
       return res.status(500).json({ ok: false, error: err.message });
@@ -393,30 +506,53 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
       const result = await pool.query(
         `
+        WITH active_rows AS (
+          SELECT
+            j.id,
+            j.nombre,
+            j.dni,
+            TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
+            j.foto_path,
+            j.nombre_normalizado,
+            je.id AS association_id,
+            je.categoria,
+            je.activo,
+            je.desde,
+            je.hasta,
+            e.id AS equipo_id,
+            e.display_name AS equipo,
+            e.slug_uid,
+            'name:' || COALESCE(NULLIF(j.nombre_normalizado, ''), LOWER(j.nombre)) AS person_key
+          FROM jugador_equipos je
+          JOIN jugadores j ON j.id = je.jugador_id
+          JOIN equipos e ON e.id = je.equipo_id
+          WHERE je.activo = true
+            AND ($2 = '' OR je.categoria = $2)
+        ),
+        candidate_keys AS (
+          SELECT DISTINCT person_key
+          FROM active_rows
+          WHERE equipo_id = $1
+        )
         SELECT
-          j.id,
-          j.nombre,
-          j.dni,
-          TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
-          j.foto_path,
-          je.id AS association_id,
-          je.categoria,
-          je.activo,
-          e.id AS equipo_id,
-          e.display_name AS equipo,
-          e.slug_uid
-        FROM jugador_equipos je
-        JOIN jugadores j ON j.id = je.jugador_id
-        JOIN equipos e ON e.id = je.equipo_id
-        WHERE je.activo = true
-          AND je.equipo_id = $1
-          AND ($2 = '' OR je.categoria = $2)
-        ORDER BY je.orden ASC NULLS LAST, j.nombre ASC
+          id, nombre, dni, fecha_nacimiento, foto_path, nombre_normalizado,
+          association_id, categoria, activo, desde, hasta, equipo_id, equipo, slug_uid
+        FROM active_rows
+        WHERE person_key IN (SELECT person_key FROM candidate_keys)
+        ORDER BY nombre ASC, desde DESC NULLS LAST, association_id DESC
         `,
         [team.id, category]
       );
 
-      return res.json({ ok: true, team, players: result.rows.map(mapPlayer) });
+      return res.json({
+        ok: true,
+        team,
+        players: canonicalizePlayerRows(result.rows, {
+          category,
+          teamId: team.id,
+          currentByCategory: true
+        })
+      });
     } catch (err) {
       console.error('players-public/by-team', err);
       return res.status(500).json({ ok: false, error: err.message });
@@ -429,12 +565,32 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       const playerId = Number(req.params.id);
       if (!Number.isFinite(playerId)) return res.status(400).json({ ok: false, error: 'ID inválido' });
 
+      const current = await pool.query(
+        `
+        SELECT id, dni, nombre_normalizado, nombre
+        FROM jugadores
+        WHERE id = $1
+        LIMIT 1
+        `,
+        [playerId]
+      );
+
+      const player = current.rows[0] || null;
+      if (!player) return res.status(404).json({ ok: false, error: 'Jugador no encontrado' });
+
+      const dni = normalizeDni(player.dni || '');
+      const normalizedName = normalizeText(player.nombre_normalizado || player.nombre || '');
       const result = await pool.query(
         `
         SELECT
           je.id,
+          j.id AS jugador_id,
+          j.nombre,
+          j.dni,
+          j.nombre_normalizado,
           je.categoria,
           je.activo,
+          je.desde AS desde_raw,
           TO_CHAR(je.desde, 'YYYY-MM-DD') AS desde,
           TO_CHAR(je.hasta, 'YYYY-MM-DD') AS hasta,
           TO_CHAR(je.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
@@ -442,14 +598,19 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           e.display_name AS equipo,
           e.slug_uid
         FROM jugador_equipos je
+        JOIN jugadores j ON j.id = je.jugador_id
         JOIN equipos e ON e.id = je.equipo_id
-        WHERE je.jugador_id = $1
+        WHERE (
+          ($2 <> '' AND j.dni = $2)
+          OR ($3 <> '' AND COALESCE(j.nombre_normalizado, '') = $3)
+          OR j.id = $1
+        )
         ORDER BY je.activo DESC, je.desde DESC NULLS LAST, je.id DESC
         `,
-        [playerId]
+        [playerId, dni, normalizedName]
       );
 
-      return res.json({ ok: true, history: result.rows });
+      return res.json({ ok: true, history: dedupeHistoryRows(result.rows) });
     } catch (err) {
       console.error('players-public/history', err);
       return res.status(500).json({ ok: false, error: err.message });
