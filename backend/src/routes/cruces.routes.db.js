@@ -2469,11 +2469,14 @@ function buildValidatedPlayerSuggestions(results = [], q = '') {
 
 function mergePlayerSuggestions(primary = [], fallback = []) {
   const map = new Map();
+  const visualKeys = new Set();
   [...primary, ...fallback].forEach((item) => {
     const id = Number(item?.id || 0) || null;
     const key = id ? `id:${id}` : `${normalizeText(item?.name)}::${canonicalPlayerTeamSlug(item?.teamSlug)}`;
-    if (!key || map.has(key)) return;
+    const visualKey = `${normalizeText(item?.name)}::${canonicalPlayerTeamSlug(item?.teamSlug || item?.teamName)}::${normalizeText(item?.teamName)}`;
+    if (!key || map.has(key) || visualKeys.has(visualKey)) return;
     map.set(key, item);
+    visualKeys.add(visualKey);
   });
   return Array.from(map.values())
     .sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'es'))
