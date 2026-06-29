@@ -2531,140 +2531,23 @@ router.get('/player-query', async (req, res) => {
     }
 
     const registeredSuggestions = await findRegisteredPlayerSuggestionsByCategory(category, q);
+    const resultadoSuggestions = await findJugadorResultadoSuggestionsByCategory(category, q);
+    const suggestions = mergePlayerSuggestions(resultadoSuggestions, registeredSuggestions);
     if (suggestOnly) {
-      return res.json({ ok: true, category, q, suggestions: registeredSuggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
+      return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
-
-    const results = await buildAllValidatedCrucesForPlayerQuery(category);
-    const validatedSuggestions = buildValidatedPlayerSuggestions(results, q);
-    const suggestions = mergePlayerSuggestions(registeredSuggestions, validatedSuggestions);
 
     const exact = resolveExactPlayerSuggestion(suggestions, q);
     if (!exact) {
       return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
+    const { ranking: categoryRanking, radContext } = await buildRadRankingFromJugadorResultados(category);
     const playerRadRow = categoryRanking.find((item) =>
       (Number(item.id || 0) && Number(item.id) === Number(exact.id)) ||
       (sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug))
     ) || null;
-
-    const matches = [];
-    const pairMatches = [];
-
-    for (const item of results) {
-      const localPlayers = getIndividualPlayerRefs(item.localPlanilla);
-      const visitantePlayers = getIndividualPlayerRefs(item.visitantePlanilla);
-      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
-      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
-
-      const scan = [
-        {
-          players: localPlayers,
-          scoreRows: localScores,
-          opponentScoreRows: visitanteScores,
-          opponentPlayers: visitantePlayers,
-          teamSlug: item.localSlug,
-          teamName: item.localName,
-          opponentSlug: item.visitanteSlug,
-          opponentName: item.visitanteName
-        },
-        {
-          players: visitantePlayers,
-          scoreRows: visitanteScores,
-          opponentScoreRows: localScores,
-          opponentPlayers: localPlayers,
-          teamSlug: item.visitanteSlug,
-          teamName: item.visitanteName,
-          opponentSlug: item.localSlug,
-          opponentName: item.localName
-        }
-      ];
-
-      for (const side of scan) {
-        if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
-        side.players.forEach((player, idx) => {
-          if (!samePlayerRef(player, exact, side.teamSlug)) return;
-          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
-          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
-          const opponentPlayerName = String(side.opponentPlayers?.[idx]?.name || '').trim();
-          matches.push({
-            fechaISO: item.fechaISO,
-            category: item.category || category,
-            playerId: player.id || exact.id || null,
-            playerName: player.name,
-            teamSlug: side.teamSlug,
-            teamName: side.teamName,
-            opponentSlug: side.opponentSlug,
-            opponentName: side.opponentName,
-            opponentPlayerName,
-            row: idx + 1,
-            triangulosFavor,
-            triangulosContra,
-            result: triangulosFavor > triangulosContra ? 'ganado' : (triangulosFavor < triangulosContra ? 'perdido' : 'empatado')
-          });
-        });
-      }
-
-      const pairScan = [
-        {
-          planilla: item.localPlanilla,
-          scoreRows: localScores,
-          opponentPlanilla: item.visitantePlanilla,
-          opponentScoreRows: visitanteScores,
-          teamSlug: item.localSlug,
-          teamName: item.localName,
-          opponentSlug: item.visitanteSlug,
-          opponentName: item.visitanteName
-        },
-        {
-          planilla: item.visitantePlanilla,
-          scoreRows: visitanteScores,
-          opponentPlanilla: item.localPlanilla,
-          opponentScoreRows: localScores,
-          teamSlug: item.visitanteSlug,
-          teamName: item.visitanteName,
-          opponentSlug: item.localSlug,
-          opponentName: item.localName
-        }
-      ];
-
-      for (const side of pairScan) {
-        if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
-
-        for (let pairIndex = 0; pairIndex < 2; pairIndex++) {
-          const pairPlayers = getPairPlayerRefs(side.planilla, pairIndex);
-          const matchedIndex = pairPlayers.findIndex((player) => samePlayerRef(player, exact, side.teamSlug));
-          if (matchedIndex === -1) continue;
-
-          const player = pairPlayers[matchedIndex] || {};
-          const companion = pairPlayers[matchedIndex === 0 ? 1 : 0] || {};
-          const playerName = String(player.name || exact.name || '').trim();
-          const companionName = String(companion.name || '').trim();
-          const opponentPairPlayers = getPairPlayers(side.opponentPlanilla, pairIndex);
-          const triangulosFavor = getPairScore(side.scoreRows, side.planilla, pairIndex);
-          const triangulosContra = getPairScore(side.opponentScoreRows, side.opponentPlanilla, pairIndex);
-
-          pairMatches.push({
-            fechaISO: item.fechaISO,
-            category: item.category || category,
-            playerId: player.id || exact.id || null,
-            playerName,
-            companionName,
-            teamSlug: side.teamSlug,
-            teamName: side.teamName,
-            opponentSlug: side.opponentSlug,
-            opponentName: side.opponentName,
-            opponentPairPlayers,
-            pairNumber: pairIndex + 1,
-            triangulosFavor,
-            triangulosContra,
-            result: triangulosFavor > triangulosContra ? 'ganado' : (triangulosFavor < triangulosContra ? 'perdido' : 'empatado')
-          });
-        }
-      }
-    }
+    const { matches, pairMatches } = await getJugadorResultadoMatches(category, exact.id || playerRadRow?.id || null);
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
@@ -2860,6 +2743,185 @@ function buildRadRankingFromResults(results = []) {
   };
 }
 
+async function buildPlayerRowsFromJugadorResultados(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  if (!division) return [];
+
+  const { rows } = await pool.query(
+    `
+    WITH agg AS (
+      SELECT
+        jugador_id,
+        categoria,
+        MAX(jugador_nombre) AS name,
+        COUNT(*)::int AS played,
+        SUM(CASE WHEN resultado = 'ganado' THEN 1 ELSE 0 END)::int AS wins,
+        SUM(CASE WHEN resultado = 'perdido' THEN 1 ELSE 0 END)::int AS losses,
+        SUM(CASE WHEN resultado = 'empatado' THEN 1 ELSE 0 END)::int AS draws,
+        SUM(triangulos_favor)::int AS triangulos_favor,
+        SUM(triangulos_contra)::int AS triangulos_contra
+      FROM jugador_resultados
+      WHERE categoria = $1
+        AND modalidad = 'individual'
+        AND jugador_id IS NOT NULL
+      GROUP BY jugador_id, categoria
+    ),
+    latest AS (
+      SELECT DISTINCT ON (jugador_id, categoria)
+        jugador_id,
+        categoria,
+        equipo_slug,
+        equipo_nombre
+      FROM jugador_resultados
+      WHERE categoria = $1
+        AND modalidad = 'individual'
+        AND jugador_id IS NOT NULL
+      ORDER BY jugador_id, categoria, fecha_iso DESC, id DESC
+    )
+    SELECT
+      agg.jugador_id AS id,
+      agg.name,
+      latest.equipo_slug,
+      latest.equipo_nombre,
+      agg.played,
+      agg.wins,
+      agg.losses,
+      agg.draws,
+      agg.triangulos_favor,
+      agg.triangulos_contra
+    FROM agg
+    LEFT JOIN latest
+      ON latest.jugador_id = agg.jugador_id
+     AND latest.categoria = agg.categoria
+    ORDER BY agg.name ASC
+    `,
+    [division]
+  );
+
+  return rows.map((row) => ({
+    id: Number(row.id || 0) || null,
+    name: String(row.name || '').trim(),
+    teamSlug: row.equipo_slug,
+    teamName: row.equipo_nombre,
+    played: Number(row.played || 0),
+    wins: Number(row.wins || 0),
+    losses: Number(row.losses || 0),
+    draws: Number(row.draws || 0),
+    triangulosFavor: Number(row.triangulos_favor || 0),
+    triangulosContra: Number(row.triangulos_contra || 0),
+    diff: Number(row.triangulos_favor || 0) - Number(row.triangulos_contra || 0),
+    effectiveness: Number(row.played || 0) > 0
+      ? Math.round((Number(row.wins || 0) / Number(row.played || 0)) * 100)
+      : 0
+  }));
+}
+
+async function buildRadRankingFromJugadorResultados(category = '') {
+  const baseRows = await buildPlayerRowsFromJugadorResultados(category);
+  const activeRows = baseRows.filter((item) => radNumber(item.played) > 0);
+  const rawContext = buildRadContextFromRows(activeRows);
+
+  const ranking = baseRows
+    .map((item) => applyRadToPlayerRow(item, rawContext))
+    .sort(sortPlayerRadRows);
+
+  return {
+    ranking,
+    radContext: {
+      maxPlayed: radRound1(rawContext.maxPlayed),
+      avgPlayed: radRound1(rawContext.avgPlayed),
+      spread: radRound1(rawContext.spread),
+      force: radRound1(rawContext.force)
+    }
+  };
+}
+
+async function findJugadorResultadoSuggestionsByCategory(category = '', q = '') {
+  const division = String(category || '').trim().toLowerCase();
+  const query = parsePlayerQuery(q).name;
+  if (!division || normalizeText(query).length < 2) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT DISTINCT ON (jr.jugador_id)
+      jr.jugador_id AS id,
+      jr.jugador_nombre AS name,
+      jr.equipo_slug,
+      jr.equipo_nombre
+    FROM jugador_resultados jr
+    WHERE jr.categoria = $1
+      AND jr.jugador_id IS NOT NULL
+      AND TRIM(COALESCE(jr.jugador_nombre, '')) <> ''
+    ORDER BY jr.jugador_id, jr.fecha_iso DESC, jr.id DESC
+    `,
+    [division]
+  );
+
+  return rows
+    .filter((row) => includesNormalizedName(row.name, query))
+    .map((row) => ({
+      id: Number(row.id),
+      name: String(row.name || '').trim(),
+      teamSlug: row.equipo_slug,
+      teamName: row.equipo_nombre,
+      label: `${String(row.name || '').trim()} · ${row.equipo_nombre}`
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+    .slice(0, 12);
+}
+
+async function getJugadorResultadoMatches(category = '', playerId = null) {
+  const division = String(category || '').trim().toLowerCase();
+  const id = Number(playerId || 0);
+  if (!division || !id) return { matches: [], pairMatches: [] };
+
+  const { rows } = await pool.query(
+    `
+    SELECT
+      to_char(fecha_iso, 'YYYY-MM-DD') AS fecha_iso,
+      categoria,
+      jugador_id,
+      jugador_nombre,
+      equipo_slug,
+      equipo_nombre,
+      rival_slug,
+      rival_nombre,
+      modalidad,
+      slot,
+      pareja_index,
+      triangulos_favor,
+      triangulos_contra,
+      resultado
+    FROM jugador_resultados
+    WHERE categoria = $1
+      AND jugador_id = $2
+    ORDER BY fecha_iso ASC, modalidad ASC, slot ASC, id ASC
+    `,
+    [division, id]
+  );
+
+  const toItem = (row) => ({
+    fechaISO: normalizeDateOnly(row.fecha_iso),
+    category: row.categoria,
+    playerId: Number(row.jugador_id || 0) || null,
+    playerName: row.jugador_nombre,
+    teamSlug: row.equipo_slug,
+    teamName: row.equipo_nombre,
+    opponentSlug: row.rival_slug,
+    opponentName: row.rival_nombre,
+    row: Number(row.slot || 0),
+    pairNumber: Number(row.pareja_index || row.slot || 0),
+    triangulosFavor: Number(row.triangulos_favor || 0),
+    triangulosContra: Number(row.triangulos_contra || 0),
+    result: row.resultado
+  });
+
+  return {
+    matches: rows.filter((row) => row.modalidad === 'individual').map(toItem),
+    pairMatches: rows.filter((row) => row.modalidad === 'pareja').map(toItem)
+  };
+}
+
 
 async function countRegisteredIndividualPlayersByCategory(category = '') {
   const division = String(category || '').trim().toLowerCase();
@@ -2867,10 +2929,11 @@ async function countRegisteredIndividualPlayersByCategory(category = '') {
 
   const { rows } = await pool.query(
     `
-    SELECT COUNT(*)::int AS total
+    SELECT COUNT(DISTINCT j.id)::int AS total
     FROM jugadores j
-    INNER JOIN equipos e ON e.id = j.equipo_id
-    WHERE LOWER(e.division) = $1
+    LEFT JOIN jugador_equipos je ON je.jugador_id = j.id
+    LEFT JOIN equipos e ON e.id = COALESCE(je.equipo_id, j.equipo_id)
+    WHERE LOWER(COALESCE(je.categoria, e.division, '')) = $1
       AND TRIM(COALESCE(j.nombre, '')) <> ''
     `,
     [division]
@@ -2890,13 +2953,12 @@ router.get('/player-ranking', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
-    const [results, totalRegisteredPlayers] = await Promise.all([
-      buildAllValidatedCrucesForPlayerQuery(category),
+    const [{ ranking: fullRanking, radContext }, totalRegisteredPlayers] = await Promise.all([
+      buildRadRankingFromJugadorResultados(category),
       countRegisteredIndividualPlayersByCategory(category)
     ]);
 
     // Primero calcula RAD usando TODA la categoría; recién después corta Top 10/20/50.
-    const { ranking: fullRanking, radContext } = buildRadRankingFromResults(results);
     const totalActivePlayers = fullRanking.filter((item) => Number(item.played || 0) > 0).length;
     const ranking = fullRanking.slice(0, limit);
 
@@ -3051,11 +3113,16 @@ async function getRegisteredPlayersForTeam(teamId) {
 
   const { rows } = await pool.query(
     `
-    SELECT id, TRIM(nombre) AS name
-    FROM jugadores
-    WHERE equipo_id = $1
-      AND TRIM(COALESCE(nombre, '')) <> ''
-    ORDER BY orden ASC, nombre ASC, id ASC
+    SELECT DISTINCT ON (j.id)
+      j.id,
+      TRIM(j.nombre) AS name,
+      COALESCE(je.orden, j.orden) AS orden
+    FROM jugadores j
+    LEFT JOIN jugador_equipos je ON je.jugador_id = j.id
+    WHERE COALESCE(je.equipo_id, j.equipo_id) = $1
+      AND COALESCE(je.activo, true) = true
+      AND TRIM(COALESCE(j.nombre, '')) <> ''
+    ORDER BY j.id, COALESCE(je.orden, j.orden) ASC, j.nombre ASC
     `,
     [teamId]
   );
@@ -3123,12 +3190,12 @@ router.get('/team-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions, team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
     }
 
-    const [registeredPlayers, results] = await Promise.all([
+    const [registeredPlayers, rankingData] = await Promise.all([
       getRegisteredPlayersForTeam(exactTeam.id),
-      buildAllValidatedCrucesForPlayerQuery(category)
+      buildRadRankingFromJugadorResultados(category)
     ]);
 
-    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
+    const { ranking: categoryRanking, radContext } = rankingData;
     const categoryPlayersByKey = new Map();
 
     categoryRanking.forEach((item) => {
@@ -3170,6 +3237,9 @@ router.get('/team-query', async (req, res) => {
     };
 
     registeredPlayers.forEach(ensureTeamPlayer);
+    categoryRanking
+      .filter((item) => teamInfoMatchesSide(exactTeam, item.teamSlug, item.teamName))
+      .forEach(ensureTeamPlayer);
 
     const players = Array.from(playersMap.values()).sort(sortPlayerRadRows);
     const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
