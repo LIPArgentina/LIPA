@@ -1,4 +1,4 @@
-// cruces.routes.db.js
+
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
@@ -448,7 +448,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ===== ADMIN CRUCES (compatibilidad con frontend) =====
+
 const crucesEnabledUntilByKey = new Map();
 
 function normalizeCrucesAdminKey(team, fechaKey) {
@@ -531,7 +531,7 @@ router.post('/enable', requireAdmin, (req, res) => {
 
   const now = Date.now();
   const key = normalizeCrucesAdminKey(team, fechaKey);
-  const until = now + (48 * 60 * 60 * 1000); // 48 horas
+  const until = now + (48 * 60 * 60 * 1000);
   crucesEnabledUntilByKey.set(key, until);
 
   res.json({

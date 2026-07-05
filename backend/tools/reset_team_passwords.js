@@ -1,24 +1,24 @@
-/**
- * Reset de contraseñas (equipos) – LIGA / LIPA
- *
- * - Lee backend/data/team_passwords.json (o el archivo que le pases por argv)
- * - Genera:
- *    1) backend/data/team_passwords.json  (nuevo, con hashes bcrypt)
- *    2) backend/data/team_passwords.export.csv (slug,password en claro para que las repartas)
- *
- * Uso:
- *   node tools/reset_team_passwords.js
- *   node tools/reset_team_passwords.js backend/data/team_passwords.json
- *
- * Requisitos:
- *   npm i bcrypt
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
 
 const inFile = process.argv[2] || path.join("backend", "data", "team_passwords.json");
-const outFile = inFile; // sobreescribe el mismo archivo
+const outFile = inFile;
 const exportCsv = path.join(path.dirname(inFile), "team_passwords.export.csv");
 
 function readJson(p){
@@ -26,7 +26,7 @@ function readJson(p){
 }
 
 function randPassword(len=10){
-  // Evito caracteres confusos
+
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#";
   let out = "";
   for(let i=0;i<len;i++){
@@ -62,7 +62,7 @@ function randPassword(len=10){
 
   fs.writeFileSync(outFile, JSON.stringify(newHashes, null, 2) + "\n", "utf8");
 
-  // CSV
+
   const csvText = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n") + "\n";
   fs.writeFileSync(exportCsv, csvText, "utf8");
 

@@ -42,8 +42,8 @@ function normalizeTeamName(name){
   if (!raw) return '';
   const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
-  // Ojo: ANEXO existe en Tercera y ANEXO 2DA existe en Segunda.
-  // No hay que convertir ANEXO -> ANEXO 2DA salvo que la llave sea de Segunda.
+
+
   if (currentCategory === 'segunda') {
     const aliasesSegunda = {
       'ANEXO': 'ANEXO 2DA',

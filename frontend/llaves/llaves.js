@@ -68,8 +68,8 @@ function normalizeTeamName(name){
   if (!raw) return '';
   const upper = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
-  // ANEXO y ANEXO 2DA son equipos distintos según la categoría.
-  // La normalización tiene que respetar la categoría actual.
+
+
   if (currentCategory === 'segunda') {
     const aliasesSegunda = {
       'ANEXO': 'ANEXO 2DA',
@@ -290,8 +290,8 @@ function computeStandings(category, ida, vuelta){
       }
     });
 
-    // Si todo está en cero, lo consideramos no jugado para JU,
-    // pero no afecta puntos/triángulos.
+
+
     const played = (
       match.home.puntos > 0 ||
       match.away.puntos > 0 ||
@@ -371,7 +371,7 @@ function setTwoLegTie(data, roundId, firstPlaceTeam, secondPlaceTeam){
   const first = normalizeTeamName(firstPlaceTeam) || 'WO';
   const second = normalizeTeamName(secondPlaceTeam) || 'WO';
 
-  // Regla LIPA: el 1ro de grupo arranca visitante/derecha y define local/izquierda.
+
   round.legs[0].home.team = second;
   round.legs[0].away.team = first;
   round.legs[1].home.team = first;
@@ -710,8 +710,6 @@ function llSeriesWinner(round){
     return { winner:'WO', loser:'WO', decided:false, needsExtra:false };
   }
 
-  // Regla visual: el primero de grupo juega ida de visitante y vuelta de local.
-  // Por eso acumulamos por nombre de equipo y no por lado fijo.
   const acc = {};
   [firstTeam, secondTeam].forEach(t => acc[t] = { pts:0, tri:0 });
 
@@ -782,9 +780,7 @@ function llSetSeriesTeams(round, teamA, teamB){
     return;
   }
 
-  // ida: equipo A visitante/derecha, equipo B local/izquierda
   llSetLegTeams(round, 0, teamB, teamA);
-  // vuelta: equipo A local/izquierda, equipo B visitante/derecha
   llSetLegTeams(round, 1, teamA, teamB);
 
   if (round.legs[2]) {
@@ -901,7 +897,6 @@ function mergeSavedEditableData(baseData, savedData){
     const savedRound = savedData.rounds.find(r => r?.id === round.id);
     if (!savedRound || !Array.isArray(savedRound.legs)) return;
 
-    // Si la DB tenía más partidos que el default (desempate), los recreamos.
     while (round.legs.length < savedRound.legs.length) {
       const savedLeg = savedRound.legs[round.legs.length] || {};
       const extra = getEmptyLeg();
@@ -917,7 +912,6 @@ function mergeSavedEditableData(baseData, savedData){
 
       leg.date = typeof savedLeg.date === 'string' ? savedLeg.date : leg.date;
 
-      // En desempate sí persistimos equipos porque el partido nace dinámicamente.
       if (index >= 2) {
         leg.home.team = normalizeTeamName(savedLeg?.home?.team) || leg.home.team;
         leg.away.team = normalizeTeamName(savedLeg?.away?.team) || leg.away.team;
@@ -940,21 +934,15 @@ async function renderCategory(category){
 
   const data = getDefaultData(category);
 
-  // 1) clasificados iniciales siempre desde fixture/tablas
   CURRENT_STANDINGS = await applyAutomaticEntrants(data, category);
 
-  // 2) recuperar resultados/fechas guardadas
   const savedDbData = await loadFromServer(category);
   mergeSavedEditableData(data, savedDbData);
 
-  // 3) avanzar automáticamente y crear desempate si corresponde
   applyAutomaticAdvance(data);
 
-  // 4) volver a aplicar DB DESPUÉS de crear el desempate,
-  // porque el extra no existe en la estructura inicial.
   mergeSavedEditableData(data, savedDbData);
 
-  // 5) recalcular avance con los valores reales del desempate
   applyAutomaticAdvance(data);
 
   renderBracket(data);

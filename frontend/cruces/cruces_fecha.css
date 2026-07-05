@@ -23,11 +23,11 @@ body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial;
 }
 
-/* Contenedor principal sin escalado global */
+
 #pageScaleRoot {
   width: 100%;
 }
-/* === LAYOUT PRINCIPAL === */
+
 .wrap {
   width: min(calc(var(--slot-base-w) * var(--slot-scale, 1) + 36px + 12px + 36px + 12px + 44px), 100%);
 }
@@ -72,7 +72,7 @@ body {
   font-size: 22px;
 }
 
-/* === FILAS === */
+
 .row {
   display: flex;
   align-items: center;
@@ -139,7 +139,7 @@ body {
 
 @keyframes fadeIn { to { opacity: 1; } }
 
-/* === PUNTOS === */
+
 #planilla-root-left .row .slot,
 #planilla-root-right .row .slot {
   width: calc(var(--slot-base-w) * var(--slot-scale, 1));
@@ -188,7 +188,7 @@ body {
   margin: 0;
 }
 
-/* === ORDEN EN DERECHA === */
+
 #planilla-root-right .row {
   display: flex;
   justify-content: flex-end;
@@ -199,7 +199,7 @@ body {
 #planilla-root-right .row .slot     { order: 2; }
 #planilla-root-right .row .badge    { order: 3; }
 
-/* === TOTALES === */
+
 .totals-wrap { margin-top: 18px; display: flex; }
 #planilla-root-left .totals-wrap  { justify-content: flex-end; }
 #planilla-root-right .totals-wrap { justify-content: flex-start; }
@@ -252,7 +252,7 @@ body {
 #planilla-root-left .totals-chip  { flex-direction: row; }
 #planilla-root-right .totals-chip { flex-direction: row-reverse; }
 
-/* === PUNTOS FINALES === */
+
 .wins-wrap { margin-top: 12px; display: flex; }
 #planilla-root-left .wins-wrap  { justify-content: flex-end; }
 #planilla-root-right .wins-wrap { justify-content: flex-start; }
@@ -295,7 +295,7 @@ body {
 #planilla-root-left .wins-chip  { flex-direction: row; justify-content: center; }
 #planilla-root-right .wins-chip { flex-direction: row-reverse; justify-content: center; }
 
-/* === HEADER === */
+
 .header-bg {
   width: 100%;
   background: #0a0a0a;
@@ -303,7 +303,7 @@ body {
 }
 
 .header-bg .container {
-  max-width: none;     /* ocupa todo el ancho */
+  max-width: none;
   width: 100%;
   padding: 8px 16px;
   margin: 0;
@@ -322,7 +322,7 @@ header.lpi-top {
 }
 
 .logo-link { display: inline-flex; line-height: 0; }
-.liga-logo { width: 42px; height: 42px; object-fit: contain; display: block; } /* ~30% más chico */
+.liga-logo { width: 42px; height: 42px; object-fit: contain; display: block; }
 
 
 .actions { margin-left: auto; display: flex; }
@@ -332,7 +332,7 @@ header.lpi-top {
   background: transparent;
   color: #ffcc00;
   font-weight: 800;
-  padding: 4px 12px; /* botón un poco más chico */
+  padding: 4px 12px;
   border-radius: 8px;
   text-decoration: none;
   display: inline-flex;
@@ -346,7 +346,7 @@ header.lpi-top {
 
 .content-under-header { padding: 8px 16px 0; }
 
-/* === GRID === */
+
 .cruces-grid {
   display: grid;
   grid-template-columns: repeat(2, auto);
@@ -365,7 +365,7 @@ header.lpi-top {
   margin: 0 0 4px;
 }
 
-/* === BOTÓN VALIDAR CENTRADO === */
+
 .validate-cta {
   grid-column: 1 / -1;
   display: flex;
@@ -378,7 +378,7 @@ header.lpi-top {
   font-weight: 900;
   font-size: 16px;
   color: #000;
-  background: #ffcc00; /* dorado modo espera */
+  background: #ffcc00;
   border: 1px solid #b28900;
   border-radius: 12px;
   cursor: pointer;
@@ -387,11 +387,11 @@ header.lpi-top {
 }
 
 .btn-validate:hover:not(:disabled) {
-  background: #ffd633; /* dorado un poco más claro al hover */
+  background: #ffd633;
   transform: translateY(-2px);
 }
 
-.btn-validate.success { 
+.btn-validate.success {
   background: linear-gradient(145deg, #00c853, #009624) !important;
   border: 1px solid #0f5132 !important;
   color: #ffffff;
@@ -402,7 +402,7 @@ header.lpi-top {
 .btn-validate.error { background: #d32f2f !important; animation: shake 0.5s; }
 .btn-validate.rival-pending { background: #d81b60; }
 
-/* === TOAST === */
+
 .toast {
   position: fixed;
   bottom: 20px;
@@ -427,22 +427,22 @@ header.lpi-top {
 .toast-error   { background: #d32f2f; }
 .toast-info    { background: #1976d2; }
 
-/* === ANIMACIONES === */
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-5px); }
   75% { transform: translateX(5px); }
 }
 
-/* === ACCESIBILIDAD === */
+
 .btn:focus-visible,
 .pts-select:focus {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* === RESPONSIVE === */
-/* === ESTADOS === */
+
+
 .error {
   background: #2b1212;
   color: #ffb4b4;
@@ -466,13 +466,13 @@ header.lpi-top {
   font-size: 14px;
 }
 
-/* --- Rol de lado, pequeño y gris sobre el nombre --- */
+
 #planilla-root-left .card .title::before {
   content: "LOCAL";
   display: block;
   font-size: 20px;
   line-height: 1.1;
-  color: #6b7280; /* gris medio */
+  color: #6b7280;
   letter-spacing: 0.06em;
   margin-bottom: 2px;
   text-transform: uppercase;
@@ -484,31 +484,31 @@ header.lpi-top {
   display: block;
   font-size: 20px;
   line-height: 1.1;
-  color: #6b7280; /* gris medio */
+  color: #6b7280;
   letter-spacing: 0.06em;
   margin-bottom: 2px;
   text-transform: uppercase;
   font-weight: 600;
 }
 
-/* Apilar etiqueta y título en columna */
+
 #planilla-root-left .card .title,
 #planilla-root-right .card .title {
   display: flex;
-  flex-direction: column;      /* etiqueta arriba, título abajo */
-  align-items: center;     /* alineado a la izquierda */
+  flex-direction: column;
+  align-items: center;
   line-height: 1.1;
 }
 
-/* Asegurar que la etiqueta quede antes del texto del título */
+
 #planilla-root-left .card .title::before,
 #planilla-root-right .card .title::before {
-  order: -1;                   /* va arriba */
-  margin-bottom: 2px;          /* separa de THE CUES/BABYLON */
+  order: -1;
+  margin-bottom: 2px;
 }
 
 
-/* === Mobile estable real (sin zoom ni overflow) === */
+
 @media (max-width: 900px) {
   .content-under-header {
     padding: 8px 8px 0;
@@ -782,13 +782,13 @@ header.lpi-top {
 }
 
 
-/* Pictures */
+
 .btn-picture{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 16px;border-radius:12px;border:1px solid #caa24b;background:transparent;color:#fff;text-decoration:none;font-weight:700;}
 .btn-picture.disabled{opacity:.45;pointer-events:none;}
 
 
 
-/* Ajustes de cruces fecha */
+
 .header-title {
   margin: 0;
   font-weight: 900;
@@ -816,7 +816,7 @@ header.lpi-top {
 }
 
 
-/* Ajuste de nombres largos */
+
 #planilla-root-left .card .title,
 #planilla-root-right .card .title,
 #planilla-root-left .card .meta,
@@ -882,7 +882,7 @@ header.lpi-top {
 }
 
 
-/* Ajuste fino de ancho y alineación */
+
 .wrap {
   width: min(calc(var(--slot-base-w) + 36px + 12px + 36px + 12px + 44px), 100%);
   max-width: 404px;
@@ -977,7 +977,7 @@ header.lpi-top {
 }
 
 
-/* ===== Export buttons + hidden A4 export ===== */
+
 .actions{
   gap:10px;
   flex-wrap:wrap;
@@ -1157,7 +1157,7 @@ header.lpi-top {
 }
 
 
-/* ===== Fix de alineación responsive entre ambas columnas ===== */
+
 .cruces-grid > section {
   min-width: 0;
 }
@@ -1197,7 +1197,7 @@ header.lpi-top {
 }
 
 
-/* ===== Fix final Chrome/WebView: alturas más rígidas arriba ===== */
+
 #planilla-root-left .card .title,
 #planilla-root-right .card .title {
   min-height: 78px;
@@ -1248,7 +1248,7 @@ header.lpi-top {
   }
 }
 
-/* === DESEMPATE DE SERIE === */
+
 .tiebreak-card{
   max-width:min(920px, calc(100vw - 24px));
   margin:18px auto 28px;
@@ -1381,7 +1381,7 @@ header.lpi-top {
   .tiebreak-header{ flex-direction:column; }
 }
 
-/* Ajustes desempate: validación visual */
+
 .tiebreak-player.tiebreak-field-error,
 .tiebreak-points.tiebreak-field-error{
   border:2px solid #ff4d4d !important;
@@ -1401,7 +1401,7 @@ header.lpi-top {
 }
 
 
-/* === BOTÓN UBICACIÓN GOOGLE MAPS EN CRUCES === */
+
 .team-map-btn{
   display:inline-flex;
   align-items:center;

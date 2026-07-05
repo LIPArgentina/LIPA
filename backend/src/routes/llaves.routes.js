@@ -165,7 +165,7 @@ module.exports = function createLlavesRouter() {
       return;
     }
 
-    // El mejor posicionado (teamA) arranca visitante y define la vuelta de local.
+
     setLegTeams(round, 0, teamB, teamA);
     setLegTeams(round, 1, teamA, teamB);
 
@@ -547,9 +547,9 @@ module.exports = function createLlavesRouter() {
       const rawData = result.rows[0]?.data || null;
       const data = rawData ? JSON.parse(JSON.stringify(rawData)) : null;
 
-      // El frontend arma semifinales/final dinámicamente a partir de cuartos.
-      // Para que /proximo-cruce vea lo mismo que la pantalla de llaves,
-      // recalculamos el avance en memoria antes de buscar el partido.
+
+
+
       if (data && Array.isArray(data.rounds)) {
         const [ida, vuelta] = await Promise.all([
           fetchFixtureData('ida', category),
@@ -567,8 +567,8 @@ module.exports = function createLlavesRouter() {
         const legs = Array.isArray(round?.legs) ? round.legs : [];
 
         legs.forEach((leg, legIndex) => {
-          // El desempate (leg 2) no se abre como planilla completa;
-          // se gestiona desde el bloque DESEMPATE en cruces_fecha.
+
+
           if (legIndex >= 2) return;
           if (!legContainsTeam(leg, teamKey)) return;
 
@@ -639,8 +639,8 @@ module.exports = function createLlavesRouter() {
           round.legs = [];
         }
 
-        // Marca para que el frontend no lo regenere automáticamente
-        // hasta que vuelvan a guardar valores distintos en ida/vuelta.
+
+
         round.extraDeleted = true;
       }
 
@@ -659,9 +659,9 @@ module.exports = function createLlavesRouter() {
     }
   }
 
-  // Soporta ambos montajes:
-  // router.use(createLlavesRouter()) => /api/llaves
-  // router.use('/llaves', createLlavesRouter()) => /api/llaves
+
+
+
   router.get('/llaves/proximo-cruce', getProximoCruce);
   router.get('/proximo-cruce', getProximoCruce);
 

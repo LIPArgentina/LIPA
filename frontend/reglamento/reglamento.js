@@ -143,7 +143,7 @@
   });
 
 
-  // Lightbox para ampliar imágenes del reglamento
+
   const figureButtons = $$('.rule-figure__button');
   let lightbox = null;
 

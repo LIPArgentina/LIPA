@@ -1,6 +1,6 @@
-/* cruces_fecha.js — FINAL: TRIÁNGULOS ARRIBA, PUNTOS ABAJO, PAREJAS 1 SELECT, RUTA ../fecha/ */
+
 (() => {
-  'use strict';  // ---------------- UTILS ----------------
+  'use strict';
   const dtf = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' });
 
   const normalize = (s = '', { stripHyphens = false } = {}) => {
@@ -334,7 +334,6 @@ function apiUrl(path){
     rounds.forEach((round, roundIndex) => {
       const legs = Array.isArray(round?.legs) ? round.legs : [];
       legs.forEach((leg, legIndex) => {
-        // El desempate se maneja en el bloque de desempate, no como planilla completa.
         if (legIndex >= 2) return;
         const homeKey = normalizeLlavesTeam(leg?.home?.team);
         const awayKey = normalizeLlavesTeam(leg?.away?.team);
@@ -366,7 +365,6 @@ function apiUrl(path){
     const cleanTeam = String(team || '').trim();
     if (!cleanCategory || !cleanTeam) return null;
 
-    // 1) Camino ideal: backend ya calcula el próximo cruce igual que la pantalla de llaves.
     try {
       const qs = new URLSearchParams({
         category: cleanCategory,
@@ -393,7 +391,6 @@ function apiUrl(path){
       console.warn('No se pudo cargar próximo cruce desde /api/llaves/proximo-cruce; pruebo fallback /api/llaves', err);
     }
 
-    // 2) Fallback: si el endpoint nuevo no existe o devuelve vacío, leo la data guardada de llaves.
     try {
       const qs = new URLSearchParams({ category: cleanCategory });
       const data = await fetchJson(apiUrl('/api/llaves?') + qs.toString(), {
@@ -600,7 +597,6 @@ function apiUrl(path){
   }
 
 
-  // ---------------- DATA LOADING ----------------
   function getStoredCrucesCandidates() {
     return getCrucesTeamContext().candidates.slice();
   }
@@ -650,7 +646,6 @@ function apiUrl(path){
   }
 
 
-  // ---------------- CARGAR PLANILLAS DESDE BACKEND (MISMO ORIGEN QUE VISOR) ----------------
   let __PLANILLAS_CACHE = null;
 
   function emptyPlanilla(team = '') {
@@ -788,7 +783,6 @@ function apiUrl(path){
   }
 
 
-  // ---------------- RENDER ----------------
   function createPtsSelect() {
     const wrap = document.createElement('div');
     wrap.className = 'pts-edit';
@@ -865,7 +859,6 @@ function apiUrl(path){
   }
 
 
-  // ---------------- UBICACIÓN GOOGLE MAPS ----------------
   function extractCoords(value){
     const text = String(value || '').trim();
 
@@ -1007,7 +1000,7 @@ function apiUrl(path){
     root.appendChild(card);
   }
 
-  // ---------------- SCORES: TRIÁNGULOS ARRIBA, PUNTO GENERAL POR COMPARACIÓN DIRECTA ----------------
+
   function getScoreRows(rootId) {
     const root = document.getElementById(rootId);
     if (!root) return [];
@@ -1075,7 +1068,7 @@ function apiUrl(path){
   }
 
 
-  // ---------------- CAMBIOS CON SUPLENTES ----------------
+
   function ensureSwapStyles(){
     if (document.getElementById('swap-styles')) return;
     const style = document.createElement('style');
@@ -1456,7 +1449,7 @@ function apiUrl(path){
     return values.some(v => String(v || '').trim() !== '');
   }
 
-  // ---------------- VALIDACIÓN ----------------
+
   function setupValidationButtons(local, visitante, matchDate) {
     const cta = document.getElementById('validateCta');
     const btn = document.getElementById('btnValidarGlobal');
@@ -1468,8 +1461,8 @@ function apiUrl(path){
 
     cta.hidden = false;
 
-     
-// === AUTOSAVE + STATUS HELPERS ===
+
+
 const toDateAR = (d = new Date()) => {
   const z = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
   const pad = n => String(n).padStart(2, '0');
@@ -1701,7 +1694,7 @@ function startValidationPolling(btn) {
         showToast('Validación exitosa', 'success');
       } else if (data?.tipo === 'mismatch') {
         if (Array.isArray(data?.diff)) applyMismatchDiff(data.diff);
-        // NO cortamos polling: seguimos esperando que el rival corrija
+
         setBtnState('pending', data?.mensaje || 'Esperando que el rival corrija y valide');
       }
     } catch (_) {}
@@ -1765,7 +1758,7 @@ async function saveMatchStatus(validated = false) {
   return data;
 }
 
-// AUTOSAVE
+
 function autosaveSave() {
   try {
     const payload = { fechaISO: getCurrentFechaISO(), left: readAllSelects('planilla-root-left'), right: readAllSelects('planilla-root-right') };
@@ -1815,7 +1808,7 @@ function autosaveAttachListeners(){
   });
 }
 
-// STATUS autocarga: primero borrador propio, si no existe compartido final
+
 async function tryApplyStatusIfExists(){
   if (ADMIN_TEST_MODE) return false;
   try {
@@ -1828,9 +1821,9 @@ async function tryApplyStatusIfExists(){
     if (!res.ok || !result?.ok || !result?.data) return false;
 
     const data = result.data;
-    // Importante: el match-status puede quedar viejo respecto de /api/admin/planillas.
-    // Para no pisar la planilla vigente, acá solo restauramos puntajes/estado del cruce.
-    // Los nombres/jugadores se siguen tomando siempre de la planilla base renderizada.
+
+
+
 
     const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
     const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
@@ -1848,7 +1841,7 @@ async function tryApplyStatusIfExists(){
   } catch { return false; }
 }
 
-// Inicializar
+
 autosaveApplyIfAny();
 autosaveAttachListeners();
 tryApplyStatusIfExists();
@@ -1881,7 +1874,7 @@ btnSubirFotos?.addEventListener('click', (ev) => {
 updatePictureButton(false);
 
 
-// === DESEMPATE DE SERIE ===
+
 let tiebreakPollTimer = null;
 let tiebreakUserDirty = false;
 
@@ -1992,8 +1985,6 @@ function wireTiebreakDirtyGuard(locked) {
   const markTiebreakEdited = () => {
     tiebreakUserDirty = true;
 
-    // Si el equipo estaba esperando al rival pero necesita corregir algo,
-    // detenemos el polling para que no vuelva a pisar los campos mientras edita.
     if (tiebreakPollTimer) {
       clearInterval(tiebreakPollTimer);
       tiebreakPollTimer = null;
@@ -2109,8 +2100,6 @@ function wireTiebreakActions(locked) {
     const error = validateTiebreakStatus(status);
     if (error) { setTiebreakMsg(error, 'error'); return; }
     try {
-      // A partir de este POST, el estado local vuelve a estar sincronizado.
-      // Si queda pendiente, el polling debe seguir hasta que responda el rival.
       tiebreakUserDirty = false;
       btn.disabled = true;
       btn.textContent = 'VALIDANDO...';
@@ -2194,8 +2183,6 @@ async function refreshTiebreakBlock() {
 function startTiebreakPolling() {
   if (tiebreakPollTimer) clearInterval(tiebreakPollTimer);
   tiebreakPollTimer = setInterval(async () => {
-    // Si el capitán está corrigiendo, no consultamos para no pisar la UI.
-    // El polling se reanuda automáticamente cuando vuelve a validar.
     if (tiebreakUserDirty) return;
 
     const data = await refreshTiebreakBlock();
@@ -2469,8 +2456,8 @@ btn.onclick = async () => {
     setTimeout(() => toast.classList.remove('show'), 3000);
   }
 
-  
-  
+
+
 function sheetFileNameForMatch(ext){
   const exportData = window.__CRUCE_EXPORT_DATA__ || {};
 
@@ -2876,7 +2863,6 @@ function isAndroidAppWebView(){
   }
 
 
-  // ---------------- SYNC ----------------
   function syncSlotWidths() {
     document.documentElement.style.setProperty('--slot-base-w', '300px');
   }
@@ -2978,7 +2964,6 @@ function isAndroidAppWebView(){
   }
 
 
-  // ---------------- BOOT ----------------
   async function bootCruces() {
     const loading = document.createElement('div');
     loading.className = 'loading';
@@ -2997,8 +2982,6 @@ function isAndroidAppWebView(){
 
       let match = findCruceForTeam(cruces, teamCandidates);
 
-      // Si el fixture ya no tiene una fecha/cruce para este equipo,
-      // pasamos a llaves para tomar el próximo rival eliminatorio.
       if (!match) {
         match = await loadProximoCruceFromLlaves(category, teamSlug);
       }
@@ -3056,7 +3039,6 @@ function isAndroidAppWebView(){
   }
 
 
-  // ---------------- INIT ----------------
 window.addEventListener('load', async () => {
   setupAdminTestMode();
   wireExportButtons();
@@ -3067,7 +3049,6 @@ window.addEventListener('load', async () => {
     bootCruces().catch(console.error);
   }
 
-  // === BOTÓN VOLVER ===
   const volverBtn = document.getElementById('btnVolver');
   if (volverBtn) {
     volverBtn.addEventListener('click', (e) => {

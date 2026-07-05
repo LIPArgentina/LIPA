@@ -1,13 +1,13 @@
-// === Config ===
+
 const sessionKey = "lpi.session";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
-// Header / acciones
+
 const btnAdminEquipos = $("#btnAdminEquipos");
 const btnBanner = $("#btnBanner");
 
-// --- Helpers ---
+
 function readSession() {
   try {
     return JSON.parse(localStorage.getItem(sessionKey) || "null");
@@ -24,7 +24,7 @@ function openLoginWindow() {
   const left = Math.max(0, Math.round((window.screen.width - width) / 2));
   const top = Math.max(0, Math.round((window.screen.height - height) / 2));
 
-  // En mobile conviene abrir normal
+
   if (isMobile) {
     window.location.href = url;
     return;
@@ -36,7 +36,7 @@ function openLoginWindow() {
     `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
   );
 
-  // Fallback si el navegador bloquea popup
+
   if (!popup || popup.closed || typeof popup.closed === "undefined") {
     window.location.href = url;
     return;
@@ -74,13 +74,13 @@ function wireIncomingAuthEvents() {
   });
 }
 
-// --- Boot ---
+
 document.addEventListener("DOMContentLoaded", () => {
   renderSession(readSession());
   wireIncomingAuthEvents();
 });
 
-// === Sesión / Header ===
+
 function renderSession(sess) {
   const box = $("#sessionBox");
   const brandCta = $(".brand__cta");

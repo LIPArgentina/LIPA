@@ -282,7 +282,7 @@ header img{ height:60px; width:auto; display:block; }
 }
 
 
-/* Ajustes finales solicitados */
+
 
 [data-round-card="q1"] .tie-subtitle,
 [data-round-card="q2"] .tie-subtitle,
@@ -304,7 +304,7 @@ header img{ height:60px; width:auto; display:block; }
 }
 
 
-/* bajar jerarquía cuartos y semis */
+
 [data-round-card="q1"] .tie-title,
 [data-round-card="q2"] .tie-title,
 [data-round-card="q3"] .tie-title,
@@ -338,7 +338,7 @@ header img{ height:60px; width:auto; display:block; }
 }
 
 
-/* Desempate: solo muestra puntos, sin triángulos/puntosExtra */
+
 .match-block-extra .team-row-extra{
   grid-template-columns:34px minmax(220px,1fr) minmax(220px,1fr) 34px;
 }

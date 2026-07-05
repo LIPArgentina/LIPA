@@ -1,4 +1,4 @@
-// backend/src/routes/admin.routes.js
+
 const express = require('express');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -14,7 +14,7 @@ module.exports = function createAdminRouter(deps) {
 
   const router = express.Router();
 
-  // ----- Admin password store -----
+
   const ADMIN_STORE = path.join(DATA_DIR, 'admin_password.json');
   let adminPassword = readJSON(ADMIN_STORE, null);
   if (!adminPassword?.hash) {
@@ -76,7 +76,7 @@ module.exports = function createAdminRouter(deps) {
     return updated.rows[0] || { ...team, password_hash: hash, must_change_password: true };
   }
 
-  // ====== API: Admin ======
+
   router.post('/admin/login', async (req, res) => {
     const { password } = req.body || {};
     if (!password) return res.status(400).json({ ok: false, msg: 'faltan campos' });
@@ -114,7 +114,7 @@ module.exports = function createAdminRouter(deps) {
     return res.json({ ok: true });
   });
 
-  // ====== API: Team Login (DB + JWT) ======
+
   router.post('/team/login', async (req, res) => {
     const { slug, password } = req.body || {};
     if (!slug || !password) {

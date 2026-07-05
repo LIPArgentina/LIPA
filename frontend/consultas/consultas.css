@@ -143,7 +143,7 @@ header img{ height:34px; width:auto; display:block; }
   .reload-btn{ width:100%; }
 }
 
-/* Sistema RAD LIPA */
+
 .hero-buttons{
   display:flex;
   gap:8px;
@@ -271,7 +271,7 @@ body.modal-open{
 }
 
 
-/* Consulta individual: RAD visible en web y responsive */
+
 .summary-box{
   grid-template-columns:minmax(180px,260px) minmax(0,1fr);
 }

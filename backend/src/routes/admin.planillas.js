@@ -66,7 +66,6 @@ async function enrichPlanillaWithPlayerIds(planilla, equipoId) {
   };
 }
 
-// GET /api/admin/planillas
 router.get('/planillas', async (req, res) => {
   try {
     const result = await pool.query(`

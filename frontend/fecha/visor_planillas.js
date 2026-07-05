@@ -1,4 +1,4 @@
-// base del backend
+
 const API_BASE = (() => {
   const configured = window.APP_CONFIG?.API_BASE_URL;
   if (configured) return String(configured).replace(/\/+$/, "");
@@ -144,11 +144,11 @@ const API_BASE = (() => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-    // diferencia en días
+
     const diffMs = today.getTime() - target.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    return diffDays >= 0 && diffDays <= 3; // 👈 4 días (0,1,2,3)
+    return diffDays >= 0 && diffDays <= 3;
   }catch(_){
     return false;
   }
@@ -346,7 +346,7 @@ const API_BASE = (() => {
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]/g, '');
 
-    // Prioridad 1: resolver por slug / team key guardado en DB
+
     if (
       /(?:^|[_\s-])tercera$/.test(raw.toLowerCase()) ||
       compact.endsWith('tercera') ||
@@ -361,7 +361,7 @@ const API_BASE = (() => {
       compact.endsWith('2nda')
     ) return 'segunda';
 
-    // Prioridad 2: fallback legacy por archivos de usuarios
+
     if(state.categories.tercera.has(normalized)) return 'tercera';
     if(state.categories.segunda.has(normalized)) return 'segunda';
 
@@ -525,7 +525,7 @@ window._sortBoards = function(mode){
   cards.forEach(c=>cont.appendChild(c));
 };
 
-// === Indicadores generales por categoría ===
+
 function resetCategoryHeaderIndicators(){
   ['tercera','segunda'].forEach((category) => {
     const suffix = category.charAt(0).toUpperCase() + category.slice(1);
@@ -625,8 +625,8 @@ function resetCategoryHeaderIndicators(){
 
   function scheduledAtFromDateKey(dateKey){
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return '';
-    // La fecha que viene de fixture/llaves es la fecha del encuentro.
-    // Los cruces deben liberarse un día antes a las 20:00 hs AR.
+
+
     const releaseDateKey = addDaysToDateKey(dateKey, -1);
     return releaseDateKey ? (releaseDateKey + 'T20:00:00-03:00') : '';
   }
@@ -644,7 +644,7 @@ function resetCategoryHeaderIndicators(){
     const possibleDate = node.date || node.fecha || node.fechaISO || node.fechaKey || node.scheduledAt;
     const hasMatchShape = !!(
       node.local || node.visitante || node.localSlug || node.visitanteSlug ||
-      // llaves.js guarda cada partido como leg.home / leg.away
+
       node.home || node.away ||
       node.teamA || node.teamB || node.equipoA || node.equipoB ||
       node.player1 || node.player2
@@ -794,8 +794,8 @@ function resetCategoryHeaderIndicators(){
 
     const status = await r.json();
 
-    // Si el backend trae una fecha vieja de fixture, el visor prefiere la próxima fecha de llaves.
-    // La fecha de llaves es la fecha del encuentro; la habilitación se muestra un día antes a las 20:00 hs.
+
+
     const llavesSchedule = await loadNextScheduleFromLlaves(category);
     if (llavesSchedule?.scheduledAt) {
       const statusFixtureDate = parseDateKeyFromValue(status?.nextFixtureDate);

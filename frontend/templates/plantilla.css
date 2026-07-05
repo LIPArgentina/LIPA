@@ -5,7 +5,7 @@ body {
     margin: 0;
   }
 
-  /* Header con logo (izquierda) + acciones (derecha) */
+
   header {
     position: static;
     background: rgba(0,0,0,.85);
@@ -22,20 +22,20 @@ body {
   .main-container{
     max-width: 1100px;
     width: min(100%, 1100px);
-    margin-inline: auto;   
+    margin-inline: auto;
     padding-inline: clamp(12px, 3vw, 24px);
     box-sizing: border-box;
   }
   .main-container{
-    justify-content: center; 
- 
+    justify-content: center;
+
 }
   .team-name{
     margin-left: 12px;
     font-weight: 900;
     letter-spacing: .06em;
     text-transform: uppercase;
-    color: #f3e7aa; /* dorado suave */
+    color: #f3e7aa;
     font-size: 18px;
     white-space: nowrap;
   }
@@ -88,22 +88,22 @@ body {
 
   #alert {
     position: fixed;
-    top: 100px;                 /* debajo del header fijo */
+    top: 100px;
     left: 50%;
     transform: translateX(-50%);
-    background: #ff2d2d;        /* rojo más vivo */
+    background: #ff2d2d;
     color: #fff;
     padding: 12px 18px;
     border-radius: 8px;
-    border: 2px solid #ffb3b3;  /* contorno para contraste */
+    border: 2px solid #ffb3b3;
     box-shadow: 0 8px 24px rgba(0,0,0,.45);
     font-weight: 900;
     letter-spacing: .02em;
     display: none;
-    z-index: 2000;              /* por encima del header (1000) */
+    z-index: 2000;
 }
 
-  /* Papelera */
+
   #trash {
     position: fixed;
     bottom: 30px;
@@ -122,7 +122,7 @@ body {
   }
   #trash.over { transform: scale(1.1); box-shadow: 0 0 10px #fff; }
 
-/* --- Recuadre de columnas y botón abajo --- */
+
 .jugadores-container, .extra-column, .player-card-panel{
   border:1px solid #ffffff22;
   border-radius:12px;
@@ -160,7 +160,7 @@ body {
 
 
 
-/* === LPI: Estética del popup de login/contraseña (oscuro + dorado) === */
+
 dialog.modal { padding: 0; border: none; background: transparent; }
 dialog.modal::backdrop { background: rgba(0,0,0,.55); }
 .modal__panel{
@@ -196,7 +196,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
 .success{ color:#4cd964; margin-top:8px; }
 
 
-  /* --- Botón centrado en el header --- */
+
   .header-middle{
     flex: 1;
     display: flex;
@@ -217,12 +217,12 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
 
   .btn-cruces.is-disabled{ opacity:.5; pointer-events:none; filter:grayscale(0.2); }
 
-/* Touch & Tap fallbacks */
+
 .tap-selecting { outline: 2px solid #4cd964 !important; }
 .tap-hint { outline: 2px dashed #888 !important; }
 .noselect, .fila, .yellow-box, .yellow-box-free { -webkit-user-select: none; user-select: none; }
-/* Prevent default touch gestures during pointer-drag on coarse pointers;
-   allow tapping to still click buttons/links quickly */
+
+
 @media (pointer: coarse){
   .fila, .yellow-box, .yellow-box-free { touch-action: manipulation; }
 }
@@ -255,7 +255,7 @@ dialog.modal { padding: 0 !important; }
     user-select: none;
   }
 
-/* Centrar y limitar tamaño del modal */
+
   dialog#passModal { position: fixed; inset: 0; margin: auto; transform: none; max-height: 90vh; overflow: auto; }
   dialog#passModal::backdrop { background: rgba(0,0,0,.55); }
   .player-card-photo{
@@ -277,11 +277,11 @@ dialog.modal { padding: 0 !important; }
   }
 
 .field__toggle input[type="checkbox"]{
-  accent-color: #d4af37;  /* dorado en vez de rojo */
+  accent-color: #d4af37;
 }
 
 
-/* ===== Ajuste real mobile: las dos tablas siguen lado a lado ===== */
+
 @media (max-width: 768px){
   body{
     overflow-x: hidden;
@@ -412,7 +412,7 @@ dialog.modal { padding: 0 !important; }
 }
 
 
-/* ===== Ajustes finos mobile ===== */
+
 @media (max-width: 768px){
   html, body{
     max-width: 100%;
@@ -521,7 +521,7 @@ dialog.modal { padding: 0 !important; }
   }
 }
 
-/* celulares angostos */
+
 @media (max-width: 420px){
   .main-container{
     gap: 4px !important;
@@ -569,7 +569,7 @@ dialog.modal { padding: 0 !important; }
   }
 }
 
-/* móvil horizontal */
+
 @media (max-width: 932px) and (orientation: landscape){
   .main-container{
     gap: 8px !important;
@@ -585,7 +585,7 @@ dialog.modal { padding: 0 !important; }
 }
 
 
-/* ===== Limpieza del espacio inferior ===== */
+
 html, body{
   min-height: 0;
 }
@@ -617,7 +617,7 @@ body{
   z-index: 9999 !important;
 }
 
-/* ===== Ajuste extra mobile ===== */
+
 @media (max-width: 768px){
   body{
     padding-bottom: 4px !important;
@@ -650,7 +650,7 @@ body{
   }
 }
 
-/* celulares muy chicos */
+
 @media (max-width: 420px){
   .jugador,
   .yellow-box,
@@ -663,7 +663,7 @@ body{
   }
 }
 
-/* ===== Header ultra compacto para móvil ===== */
+
 @media (max-width: 768px){
 
   header{
@@ -699,7 +699,7 @@ body{
 
 }
 
-/* ===== Icono contraseña en móvil ===== */
+
 @media (max-width: 768px){
 
   #headerActions a[href*="password"],
@@ -718,7 +718,7 @@ body{
 }
 
 
-/* ===== Override final header mobile estable ===== */
+
 @media (max-width: 768px){
   header{
     display:flex !important;
@@ -808,7 +808,7 @@ body{
 
 
 
-/* ===== Estado remoto de envío de planilla ===== */
+
 .btn-enviar:disabled{
   opacity:.5;
   cursor:not-allowed;
@@ -837,7 +837,7 @@ body{
 .btn-vaciar-planilla{ width:200px; max-width:100%; padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.22); background:transparent; color:#fff1a6; font-weight:800; cursor:pointer; }
 .btn-vaciar-planilla:hover{ background:rgba(255,255,255,.06); }
 
-/* ===== Layout final: tablas siempre juntas, ficha debajo ===== */
+
 .main-container{
   display:grid !important;
   grid-template-columns:minmax(0, 1fr) minmax(0, 1fr) !important;
@@ -893,7 +893,7 @@ body{
   }
 }
 
-/* ===== Popup claro para errores de envío ===== */
+
 .send-error-dialog{
   border:0;
   padding:0;

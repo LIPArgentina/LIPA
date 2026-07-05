@@ -1,4 +1,4 @@
-// backend/src/routes/banner.routes.js
+
 
 const express = require("express");
 const { getBanner, saveBanner } = require("../services/banner.service");
@@ -8,7 +8,7 @@ module.exports = function createBannerRouter() {
 
   const router = express.Router();
 
-  // GET banner
+
   router.get("/get-banner", async (req, res) => {
     try {
 
@@ -29,7 +29,7 @@ module.exports = function createBannerRouter() {
     }
   });
 
-  // SAVE banner
+
   router.post("/save-banner", requireAdmin, async (req, res) => {
 
     try {

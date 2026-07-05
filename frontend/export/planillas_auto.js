@@ -193,7 +193,7 @@ function extractLlavesCruces(raw){
   rounds.forEach((round, roundIndex) => {
     const legs = Array.isArray(round?.legs) ? round.legs : [];
     legs.forEach((leg, legIndex) => {
-      // El tercer leg/desempate no se imprime como planilla normal.
+
       if (legIndex >= 2) return;
       const cruce = buildCruceFromLlavesLeg(leg, round, roundIndex, legIndex);
       if (cruce) cruces.push(cruce);
@@ -319,9 +319,9 @@ function extractCrucesFromFechaNode(fechaNode){
     const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos.filter(Boolean) : [];
     if (!equipos.length) return;
 
-    // El fixture real guarda los encuentros por posición en el array:
-    // [local1, visitante1, local2, visitante2, ...]
-    // La categoría local/visitante puede existir, pero no es confiable como única fuente.
+
+
+
     for (let i = 0; i < equipos.length; i += 2) {
       const a = equipos[i];
       const b = equipos[i + 1];

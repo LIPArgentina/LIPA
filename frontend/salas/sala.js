@@ -172,8 +172,8 @@
         /maps\.app\.goo\.gl/i.test(location) ||
         /goo\.gl\/maps/i.test(location);
 
-      // Los links cortos no sirven como query para iframe: Google no los expande dentro del embed.
-      // Para el visor usamos la sala como búsqueda; el botón mantiene el link original.
+
+
       const embedQuery = isShortGoogleMaps && fallback ? fallback : location;
 
       return {
