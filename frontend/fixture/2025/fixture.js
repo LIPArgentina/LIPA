@@ -1,9 +1,9 @@
 (function(){
-  const KIND_KEY = 'fixture_kind';    // ida | vuelta
-  const CAT_KEY  = 'fixture_cat';     // primera | segunda | tercera
+  const KIND_KEY = 'fixture_kind';
+  const CAT_KEY  = 'fixture_cat';
   const SCRIPT_ID = 'fixture-data-script';
 
-  
+
   let PERSIST_WARNED = false;
 function removeExistingScript(){
     const old = document.getElementById(SCRIPT_ID);
@@ -22,7 +22,7 @@ function removeExistingScript(){
       document.head.appendChild(s);
     });
   }
-  
+
   function getStored(key, fallback){ try { return localStorage.getItem(key) || fallback; } catch(_) { return fallback; } }
   function setStored(key, val){
     try { localStorage.setItem(key, val); }
@@ -116,21 +116,21 @@ function removeExistingScript(){
   };
 })();
 
-// === Module chunk separator ===
 
-/* --- Cargar equipos desde usuarios.<cat>.js --- */
+
+
 function loadUsersJS(cat){
   return new Promise((resolve, reject) => {
     const ID = 'users-script';
     const old = document.getElementById(ID);
-    if (old) old.remove();                     // quita el script anterior si había
+    if (old) old.remove();
 
-    // Limpia LPI_USERS previo
+
     try { delete window.LPI_USERS; } catch(_) { window.LPI_USERS = undefined; }
 
     const s = document.createElement('script');
     s.id = ID;
-    s.src = `../data/usuarios.${cat}.js`;   // <-- tu ruta de JS
+    s.src = `../data/usuarios.${cat}.js`;
     s.onload = () => {
       const arr = (window.LPI_USERS || [])
         .filter(u => u.role === 'team')
@@ -146,7 +146,7 @@ function loadUsersJS(cat){
   });
 }
 
-// Restaura fechas desde el fixture (si el JS las trae)
+
 function restoreDatesFromFixture(fx){
   if (!fx || !Array.isArray(fx.fechas)) return;
   for (let fecha=1; fecha<=7; fecha++){
@@ -162,8 +162,8 @@ function restoreDatesFromFixture(fx){
   }
 }
 
-  
-/* --- Render con SELECTS: equipos + puntos --- */
+
+
 function renderRows(rowsCont, equipos, fecha, grupo, equiposCat){
   rowsCont.innerHTML = '';
   const __list = (equipos || []);
@@ -177,7 +177,7 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat){
     const row = document.createElement('div');
     row.className = 'row';
 
-    // Puntos local (0–9)
+
     const puntL = document.createElement('select');
     puntL.className = 'score-badge';
     puntL.dataset.field = 'puntos'; puntL.dataset.side = 'L';
@@ -185,7 +185,7 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat){
     for (let n=0; n<=9; n++){ const o=document.createElement('option'); o.value=o.textContent=String(n); puntL.appendChild(o); }
     if (L.puntos !== undefined && L.puntos !== '') puntL.value = String(L.puntos).slice(0,1);
 
-    // Equipo local
+
     const selL = document.createElement('select');
     selL.className = 'team-name';
     selL.dataset.field = 'equipo'; selL.dataset.side = 'L';
@@ -193,12 +193,12 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat){
     equiposCat.forEach(n => { const o=document.createElement('option'); o.value=o.textContent=n; selL.appendChild(o); });
     if (L.equipo) selL.value = L.equipo; else selL.value = 'WO';
 
-    // VS
+
     const vs = document.createElement('div');
     vs.className = 'vs';
     vs.textContent = 'VS';
 
-    // Equipo visitante
+
     const selV = document.createElement('select');
     selV.className = 'team-name';
     selV.dataset.field = 'equipo'; selV.dataset.side = 'V';
@@ -206,7 +206,7 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat){
     equiposCat.forEach(n => { const o=document.createElement('option'); o.value=o.textContent=n; selV.appendChild(o); });
     if (V.equipo) selV.value = V.equipo; else selV.value = 'WO';
 
-    // Puntos visitante (0–9)
+
     const puntV = document.createElement('select');
     puntV.className = 'score-badge';
     puntV.dataset.field = 'puntos'; puntV.dataset.side = 'V';
@@ -223,17 +223,17 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat){
   }
 }
 
-  
-/* --- applyFixture: carga usuarios según categoría y pinta --- */
+
+
 window.applyFixture = async function applyFixture(){
   const fx = window.LPI_FIXTURE;
   if (!fx) { alert('No se pudo cargar el fixture'); return; }
 
-  // categoría guardada (tal como ya hacías)
-  const cat = (localStorage.getItem('fixture_cat') || 'tercera');
-  const equiposCat = await loadUsersJS(cat);   // <- carga desde usuarios.<cat>.js
 
-  // helpers locales
+  const cat = (localStorage.getItem('fixture_cat') || 'tercera');
+  const equiposCat = await loadUsersJS(cat);
+
+
   function clearGroups(){
     document.querySelectorAll('section.card[data-group] .rows, section.card[data-group] .rule, section.card[data-group] .fecha-header, section.card[data-group] .h2')
       .forEach(n => n.remove());
@@ -242,7 +242,7 @@ window.applyFixture = async function applyFixture(){
   const tpl = document.getElementById('tpl-fecha');
   document.querySelectorAll('section.card[data-group]').forEach(section => {
     const existingFechas = Array.from(section.querySelectorAll('.rows[data-fecha]')).map(el => Number(el.getAttribute('data-fecha')));
-    const maxFecha = Math.max(...existingFechas, 7); // Dinámico basado en existentes o al menos 7
+    const maxFecha = Math.max(...existingFechas, 7);
     for(let fecha=1; fecha<=maxFecha; fecha++){
       if (section.querySelector(`.rows[data-fecha="${fecha}"]`)) continue;
       const clone = document.importNode(tpl.content, true);
@@ -266,7 +266,7 @@ window.applyFixture = async function applyFixture(){
       if (!cont) return;
       const tabla = (fx.fechas?.[fecha-1]?.tablas || []).find(t => (t.grupo||'').toUpperCase() === grupo);
       const equipos = tabla?.equipos || [];
-      renderRows(cont, equipos, fecha, grupo, equiposCat); // <- pasa equiposCat
+      renderRows(cont, equipos, fecha, grupo, equiposCat);
     });
   }
 };
@@ -278,13 +278,13 @@ window.applyFixture = async function applyFixture(){
   });
 
 
-/* === Helper: alterna categoria 'local'/'visitante' al guardar === */
+
 function assignCategoriasAlternadas(fixture, scope = 'fecha'){
   if (!fixture || !Array.isArray(fixture.fechas)) return fixture;
   for (const fecha of fixture.fechas){
     if (!Array.isArray(fecha.tablas)) continue;
     if (scope === 'tabla'){
-      // Alterna dentro de cada tabla (A y B por separado)
+
       for (const tabla of fecha.tablas){
         if (!Array.isArray(tabla.equipos)) continue;
         for (let i = 0; i < tabla.equipos.length; i++){
@@ -295,7 +295,7 @@ function assignCategoriasAlternadas(fixture, scope = 'fecha'){
         }
       }
     } else {
-      // Alterna a lo largo de toda la fecha (A continúa en B)
+
       const refs = [];
       for (const tabla of fecha.tablas){
         if (Array.isArray(tabla.equipos)){
@@ -313,7 +313,7 @@ function assignCategoriasAlternadas(fixture, scope = 'fecha'){
   return fixture;
 }
 
-// === Construye objeto fixture con fechas incluidas ===
+
 function buildFixtureFromUI(){
   const fechasArr = [];
   const rowsAll = document.querySelectorAll('.rows[data-fecha]');
@@ -358,12 +358,12 @@ async function saveFixtureJSOnServer(){
   const relPathJS   = `fixture/${filename}.js`;
   const relPathJSON = `fixture/${filename}.json`;
   const data    = buildFixtureFromUI();
-  // Alternar categoria antes de guardar (por fecha completa)
+
   assignCategoriasAlternadas(data, 'fecha');
 
   const js      = "window.LPI_FIXTURE = " + JSON.stringify(data, null, 2) + "\n";
   const jsonStr = JSON.stringify(data, null, 2);
-  // JS
+
   {
     const resp = await fetch('/api/save-js', {
       method: 'POST',
@@ -373,7 +373,7 @@ async function saveFixtureJSOnServer(){
     const j = await resp.json().catch(()=>({ok:false}));
     if (!resp.ok || !j.ok) throw new Error(j.error || `Error guardando ${relPathJS}`);
   }
-  // JSON
+
   {
     const resp = await fetch('/api/save-js', {
       method: 'POST',
@@ -408,9 +408,9 @@ function showToast(message, ms=2500){
   showToast._t = setTimeout(()=>{ el.classList.remove('show'); }, ms);
 }
 
-// === Module chunk separator ===
 
-/* === Parche: la fecha del Grupo B replica la del Grupo A si viene vacía === */
+
+
 (function mirrorGroupBDatesFromA(){
   function headerOf(group, fecha){
     const rows = document.querySelector(`section.card[data-group="${group}"] .rows[data-fecha="${fecha}"]`);
@@ -434,7 +434,7 @@ function showToast(message, ms=2500){
   }
 
   function mirrorAll(){
-    // Contá cuántas fechas hay construidas
+
     const countA = document.querySelectorAll('section.card[data-group="A"] .rows[data-fecha]').length;
     const countB = document.querySelectorAll('section.card[data-group="B"] .rows[data-fecha]').length;
     const total = Math.max(countA, countB, 7);
@@ -445,7 +445,7 @@ function showToast(message, ms=2500){
     }
   }
 
-  // 1) Envolvemos applyFixture si existe
+
   const _orig = window.applyFixture;
   window.applyFixture = async function(){
     if (typeof _orig === 'function'){
@@ -454,9 +454,9 @@ function showToast(message, ms=2500){
     mirrorAll();
   };
 
-  // 2) También nos enganchamos al evento de datos
+
   document.addEventListener('fixture:data-ready', mirrorAll);
 
-  // 3) Por si ya se construyó todo antes
+
   window.addEventListener('load', mirrorAll);
 })();

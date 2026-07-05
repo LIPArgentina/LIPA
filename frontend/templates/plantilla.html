@@ -3,13 +3,13 @@
 <html lang="es">
 <head>
   <link rel="stylesheet" href="./plantilla.css" />
-<!-- Cargar el archivo de jugadores del equipo actual (seguro, sin document.write) -->
+
 
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <title>Planilla Liga Drag &amp; Drop</title>
 
-<!-- Helpers unificados -->
+
 
 </head>
 <body>
@@ -33,7 +33,7 @@
 </div>
 </dialog>
 <div class="main-container">
-<!-- Ficha editable del jugador seleccionado -->
+
 <aside class="player-card-panel" aria-label="Ficha del jugador seleccionado">
 <form autocomplete="off" class="player-card-form" id="playerCardForm">
 <h2>FICHA</h2>
@@ -52,7 +52,7 @@
 <button class="btn btn-primary player-card-save" id="btnSavePlayerCard" type="submit" disabled>Guardar ficha</button>
 </form>
 </aside>
-<!-- Tabla Jugadores (ORIGINALES) -->
+
 <div class="jugadores-container">
 <h2>CAPITANES</h2>
 <div class="fila fila-capitan" draggable="true"><div class="numero">C1</div><div class="jugador"></div></div>
@@ -79,11 +79,11 @@
 <div class="fila" draggable="true"><div class="numero">19</div><div class="jugador"></div></div>
 <div class="fila" draggable="true"><div class="numero">20</div><div class="jugador"></div></div>
 </div>
-<!-- Planilla Liga (ORIGINAL) -->
+
 <div class="extra-column">
 <h2>PLANILLA LIGA</h2>
 <div class="planilla-tools"><button type="button" class="btn-vaciar-planilla" id="btnVaciarPlanilla">Vaciar planilla</button></div>
-<!-- === Bloque Capitán (DnD limpio) === -->
+
 <div class="group-container" data-group="capitan">
 <div class="group-title">CAPITÁN</div>
 <div class="fila-extra"><div class="white-box">1</div><div class="yellow-box-free" data-player="" draggable="true"></div></div>
@@ -120,11 +120,11 @@
 <div class="send-wrap"><button class="btn-enviar" id="btnEnviar">Enviar planilla</button></div>
 </div>
 </div>
-<!-- Papelera -->
+
 <div id="trash">🗑️</div>
 
 
-<!-- ===== Modal Cambiar contraseña (Equipo) ===== -->
+
 <dialog class="modal" id="passModal">
 <form autocomplete="off" class="modal__panel" id="passForm" method="dialog" style="min-width:320px;">
 <div class="modal__header"><h3>Cambiar contraseña</h3></div>
@@ -154,7 +154,7 @@
 </form>
 </dialog>
 
-<!-- Unificador: usar un solo evento para cargar lista de jugadores -->
+
 
 <script>
 (function () {

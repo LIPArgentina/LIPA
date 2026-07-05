@@ -1,4 +1,4 @@
-// --- AUTH REDIRECT PATCH ---
+
 function redirectToLogin() {
   try {
     localStorage.removeItem("lpi.session");
@@ -19,9 +19,9 @@ async function fetchWithAuth(url, options = {}) {
   }
   return res;
 }
-// --- END PATCH ---
 
-// === LPI Auth helper ===
+
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -146,7 +146,7 @@ async function fetchWithAuth(url, options = {}) {
   }catch(_){ }
 })();
 
-// ===== Ficha editable de jugador desde plantilla =====
+
 (function(){
   function getHeadersForFormData(){
     var headers = {};
@@ -330,7 +330,7 @@ async function fetchWithAuth(url, options = {}) {
   });
 })();
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -424,7 +424,7 @@ async function fetchWithAuth(url, options = {}) {
       return base + '_' + cat;
     }
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -451,7 +451,7 @@ async function fetchWithAuth(url, options = {}) {
     return headers;
   }
 
-/* ========= AUTH persistente (con fallback para file://) ========= */
+
 const AUTH_KEY = 'lpi_auth';
 function tryParse(s){ try{ return JSON.parse(s || '{}'); } catch { return {}; } }
 function setAuth(user, days=7){
@@ -485,7 +485,7 @@ function getAuth(){
 }
 function logoutAuth(){ clearAuth(); }
 
-/* ====== Header: badge + logout ====== */
+
 document.addEventListener('DOMContentLoaded', ()=>{
   const auth = getAuth();
   const actions = document.getElementById('headerActions');
@@ -507,7 +507,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     actions.append(badge, btn);
   }
 
-  // Si abrís con file://, transportar el usuario en el clic del logo
+
   const logo = document.querySelector('a.logo-link');
   if(logo && location.protocol === 'file:' && auth?.user){
     logo.addEventListener('click', (e)=>{
@@ -519,9 +519,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
 });
 
-/* =========================
-   Tu DnD original
-   ========================= */
+
+
+
 const alertBox = document.getElementById('alert');
 function showAlert(msg) {
   alertBox.textContent = msg;
@@ -559,7 +559,7 @@ const prevTransform = alertBox.style.transform;
 
 alertBox.textContent = msg;
 
-// Toast OK: negro y abajo (centrado). Cambios temporales SOLO para este aviso.
+
 alertBox.style.background = '#000';
 alertBox.style.border = '2px solid #777';
 alertBox.style.color = '#fff';
@@ -578,7 +578,7 @@ alertBox.style.display = 'block';
 
 setTimeout(() => {
   alertBox.style.display = 'none';
-  // Restaurar estilos originales para no afectar el toast de error ni el DnD
+
   alertBox.style.background = prevBg;
   alertBox.style.border = prevBorder;
   alertBox.style.color = prevColor;
@@ -618,7 +618,7 @@ function updateRepeatedHighlight() {
   });
 }
 
-// Drag desde la lista de jugadores (filas)
+
 document.querySelectorAll('.fila').forEach(el => {
   el.addEventListener('dragstart', e => {
     draggedPlayer = el.querySelector('.jugador').textContent;
@@ -632,7 +632,7 @@ document.querySelectorAll('.fila').forEach(el => {
   });
 });
 
-// Drag & Drop para casilleros
+
 document.querySelectorAll('.yellow-box').forEach(box => {
   box.addEventListener('dragstart', e => {
     if(box.dataset.player) {
@@ -728,7 +728,7 @@ document.querySelectorAll('.yellow-box').forEach(box => {
   });
 });
 
-// Papelera
+
 trash.addEventListener('dragover', e => { e.preventDefault(); trash.classList.add('over'); });
 trash.addEventListener('dragleave', e => { trash.classList.remove('over'); });
 trash.addEventListener('drop', e => {
@@ -744,7 +744,7 @@ trash.addEventListener('drop', e => {
   trash.style.display = 'none';
 });
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -771,7 +771,7 @@ trash.addEventListener('drop', e => {
     return headers;
   }
 
-// Carga de nombres hacia la columna "JUGADORES" (robusta, espera a que estén listos)
+
 (function() {
   function selectPlayers() {
     if (Array.isArray(window.LPI_PLAYER_DETAILS) && window.LPI_PLAYER_DETAILS.length) return window.LPI_PLAYER_DETAILS;
@@ -844,7 +844,7 @@ trash.addEventListener('drop', e => {
   });
 })();
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -871,24 +871,24 @@ trash.addEventListener('drop', e => {
     return headers;
   }
 
-// ===== Botones "Volver" + "Cambiar contraseña" en header =====
+
 (function(){
   function ensureButtons(){
     var header = document.getElementById('headerActions');
     if(!header) return;
-    // Volver
+
     var volver = document.createElement('a');
     volver.href = '../index.html';
     volver.textContent = 'Volver';
     volver.className = 'btn-logout';
     volver.style.textDecoration = 'none';
-    // Cambiar contraseña
+
     var change = document.createElement('button');
     change.type = 'button';
     change.id = 'btnChangePassTop';
     change.textContent = 'Cambiar contraseña';
-    change.className = 'btn-logout'; // mismo look visual
-    change.style.background = '#d4af37'; // dorado suave
+    change.className = 'btn-logout';
+    change.style.background = '#d4af37';
     change.style.color = '#111';
     change.style.borderColor = '#d4af37';
     change.style.fontWeight = '800';
@@ -903,7 +903,7 @@ trash.addEventListener('drop', e => {
   }
 })();
 
-// ===== Lógica cambio de contraseña (equipo) =====
+
 (function(){
   function getTeamSlug(){
     try {
@@ -975,7 +975,7 @@ trash.addEventListener('drop', e => {
   } else { wireSubmit(); }
 })();
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -1029,7 +1029,7 @@ trash.addEventListener('drop', e => {
   });
 })();
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -1057,33 +1057,33 @@ trash.addEventListener('drop', e => {
   }
 
 (function(){
-  if (window.__LPI_UNIFIED_READY) return; // evitar duplicado si ya existe
+  if (window.__LPI_UNIFIED_READY) return;
   window.__LPI_UNIFIED_READY = true;
 
   function once(fn){ let ran=false; return function(){ if(!ran){ ran=true; try{ fn.apply(this, arguments); this.__ran=true; }catch(_){} } } }
 
-  // Buscar función de rellenado si existe
+
   var fill = (typeof window.fillJugadores === 'function') ? window.fillJugadores : null;
 
-  // Handler principal: usa el detalle de players si viene, o delega al fill existente
+
   var handle = once(function(ev){
     try{
       var detail = ev && ev.detail || {};
       if (detail && Array.isArray(detail.players) && typeof window.renderPlayers === 'function'){
-        // Si la página expone renderPlayers(lista), úsalo directamente
+
         window.renderPlayers(detail.players);
       } else if (fill){
-        fill(); // la función interna sabe cómo leer jugadores globales/estado
+        fill();
       }
     }catch(_){}
   });
 
   window.addEventListener('lpi:players-ready', handle, { once: true });
 
-  // Fallback: si por alguna razón no llega el evento, intentamos una sola vez más
+
   setTimeout(function(){
     try{
-      // Si ya corrió el handler, nada; si no, invocamos fill si está
+
       if (!handle.__ran && fill) fill();
     }catch(_){}
   }, 300);
@@ -1169,7 +1169,7 @@ async function savePlanilla(){
     }
   }
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -1208,7 +1208,7 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -1248,10 +1248,10 @@ document.addEventListener('DOMContentLoaded', function(){
     return '';
   }
   function pickTeamName(slug){
-    // Preferir nombres publicados por el players.js
+
     var NAMES = window.LPI_TEAM_NAME || window.TEAM_NAMES || null;
     if (NAMES && (NAMES[slug] || NAMES[String(slug)])) return NAMES[slug] || NAMES[String(slug)];
-    // Fallback a storage
+
     var sess = null;
     try{ sess = JSON.parse(localStorage.getItem('lpi.session')||sessionStorage.getItem('lpi.session')||'null'); }catch(_){}
     if (sess && sess.displayName) return sess.displayName;
@@ -1269,11 +1269,11 @@ document.addEventListener('DOMContentLoaded', function(){
   } else {
     setBadge();
   }
-  // Reintentar cuando el players.js haya cargado y expuesto NAMES
+
   document.addEventListener('lpi:players-ready', setBadge, { once: true });
 })();
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -1300,7 +1300,7 @@ document.addEventListener('DOMContentLoaded', function(){
     return headers;
   }
 
-// DnD sin validación para CAPITÁN (no participa de las reglas)
+
 (function(){
   function wireFree(box){
     box.addEventListener('dragstart', function(e){
@@ -1328,7 +1328,7 @@ document.addEventListener('DOMContentLoaded', function(){
   else initFree();
 })();
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -1355,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', function(){
     return headers;
   }
 
-// === Shim unificado con Pointer Events (touch/pen) para Drag & Drop ===
+
 (function(){
   if (window.__LPI_POINTER_SHIM__) return;
   window.__LPI_POINTER_SHIM__ = true;
@@ -1456,7 +1456,7 @@ document.addEventListener('DOMContentLoaded', function(){
   document.addEventListener('pointercancel', onPointerUp, { passive: false });
 })();
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -1483,7 +1483,7 @@ document.addEventListener('DOMContentLoaded', function(){
     return headers;
   }
 
-// ===== Tap-to-place (fallback para touch) =====
+
 (function(){
   if (window.__LPI_TAP_PLACE__) return;
   window.__LPI_TAP_PLACE__ = true;
@@ -1628,7 +1628,7 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 })();
 
-// === LPI Auth helper ===
+
   function LPI_getAuthHeaders() {
     let token = "";
 
@@ -1655,7 +1655,7 @@ document.addEventListener('DOMContentLoaded', function(){
     return headers;
   }
 
-// Guarda el team para cruces y pasa la categoría explícitamente
+
 (function(){
   function readCrucesCategoryFromSession(){
     try {
@@ -1723,10 +1723,10 @@ document.addEventListener('DOMContentLoaded', function(){
         location.href = url;
       });
     }
-  }catch(e){ /* no-op */ }
+  }catch(e){  }
 })();
 
-// === Autocarga de planilla por defecto (hoy o mañana) vía API privada ===
+
 (function(){
   function sameDay(a,b){
     return a && b &&
@@ -1801,7 +1801,7 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 })();
 
-// === Control remoto de "ver cruces" (habilitado por admin por categoría) ===
+
 (function(){
   const CATEGORY_KEYS = {
     tercera: '__categoria_tercera__',
@@ -2004,14 +2004,14 @@ document.addEventListener('DOMContentLoaded', function(){
     };
   } catch(_){}
 
-  // fallback liviano por si el stream no conecta
+
   setInterval(() => {
     queueCheck();
   }, 60000);
 })();
 
 
-// ===== Ajuste visual mobile: el mensaje de éxito no empuja el layout =====
+
 document.addEventListener("DOMContentLoaded", function () {
   const posibles = [
     document.getElementById("mensaje-exito"),
@@ -2031,7 +2031,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-// === Sincronización central: "ver cruces" y "enviar planilla" por categoría ===
+
 (function(){
   if (window.__LPI_CRUCES_PLANILLA_SYNC_V2__) return;
   window.__LPI_CRUCES_PLANILLA_SYNC_V2__ = true;
@@ -2235,8 +2235,8 @@ document.addEventListener("DOMContentLoaded", function () {
     refreshTimer = setTimeout(checkRemoteState, 250);
   }
 
-  // Estado inicial coherente con la regla:
-  // cruces deshabilitados => enviar planilla habilitado
+
+
   applyState(false, null);
 
   if (document.readyState === 'loading') {

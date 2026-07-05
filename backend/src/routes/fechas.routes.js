@@ -132,13 +132,13 @@ module.exports = function createFechasRouter(deps) {
     };
   }
 
-  // ====== LEGACY DESCONTINUADO ======
-  // Estas rutas escribían archivos en disco y generaban una segunda fuente de verdad.
-  // A partir de ahora, cruces/validaciones deben persistirse en DB mediante:
-  //   POST /api/cruces/match-status
-  //   POST /api/cruces/validate
-  // El fixture debe guardarse con:
-  //   POST /fixture
+
+
+
+
+
+
+
   router.post('/validar', async (_req, res) => {
     return res.status(410).json({
       ok: false,
@@ -156,7 +156,7 @@ module.exports = function createFechasRouter(deps) {
   });
 
 
-  // ====== API: Leer/GUARDAR FIXTURE (PostgreSQL con fallback a archivo) ======
+
   router.get('/fixture', async (req, res) => {
     try {
       const kind = String(req.query.kind || '').trim().toLowerCase();
@@ -235,7 +235,7 @@ module.exports = function createFechasRouter(deps) {
     }
   });
 
-  // ====== API: Guardar PLANILLA (PostgreSQL) ======
+
   router.post('/save-planilla', requireTeam, async (req, res) => {
     try {
       const { path: relPath, content, team } = req.body || {};
@@ -336,7 +336,7 @@ module.exports = function createFechasRouter(deps) {
     }
   });
 
-  // ====== API: Obtener PLANILLA del equipo autenticado (PostgreSQL) ======
+
   router.get('/team/planilla', requireTeam, async (req, res) => {
     try {
 
@@ -381,7 +381,7 @@ const equipo = await resolveEquipoBySlug(requested);
   });
 
 
-  // ====== API: Obtener planilla de cualquier equipo (para cruces) ======
+
   router.get('/planilla', async (req, res) => {
     try {
 
@@ -422,7 +422,7 @@ const equipo = await resolveEquipoBySlug(requested);
     }
   });
 
-  // ====== API: Listar planillas existentes (PostgreSQL) ======
+
   router.get('/planillas', async (req, res) => {
     try {
       const result = await pool.query(

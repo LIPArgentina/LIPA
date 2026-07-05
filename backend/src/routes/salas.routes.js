@@ -89,9 +89,9 @@ module.exports = function createSalasRouter(deps = {}) {
     const raw = String(value || '').trim();
     if (!raw) return null;
 
-    // El input datetime-local llega sin zona horaria: 2026-05-19T19:00.
-    // En Render/Node puede interpretarse como UTC y mostrar 3 horas menos.
-    // Para la liga lo fijamos como horario Argentina.
+
+
+
     const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
     const normalized = hasTimezone ? raw : `${raw}:00-03:00`;
 
@@ -457,7 +457,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // GET /api/salas
+
   router.get('/salas', async (_req, res) => {
     try {
       await ensureTable();
@@ -483,7 +483,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // POST /api/save-salas
+
   router.post('/save-salas', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
@@ -553,7 +553,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // POST /api/sala/login
+
   router.post('/sala/login', async (req, res) => {
     try {
       const { slug, salaId, password } = req.body || {};
@@ -600,7 +600,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // POST /api/sala/change-password
+
   router.post('/sala/change-password', async (req, res) => {
     try {
       const { slug, salaId, oldPassword, newPassword } = req.body || {};
@@ -633,7 +633,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // POST /api/admin/reset-sala-password/:id
+
   router.post('/admin/reset-sala-password/:id', requireAdmin, async (req, res) => {
     try {
       const salaId = Number(req.params.id);
@@ -672,7 +672,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // GET /api/sala/torneos
+
   router.get('/sala/torneos', requireSala, async (req, res) => {
     try {
       const salaId = Number(req.user.salaId);
@@ -684,7 +684,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // POST /api/sala/torneos/:slot
+
   router.post('/sala/torneos/:slot', requireSala, uploadTorneoImage.single('imagen'), async (req, res) => {
     try {
       await ensureTable();
@@ -723,7 +723,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // DELETE /api/sala/torneos/:slot
+
   router.delete('/sala/torneos/:slot', requireSala, async (req, res) => {
     const client = await pool.connect();
     try {
@@ -757,7 +757,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // GET /api/admin/sala-torneos/:salaId
+
   router.get('/admin/sala-torneos/:salaId', requireAdmin, async (req, res) => {
     try {
       const salaId = Number(req.params.salaId);
@@ -774,7 +774,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // POST /api/admin/sala-torneos/:salaId/:slot
+
   router.post('/admin/sala-torneos/:salaId/:slot', requireAdmin, uploadTorneoImage.single('imagen'), async (req, res) => {
     try {
       const salaId = Number(req.params.salaId);
@@ -801,7 +801,7 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // GET /api/torneos
+
   router.get('/torneos', async (_req, res) => {
     try {
       await ensureTable();
@@ -824,13 +824,13 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
-  // OPTIONS /api/sala-torneos/media/:id
+
   router.options('/sala-torneos/media/:id', async (req, res) => {
     setImageCorsHeaders(req, res);
     return res.status(204).end();
   });
 
-  // GET /api/sala-torneos/media/:id
+
   router.get('/sala-torneos/media/:id', async (req, res) => {
     try {
       await ensureTable();

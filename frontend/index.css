@@ -1,11 +1,11 @@
-/* Tamaño proporcional del logo en todas las pantallas */
+
 .hero__logo{
   width: clamp(180px, 18vw, 260px);
   height: auto;
 }
 
 
-/* Tamaño más grande del modal de Banner */
+
 #bannerModal .modal__panel {
   width: min(1000px, 96vw);
   max-width: 1100px;
@@ -17,12 +17,12 @@
 }
 
 #bannerModal textarea#bannerText {
-  min-height: 180px; /* más alto por defecto */
+  min-height: 180px;
   font-size: 15px;
   line-height: 1.35;
 }
 
-/* Layout del label + tabs en el modal */
+
 #bannerModal .field__label-row {
   display: flex;
   justify-content: space-between;
@@ -55,7 +55,7 @@
   color: #fff;
 }
 
-/* Puntitos del carrusel debajo del banner */
+
 .banner-dots {
   display: flex;
   justify-content: center;
@@ -87,7 +87,7 @@
   outline-offset: 2px;
 }
 
-/* Animación del banner de derecha a izquierda */
+
 #bannerMessage {
   position: relative;
   overflow: hidden;
@@ -110,7 +110,7 @@
   }
 }
 
-/* ====== Home – botones de categorías con look admin ====== */
+
 .featured-actions{
   width:min(980px, 100%);
   margin:1.35rem auto 0;
@@ -172,7 +172,7 @@
   filter:drop-shadow(0 1px 1px rgba(255,255,255,.45));
 }
 
-/* ====== Home – popup redes sociales ====== */
+
 .social-follow-modal{
   width:min(620px, calc(100vw - 28px));
   max-width:620px;
@@ -312,7 +312,7 @@
   text-transform:uppercase;
 }
 
-/* ====== Home – popup flyer Aldo ====== */
+
 .flyer-popup{
   width:min(560px, calc(100vw - 24px));
   max-width:560px;
@@ -479,15 +479,15 @@
   outline-offset:3px;
 }
 
-/* ====== Home – grilla de accesos ======
-   Quedan 6 botones: 3 arriba y 3 abajo en escritorio.
-   En mobile se apilan a una columna.
-*/
+
+
+
+
 .cta-grid .btn-cta-wide{
   grid-column: 1 / -1;
 }
 
-/* ====== Home – header mobile fino ====== */
+
 @media (max-width: 768px) {
   .topbar {
     position: relative;
@@ -508,13 +508,13 @@
   }
 
   .brand__logo {
-    width: 32px;           /* más chico todavía */
+    width: 32px;
     height: auto;
     flex-shrink: 0;
   }
 
   .brand__cta {
-    font-size: 0.6rem;     /* texto más chico */
+    font-size: 0.6rem;
     line-height: 1.15;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -529,13 +529,13 @@
 
   .actions .btn {
     font-size: 0.7rem;
-    padding: 0.1rem 0.7rem;   /* botón más bajito */
+    padding: 0.1rem 0.7rem;
     height: 28px;
     min-width: auto;
     white-space: nowrap;
   }
 
-  /* Barra de sesión (logueadx): solo botón arriba a la derecha en celu */
+
   #sessionBar {
     position: absolute;
     top: 0.4rem;
@@ -556,7 +556,7 @@
     height: 26px;
   }
 
-  /* Resto del home se mantiene */
+
   .hero {
     padding: 1.3rem 1rem 2rem;
   }
@@ -657,13 +657,13 @@
   }
 }
 
-/* Solo en mobile: acortar texto de "Administrar equipos" a "Administrar" */
+
 @media (max-width: 768px) {
   #btnAdminEquipos {
-    display: flex;                /* centrado con flex */
+    display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0;                 /* oculto el texto original */
+    font-size: 0;
     padding: 0 1rem;
     height: 28px;
     min-width: auto;
@@ -677,11 +677,11 @@
   }
 }
 
-/* ====== FIX RESPONSIVE HEADER HOME ======
-   Corrección para cuando aparecen varios botones en mobile:
-   Banner, Consultas, Adm. equipos y Cerrar sesión.
-   Se agrega al final para pisar reglas anteriores sin perder nada.
-*/
+
+
+
+
+
 @media (max-width: 768px) {
   .topbar {
     flex-wrap: wrap;
@@ -785,7 +785,7 @@
   }
 }
 
-/* Mobile: texto correcto cuando el acceso es de dueño de sala */
+
 @media (max-width: 768px) {
   #btnAdminEquipos.btn-admin-salas::after {
     content: "Adm. sala";

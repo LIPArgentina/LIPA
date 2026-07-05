@@ -548,7 +548,7 @@ body.photos-open{ overflow:hidden; }
 }
 
 
-/* Resultado de desempate: no muestra triángulos ni tanteador general */
+
 .encounter-tiebreak .encounter-title::before{
   content:'SERIE EMPATADA';
   display:block;

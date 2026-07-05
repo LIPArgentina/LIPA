@@ -126,8 +126,8 @@ function loadReglamentoIndex(frontendDir) {
     }
   }
 
-  // Fragmentos destacados manuales para las secciones más consultadas.
-  // Esto evita que una pregunta corta se vaya a páginas cercanas pero equivocadas.
+
+
   const manual = [
     {
       page: 20,

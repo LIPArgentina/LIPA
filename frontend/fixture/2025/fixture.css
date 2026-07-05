@@ -1,8 +1,8 @@
-/* --- Estilo para los selects de equipos y puntos --- */
+
 select.team-name {
   appearance: none;
-  background: #000;     /* contenedor negro */
-  color: #fff;          /* texto blanco */
+  background: #000;
+  color: #fff;
   border: 1px solid #444;
   border-radius: 10px;
   padding: 6px 8px;
@@ -47,12 +47,12 @@ select.score-badge {
     .actions{ margin-left:auto; display:flex; }
     .btn{ border:1px solid #b28900; background:transparent; color:var(--gold); font-weight:800; padding:5px 5px; border-radius:10px; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
 
-    /* Botones de encuentros */
+
     .pill-wrap { display:flex; justify-content:flex-start; gap:16px; margin-top:28px; flex-wrap:wrap; }
     .pill-btn { display:inline-block; padding:12px 22px; border:2px solid #b28900; border-radius:14px; background:#0f0f11; color:#ffd966; font-weight:900; letter-spacing:.06em; text-transform:uppercase; font-size:clamp(16px,2vw,20px); text-decoration:none; box-shadow:inset 0 0 0 3px #1b1600; user-select:none; cursor:pointer; opacity:.5; transition:opacity .15s ease-in-out; }
     .pill-btn.active { background:#1b1b1b; opacity:1; }
 
-    /* ===== Tablas ===== */
+
     .grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; margin-top:22px; }
     @media (max-width:1100px){ .grid{ grid-template-columns:1fr; } }
     .card{ background:#16171a; border:1px solid var(--line); border-radius:20px; padding:20px 12px 8px; box-shadow:0 10px 24px #0006; max-width:640px; justify-self:start; }
@@ -70,7 +70,7 @@ select.score-badge {
 
     footer{ text-align:center; font-size:12px; padding:24px 0; }
 
-    /* ===== Categorías ===== */
+
     .cat-inline{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .cat-btn{ display:inline-block; padding:10px 18px; border:1px solid #b28900; border-radius:12px;background:linear-gradient(180deg,#ffd966 0%, #ffcc00 60%, #e5b300 100%);color:#1b1600; font-weight:900; letter-spacing:.06em; text-transform:uppercase;font-size:clamp(14px,1.8vw,16px); text-decoration:none;box-shadow:inset 0 -2px 0 #b28900, 0 2px 8px rgba(0,0,0,.4);user-select:none; cursor:pointer; opacity:.5; transition:opacity .15s ease-in-out; }
     .cat-btn.active{ opacity:1; transform:translateY(-1px); }
@@ -80,8 +80,8 @@ select.score-badge {
     .cat-btn:hover{ opacity:.85; }
     .cat-btn:active{ transform:translateY(0); box-shadow:inset 0 1px 0 #b28900, 0 1px 4px rgba(0,0,0,.3); }
 
-  
-/* Fecha header layout and date input style */
+
+
 .fecha-header{ display:flex; align-items:center; gap:.5rem; }
 .fecha-header .h2{ flex:1 1 auto; }
 .fecha-header .fecha-input{
@@ -97,7 +97,7 @@ select.score-badge {
 .fecha-header .fecha-input::-webkit-calendar-picker-indicator{ filter: invert(1); }
 @media (max-width: 640px){ .fecha-header .fecha-input{ width:9.5rem; } }
 
-/* Botón Guardar con estilo dorado consistente */
+
 .save-btn{
   padding:10px 18px;
   border:1px solid #b28900;
@@ -114,7 +114,7 @@ select.score-badge {
 .save-btn:hover{ opacity:.85; filter: brightness(1.05); }
 .save-btn:active{ transform:translateY(0); box-shadow:inset 0 1px 0 #b28900, 0 1px 4px rgba(0,0,0,.3); }
 
-/* Toast "Guardado correctamente" */
+
 .toast {
   position: fixed;
   left: 24px;

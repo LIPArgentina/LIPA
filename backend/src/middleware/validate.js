@@ -1,7 +1,7 @@
-// backend/src/middleware/validate.js
+
 function makeBodyValidator(rules, options = {}) {
   const {
-    abortEarly = false, // si true, corta en el primer error
+    abortEarly = false,
     statusCode = 400,
   } = options;
 
@@ -13,7 +13,7 @@ function makeBodyValidator(rules, options = {}) {
       const { field, required, type, enum: enumValues, regex, message } = rule;
       const value = body[field];
 
-      // requerido
+
       if (required && (value === undefined || value === null || value === '')) {
         const msg = message || `El campo "${field}" es obligatorio`;
         errors.push({ field, msg });
@@ -21,10 +21,10 @@ function makeBodyValidator(rules, options = {}) {
         continue;
       }
 
-      // si no es requerido y no vino, seguimos
+
       if (value === undefined || value === null) continue;
 
-      // tipo
+
       if (type) {
         if (type === 'array') {
           if (!Array.isArray(value)) {
@@ -39,7 +39,7 @@ function makeBodyValidator(rules, options = {}) {
         }
       }
 
-      // enum
+
       if (enumValues && !enumValues.includes(value)) {
         errors.push({
           field,
@@ -49,7 +49,7 @@ function makeBodyValidator(rules, options = {}) {
         continue;
       }
 
-      // regex
+
       if (regex && typeof value === 'string' && !regex.test(value)) {
         errors.push({
           field,

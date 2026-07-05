@@ -149,7 +149,7 @@ body {
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
 }
 
-/* ===== FIX SELECT EQUIPOS ===== */
+
 
 select.field-control {
   appearance: none;
@@ -157,13 +157,13 @@ select.field-control {
   -moz-appearance: none;
 }
 
-/* color visible en la lista desplegable */
+
 select.field-control option {
   color: #111827;
   background: #ffffff;
 }
 
-/* evita que Chrome herede el color blanco del tema */
+
 select.field-control option {
   background: #0f172a;
   color: #f8fafc;
@@ -173,7 +173,7 @@ select.field-control optgroup {
   background: #0f172a;
   color: #f8fafc;
 }
-/* ===== ===== */
+
 
 .check-row {
   display: flex;

@@ -1,4 +1,4 @@
-/* ====== Header: mantener ?admin=1 en enlaces ====== */
+
 (function(){
   try{
     const params = new URLSearchParams(location.search);
@@ -25,7 +25,7 @@
   }catch(e){ console.warn('Nav admin patch:', e); }
 })();
 
-/* ====== Config compartida ====== */
+
 const DIVISIONES = ['primera', 'segunda', 'tercera'];
 const ADMIN_TABS = ['primera', 'segunda', 'tercera', 'salas'];
 const SALAS_SLOTS = 30;
@@ -49,7 +49,7 @@ function authHeaders(extra = {}){
   return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
 }
 
-/* ====== Helpers ====== */
+
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 function toast(msg){ const t=$('#toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 1800); }
@@ -233,7 +233,6 @@ async function impersonateTeam(team, target){
   }
 }
 
-/* ====== Tabla izquierda (equipos de liga) ====== */
 function renderRows(users){
   const tbody = $('#tbodyTeams');
   tbody.innerHTML = '';
@@ -341,8 +340,6 @@ function collectRows(){
     const sala      = tr.querySelector('.sala')?.value.trim()      || '';
     const ubicacion = tr.querySelector('.location')?.value.trim()  || '';
     if(!name) return;
-    // Se mantienen las claves email/phone porque el backend/DB anterior guarda esos campos.
-    // Ahora email = SALA y phone = UBICACIÓN (link de Google Maps o texto de ubicación).
     rows.push({ username:name, role:'team', captain, subcaptain, email:sala, phone:ubicacion });
   });
   return rows;
@@ -366,7 +363,6 @@ async function saveTeams(){
   }
 }
 
-/* ====== Panel derecho (plantel) ====== */
 let teamsInDiv = []; // [{ id, name, slug }]
 
 function normalizePlayerFormValue(value){
@@ -527,7 +523,6 @@ async function discardDraftForCurrentTeam(){
   toast('Borrador descartado');
 }
 
-/* === Cargar jugadores desde API === */
 async function loadPlayersForTeam(slug){
   try {
     const r = await fetch(`${API_BASE}/api/team-assets?team=${encodeURIComponent(slug)}`, {
@@ -555,7 +550,6 @@ async function loadPlayersForTeam(slug){
   return Array(SLOTS).fill(null).map(() => ({ name: '', dni: '', fechaNacimiento: '' }));
 }
 
-/* === Cambio de equipo (async) === */
 async function changeTeam(){
   const teamSlug = $('#teamSelect').value;
   let vals = await loadPlayersForTeam(teamSlug);
@@ -590,7 +584,6 @@ async function saveRoster(){
   }
 }
 
-/* === Cargar equipos desde API === */
 async function loadTeamsForDivision(div){
   try {
     const r = await fetch(`${API_BASE}/api/teams?division=${encodeURIComponent(div)}`, {
@@ -630,7 +623,6 @@ async function loadTeamsForDivision(div){
 }
 
 
-/* ====== Tabla de salas ====== */
 function normalizeSala(item){
   return {
     id: item?.id || null,
@@ -777,7 +769,6 @@ function showAdminTab(tab){
 }
 
 
-/* ====== Exportar / importar tablas ====== */
 let pendingImportTable = null;
 
 function makeExportFilename(kind){
@@ -897,7 +888,6 @@ async function handleTableImportFile(ev){
   }
 }
 
-/* ====== Carga de división ====== */
 let _activeDiv = 'primera';
 async function loadDivision(div){
   _activeDiv = div;
@@ -946,7 +936,6 @@ async function loadDivision(div){
   }
 }
 
-/* ====== Init ====== */
 document.addEventListener('DOMContentLoaded', () => {
   ensureResetPassUI();
   $$('.sw').forEach(btn => btn.addEventListener('click', () => loadDivision(btn.dataset.div)));
@@ -959,7 +948,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnImportSalas')?.addEventListener('click', () => openImportDialog('salas'));
   $('#tableImportFile')?.addEventListener('change', handleTableImportFile);
   $('#teamSelect')?.addEventListener('change', changeTeam);
-  
+
   $('#btnToggleImport')?.addEventListener('click', () => toggleImportBox());
   $('#btnApplyImport')?.addEventListener('click', importPlayersFromTextarea);
   $('#btnCancelImport')?.addEventListener('click', () => toggleImportBox(false));
@@ -971,7 +960,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadDivision(last.division || 'primera');
 });
 
-// === Cambio de contraseña (admin) ===
 (function(){
   function getTeamSlug(){
     try {
@@ -1069,7 +1057,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 })();
 
-// === Toggles "Mostrar" para contraseñas ===
 (function(){
   function wirePasswordToggles(){
     var toggles = document.querySelectorAll('input[data-toggle]');

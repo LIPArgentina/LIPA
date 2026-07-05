@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require('../../db');
 const { requireAdmin } = require('../middleware/auth');
 
-// ===== ADMIN CRUCES (persistido + automatización por fixture) =====
+
 
 const CATEGORY_KEYS = {
   tercera: '__categoria_tercera__',
@@ -247,8 +247,8 @@ async function fetchAutomationFixtureInfo(team) {
     }
   }
 
-  // En fase de llaves puede no existir una próxima fecha útil en fixture.
-  // Para que la habilitación automática siga el cruce real, sumamos las fechas cargadas en llaves_data.
+
+
   const llavesFixtures = await fetchAutomationLlavesInfo(category);
   const automationFixtures = [...fixtures, ...llavesFixtures];
   const automation = computeNextAutomation(automationFixtures);
@@ -364,7 +364,7 @@ router.get('/stream', (req, res) => {
   });
 });
 
-// ===== HELPERS =====
+
 
 function normalizeSlug(value = '') {
   return String(value || '').trim().toLowerCase();
@@ -615,7 +615,7 @@ function setNoCache(res) {
   res.set('Expires', '0');
 }
 
-// ===== CRUCES DESDE DB =====
+
 
 router.get('/cruces', async (req, res) => {
   const team = String(req.query.team || '').trim();
@@ -647,7 +647,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ===== AUTOSAVE / VALIDACIÓN CRUCES =====
+
 
 router.post('/match-status', async (req, res) => {
   try {
@@ -1451,7 +1451,7 @@ function llavesAutoSetSeriesTeams(round, teamA, teamB) {
     return;
   }
 
-  // El mejor posicionado (teamA) arranca visitante y define la vuelta de local.
+
   llavesAutoSetLegTeams(round, 0, teamB, teamA);
   llavesAutoSetLegTeams(round, 1, teamA, teamB);
 
@@ -1863,7 +1863,7 @@ async function syncValidatedMatchIntoLlaves({
     leg.away.puntosExtra = localExtra;
   };
 
-  // 1) Camino normal: la llave guardada ya tiene ambos equipos reales.
+
   for (const round of rounds) {
     const legs = Array.isArray(round?.legs) ? round.legs : [];
 
@@ -1888,10 +1888,10 @@ async function syncValidatedMatchIntoLlaves({
     }
   }
 
-  // 2) Camino correcto para fases que el frontend arma dinámicamente.
-  // Recalculamos una copia en memoria con la misma lógica de /api/llaves/proximo-cruce,
-  // buscamos allí el cruce exacto por equipos, y recién entonces escribimos en el round/leg
-  // equivalente de la DB. Esto evita meter un resultado en el primer hueco de la fecha.
+
+
+
+
   const autoData = await buildLlavesAutoData(data, category);
   const autoFound = findLlavesLegInData(autoData, { dateKey, localCandidates, visitanteCandidates });
 
@@ -1904,8 +1904,8 @@ async function syncValidatedMatchIntoLlaves({
       if (!leg.home) leg.home = { team: 'WO', puntos: 0, puntosExtra: 0 };
       if (!leg.away) leg.away = { team: 'WO', puntos: 0, puntosExtra: 0 };
 
-      // Copiamos el orden de equipos calculado en memoria para mantener la llave igual
-      // a lo que ve el frontend, pero no reconstruimos toda la llave.
+
+
       leg.home.team = autoFound.leg?.home?.team || leg.home.team || 'WO';
       leg.away.team = autoFound.leg?.away?.team || leg.away.team || 'WO';
       applyLlavesScore(leg, autoFound.orientation || 'direct');
@@ -1913,8 +1913,8 @@ async function syncValidatedMatchIntoLlaves({
     }
   }
 
-  // 3) Fallback final y seguro: solo por fecha si existe un único candidato posible.
-  // Si hay dos semifinales en la misma fecha, no se sincroniza por fecha para no cruzar resultados.
+
+
   const fallbackCandidates = [];
 
   for (const round of rounds) {
@@ -1931,7 +1931,7 @@ async function syncValidatedMatchIntoLlaves({
       const homeIsReal = !!homeKey && homeKey !== 'WO';
       const awayIsReal = !!awayKey && awayKey !== 'WO';
 
-      // No pisar un partido real distinto.
+
       if (homeIsReal && awayIsReal) continue;
 
       const homeIsLocal = llavesTeamMatches(leg?.home?.team, localCandidates);
@@ -2012,7 +2012,7 @@ async function syncTiebreakIntoLlaves({ fechaISO, localSlug, visitanteSlug, snap
   const awayIsLocal = llavesTeamMatches(extra?.away?.team, found.localCandidates);
 
   if (!(homeIsLocal && awayIsVisitante) && !(homeIsVisitante && awayIsLocal)) {
-    // Regla visual de LIPA para desempate: se toma el orden de la vuelta si existe.
+
     extra.home.team = found.legs?.[1]?.home?.team || found.leg?.home?.team || localSlug;
     extra.away.team = found.legs?.[1]?.away?.team || found.leg?.away?.team || visitanteSlug;
   }
@@ -2745,7 +2745,7 @@ router.get('/player-ranking', async (req, res) => {
       countRegisteredIndividualPlayersByCategory(category)
     ]);
 
-    // Primero calcula RAD usando TODA la categoría; recién después corta Top 10/20/50.
+
     const { ranking: fullRanking, radContext } = buildRadRankingFromResults(results);
     const totalActivePlayers = fullRanking.filter((item) => Number(item.played || 0) > 0).length;
     const ranking = fullRanking.slice(0, limit);
@@ -2802,8 +2802,8 @@ router.get('/team-ranking', async (req, res) => {
     const countedMatches = new Set();
 
     for (const item of results) {
-      // Evita contar dos veces el mismo cruce si en la DB quedó guardado
-      // también con el orden invertido de equipos. La fecha separa ida/vuelta.
+
+
       const matchTeamsKey = [canonicalPlayerTeamSlug(item.localSlug), canonicalPlayerTeamSlug(item.visitanteSlug)]
         .sort()
         .join('::');
@@ -2814,9 +2814,9 @@ router.get('/team-ranking', async (req, res) => {
       const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
       const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
 
-      // Puntos = puntosTotales de la planilla.
-      // Triángulos = triangulosTotales de la planilla.
-      // Fallbacks para planillas viejas que no tengan esos campos.
+
+
+
       const localPF = item.local?.puntosTotales !== undefined && item.local?.puntosTotales !== null
         ? Number(item.local.puntosTotales) || 0
         : localScores.filter((n) => Number(n || 0) > 0).length;

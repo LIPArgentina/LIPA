@@ -118,7 +118,7 @@ async function fetchFixture(kind){
 function clearFixtureCards(){
   document.querySelectorAll('section.card[data-group]').forEach(section => {
     Array.from(section.children).forEach((child, idx) => {
-      if (idx === 0) return; // deja el h1
+      if (idx === 0) return;
       child.remove();
     });
   });

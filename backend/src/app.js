@@ -5,7 +5,7 @@ const fs = require('fs');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 
-// Seguridad
+
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
@@ -27,9 +27,9 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
-/* =========================================================
-   CORS PARA FRONTEND SEPARADO / LOCAL
-========================================================= */
+
+
+
 
 const allowedOrigins = [
   'http://localhost:3000',
@@ -56,9 +56,9 @@ app.use(
   })
 );
 
-/* =========================================================
-   SEGURIDAD
-========================================================= */
+
+
+
 
 app.use(helmet());
 
@@ -80,11 +80,11 @@ const limiter = rateLimit({
   skip: (req) => {
     if (isLocalRequest(req)) return true;
 
-    // Login de equipos y auth no se limitan para evitar bloquear pruebas locales
+
     if (req.path.startsWith('/team/')) return true;
     if (req.path.startsWith('/auth/')) return true;
 
-    // Lecturas públicas no limitadas
+
     if (req.method === 'GET') {
       if (req.path.startsWith('/fixture')) return true;
       if (req.path.startsWith('/llaves')) return true;
@@ -101,9 +101,9 @@ const limiter = rateLimit({
 
 app.use('/api', limiter);
 
-/* =========================================================
-   PATHS DEL PROYECTO
-========================================================= */
+
+
+
 
 const ROOT = path.resolve(__dirname, '../../');
 const DATA_DIR = path.join(ROOT, 'backend', 'data');
@@ -118,9 +118,9 @@ const PICTURES_DIR = process.env.PICTURES_DIR
 
 app.locals.FRONTEND_DIR = FRONTEND_DIR;
 
-/* =========================================================
-   ASEGURAR DIRECTORIOS
-========================================================= */
+
+
+
 
 [
   DATA_DIR,
@@ -136,9 +136,9 @@ app.locals.FRONTEND_DIR = FRONTEND_DIR;
   }
 });
 
-/* =========================================================
-   API
-========================================================= */
+
+
+
 
 app.get('/api/health-direct', (req, res) => {
   res.json({ ok: true, source: 'app.js-direct' });
@@ -160,9 +160,9 @@ app.use(
   })
 );
 
-/* =========================================================
-   FRONTEND ESTÁTICO (temporal, hasta separar del todo)
-========================================================= */
+
+
+
 
 app.use(express.static(FRONTEND_DIR));
 app.use('/frontend', express.static(FRONTEND_DIR));
@@ -177,9 +177,9 @@ app.use('/pictures', express.static(PICTURES_DIR, {
   }
 }));
 
-/* =========================================================
-   TEST DB
-========================================================= */
+
+
+
 
 app.get("/test-db", requireAdmin, async (req, res) => {
   try {
@@ -197,9 +197,9 @@ app.get("/test-db", requireAdmin, async (req, res) => {
   }
 });
 
-/* =========================================================
-   INIT DB (TEMPORAL / LEGACY)
-========================================================= */
+
+
+
 
 app.get("/init-db", requireAdmin, async (req, res) => {
   try {
@@ -276,9 +276,9 @@ app.get("/init-db", requireAdmin, async (req, res) => {
   }
 });
 
-/* =========================================================
-   FALLBACK
-========================================================= */
+
+
+
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));

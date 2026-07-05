@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
 
-// GET /api/admin/planillas
+
 router.get('/planillas', async (req, res) => {
   try {
     const result = await pool.query(`

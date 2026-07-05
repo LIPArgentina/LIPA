@@ -291,7 +291,6 @@
 
     if (!['s1', 's2'].includes(round)) return '';
 
-    // Fechas de semifinales 2026 por categoría cuando la llave todavía no trae fecha guardada.
     if (cat === 'segunda') {
       if (index === 0) return '2026-05-25';
       if (index === 1) return '2026-06-01';
@@ -323,15 +322,12 @@
     const dates = new Set();
     const teamSlugs = unique((teams || []).map((team) => team?.slug || team?.teamSlug || team?.team || team?.nombre || team?.displayName));
 
-    // Primero leemos la llave completa: así no dependemos de "proximo-cruce", que devuelve
-    // un solo partido por equipo y puede dejar afuera fechas ya jugadas, como 2026-05-25 en Segunda.
     await Promise.all(categories.map(async (category) => {
       try {
         await fetchLlavesDatesFromData(category, dates);
       } catch {}
     }));
 
-    // Mantenemos proximo-cruce como respaldo porque algunas llaves se calculan en memoria.
     if (teamSlugs.length) {
       await Promise.all(categories.flatMap(category => teamSlugs.map(async (team) => {
         try {
