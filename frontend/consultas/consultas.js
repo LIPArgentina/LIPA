@@ -169,7 +169,7 @@
     $datalist.innerHTML = '';
     items.forEach((item) => {
       const option = document.createElement('option');
-      option.value = item.name || '';
+      option.value = item.label || item.name || '';
       option.label = item.label || item.name || '';
       $datalist.appendChild(option);
     });
@@ -196,7 +196,7 @@
     }
 
     try {
-      const data = await fetchJson(apiUrl('/api/cruces/player-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q)));
+      const data = await fetchJson(apiUrl('/api/cruces/player-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q) + '&suggest=1'));
       renderSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
     } catch (err) {
       console.error(err);
@@ -615,7 +615,7 @@
     }
   }
 
-  async function searchPlayer(ev) {
+  async function searchPlayer(ev, retryingSuggestion = false) {
     ev?.preventDefault();
 
     const teamQ = String($team?.value || '').trim();
@@ -642,6 +642,11 @@
 
       if (!data?.player) {
         const count = Array.isArray(data?.suggestions) ? data.suggestions.length : 0;
+        if (!retryingSuggestion && count === 1 && data.suggestions[0]?.label) {
+          $player.value = data.suggestions[0].label;
+          await searchPlayer(null, true);
+          return;
+        }
         setStatus(count ? 'Elegí una coincidencia de la lista y volvé a buscar.' : 'No se encontraron jugadores con esa búsqueda.', count ? 'info' : 'error');
         return;
       }

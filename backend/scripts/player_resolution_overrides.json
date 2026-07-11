@@ -1,0 +1,66 @@
+{
+  "flexibleNames": [
+    "Facundo Luna",
+    "Dario Vicente Sierra",
+    "Jorge Rodriguez",
+    "Julio Molina",
+    "Edgardo Rodriguez",
+    "Rocio Lobos",
+    "Lucas Gomez",
+    "Gabriel Zambianchi",
+    "Orion Palla",
+    "Eduardo Gomez",
+    "Federico Alcaraz",
+    "Gustavo Alcaraz",
+    "Dante Desposito",
+    "Fabian Telechea",
+    "Mariano Badel",
+    "Javier Martino"
+  ],
+  "aliases": [
+    {
+      "fromName": "Mateo Duarte",
+      "team": "ANEXO 2DA",
+      "category": "segunda",
+      "toName": "Mateo Ruarte"
+    },
+    {
+      "fromName": "Teresa Jesus Garcia",
+      "team": "LOS PATOS DEL TREBOL",
+      "category": "tercera",
+      "toName": "Teresita Jesus Garcia"
+    },
+    {
+      "fromName": "Hugo Llamas",
+      "team": "TAKOS FUSION",
+      "category": "segunda",
+      "toName": "Hugo Llanos"
+    },
+    {
+      "fromName": "Ivan Simon Valdez",
+      "team": "EL TREBOL DE PACHECO",
+      "category": "tercera",
+      "toName": "Juan Simon Valdez"
+    }
+  ],
+  "exclude": [
+    {
+      "name": "Damian Benitez",
+      "team": "TAKOS PRO",
+      "category": "segunda",
+      "reason": "Nunca jugo"
+    },
+    {
+      "name": "Jhonatan Zozaya",
+      "team": "TAKOS FUSION",
+      "category": "segunda",
+      "reason": "Nunca jugo y se elimino de la liga"
+    },
+    {
+      "name": "Elias Saccoritti",
+      "team": "PR BAR",
+      "category": "tercera",
+      "reason": "Nunca jugo"
+    }
+  ]
+}

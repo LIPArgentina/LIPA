@@ -72,6 +72,70 @@ module.exports = function createFechasRouter(deps) {
     };
   }
 
+  function normalizePlayerKey(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+  }
+
+  async function fetchPlayerIdentityMap(equipoId) {
+    const result = await pool.query(
+      `
+        SELECT id, nombre
+        FROM jugadores
+        WHERE equipo_id = $1
+          AND TRIM(COALESCE(nombre, '')) <> ''
+        ORDER BY orden ASC, id ASC
+      `,
+      [equipoId]
+    );
+
+    const map = new Map();
+    result.rows.forEach((row) => {
+      const key = normalizePlayerKey(row.nombre);
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(Number(row.id));
+    });
+    return map;
+  }
+
+  async function enrichPlanillaWithPlayerIds(planilla, equipoId) {
+    const cleanPlanilla = planilla && typeof planilla === 'object' ? planilla : {};
+    const identityMap = await fetchPlayerIdentityMap(equipoId);
+    const used = new Set();
+    const sections = ['capitan', 'individuales', 'pareja1', 'pareja2', 'suplentes'];
+    const jugadorIds = {};
+
+    sections.forEach((section) => {
+      const names = Array.isArray(cleanPlanilla[section]) ? cleanPlanilla[section] : [];
+      const existingIds = Array.isArray(cleanPlanilla?.jugadorIds?.[section])
+        ? cleanPlanilla.jugadorIds[section]
+        : [];
+
+      jugadorIds[section] = names.map((name, index) => {
+        const existingId = Number(existingIds[index] || 0);
+        if (Number.isFinite(existingId) && existingId > 0) {
+          used.add(existingId);
+          return existingId;
+        }
+
+        const candidates = identityMap.get(normalizePlayerKey(name)) || [];
+        const availableId = candidates.find((id) => !used.has(id)) || candidates[0] || null;
+        if (availableId) used.add(availableId);
+        return availableId;
+      });
+    });
+
+    return {
+      ...cleanPlanilla,
+      jugadorIds
+    };
+  }
+
   function extractPlanFromContent(content) {
     if (typeof content !== 'string' || !content.trim()) return null;
     const m = content.match(/window\.LPI_PLANILLA\s*=\s*([\s\S]*?)\s*;\s*$/);
@@ -267,13 +331,15 @@ module.exports = function createFechasRouter(deps) {
         return res.status(400).json({ ok:false, error:'Faltan campos (planilla/plan) o el content es inválido' });
       }
 
-      const finalPlan = normalizePlanillaPayload(plan, authSlug);
+      let finalPlan = normalizePlanillaPayload(plan, authSlug);
       finalPlan.team = authSlug;
 
       const equipo = await resolveEquipoBySlug(authSlug);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
       }
+
+      finalPlan = await enrichPlanillaWithPlayerIds(finalPlan, equipo.id);
 
            const existingPlanilla = await pool.query(
         `
@@ -370,7 +436,7 @@ const equipo = await resolveEquipoBySlug(requested);
         return res.status(404).json({ ok:false, error:'No existe planilla guardada' });
       }
 
-      const planilla = result.rows[0].datos || {};
+      const planilla = await enrichPlanillaWithPlayerIds(result.rows[0].datos || {}, equipo.id);
 
       res.set('Cache-Control', 'no-store');
       return res.json({ ok:true, planilla });
@@ -411,9 +477,11 @@ const equipo = await resolveEquipoBySlug(requested);
         return res.json({ ok:true, planilla:{} });
       }
 
+      const planilla = await enrichPlanillaWithPlayerIds(result.rows[0].datos || {}, equipo.id);
+
       return res.json({
         ok:true,
-        planilla: result.rows[0].datos || {}
+        planilla
       });
 
     } catch (err) {

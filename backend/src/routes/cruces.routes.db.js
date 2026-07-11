@@ -2219,10 +2219,27 @@ function samePlayerTeamSlug(a, b) {
   return aa === bb || canonicalPlayerTeamSlug(aa) === canonicalPlayerTeamSlug(bb) || slugMatchesTeam(aa, bb);
 }
 
-function getIndividualPlayers(planilla = {}) {
-  return Array.isArray(planilla?.individuales)
-    ? planilla.individuales.map((name) => String(name || '').trim())
+function getPlanillaPlayerId(planilla = {}, section = '', index = 0) {
+  const raw = planilla?.jugadorIds?.[section]?.[index];
+  const id = Number(raw);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function getPlanillaPlayerRefs(planilla = {}, section = '') {
+  return Array.isArray(planilla?.[section])
+    ? planilla[section].map((name, index) => ({
+        id: getPlanillaPlayerId(planilla, section, index),
+        name: String(name || '').trim()
+      }))
     : [];
+}
+
+function getIndividualPlayerRefs(planilla = {}) {
+  return getPlanillaPlayerRefs(planilla, 'individuales');
+}
+
+function getIndividualPlayers(planilla = {}) {
+  return getIndividualPlayerRefs(planilla).map((player) => player.name);
 }
 
 function uniquePlayerNames(names = []) {
@@ -2241,9 +2258,12 @@ function uniquePlayerNames(names = []) {
 
 function getPairPlayers(planilla = {}, pairIndex = 0) {
   const key = pairIndex === 0 ? 'pareja1' : 'pareja2';
-  return Array.isArray(planilla?.[key])
-    ? planilla[key].map((name) => String(name || '').trim())
-    : [];
+  return getPlanillaPlayerRefs(planilla, key).map((player) => player.name);
+}
+
+function getPairPlayerRefs(planilla = {}, pairIndex = 0) {
+  const key = pairIndex === 0 ? 'pareja1' : 'pareja2';
+  return getPlanillaPlayerRefs(planilla, key);
 }
 
 function getSearchablePlayers(planilla = {}) {
@@ -2252,6 +2272,25 @@ function getSearchablePlayers(planilla = {}) {
     ...getPairPlayers(planilla, 0),
     ...getPairPlayers(planilla, 1)
   ]);
+}
+
+function getSearchablePlayerRefs(planilla = {}) {
+  const seen = new Set();
+  const out = [];
+  [
+    ...getIndividualPlayerRefs(planilla),
+    ...getPairPlayerRefs(planilla, 0),
+    ...getPairPlayerRefs(planilla, 1)
+  ].forEach((player) => {
+    const name = String(player?.name || '').trim();
+    if (!name) return;
+    const id = Number(player?.id || 0) || null;
+    const key = id ? `id:${id}` : `name:${normalizeText(name)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ id, name });
+  });
+  return out;
 }
 
 function getPairScore(scoreRows = [], planilla = {}, pairIndex = 0) {
@@ -2359,11 +2398,132 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
   return results;
 }
 
+async function findRegisteredPlayerSuggestionsByCategory(category = '', q = '') {
+  const division = String(category || '').trim().toLowerCase();
+  const query = parsePlayerQuery(q).name;
+  if (!division || normalizeText(query).length < 2) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT
+      j.id,
+      TRIM(j.nombre) AS name,
+      e.slug_uid,
+      e.slug_base,
+      e.display_name AS team_name
+    FROM jugadores j
+    INNER JOIN equipos e ON e.id = j.equipo_id
+    WHERE LOWER(e.division) = $1
+      AND TRIM(COALESCE(j.nombre, '')) <> ''
+    ORDER BY j.nombre ASC, e.display_name ASC, j.id ASC
+    `,
+    [division]
+  );
+
+  return rows
+    .filter((row) => includesNormalizedName(row.name, query))
+    .map((row) => ({
+      id: Number(row.id),
+      name: String(row.name || '').trim(),
+      teamSlug: row.slug_uid || row.slug_base,
+      teamName: row.team_name,
+      label: `${String(row.name || '').trim()} · ${row.team_name}`
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+    .slice(0, 12);
+}
+
+function buildValidatedPlayerSuggestions(results = [], q = '') {
+  const parsed = parsePlayerQuery(q);
+  const suggestionsMap = new Map();
+
+  for (const item of results) {
+    const sides = [
+      { teamSlug: item.localSlug, teamName: item.localName, players: getSearchablePlayerRefs(item.localPlanilla) },
+      { teamSlug: item.visitanteSlug, teamName: item.visitanteName, players: getSearchablePlayerRefs(item.visitantePlanilla) }
+    ];
+
+    for (const side of sides) {
+      side.players.forEach((player) => {
+        if (!player?.name || !includesNormalizedName(player.name, parsed.name)) return;
+        if (parsed.team && !sameNormalizedName(side.teamName, parsed.team) && !samePlayerTeamSlug(side.teamSlug, parsed.team)) return;
+        const playerId = Number(player.id || 0) || null;
+        const key = playerId ? `id:${playerId}` : `${normalizeText(player.name)}::${canonicalPlayerTeamSlug(side.teamSlug)}`;
+        if (!suggestionsMap.has(key)) {
+          suggestionsMap.set(key, {
+            id: playerId,
+            name: player.name,
+            teamSlug: side.teamSlug,
+            teamName: side.teamName,
+            label: `${player.name} · ${side.teamName}`
+          });
+        }
+      });
+    }
+  }
+
+  return Array.from(suggestionsMap.values())
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+    .slice(0, 12);
+}
+
+function mergePlayerSuggestions(primary = [], fallback = []) {
+  const map = new Map();
+  const visualKeys = new Set();
+  [...primary, ...fallback].forEach((item) => {
+    const id = Number(item?.id || 0) || null;
+    const key = id ? `id:${id}` : `${normalizeText(item?.name)}::${canonicalPlayerTeamSlug(item?.teamSlug)}`;
+    const visualKey = `${normalizeText(item?.name)}::${canonicalPlayerTeamSlug(item?.teamSlug || item?.teamName)}::${normalizeText(item?.teamName)}`;
+    if (!key || map.has(key) || visualKeys.has(visualKey)) return;
+    map.set(key, item);
+    visualKeys.add(visualKey);
+  });
+  return Array.from(map.values())
+    .sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'es'))
+    .slice(0, 12);
+}
+
+function parsePlayerQuery(value = '') {
+  const raw = String(value || '').trim();
+  const parts = raw.split(/\s+[·-]\s+/);
+  return {
+    raw,
+    name: String(parts[0] || raw).trim(),
+    team: String(parts.slice(1).join(' - ') || '').trim()
+  };
+}
+
+function suggestionMatchesQuery(item = {}, query = '') {
+  const parsed = parsePlayerQuery(query);
+  if (sameNormalizedName(item.label, parsed.raw)) return true;
+  if (!parsed.team) return sameNormalizedName(item.name, parsed.name);
+  return sameNormalizedName(item.name, parsed.name) && (
+    sameNormalizedName(item.teamName, parsed.team) ||
+    samePlayerTeamSlug(item.teamSlug, parsed.team)
+  );
+}
+
+function resolveExactPlayerSuggestion(suggestions = [], query = '') {
+  const parsed = parsePlayerQuery(query);
+  const exact = suggestions.find((item) => suggestionMatchesQuery(item, query));
+  if (exact) return exact;
+  if (parsed.team && suggestions.length === 1) return suggestions[0];
+  return null;
+}
+
+function samePlayerRef(player, exact, teamSlug = '') {
+  const playerId = Number(player?.id || 0) || null;
+  const exactId = Number(exact?.id || 0) || null;
+  if (playerId && exactId) return playerId === exactId;
+  return sameNormalizedName(player?.name, exact?.name) && samePlayerTeamSlug(teamSlug, exact?.teamSlug);
+}
+
 router.get('/player-query', async (req, res) => {
   setNoCache(res);
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
     const q = String(req.query.q || '').trim();
+    const suggestOnly = String(req.query.suggest || '') === '1';
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
@@ -2373,157 +2533,24 @@ router.get('/player-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const results = await buildAllValidatedCrucesForPlayerQuery(category);
-    const suggestionsMap = new Map();
-
-    for (const item of results) {
-      const sides = [
-        { teamSlug: item.localSlug, teamName: item.localName, players: getSearchablePlayers(item.localPlanilla) },
-        { teamSlug: item.visitanteSlug, teamName: item.visitanteName, players: getSearchablePlayers(item.visitantePlanilla) }
-      ];
-
-      for (const side of sides) {
-        side.players.forEach((playerName) => {
-          if (!playerName || !includesNormalizedName(playerName, q)) return;
-          const key = `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(side.teamSlug)}`;
-          if (!suggestionsMap.has(key)) {
-            suggestionsMap.set(key, {
-              name: playerName,
-              teamSlug: side.teamSlug,
-              teamName: side.teamName,
-              label: `${playerName} · ${side.teamName}`
-            });
-          }
-        });
-      }
+    const registeredSuggestions = await findRegisteredPlayerSuggestionsByCategory(category, q);
+    const resultadoSuggestions = await findJugadorResultadoSuggestionsByCategory(category, q);
+    const suggestions = mergePlayerSuggestions(resultadoSuggestions, registeredSuggestions);
+    if (suggestOnly) {
+      return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const suggestions = Array.from(suggestionsMap.values())
-      .sort((a, b) => a.label.localeCompare(b.label, 'es'))
-      .slice(0, 12);
-
-    const exact = suggestions.find((item) => sameNormalizedName(item.name, q));
+    const exact = resolveExactPlayerSuggestion(suggestions, q);
     if (!exact) {
       return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
+    const { ranking: categoryRanking, radContext } = await buildRadRankingFromJugadorResultados(category);
     const playerRadRow = categoryRanking.find((item) =>
-      sameNormalizedName(item.name, exact.name) &&
-      samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
+      (Number(item.id || 0) && Number(item.id) === Number(exact.id)) ||
+      (sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug))
     ) || null;
-
-    const matches = [];
-    const pairMatches = [];
-
-    for (const item of results) {
-      const localPlayers = getIndividualPlayers(item.localPlanilla);
-      const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
-      const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
-      const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
-
-      const scan = [
-        {
-          players: localPlayers,
-          scoreRows: localScores,
-          opponentScoreRows: visitanteScores,
-          opponentPlayers: visitantePlayers,
-          teamSlug: item.localSlug,
-          teamName: item.localName,
-          opponentSlug: item.visitanteSlug,
-          opponentName: item.visitanteName
-        },
-        {
-          players: visitantePlayers,
-          scoreRows: visitanteScores,
-          opponentScoreRows: localScores,
-          opponentPlayers: localPlayers,
-          teamSlug: item.visitanteSlug,
-          teamName: item.visitanteName,
-          opponentSlug: item.localSlug,
-          opponentName: item.localName
-        }
-      ];
-
-      for (const side of scan) {
-        if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
-        side.players.forEach((playerName, idx) => {
-          if (!sameNormalizedName(playerName, exact.name)) return;
-          const triangulosFavor = Number(side.scoreRows[idx] ?? 0) || 0;
-          const triangulosContra = Number(side.opponentScoreRows[idx] ?? 0) || 0;
-          const opponentPlayerName = String(side.opponentPlayers?.[idx] || '').trim();
-          matches.push({
-            fechaISO: item.fechaISO,
-            category: item.category || category,
-            playerName,
-            teamSlug: side.teamSlug,
-            teamName: side.teamName,
-            opponentSlug: side.opponentSlug,
-            opponentName: side.opponentName,
-            opponentPlayerName,
-            row: idx + 1,
-            triangulosFavor,
-            triangulosContra,
-            result: triangulosFavor > triangulosContra ? 'ganado' : (triangulosFavor < triangulosContra ? 'perdido' : 'empatado')
-          });
-        });
-      }
-
-      const pairScan = [
-        {
-          planilla: item.localPlanilla,
-          scoreRows: localScores,
-          opponentPlanilla: item.visitantePlanilla,
-          opponentScoreRows: visitanteScores,
-          teamSlug: item.localSlug,
-          teamName: item.localName,
-          opponentSlug: item.visitanteSlug,
-          opponentName: item.visitanteName
-        },
-        {
-          planilla: item.visitantePlanilla,
-          scoreRows: visitanteScores,
-          opponentPlanilla: item.localPlanilla,
-          opponentScoreRows: localScores,
-          teamSlug: item.visitanteSlug,
-          teamName: item.visitanteName,
-          opponentSlug: item.localSlug,
-          opponentName: item.localName
-        }
-      ];
-
-      for (const side of pairScan) {
-        if (!samePlayerTeamSlug(side.teamSlug, exact.teamSlug)) continue;
-
-        for (let pairIndex = 0; pairIndex < 2; pairIndex++) {
-          const pairPlayers = getPairPlayers(side.planilla, pairIndex);
-          const matchedIndex = pairPlayers.findIndex((playerName) => sameNormalizedName(playerName, exact.name));
-          if (matchedIndex === -1) continue;
-
-          const playerName = String(pairPlayers[matchedIndex] || exact.name || '').trim();
-          const companionName = String(pairPlayers[matchedIndex === 0 ? 1 : 0] || '').trim();
-          const opponentPairPlayers = getPairPlayers(side.opponentPlanilla, pairIndex);
-          const triangulosFavor = getPairScore(side.scoreRows, side.planilla, pairIndex);
-          const triangulosContra = getPairScore(side.opponentScoreRows, side.opponentPlanilla, pairIndex);
-
-          pairMatches.push({
-            fechaISO: item.fechaISO,
-            category: item.category || category,
-            playerName,
-            companionName,
-            teamSlug: side.teamSlug,
-            teamName: side.teamName,
-            opponentSlug: side.opponentSlug,
-            opponentName: side.opponentName,
-            opponentPairPlayers,
-            pairNumber: pairIndex + 1,
-            triangulosFavor,
-            triangulosContra,
-            result: triangulosFavor > triangulosContra ? 'ganado' : (triangulosFavor < triangulosContra ? 'perdido' : 'empatado')
-          });
-        }
-      }
-    }
+    const { matches, pairMatches } = await getJugadorResultadoMatches(category, exact.id || playerRadRow?.id || null);
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
@@ -2554,10 +2581,19 @@ router.get('/player-query', async (req, res) => {
 
 
 function ensureRankingRow(map, playerName, teamSlug, teamName) {
-  const key = `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`;
+  return ensureRankingRowForPlayer(map, { name: playerName, id: null }, teamSlug, teamName);
+}
+
+function ensureRankingRowForPlayer(map, player, teamSlug, teamName) {
+  const playerId = Number(player?.id || 0) || null;
+  const playerName = String(player?.name || '').trim();
+  const key = playerId
+    ? `id:${playerId}`
+    : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`;
   if (!map.has(key)) {
     map.set(key, {
-      name: String(playerName || '').trim(),
+      id: playerId,
+      name: playerName,
       teamSlug,
       teamName,
       played: 0,
@@ -2648,20 +2684,20 @@ function buildPlayerRowsFromResults(results = []) {
   const rankingMap = new Map();
 
   for (const item of results) {
-    const localPlayers = getIndividualPlayers(item.localPlanilla);
-    const visitantePlayers = getIndividualPlayers(item.visitantePlanilla);
+    const localPlayers = getIndividualPlayerRefs(item.localPlanilla);
+    const visitantePlayers = getIndividualPlayerRefs(item.visitantePlanilla);
     const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
     const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
     const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
 
     for (let idx = 0; idx < max; idx++) {
-      const localPlayer = String(localPlayers[idx] || '').trim();
-      const visitantePlayer = String(visitantePlayers[idx] || '').trim();
+      const localPlayer = localPlayers[idx] || { id: null, name: '' };
+      const visitantePlayer = visitantePlayers[idx] || { id: null, name: '' };
       const localScore = Number(localScores[idx] ?? 0) || 0;
       const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
 
-      if (localPlayer) {
-        const row = ensureRankingRow(rankingMap, localPlayer, item.localSlug, item.localName);
+      if (localPlayer.name) {
+        const row = ensureRankingRowForPlayer(rankingMap, localPlayer, item.localSlug, item.localName);
         row.played += 1;
         row.triangulosFavor += localScore;
         row.triangulosContra += visitanteScore;
@@ -2670,8 +2706,8 @@ function buildPlayerRowsFromResults(results = []) {
         else row.draws += 1;
       }
 
-      if (visitantePlayer) {
-        const row = ensureRankingRow(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
+      if (visitantePlayer.name) {
+        const row = ensureRankingRowForPlayer(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
         row.played += 1;
         row.triangulosFavor += visitanteScore;
         row.triangulosContra += localScore;
@@ -2710,6 +2746,185 @@ function buildRadRankingFromResults(results = []) {
   };
 }
 
+async function buildPlayerRowsFromJugadorResultados(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  if (!division) return [];
+
+  const { rows } = await pool.query(
+    `
+    WITH agg AS (
+      SELECT
+        jugador_id,
+        categoria,
+        MAX(jugador_nombre) AS name,
+        COUNT(*)::int AS played,
+        SUM(CASE WHEN resultado = 'ganado' THEN 1 ELSE 0 END)::int AS wins,
+        SUM(CASE WHEN resultado = 'perdido' THEN 1 ELSE 0 END)::int AS losses,
+        SUM(CASE WHEN resultado = 'empatado' THEN 1 ELSE 0 END)::int AS draws,
+        SUM(triangulos_favor)::int AS triangulos_favor,
+        SUM(triangulos_contra)::int AS triangulos_contra
+      FROM jugador_resultados
+      WHERE categoria = $1
+        AND modalidad = 'individual'
+        AND jugador_id IS NOT NULL
+      GROUP BY jugador_id, categoria
+    ),
+    latest AS (
+      SELECT DISTINCT ON (jugador_id, categoria)
+        jugador_id,
+        categoria,
+        equipo_slug,
+        equipo_nombre
+      FROM jugador_resultados
+      WHERE categoria = $1
+        AND modalidad = 'individual'
+        AND jugador_id IS NOT NULL
+      ORDER BY jugador_id, categoria, fecha_iso DESC, id DESC
+    )
+    SELECT
+      agg.jugador_id AS id,
+      agg.name,
+      latest.equipo_slug,
+      latest.equipo_nombre,
+      agg.played,
+      agg.wins,
+      agg.losses,
+      agg.draws,
+      agg.triangulos_favor,
+      agg.triangulos_contra
+    FROM agg
+    LEFT JOIN latest
+      ON latest.jugador_id = agg.jugador_id
+     AND latest.categoria = agg.categoria
+    ORDER BY agg.name ASC
+    `,
+    [division]
+  );
+
+  return rows.map((row) => ({
+    id: Number(row.id || 0) || null,
+    name: String(row.name || '').trim(),
+    teamSlug: row.equipo_slug,
+    teamName: row.equipo_nombre,
+    played: Number(row.played || 0),
+    wins: Number(row.wins || 0),
+    losses: Number(row.losses || 0),
+    draws: Number(row.draws || 0),
+    triangulosFavor: Number(row.triangulos_favor || 0),
+    triangulosContra: Number(row.triangulos_contra || 0),
+    diff: Number(row.triangulos_favor || 0) - Number(row.triangulos_contra || 0),
+    effectiveness: Number(row.played || 0) > 0
+      ? Math.round((Number(row.wins || 0) / Number(row.played || 0)) * 100)
+      : 0
+  }));
+}
+
+async function buildRadRankingFromJugadorResultados(category = '') {
+  const baseRows = await buildPlayerRowsFromJugadorResultados(category);
+  const activeRows = baseRows.filter((item) => radNumber(item.played) > 0);
+  const rawContext = buildRadContextFromRows(activeRows);
+
+  const ranking = baseRows
+    .map((item) => applyRadToPlayerRow(item, rawContext))
+    .sort(sortPlayerRadRows);
+
+  return {
+    ranking,
+    radContext: {
+      maxPlayed: radRound1(rawContext.maxPlayed),
+      avgPlayed: radRound1(rawContext.avgPlayed),
+      spread: radRound1(rawContext.spread),
+      force: radRound1(rawContext.force)
+    }
+  };
+}
+
+async function findJugadorResultadoSuggestionsByCategory(category = '', q = '') {
+  const division = String(category || '').trim().toLowerCase();
+  const query = parsePlayerQuery(q).name;
+  if (!division || normalizeText(query).length < 2) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT DISTINCT ON (jr.jugador_id)
+      jr.jugador_id AS id,
+      jr.jugador_nombre AS name,
+      jr.equipo_slug,
+      jr.equipo_nombre
+    FROM jugador_resultados jr
+    WHERE jr.categoria = $1
+      AND jr.jugador_id IS NOT NULL
+      AND TRIM(COALESCE(jr.jugador_nombre, '')) <> ''
+    ORDER BY jr.jugador_id, jr.fecha_iso DESC, jr.id DESC
+    `,
+    [division]
+  );
+
+  return rows
+    .filter((row) => includesNormalizedName(row.name, query))
+    .map((row) => ({
+      id: Number(row.id),
+      name: String(row.name || '').trim(),
+      teamSlug: row.equipo_slug,
+      teamName: row.equipo_nombre,
+      label: `${String(row.name || '').trim()} · ${row.equipo_nombre}`
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+    .slice(0, 12);
+}
+
+async function getJugadorResultadoMatches(category = '', playerId = null) {
+  const division = String(category || '').trim().toLowerCase();
+  const id = Number(playerId || 0);
+  if (!division || !id) return { matches: [], pairMatches: [] };
+
+  const { rows } = await pool.query(
+    `
+    SELECT
+      to_char(fecha_iso, 'YYYY-MM-DD') AS fecha_iso,
+      categoria,
+      jugador_id,
+      jugador_nombre,
+      equipo_slug,
+      equipo_nombre,
+      rival_slug,
+      rival_nombre,
+      modalidad,
+      slot,
+      pareja_index,
+      triangulos_favor,
+      triangulos_contra,
+      resultado
+    FROM jugador_resultados
+    WHERE categoria = $1
+      AND jugador_id = $2
+    ORDER BY fecha_iso ASC, modalidad ASC, slot ASC, id ASC
+    `,
+    [division, id]
+  );
+
+  const toItem = (row) => ({
+    fechaISO: normalizeDateOnly(row.fecha_iso),
+    category: row.categoria,
+    playerId: Number(row.jugador_id || 0) || null,
+    playerName: row.jugador_nombre,
+    teamSlug: row.equipo_slug,
+    teamName: row.equipo_nombre,
+    opponentSlug: row.rival_slug,
+    opponentName: row.rival_nombre,
+    row: Number(row.slot || 0),
+    pairNumber: Number(row.pareja_index || row.slot || 0),
+    triangulosFavor: Number(row.triangulos_favor || 0),
+    triangulosContra: Number(row.triangulos_contra || 0),
+    result: row.resultado
+  });
+
+  return {
+    matches: rows.filter((row) => row.modalidad === 'individual').map(toItem),
+    pairMatches: rows.filter((row) => row.modalidad === 'pareja').map(toItem)
+  };
+}
+
 
 async function countRegisteredIndividualPlayersByCategory(category = '') {
   const division = String(category || '').trim().toLowerCase();
@@ -2717,10 +2932,11 @@ async function countRegisteredIndividualPlayersByCategory(category = '') {
 
   const { rows } = await pool.query(
     `
-    SELECT COUNT(*)::int AS total
+    SELECT COUNT(DISTINCT j.id)::int AS total
     FROM jugadores j
-    INNER JOIN equipos e ON e.id = j.equipo_id
-    WHERE LOWER(e.division) = $1
+    LEFT JOIN jugador_equipos je ON je.jugador_id = j.id
+    LEFT JOIN equipos e ON e.id = COALESCE(je.equipo_id, j.equipo_id)
+    WHERE LOWER(COALESCE(je.categoria, e.division, '')) = $1
       AND TRIM(COALESCE(j.nombre, '')) <> ''
     `,
     [division]
@@ -2740,13 +2956,11 @@ router.get('/player-ranking', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
-    const [results, totalRegisteredPlayers] = await Promise.all([
-      buildAllValidatedCrucesForPlayerQuery(category),
+    const [{ ranking: fullRanking, radContext }, totalRegisteredPlayers] = await Promise.all([
+      buildRadRankingFromJugadorResultados(category),
       countRegisteredIndividualPlayersByCategory(category)
     ]);
 
-
-    const { ranking: fullRanking, radContext } = buildRadRankingFromResults(results);
     const totalActivePlayers = fullRanking.filter((item) => Number(item.played || 0) > 0).length;
     const ranking = fullRanking.slice(0, limit);
 
@@ -2901,16 +3115,23 @@ async function getRegisteredPlayersForTeam(teamId) {
 
   const { rows } = await pool.query(
     `
-    SELECT TRIM(nombre) AS name
-    FROM jugadores
-    WHERE equipo_id = $1
-      AND TRIM(COALESCE(nombre, '')) <> ''
-    ORDER BY nombre ASC
+    SELECT DISTINCT ON (j.id)
+      j.id,
+      TRIM(j.nombre) AS name,
+      COALESCE(je.orden, j.orden) AS orden
+    FROM jugadores j
+    LEFT JOIN jugador_equipos je ON je.jugador_id = j.id
+    WHERE COALESCE(je.equipo_id, j.equipo_id) = $1
+      AND COALESCE(je.activo, true) = true
+      AND TRIM(COALESCE(j.nombre, '')) <> ''
+    ORDER BY j.id, COALESCE(je.orden, j.orden) ASC, j.nombre ASC
     `,
     [teamId]
   );
 
-  return rows.map((row) => String(row.name || '').trim()).filter(Boolean);
+  return rows
+    .map((row) => ({ id: Number(row.id), name: String(row.name || '').trim() }))
+    .filter((row) => row.name);
 }
 
 function teamInfoMatchesSide(teamInfo = {}, sideSlug = '', sideName = '') {
@@ -2971,27 +3192,35 @@ router.get('/team-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions, team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
     }
 
-    const [registeredPlayers, results] = await Promise.all([
+    const [registeredPlayers, rankingData] = await Promise.all([
       getRegisteredPlayersForTeam(exactTeam.id),
-      buildAllValidatedCrucesForPlayerQuery(category)
+      buildRadRankingFromJugadorResultados(category)
     ]);
 
-    const { ranking: categoryRanking, radContext } = buildRadRankingFromResults(results);
+    const { ranking: categoryRanking, radContext } = rankingData;
     const categoryPlayersByKey = new Map();
 
     categoryRanking.forEach((item) => {
+      if (Number(item.id || 0)) {
+        categoryPlayersByKey.set(`id:${Number(item.id)}`, item);
+      }
       categoryPlayersByKey.set(`${normalizeText(item.name)}::${canonicalPlayerTeamSlug(item.teamSlug)}`, item);
     });
 
     const playersMap = new Map();
-    const ensureTeamPlayer = (playerName) => {
-      const key = normalizeText(playerName);
+    const ensureTeamPlayer = (playerInfo) => {
+      const playerId = Number(playerInfo?.id || 0) || null;
+      const playerName = String(playerInfo?.name || playerInfo || '').trim();
+      const key = playerId ? `id:${playerId}` : normalizeText(playerName);
       if (!key) return null;
       if (!playersMap.has(key)) {
-        const categoryKey = `${key}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
+        const categoryKey = playerId
+          ? `id:${playerId}`
+          : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
         const categoryRow = categoryPlayersByKey.get(categoryKey) || null;
         playersMap.set(key, categoryRow ? { ...categoryRow } : {
-          name: String(playerName || '').trim(),
+          id: playerId,
+          name: playerName,
           teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
           teamName: exactTeam.display_name,
           played: 0,
@@ -3010,6 +3239,9 @@ router.get('/team-query', async (req, res) => {
     };
 
     registeredPlayers.forEach(ensureTeamPlayer);
+    categoryRanking
+      .filter((item) => teamInfoMatchesSide(exactTeam, item.teamSlug, item.teamName))
+      .forEach(ensureTeamPlayer);
 
     const players = Array.from(playersMap.values()).sort(sortPlayerRadRows);
     const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
