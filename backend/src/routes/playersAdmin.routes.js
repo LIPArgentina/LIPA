@@ -103,14 +103,40 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugadores_nombre_norm ON jugadores (nombre_normalizado)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_equipos_equipo ON jugador_equipos (equipo_id, categoria, activo)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_equipos_jugador ON jugador_equipos (jugador_id)`);
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS uniq_jugador_categoria_activo
-        ON jugador_equipos (jugador_id, categoria)
-       WHERE activo = true
-    `);
+    await ensureUniquePlayerCategoryIndex(client);
 
     await migrateLegacyPlayers(client);
     schemaReady = true;
+  }
+
+  async function ensureUniquePlayerCategoryIndex(client) {
+    const duplicates = await client.query(`
+      SELECT jugador_id, categoria, COUNT(*)::int AS total
+        FROM jugador_equipos
+       WHERE activo = true
+       GROUP BY jugador_id, categoria
+      HAVING COUNT(*) > 1
+       LIMIT 5
+    `);
+
+    if (duplicates.rowCount > 0) {
+      console.warn('No se crea uniq_jugador_categoria_activo: hay asociaciones activas duplicadas', duplicates.rows);
+      return;
+    }
+
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_jugador_categoria_activo
+          ON jugador_equipos (jugador_id, categoria)
+         WHERE activo = true
+      `);
+    } catch (err) {
+      if (err?.code === '23505') {
+        console.warn('No se crea uniq_jugador_categoria_activo: aparecieron duplicados durante la migración');
+        return;
+      }
+      throw err;
+    }
   }
 
   async function migrateLegacyPlayers(client) {
