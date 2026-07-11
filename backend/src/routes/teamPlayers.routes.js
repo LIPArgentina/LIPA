@@ -77,6 +77,12 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS desde DATE DEFAULT CURRENT_DATE`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS hasta DATE`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS orden INTEGER`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`);
 
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugadores_dni ON jugadores (dni)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugadores_nombre_norm ON jugadores (nombre_normalizado)`);

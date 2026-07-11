@@ -243,6 +243,12 @@ app.get("/init-db", requireAdmin, async (req, res) => {
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
+    await pool.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
+    await pool.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS desde DATE DEFAULT CURRENT_DATE`);
+    await pool.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS hasta DATE`);
+    await pool.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS orden INTEGER`);
+    await pool.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()`);
+    await pool.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS planillas (
