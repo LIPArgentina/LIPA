@@ -306,10 +306,11 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
 
   async function replacePlayers(team, players, client = pool) {
     await ensurePlayerSchema();
+    const category = team.division || 'sin_categoria';
 
     await client.query(
       `DELETE FROM jugador_equipos WHERE equipo_id = $1 AND categoria = $2`,
-      [team.id, team.division || 'sin_categoria']
+      [team.id, category]
     );
 
     let orden = 1;
@@ -317,14 +318,48 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
       const jugadorId = await findOrCreatePlayer(client, player);
       if (!jugadorId) continue;
 
+      await deactivateOtherActiveCategoryAssociations(client, {
+        playerId: jugadorId,
+        teamId: team.id,
+        category
+      });
+
       await client.query(
         `INSERT INTO jugador_equipos
            (jugador_id, equipo_id, categoria, activo, orden, created_at, updated_at)
          VALUES ($1, $2, $3, true, $4, NOW(), NOW())`,
-        [jugadorId, team.id, team.division || 'sin_categoria', orden]
+        [jugadorId, team.id, category, orden]
       );
       orden++;
     }
+  }
+
+  async function deactivateOtherActiveCategoryAssociations(client, { playerId, teamId, category }) {
+    const player = await client.query(
+      `SELECT dni, nombre_normalizado, nombre FROM jugadores WHERE id = $1 LIMIT 1`,
+      [playerId]
+    );
+    const row = player.rows[0] || {};
+    const dni = normalizeDni(row.dni || '');
+    const normalizedName = normalizeText(row.nombre_normalizado || row.nombre || '');
+
+    await client.query(
+      `UPDATE jugador_equipos je
+          SET activo = false,
+              hasta = COALESCE(hasta, CURRENT_DATE),
+              updated_at = NOW()
+         FROM jugadores j
+        WHERE j.id = je.jugador_id
+          AND je.categoria = $1
+          AND je.activo = true
+          AND je.equipo_id <> $2
+          AND (
+            je.jugador_id = $3
+            OR ($4 <> '' AND j.dni = $4)
+            OR ($5 <> '' AND COALESCE(j.nombre_normalizado, '') = $5)
+          )`,
+      [category, teamId, playerId, dni, normalizedName]
+    );
   }
 
   function buildResponse(team, playerDetails) {

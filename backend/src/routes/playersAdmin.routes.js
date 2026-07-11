@@ -458,6 +458,14 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         LIMIT 1`,
       [playerId, teamId, normalizedCategory]
     );
+
+    await deactivateConflictingIdentityAssociations(client, {
+      playerId,
+      teamId,
+      category: normalizedCategory,
+      startDate
+    });
+
     if (same.rows[0]?.id) return same.rows[0].id;
 
     await client.query(
@@ -480,6 +488,34 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       [playerId, teamId, normalizedCategory, startDate]
     );
     return inserted.rows[0]?.id || null;
+  }
+
+  async function deactivateConflictingIdentityAssociations(client, { playerId, teamId, category, startDate }) {
+    const player = await client.query(
+      `SELECT dni, nombre_normalizado, nombre FROM jugadores WHERE id = $1 LIMIT 1`,
+      [playerId]
+    );
+    const row = player.rows[0] || {};
+    const dni = normalizeDni(row.dni || '');
+    const normalizedName = normalizeText(row.nombre_normalizado || row.nombre || '');
+
+    await client.query(
+      `UPDATE jugador_equipos je
+          SET activo = false,
+              hasta = ($5::date - INTERVAL '1 day')::date,
+              updated_at = NOW()
+         FROM jugadores j
+        WHERE j.id = je.jugador_id
+          AND je.categoria = $1
+          AND je.activo = true
+          AND je.equipo_id <> $2
+          AND (
+            je.jugador_id = $3
+            OR ($4 <> '' AND j.dni = $4)
+            OR ($6 <> '' AND COALESCE(j.nombre_normalizado, '') = $6)
+          )`,
+      [category, teamId, playerId, dni, startDate, normalizedName]
+    );
   }
 
   async function findPlayerByDni(client, dni) {
