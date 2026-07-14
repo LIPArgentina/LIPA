@@ -2545,7 +2545,7 @@ router.get('/player-query', async (req, res) => {
       return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const { ranking: categoryRanking, radContext } = await buildRadRankingFromJugadorResultados(category);
+    const { ranking: categoryRanking, radContext } = await buildRadRankingForCategory(category);
     const playerRadRow = categoryRanking.find((item) =>
       (Number(item.id || 0) && Number(item.id) === Number(exact.id)) ||
       (sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug))
@@ -2839,26 +2839,47 @@ async function buildRadRankingFromJugadorResultados(category = '') {
   };
 }
 
+async function buildRadRankingForCategory(category = '') {
+  try {
+    const rankingData = await buildRadRankingFromJugadorResultados(category);
+    if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {
+      return rankingData;
+    }
+  } catch (err) {
+    console.warn('Falling back to cruces_validations for player ranking', err?.code || err?.message || err);
+  }
+
+  const results = await buildAllValidatedCrucesForPlayerQuery(category);
+  return buildRadRankingFromResults(results);
+}
+
 async function findJugadorResultadoSuggestionsByCategory(category = '', q = '') {
   const division = String(category || '').trim().toLowerCase();
   const query = parsePlayerQuery(q).name;
   if (!division || normalizeText(query).length < 2) return [];
 
-  const { rows } = await pool.query(
-    `
-    SELECT DISTINCT ON (jr.jugador_id)
-      jr.jugador_id AS id,
-      jr.jugador_nombre AS name,
-      jr.equipo_slug,
-      jr.equipo_nombre
-    FROM jugador_resultados jr
-    WHERE jr.categoria = $1
-      AND jr.jugador_id IS NOT NULL
-      AND TRIM(COALESCE(jr.jugador_nombre, '')) <> ''
-    ORDER BY jr.jugador_id, jr.fecha_iso DESC, jr.id DESC
-    `,
-    [division]
-  );
+  let rows = [];
+  try {
+    const result = await pool.query(
+      `
+      SELECT DISTINCT ON (jr.jugador_id)
+        jr.jugador_id AS id,
+        jr.jugador_nombre AS name,
+        jr.equipo_slug,
+        jr.equipo_nombre
+      FROM jugador_resultados jr
+      WHERE jr.categoria = $1
+        AND jr.jugador_id IS NOT NULL
+        AND TRIM(COALESCE(jr.jugador_nombre, '')) <> ''
+      ORDER BY jr.jugador_id, jr.fecha_iso DESC, jr.id DESC
+      `,
+      [division]
+    );
+    rows = result.rows;
+  } catch (err) {
+    console.warn('Skipping jugador_resultados suggestions', err?.code || err?.message || err);
+    return [];
+  }
 
   return rows
     .filter((row) => includesNormalizedName(row.name, query))
@@ -2878,30 +2899,37 @@ async function getJugadorResultadoMatches(category = '', playerId = null) {
   const id = Number(playerId || 0);
   if (!division || !id) return { matches: [], pairMatches: [] };
 
-  const { rows } = await pool.query(
-    `
-    SELECT
-      to_char(fecha_iso, 'YYYY-MM-DD') AS fecha_iso,
-      categoria,
-      jugador_id,
-      jugador_nombre,
-      equipo_slug,
-      equipo_nombre,
-      rival_slug,
-      rival_nombre,
-      modalidad,
-      slot,
-      pareja_index,
-      triangulos_favor,
-      triangulos_contra,
-      resultado
-    FROM jugador_resultados
-    WHERE categoria = $1
-      AND jugador_id = $2
-    ORDER BY fecha_iso ASC, modalidad ASC, slot ASC, id ASC
-    `,
-    [division, id]
-  );
+  let rows = [];
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        to_char(fecha_iso, 'YYYY-MM-DD') AS fecha_iso,
+        categoria,
+        jugador_id,
+        jugador_nombre,
+        equipo_slug,
+        equipo_nombre,
+        rival_slug,
+        rival_nombre,
+        modalidad,
+        slot,
+        pareja_index,
+        triangulos_favor,
+        triangulos_contra,
+        resultado
+      FROM jugador_resultados
+      WHERE categoria = $1
+        AND jugador_id = $2
+      ORDER BY fecha_iso ASC, modalidad ASC, slot ASC, id ASC
+      `,
+      [division, id]
+    );
+    rows = result.rows;
+  } catch (err) {
+    console.warn('Skipping jugador_resultados matches', err?.code || err?.message || err);
+    return { matches: [], pairMatches: [] };
+  }
 
   const toItem = (row) => ({
     fechaISO: normalizeDateOnly(row.fecha_iso),
@@ -2957,7 +2985,7 @@ router.get('/player-ranking', async (req, res) => {
     }
 
     const [{ ranking: fullRanking, radContext }, totalRegisteredPlayers] = await Promise.all([
-      buildRadRankingFromJugadorResultados(category),
+      buildRadRankingForCategory(category),
       countRegisteredIndividualPlayersByCategory(category)
     ]);
 
@@ -3194,7 +3222,7 @@ router.get('/team-query', async (req, res) => {
 
     const [registeredPlayers, rankingData] = await Promise.all([
       getRegisteredPlayersForTeam(exactTeam.id),
-      buildRadRankingFromJugadorResultados(category)
+      buildRadRankingForCategory(category)
     ]);
 
     const { ranking: categoryRanking, radContext } = rankingData;
