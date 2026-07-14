@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Administración de jugadores</title>
   <link rel="stylesheet" href="../admin.css">
+  <link rel="stylesheet" href="../photo-cropper.css">
   <link rel="stylesheet" href="jugadores_admin.css">
 </head>
 <body>
@@ -60,10 +61,10 @@
           <input id="playerName" class="input" type="text" required>
 
           <label>DNI</label>
-          <input id="playerDni" class="input" type="text" inputmode="numeric" required>
+          <input id="playerDni" class="input" type="text" inputmode="numeric">
 
           <label>Fecha de nacimiento</label>
-          <input id="playerBirth" class="input" type="date" required>
+          <input id="playerBirth" class="input" type="date">
 
           <label>Foto carnet</label>
           <input id="playerPhoto" class="input" type="file" accept="image/png,image/jpeg,image/webp">
@@ -71,7 +72,7 @@
           <div class="form-grid">
             <div>
               <label>Categoría</label>
-              <select id="playerCategory" class="input" required>
+              <select id="playerCategory" class="input">
                 <option value="tercera">3ra</option>
                 <option value="segunda">2da</option>
                 <option value="primera">1ra</option>
@@ -79,7 +80,7 @@
             </div>
             <div>
               <label>Equipo</label>
-              <select id="playerTeam" class="input" required></select>
+              <select id="playerTeam" class="input"></select>
             </div>
           </div>
 
@@ -116,6 +117,7 @@
   <div class="toast" id="toast"></div>
 
   <script src="../config.js"></script>
+  <script src="../photo-cropper.js"></script>
   <script src="jugadores_admin.js"></script>
 </body>
 </html>

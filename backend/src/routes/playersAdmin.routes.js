@@ -929,34 +929,46 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         const associationId = req.body?.associationId ? Number(req.body.associationId) : null;
         const nombre = String(req.body?.nombre || req.body?.name || '').trim();
         const dni = normalizeDni(req.body?.dni);
-        const fechaNacimiento = normalizeBirthDate(req.body?.fechaNacimiento || req.body?.fecha_nacimiento);
+        const fechaNacimientoRaw = String(req.body?.fechaNacimiento || req.body?.fecha_nacimiento || '').trim();
+        const fechaNacimiento = normalizeBirthDate(fechaNacimientoRaw);
         const categoria = normalizeCategory(req.body?.categoria);
         const teamRaw = String(req.body?.team || req.body?.teamSlug || req.body?.equipo || '').trim();
 
         if (!nombre) return res.status(400).json({ ok: false, error: 'Falta nombre' });
-        if (!dni) return res.status(400).json({ ok: false, error: 'El DNI es obligatorio' });
-        if (!fechaNacimiento) return res.status(400).json({ ok: false, error: 'La fecha de nacimiento es obligatoria' });
-        if (!categoria) return res.status(400).json({ ok: false, error: 'Falta categoría' });
-        if (!teamRaw) return res.status(400).json({ ok: false, error: 'Falta equipo' });
+        if (fechaNacimientoRaw && !fechaNacimiento) return res.status(400).json({ ok: false, error: 'La fecha de nacimiento no es válida' });
+        if (teamRaw && !categoria) return res.status(400).json({ ok: false, error: 'Falta categoría' });
 
-        const team = await resolveTeam(teamRaw, categoria);
-        if (!team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado para esa categoría' });
+        const team = teamRaw ? await resolveTeam(teamRaw, categoria) : null;
+        if (teamRaw && !team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado para esa categoría' });
 
         await client.query('BEGIN');
 
-        let finalPlayerId = await findPlayerByIdentity(client, {
-          dni,
-          normalizedName: normalizeText(nombre),
-          playerId
-        });
+        let finalPlayerId = Number.isFinite(playerId) ? playerId : null;
+        if (dni) {
+          const dniOwner = await client.query(
+            `SELECT id FROM jugadores WHERE dni = $1 ORDER BY id ASC LIMIT 1`,
+            [dni]
+          );
+          const ownerId = dniOwner.rows[0]?.id || null;
+          if (ownerId && finalPlayerId && Number(ownerId) !== Number(finalPlayerId)) {
+            throw new Error('Ese DNI ya pertenece a otro jugador.');
+          }
+          if (ownerId && !finalPlayerId) finalPlayerId = ownerId;
+        }
+
+        if (!finalPlayerId) {
+          finalPlayerId = await findPlayerByIdentity(client, {
+            normalizedName: normalizeText(nombre)
+          });
+        }
 
         const fotoPath = req.file?.filename || null;
         if (finalPlayerId) {
           await client.query(
             `UPDATE jugadores
                 SET nombre = $1,
-                    dni = $2,
-                    fecha_nacimiento = $3::date,
+                    dni = COALESCE(NULLIF($2, ''), dni),
+                    fecha_nacimiento = COALESCE($3::date, fecha_nacimiento),
                     nombre_normalizado = $4,
                     foto_path = COALESCE($5, foto_path),
                     updated_at = NOW()
@@ -967,19 +979,21 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           const inserted = await client.query(
             `INSERT INTO jugadores
                (nombre, dni, fecha_nacimiento, foto_path, nombre_normalizado, created_at, updated_at)
-             VALUES ($1, $2, $3::date, $4, $5, NOW(), NOW())
+             VALUES ($1, NULLIF($2, ''), $3::date, $4, $5, NOW(), NOW())
              RETURNING id`,
             [nombre, dni, fechaNacimiento, fotoPath, normalizeText(nombre)]
           );
           finalPlayerId = inserted.rows[0].id;
         }
 
-        await upsertAssociation(client, {
-          playerId: finalPlayerId,
-          teamId: team.id,
-          category: categoria,
-          associationId,
-        });
+        if (team) {
+          await upsertAssociation(client, {
+            playerId: finalPlayerId,
+            teamId: team.id,
+            category: categoria,
+            associationId,
+          });
+        }
 
         await client.query('COMMIT');
         const players = await readPlayer(finalPlayerId);
