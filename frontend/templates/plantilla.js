@@ -148,6 +148,8 @@ async function fetchWithAuth(url, options = {}) {
 
 
 (function(){
+  var croppedPlayerCardPhoto = null;
+
   function getHeadersForFormData(){
     var headers = {};
     try {
@@ -257,6 +259,7 @@ async function fetchWithAuth(url, options = {}) {
       document.getElementById('playerCardDni').value = '';
       document.getElementById('playerCardBirth').value = '';
       document.getElementById('playerCardPhoto').value = '';
+      croppedPlayerCardPhoto = null;
       document.getElementById('playerCardPreview').src = '../logo_liga.png';
       setPlayerCardEnabled(false);
       markSelectedPlayer('');
@@ -269,6 +272,7 @@ async function fetchWithAuth(url, options = {}) {
     document.getElementById('playerCardDni').value = player.dni || '';
     document.getElementById('playerCardBirth').value = formatBirthForDisplay(player.fechaNacimiento || player.fecha_nacimiento || player.birthDate || '');
     document.getElementById('playerCardPhoto').value = '';
+    croppedPlayerCardPhoto = null;
     document.getElementById('playerCardPreview').src = playerPhotoSrc(player);
     setPlayerCardEnabled(true);
     markSelectedPlayer(player.id || '');
@@ -278,11 +282,12 @@ async function fetchWithAuth(url, options = {}) {
     ev?.preventDefault();
     var id = document.getElementById('playerCardId')?.value || '';
     var dni = document.getElementById('playerCardDni')?.value || '';
-    var birth = formatBirthForApi(document.getElementById('playerCardBirth')?.value || '');
-    var photo = document.getElementById('playerCardPhoto')?.files?.[0] || null;
+    var birthRaw = document.getElementById('playerCardBirth')?.value || '';
+    var birth = formatBirthForApi(birthRaw);
+    var photo = croppedPlayerCardPhoto || document.getElementById('playerCardPhoto')?.files?.[0] || null;
     if (!id) return showPlayerCardError('Jugador inválido');
-    if (!dni.trim()) return showPlayerCardError('El DNI es obligatorio');
-    if (!birth) return showPlayerCardError('Ingresá la fecha como DD/MM/AAAA');
+    if (birthRaw.trim() && !birth) return showPlayerCardError('Ingresá la fecha como DD/MM/AAAA');
+    if (!dni.trim() && !birth && !photo) return showPlayerCardError('No hay datos para guardar');
 
     var form = new FormData();
     form.set('id', id);
@@ -318,9 +323,24 @@ async function fetchWithAuth(url, options = {}) {
   window.openPlayerCardEditor = openPlayerCardEditor;
 
   document.addEventListener('DOMContentLoaded', function(){
-    document.getElementById('playerCardPhoto')?.addEventListener('change', function(){
+    document.getElementById('playerCardPhoto')?.addEventListener('change', async function(){
       var file = this.files?.[0];
-      if (file) document.getElementById('playerCardPreview').src = URL.createObjectURL(file);
+      if (!file) return;
+      try {
+        var cropped = window.LipaPhotoCropper
+          ? await window.LipaPhotoCropper.pick(file, { outputName: document.getElementById('playerCardName')?.value || file.name })
+          : file;
+        if (!cropped) {
+          this.value = '';
+          return;
+        }
+        croppedPlayerCardPhoto = cropped;
+        document.getElementById('playerCardPreview').src = URL.createObjectURL(cropped);
+      } catch (err) {
+        this.value = '';
+        croppedPlayerCardPhoto = null;
+        showPlayerCardError(err.message || 'No se pudo ajustar la foto');
+      }
     });
     document.getElementById('playerCardBirth')?.addEventListener('input', function(){
       normalizeBirthTyping(this);

@@ -449,13 +449,14 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
         await ensurePlayerSchema();
         const playerId = Number(req.body?.id);
         const dni = normalizeDni(req.body?.dni);
-        const fechaNacimiento = normalizeBirthDate(req.body?.fechaNacimiento || req.body?.fecha_nacimiento);
+        const fechaNacimientoRaw = String(req.body?.fechaNacimiento || req.body?.fecha_nacimiento || '').trim();
+        const fechaNacimiento = normalizeBirthDate(fechaNacimientoRaw);
 
         if (!Number.isFinite(playerId) || playerId <= 0) {
           return res.status(400).json({ ok: false, error: 'Jugador inválido' });
         }
-        if (!dni) return res.status(400).json({ ok: false, error: 'El DNI es obligatorio' });
-        if (!fechaNacimiento) return res.status(400).json({ ok: false, error: 'La fecha de nacimiento es obligatoria' });
+        if (fechaNacimientoRaw && !fechaNacimiento) return res.status(400).json({ ok: false, error: 'La fecha de nacimiento no es válida' });
+        if (!dni && !fechaNacimiento && !req.file) return res.status(400).json({ ok: false, error: 'No hay datos para actualizar' });
 
         const team = await resolveTeam(req.user.slug);
         if (!team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
@@ -473,19 +474,21 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
           return res.status(403).json({ ok: false, error: 'Ese jugador no pertenece a tu equipo' });
         }
 
-        const dniOwner = await pool.query(
-          `SELECT id FROM jugadores WHERE dni = $1 AND id <> $2 LIMIT 1`,
-          [dni, playerId]
-        );
-        if (dniOwner.rows.length) {
-          return res.status(400).json({ ok: false, error: 'Ese DNI ya pertenece a otro jugador' });
+        if (dni) {
+          const dniOwner = await pool.query(
+            `SELECT id FROM jugadores WHERE dni = $1 AND id <> $2 LIMIT 1`,
+            [dni, playerId]
+          );
+          if (dniOwner.rows.length) {
+            return res.status(400).json({ ok: false, error: 'Ese DNI ya pertenece a otro jugador' });
+          }
         }
 
         const fotoPath = req.file?.filename || null;
         await pool.query(
           `UPDATE jugadores
-              SET dni = $1,
-                  fecha_nacimiento = $2::date,
+              SET dni = COALESCE(NULLIF($1, ''), dni),
+                  fecha_nacimiento = COALESCE($2::date, fecha_nacimiento),
                   foto_path = COALESCE($3, foto_path),
                   updated_at = NOW()
             WHERE id = $4`,

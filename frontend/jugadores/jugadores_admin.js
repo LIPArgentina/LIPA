@@ -1,6 +1,7 @@
 const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 
 const $ = (selector) => document.querySelector(selector);
+let croppedPlayerPhoto = null;
 
 function readSession(){
   for (const key of ['lpi.session', 'lpi_team_session']) {
@@ -123,6 +124,7 @@ function clearForm(){
   $('#playerDni').value = '';
   $('#playerBirth').value = '';
   $('#playerPhoto').value = '';
+  croppedPlayerPhoto = null;
   $('#playerCategory').value = 'tercera';
   refreshPlayerTeams();
   $('#photoPreview').src = '../logo_liga.png';
@@ -138,6 +140,7 @@ async function fillForm(player){
   $('#playerCategory').value = player?.categoria || 'tercera';
   await refreshPlayerTeams(player?.teamSlug || player?.equipo || '');
   $('#playerPhoto').value = '';
+  croppedPlayerPhoto = null;
   $('#photoPreview').src = photoSrc(player);
   setStatus(`Editando ${player?.nombre || player?.name || 'jugador'}`);
 }
@@ -224,7 +227,7 @@ async function searchByTeam(ev){
 async function savePlayer(ev){
   ev?.preventDefault();
   const form = new FormData();
-  const photo = $('#playerPhoto').files?.[0];
+  const photo = croppedPlayerPhoto || $('#playerPhoto').files?.[0];
   if ($('#playerId').value) form.set('id', $('#playerId').value);
   if ($('#associationId').value) form.set('associationId', $('#associationId').value);
   form.set('nombre', $('#playerName').value.trim());
@@ -303,10 +306,25 @@ async function showHistory(player){
   }
 }
 
-$('#playerPhoto')?.addEventListener('change', () => {
-  const file = $('#playerPhoto').files?.[0];
+$('#playerPhoto')?.addEventListener('change', async () => {
+  const input = $('#playerPhoto');
+  const file = input?.files?.[0];
   if (!file) return;
-  $('#photoPreview').src = URL.createObjectURL(file);
+  try {
+    const cropped = window.LipaPhotoCropper
+      ? await window.LipaPhotoCropper.pick(file, { outputName: $('#playerName')?.value || file.name })
+      : file;
+    if (!cropped) {
+      input.value = '';
+      return;
+    }
+    croppedPlayerPhoto = cropped;
+    $('#photoPreview').src = URL.createObjectURL(cropped);
+  } catch (err) {
+    input.value = '';
+    croppedPlayerPhoto = null;
+    toast(err.message || 'No se pudo ajustar la foto');
+  }
 });
 
 $('#playerSearchForm')?.addEventListener('submit', searchPlayers);
