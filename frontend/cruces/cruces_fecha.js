@@ -40,6 +40,18 @@
   };
 
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  const MATCH_FORMAT = window.LIPA_getMatchFormat?.() || {
+    individualCount: 7,
+    pairCount: 2,
+    pairSize: 2,
+    totalPoints: 9,
+    captainCount: 2,
+    substituteCount: 2
+  };
+  const INDIVIDUAL_COUNT = Number(MATCH_FORMAT.individualCount || 7);
+  const PAIR_COUNT = Number(MATCH_FORMAT.pairCount || 0);
+  const PAIR_SIZE = Number(MATCH_FORMAT.pairSize || 2);
+  const TOTAL_POINTS = Number(MATCH_FORMAT.totalPoints || INDIVIDUAL_COUNT + PAIR_COUNT);
   const CATEGORY_KEYS = {
     tercera: '__categoria_tercera__',
     segunda: '__categoria_segunda__'
@@ -652,9 +664,9 @@ function apiUrl(path){
     return {
       team,
       capitan: ['', ''],
-      individuales: Array(7).fill(''),
-      pareja1: ['', ''],
-      pareja2: ['', ''],
+      individuales: Array(INDIVIDUAL_COUNT).fill(''),
+      pareja1: PAIR_COUNT >= 1 ? Array(PAIR_SIZE).fill('') : [],
+      pareja2: PAIR_COUNT >= 2 ? Array(PAIR_SIZE).fill('') : [],
       suplentes: ['', '', '']
     };
   }
@@ -704,9 +716,9 @@ function apiUrl(path){
           const normalizedPlan = {
             team: item?.team || rawTeam || planTeam || '',
             capitan: Array.isArray(plan.capitan) ? plan.capitan : ['', ''],
-            individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(7).fill(''),
-            pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['', ''],
-            pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['', ''],
+            individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(INDIVIDUAL_COUNT).fill(''),
+            pareja1: PAIR_COUNT >= 1 && Array.isArray(plan.pareja1) ? plan.pareja1 : [],
+            pareja2: PAIR_COUNT >= 2 && Array.isArray(plan.pareja2) ? plan.pareja2 : [],
             suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', ''],
             jugadorIds: plan.jugadorIds && typeof plan.jugadorIds === 'object' ? plan.jugadorIds : {}
           };
@@ -768,9 +780,9 @@ function apiUrl(path){
         return {
           team: data?.team || plan?.team || slug || key,
           capitan: Array.isArray(plan.capitan) ? plan.capitan : ['', ''],
-          individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(7).fill(''),
-          pareja1: Array.isArray(plan.pareja1) ? plan.pareja1 : ['', ''],
-          pareja2: Array.isArray(plan.pareja2) ? plan.pareja2 : ['', ''],
+          individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(INDIVIDUAL_COUNT).fill(''),
+          pareja1: PAIR_COUNT >= 1 && Array.isArray(plan.pareja1) ? plan.pareja1 : [],
+          pareja2: PAIR_COUNT >= 2 && Array.isArray(plan.pareja2) ? plan.pareja2 : [],
           suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', ''],
           jugadorIds: plan.jugadorIds && typeof plan.jugadorIds === 'object' ? plan.jugadorIds : {}
         };
@@ -975,7 +987,10 @@ function apiUrl(path){
       'SUPLENTES': planilla.suplentes || []
     };
 
-    const sections = ['CAPITÁN', 'INDIVIDUALES', 'PAREJA 1', 'PAREJA 2', 'SUPLENTES'];
+    const sections = ['CAPITÁN', 'INDIVIDUALES'];
+    if (PAIR_COUNT >= 1) sections.push('PAREJA 1');
+    if (PAIR_COUNT >= 2) sections.push('PAREJA 2');
+    sections.push('SUPLENTES');
     sections.forEach(sec => {
       const div = document.createElement('div');
       div.className = 'section';
@@ -1702,9 +1717,10 @@ function startValidationPolling(btn) {
 }
 
 function sliceToStatus(values) {
-  const jugadores = values.slice(0,7);
-  const pareja1 = { j1: values[7]  ?? 0, j2: values[8]  ?? 0 };
-  const pareja2 = { j1: values[9]  ?? 0, j2: values[10] ?? 0 };
+  const jugadores = values.slice(0, INDIVIDUAL_COUNT);
+  const pairStart = INDIVIDUAL_COUNT;
+  const pareja1 = PAIR_COUNT >= 1 ? { j1: values[pairStart] ?? 0, j2: values[pairStart + 1] ?? 0 } : { j1: 0, j2: 0 };
+  const pareja2 = PAIR_COUNT >= 2 ? { j1: values[pairStart + PAIR_SIZE] ?? 0, j2: values[pairStart + PAIR_SIZE + 1] ?? 0 } : { j1: 0, j2: 0 };
   return { jugadores, parejas: { pareja1, pareja2 } };
 }
 
@@ -1825,8 +1841,16 @@ async function tryApplyStatusIfExists(){
 
 
 
-    const L = [...(data.local?.jugadores||[]), data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0, data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0];
-    const R = [...(data.visitante?.jugadores||[]), data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0, data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0];
+    const L = [...(data.local?.jugadores||[])];
+    const R = [...(data.visitante?.jugadores||[])];
+    if (PAIR_COUNT >= 1) {
+      L.push(data.local?.parejas?.pareja1?.j1 ?? 0, data.local?.parejas?.pareja1?.j2 ?? 0);
+      R.push(data.visitante?.parejas?.pareja1?.j1 ?? 0, data.visitante?.parejas?.pareja1?.j2 ?? 0);
+    }
+    if (PAIR_COUNT >= 2) {
+      L.push(data.local?.parejas?.pareja2?.j1 ?? 0, data.local?.parejas?.pareja2?.j2 ?? 0);
+      R.push(data.visitante?.parejas?.pareja2?.j1 ?? 0, data.visitante?.parejas?.pareja2?.j2 ?? 0);
+    }
     writeAllSelects('planilla-root-left', L);
     writeAllSelects('planilla-root-right', R);
     updateScoresFor();
@@ -2307,8 +2331,8 @@ btn.onclick = async () => {
 
     const left  = computeTotalsFrom('planilla-root-left');
     const right = computeTotalsFrom('planilla-root-right');
-    if ((left.puntosTotales + right.puntosTotales) !== 9) {
-    setBtnState('error','ERROR: La suma de puntos debe ser 9');
+    if ((left.puntosTotales + right.puntosTotales) !== TOTAL_POINTS) {
+    setBtnState('error',`ERROR: La suma de puntos debe ser ${TOTAL_POINTS}`);
     setTimeout(() => {
       btn.disabled = false;
       btn.classList.remove('success','error','pending','rival-pending','btn');
@@ -2567,15 +2591,15 @@ function isAndroidAppWebView(){
   }
 
   function buildExportIndividualRows(localPlan, visitantePlan){
-    const left = safeArr(localPlan?.individuales, 7);
-    const right = safeArr(visitantePlan?.individuales, 7);
+    const left = safeArr(localPlan?.individuales, INDIVIDUAL_COUNT);
+    const right = safeArr(visitantePlan?.individuales, INDIVIDUAL_COUNT);
 
     return left.map((name, idx) => {
       if (idx === 0) {
         return `<tr>
           <td>${escapeHtml(name)}</td>
           <td></td>
-          <td class="export-vs" rowspan="7">VS.</td>
+          <td class="export-vs" rowspan="${INDIVIDUAL_COUNT}">VS.</td>
           <td></td>
           <td>${escapeHtml(right[idx])}</td>
         </tr>`;
@@ -2683,7 +2707,7 @@ function isAndroidAppWebView(){
         </table>
       </div>
 
-      <div class="export-doubles-wrap">
+      ${PAIR_COUNT >= 1 ? `<div class="export-doubles-wrap">
         <div class="export-doubles-label">PAREJAS 1</div>
         <table aria-label="Parejas 1">
           <colgroup>
@@ -2695,9 +2719,9 @@ function isAndroidAppWebView(){
           </colgroup>
           <tbody>${buildExportDoublesRows(localPlan.pareja1, visitantePlan.pareja1)}</tbody>
         </table>
-      </div>
+      </div>` : ''}
 
-      <div class="export-doubles-wrap">
+      ${PAIR_COUNT >= 2 ? `<div class="export-doubles-wrap">
         <div class="export-doubles-label">PAREJAS 2</div>
         <table aria-label="Parejas 2">
           <colgroup>
@@ -2709,7 +2733,7 @@ function isAndroidAppWebView(){
           </colgroup>
           <tbody>${buildExportDoublesRows(localPlan.pareja2, visitantePlan.pareja2)}</tbody>
         </table>
-      </div>
+      </div>` : ''}
 
       <div class="export-section">
         <table class="export-result" aria-label="Resultado final">

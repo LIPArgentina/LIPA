@@ -1,5 +1,16 @@
 (() => {
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  const MATCH_FORMAT = window.LIPA_getMatchFormat?.() || {
+    individualCount: 7,
+    pairCount: 2,
+    pairSize: 2,
+    totalPoints: 9,
+    captainCount: 2,
+    substituteCount: 2
+  };
+  const INDIVIDUAL_COUNT = Number(MATCH_FORMAT.individualCount || 7);
+  const PAIR_COUNT = Number(MATCH_FORMAT.pairCount || 0);
+  const PAIR_SIZE = Number(MATCH_FORMAT.pairSize || 2);
 
   const state = {
     teams: [],
@@ -8,9 +19,9 @@
 
   const sections = [
     { key:'capitan', title:'CAPITÁN', count:2, score:false },
-    { key:'individuales', title:'INDIVIDUALES', count:7, score:true },
-    { key:'pareja1', title:'PAREJA 1', count:2, score:'single' },
-    { key:'pareja2', title:'PAREJA 2', count:2, score:'single' },
+    { key:'individuales', title:'INDIVIDUALES', count:INDIVIDUAL_COUNT, score:true },
+    ...(PAIR_COUNT >= 1 ? [{ key:'pareja1', title:'PAREJA 1', count:PAIR_SIZE, score:'single' }] : []),
+    ...(PAIR_COUNT >= 2 ? [{ key:'pareja2', title:'PAREJA 2', count:PAIR_SIZE, score:'single' }] : []),
     { key:'suplentes', title:'SUPLENTES', count:2, score:false }
   ];
 
@@ -219,9 +230,9 @@
     });
 
     const scores = scoreRowsFor(rootId);
-    out.individualesPts = scores.slice(0,7);
-    out.pareja1Pts = [scores[7] || 0];
-    out.pareja2Pts = [scores[8] || 0];
+    out.individualesPts = scores.slice(0, INDIVIDUAL_COUNT);
+    out.pareja1Pts = PAIR_COUNT >= 1 ? [scores[INDIVIDUAL_COUNT] || 0] : [];
+    out.pareja2Pts = PAIR_COUNT >= 2 ? [scores[INDIVIDUAL_COUNT + 1] || 0] : [];
     return out;
   }
 
@@ -239,7 +250,7 @@
     let leftPts = 0;
     let rightPts = 0;
 
-    for(let i=0;i<9;i++){
+    for(let i=0;i<left.length;i++){
       const [l,r] = matchWins(left[i] || 0, right[i] || 0);
       leftPts += l;
       rightPts += r;
@@ -525,20 +536,20 @@
       validated: true,
       local: {
         parejas: {
-          pareja1: { j1: localRows[7] || 0, j2: 0 },
-          pareja2: { j1: localRows[8] || 0, j2: 0 }
+          pareja1: { j1: PAIR_COUNT >= 1 ? localRows[INDIVIDUAL_COUNT] || 0 : 0, j2: 0 },
+          pareja2: { j1: PAIR_COUNT >= 2 ? localRows[INDIVIDUAL_COUNT + 1] || 0 : 0, j2: 0 }
         },
-        jugadores: localRows.slice(0,7),
+        jugadores: localRows.slice(0, INDIVIDUAL_COUNT),
         scoreRows: localRows,
         puntosTotales: localPts,
         triangulosTotales: localTri
       },
       visitante: {
         parejas: {
-          pareja1: { j1: visRows[7] || 0, j2: 0 },
-          pareja2: { j1: visRows[8] || 0, j2: 0 }
+          pareja1: { j1: PAIR_COUNT >= 1 ? visRows[INDIVIDUAL_COUNT] || 0 : 0, j2: 0 },
+          pareja2: { j1: PAIR_COUNT >= 2 ? visRows[INDIVIDUAL_COUNT + 1] || 0 : 0, j2: 0 }
         },
-        jugadores: visRows.slice(0,7),
+        jugadores: visRows.slice(0, INDIVIDUAL_COUNT),
         scoreRows: visRows,
         puntosTotales: visPts,
         triangulosTotales: visTri

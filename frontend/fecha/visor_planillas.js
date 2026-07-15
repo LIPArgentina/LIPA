@@ -14,6 +14,15 @@ const API_BASE = (() => {
 
 (function(){
   const $ = s => document.querySelector(s);
+  const MATCH_FORMAT = window.LIPA_getMatchFormat?.() || {
+    individualCount: 7,
+    pairCount: 2,
+    pairSize: 2,
+    substituteCount: 2
+  };
+  const INDIVIDUAL_COUNT = Number(MATCH_FORMAT.individualCount || 7);
+  const PAIR_COUNT = Number(MATCH_FORMAT.pairCount || 0);
+  const PAIR_SIZE = Number(MATCH_FORMAT.pairSize || 2);
 
   const CATEGORY_FILTER_STORAGE_KEY = 'visor_planillas_active_category';
 
@@ -62,6 +71,14 @@ const API_BASE = (() => {
       .toUpperCase();
   }
 
+  function normalizeCategory(value){
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return '';
+    if (raw.includes('terc') || raw === '3' || raw === '3ra') return 'tercera';
+    if (raw.includes('seg') || raw === '2' || raw === '2da') return 'segunda';
+    return '';
+  }
+
   function getStoredCategoryFilter(){
     try{
       const stored = localStorage.getItem(CATEGORY_FILTER_STORAGE_KEY);
@@ -103,18 +120,23 @@ const API_BASE = (() => {
     const groups = document.createElement('div'); groups.className='groups';
 
     const g1 = document.createElement('article'); g1.className='group'; g1.innerHTML = '<h3>INDIVIDUALES</h3>';
-    g1.appendChild(fill(Array.isArray(safePlan.individuales) ? safePlan.individuales : [], 7));
-
-    const g2 = document.createElement('article'); g2.className='group'; g2.innerHTML = '<h3>PAREJA 1</h3>';
-    g2.appendChild(fill(Array.isArray(safePlan.pareja1) ? safePlan.pareja1 : [], 2));
-
-    const g3 = document.createElement('article'); g3.className='group'; g3.innerHTML = '<h3>PAREJA 2</h3>';
-    g3.appendChild(fill(Array.isArray(safePlan.pareja2) ? safePlan.pareja2 : [], 2));
+    g1.appendChild(fill(Array.isArray(safePlan.individuales) ? safePlan.individuales : [], INDIVIDUAL_COUNT));
 
     const g4 = document.createElement('article'); g4.className='group'; g4.innerHTML = '<h3>SUPLENTES</h3>';
     g4.appendChild(fill(Array.isArray(safePlan.suplentes) ? safePlan.suplentes : [], 2));
 
-    groups.appendChild(g1); groups.appendChild(g2); groups.appendChild(g3); groups.appendChild(g4);
+    groups.appendChild(g1);
+    if (PAIR_COUNT >= 1) {
+      const g2 = document.createElement('article'); g2.className='group'; g2.innerHTML = '<h3>PAREJA 1</h3>';
+      g2.appendChild(fill(Array.isArray(safePlan.pareja1) ? safePlan.pareja1 : [], PAIR_SIZE));
+      groups.appendChild(g2);
+    }
+    if (PAIR_COUNT >= 2) {
+      const g3 = document.createElement('article'); g3.className='group'; g3.innerHTML = '<h3>PAREJA 2</h3>';
+      g3.appendChild(fill(Array.isArray(safePlan.pareja2) ? safePlan.pareja2 : [], PAIR_SIZE));
+      groups.appendChild(g3);
+    }
+    groups.appendChild(g4);
     wrap.appendChild(groups);
     target.appendChild(wrap);
   }
@@ -416,7 +438,7 @@ const API_BASE = (() => {
     }
 
     for(const item of visibleFiles){
-      const team = item.team || 'equipo';
+      const team = item.teamName || item.team || 'equipo';
       const plan = item.planilla || item.plan || {};
       const updatedAt = item.updatedAt || null;
 
@@ -499,7 +521,8 @@ const API_BASE = (() => {
 
       state.allFiles = files.map(item => ({
         ...item,
-        __category: resolveCategory(item.team)
+        __category: normalizeCategory(item.category || item.division || item.categoria || item.planilla?.category || item.planilla?.categoria)
+          || resolveCategory(item.slug_uid || item.team)
       }));
 
       renderBoards();

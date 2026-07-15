@@ -28,9 +28,11 @@ module.exports = function createAdminRouter(deps) {
     const safeSlug = String(slug || '').trim().toLowerCase();
     if (!safeSlug) return null;
 
+    await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
+
     const result = await pool.query(
       `SELECT id, slug_uid, slug_base, division, username, display_name,
-              password_hash, must_change_password, password_updated_at
+              password_hash, must_change_password, password_updated_at, activo
          FROM equipos
         WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1
         ORDER BY CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END, id ASC
@@ -45,9 +47,11 @@ module.exports = function createAdminRouter(deps) {
     const id = Number(teamId);
     if (!Number.isFinite(id) || id <= 0) return null;
 
+    await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
+
     const result = await pool.query(
       `SELECT id, slug_uid, slug_base, division, username, display_name,
-              password_hash, must_change_password, password_updated_at
+              password_hash, must_change_password, password_updated_at, activo
          FROM equipos
         WHERE id = $1
         LIMIT 1`,
@@ -124,6 +128,9 @@ module.exports = function createAdminRouter(deps) {
     let team = await findTeamBySlug(slug);
     if (!team) {
       return res.status(404).json({ ok: false, msg: 'equipo inexistente' });
+    }
+    if (team.activo === false) {
+      return res.status(403).json({ ok: false, msg: 'equipo inactivo' });
     }
 
     team = await ensureDbTeamPassword(team);

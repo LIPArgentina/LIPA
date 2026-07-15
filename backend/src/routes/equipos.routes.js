@@ -17,6 +17,10 @@ module.exports = function createEquiposRouter() {
       .replace(/[^a-z0-9]/g, '');
   }
 
+  async function ensureActivoColumn(client = pool) {
+    await client.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
+  }
+
   router.post('/save-teams', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
@@ -27,6 +31,7 @@ module.exports = function createEquiposRouter() {
       }
 
       await client.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS subcaptain TEXT`);
+      await ensureActivoColumn(client);
 
       const processed = teams.map(t => {
         const username = String(t.username || '').trim();
@@ -45,7 +50,8 @@ module.exports = function createEquiposRouter() {
           captain: t.captain || '',
           subcaptain: t.subcaptain || t.subcapitan || '',
           phone: t.phone || '',
-          email: t.email || ''
+          email: t.email || '',
+          activo: t.activo !== false
         };
       }).filter(Boolean);
 
@@ -58,8 +64,8 @@ module.exports = function createEquiposRouter() {
         await client.query(
           `INSERT INTO equipos
              (slug_uid, slug_base, division, display_name, username, role, captain, subcaptain, phone, email,
-              password_hash, must_change_password, password_updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true,NOW())
+              activo, password_hash, must_change_password, password_updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,NOW())
            ON CONFLICT (slug_uid)
            DO UPDATE SET
              slug_base = EXCLUDED.slug_base,
@@ -70,7 +76,8 @@ module.exports = function createEquiposRouter() {
              captain = EXCLUDED.captain,
              subcaptain = EXCLUDED.subcaptain,
              phone = EXCLUDED.phone,
-             email = EXCLUDED.email`,
+             email = EXCLUDED.email,
+             activo = EXCLUDED.activo`,
           [
             t.slug_uid,
             t.slug_base,
@@ -82,6 +89,7 @@ module.exports = function createEquiposRouter() {
             t.subcaptain,
             t.phone,
             t.email,
+            t.activo,
             defaultHash,
           ]
         );
@@ -89,13 +97,14 @@ module.exports = function createEquiposRouter() {
 
       if (keepSlugs.length > 0) {
         await client.query(
-          `DELETE FROM equipos
+          `UPDATE equipos
+              SET activo = false
             WHERE division = $1
               AND NOT (slug_uid = ANY($2::text[]))`,
           [division, keepSlugs]
         );
       } else {
-        await client.query(`DELETE FROM equipos WHERE division = $1`, [division]);
+        await client.query(`UPDATE equipos SET activo = false WHERE division = $1`, [division]);
       }
 
       await client.query('COMMIT');
@@ -113,14 +122,17 @@ module.exports = function createEquiposRouter() {
   router.get('/teams', async (req, res) => {
     try {
       const { division } = req.query;
+      const includeInactive = req.query.includeInactive === '1' || req.query.includeInactive === 'true';
       await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS subcaptain TEXT`);
+      await ensureActivoColumn();
 
       const result = await pool.query(
-        `SELECT id, slug_uid, username, role, captain, subcaptain, email, phone
+        `SELECT id, slug_uid, username, role, captain, subcaptain, email, phone, activo
            FROM equipos
           WHERE division = $1
+            AND ($2::boolean = true OR activo = true)
           ORDER BY username`,
-        [division]
+        [division, includeInactive]
       );
 
       res.json({
@@ -133,13 +145,43 @@ module.exports = function createEquiposRouter() {
           captain: r.captain || '',
           subcaptain: r.subcaptain || '',
           email: r.email || '',
-          phone: r.phone || ''
+          phone: r.phone || '',
+          activo: r.activo !== false
         }))
       });
 
     } catch (err) {
       console.error(err);
       res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  router.patch('/teams/:id/active', requireAdmin, async (req, res) => {
+    try {
+      await ensureActivoColumn();
+
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id) || id <= 0) {
+        return res.status(400).json({ ok: false, error: 'id inválido' });
+      }
+
+      const active = req.body?.activo !== false && req.body?.active !== false;
+      const result = await pool.query(
+        `UPDATE equipos
+            SET activo = $1
+          WHERE id = $2
+          RETURNING id, slug_uid, username, activo`,
+        [active, id]
+      );
+
+      if (!result.rowCount) {
+        return res.status(404).json({ ok: false, error: 'equipo no encontrado' });
+      }
+
+      return res.json({ ok: true, team: result.rows[0] });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ ok: false, error: err.message });
     }
   });
 

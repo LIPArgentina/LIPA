@@ -1117,9 +1117,12 @@ function collectPlanillaPayload(){
     };
     const pickFree = () => Array.from(document.querySelectorAll('.yellow-box-free')).map(x => (x.dataset.player || '').trim());
     const team = (typeof deriveTeamKey === 'function') ? deriveTeamKey() : ((typeof deriveTeam === 'function') ? deriveTeam() : '');
+    const category = (typeof deriveCategory === 'function') ? deriveCategory() : '';
 
     return {
       team,
+      category,
+      categoria: category,
       createdAt: new Date().toISOString(),
       individuales: pick('individual'),
       pareja1: pick('pareja1'),

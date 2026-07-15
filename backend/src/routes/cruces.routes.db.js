@@ -3125,11 +3125,14 @@ async function findTeamsByCategory(category = '') {
   const division = String(category || '').trim().toLowerCase();
   if (!division) return [];
 
+  await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
+
   const { rows } = await pool.query(
     `
     SELECT id, slug_uid, slug_base, display_name, division
     FROM equipos
     WHERE LOWER(division) = $1
+      AND activo = true
     ORDER BY display_name ASC, id ASC
     `,
     [division]
