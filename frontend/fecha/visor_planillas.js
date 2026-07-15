@@ -71,6 +71,14 @@ const API_BASE = (() => {
       .toUpperCase();
   }
 
+  function normalizeCategory(value){
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return '';
+    if (raw.includes('terc') || raw === '3' || raw === '3ra') return 'tercera';
+    if (raw.includes('seg') || raw === '2' || raw === '2da') return 'segunda';
+    return '';
+  }
+
   function getStoredCategoryFilter(){
     try{
       const stored = localStorage.getItem(CATEGORY_FILTER_STORAGE_KEY);
@@ -430,7 +438,7 @@ const API_BASE = (() => {
     }
 
     for(const item of visibleFiles){
-      const team = item.team || 'equipo';
+      const team = item.teamName || item.team || 'equipo';
       const plan = item.planilla || item.plan || {};
       const updatedAt = item.updatedAt || null;
 
@@ -513,7 +521,8 @@ const API_BASE = (() => {
 
       state.allFiles = files.map(item => ({
         ...item,
-        __category: resolveCategory(item.team)
+        __category: normalizeCategory(item.category || item.division || item.categoria || item.planilla?.category || item.planilla?.categoria)
+          || resolveCategory(item.slug_uid || item.team)
       }));
 
       renderBoards();

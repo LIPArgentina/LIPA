@@ -63,6 +63,8 @@ module.exports = function createFechasRouter(deps) {
     if (!input || typeof input !== 'object') return null;
     return {
       team: String(input.team || authSlug || '').trim().toLowerCase(),
+      category: String(input.category || input.categoria || '').trim().toLowerCase(),
+      categoria: String(input.categoria || input.category || '').trim().toLowerCase(),
       createdAt: input.createdAt || new Date().toISOString(),
       individuales: Array.isArray(input.individuales) ? input.individuales.map(x => String(x || '').trim()) : [],
       pareja1: Array.isArray(input.pareja1) ? input.pareja1.map(x => String(x || '').trim()) : [],

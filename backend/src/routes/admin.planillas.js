@@ -72,6 +72,9 @@ router.get('/planillas', async (req, res) => {
       SELECT
         e.id AS equipo_id,
         e.slug_base AS team,
+        e.slug_uid,
+        e.display_name,
+        e.division,
         p.datos,
         p.updated_at
       FROM planillas p
@@ -81,6 +84,10 @@ router.get('/planillas', async (req, res) => {
 
     const out = await Promise.all(result.rows.map(async (r) => ({
       team: r.team,
+      slug_uid: r.slug_uid,
+      teamName: r.display_name,
+      division: r.division,
+      category: r.division,
       planilla: await enrichPlanillaWithPlayerIds(r.datos, r.equipo_id),
       updatedAt: r.updated_at
     })));
