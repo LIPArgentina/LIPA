@@ -3,7 +3,17 @@
 }
 
 .players-view .photo-box--large{
-  width:168px;
+  width:130px;
+  height:130px;
+}
+
+.players-view .photo-box img{
+  object-position:center center;
+}
+
+.players-view .player-card img{
+  object-fit:contain;
+  object-position:center center;
 }
 
 .players-view .player-card{
@@ -21,6 +31,6 @@
 
 @media (max-width: 900px){
   .players-view .photo-box--large{
-    width:132px;
+    width:130px;
   }
 }
