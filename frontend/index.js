@@ -305,6 +305,13 @@ function goToBanner(index, restartTimer = false) {
   }
 }
 
+function formatBirthdayNames(names) {
+  if (!names.length) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} y ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}`;
+}
+
 async function loadBirthdayTicker() {
   const ticker = document.getElementById("birthdayTicker");
   const track = document.getElementById("birthdayTickerTrack");
@@ -324,8 +331,8 @@ async function loadBirthdayTicker() {
       return;
     }
 
-    const message = `La Liga Independiente de Pool Argentina le desea un Feliz Cumpleaños a ${names.join(", ")}`;
-    track.textContent = `${message}   •   ${message}`;
+    const message = `La Liga Independiente de Pool Argentina le desea un Feliz Cumpleaños a ${formatBirthdayNames(names)}`;
+    track.textContent = message;
     ticker.classList.remove("hidden");
   } catch (err) {
     console.error("Birthday ticker load error:", err);

@@ -21,9 +21,25 @@
 .well{
   width:min(820px, 92%);
   height:138px;
-  padding:16px 20px;
-  display:flex;
-  align-items:flex-start;
+  padding:16px 12px 16px 20px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,217,102,.55) rgba(255,255,255,.08);
+}
+
+.well::-webkit-scrollbar{
+  width:7px;
+}
+
+.well::-webkit-scrollbar-track{
+  background:rgba(255,255,255,.08);
+  border-radius:999px;
+}
+
+.well::-webkit-scrollbar-thumb{
+  background:rgba(255,217,102,.55);
+  border-radius:999px;
 }
 
 .birthday-ticker{
@@ -37,18 +53,22 @@
   white-space:nowrap;
   padding:6px 0;
   border-bottom:1px solid rgba(255,217,102,.08);
+  position:relative;
+  height:25px;
 }
 
 .birthday-ticker__track{
-  display:inline-block;
-  min-width:100%;
-  padding-left:100%;
-  animation:birthday-ticker-scroll 42s linear infinite;
+  position:absolute;
+  left:0;
+  top:6px;
+  display:block;
+  white-space:nowrap;
+  animation:birthday-ticker-scroll 34s linear infinite;
   will-change:transform;
 }
 
 @keyframes birthday-ticker-scroll{
-  from{ transform:translateX(0); }
+  from{ transform:translateX(100vw); }
   to{ transform:translateX(-100%); }
 }
 
@@ -136,28 +156,11 @@
 
 #bannerMessage {
   position: relative;
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: 100%;
+  overflow: visible;
   white-space: pre-line;
   line-height: 1.45;
-  padding-right: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,217,102,.55) rgba(255,255,255,.08);
-}
-
-#bannerMessage::-webkit-scrollbar{
-  width:7px;
-}
-
-#bannerMessage::-webkit-scrollbar-track{
-  background:rgba(255,255,255,.08);
-  border-radius:999px;
-}
-
-#bannerMessage::-webkit-scrollbar-thumb{
-  background:rgba(255,217,102,.55);
-  border-radius:999px;
+  margin:0;
+  width:100%;
 }
 
 .banner-slide {
@@ -708,7 +711,7 @@
   .well {
     margin-top: 0.9rem;
     height: 118px;
-    padding: 0.65rem 0.85rem;
+    padding: 0.65rem 0.55rem 0.65rem 0.85rem;
     font-size: 0.84rem;
   }
 
@@ -718,7 +721,8 @@
   }
 
   .birthday-ticker__track{
-    animation-duration:36s;
+    top:5px;
+    animation-duration:30s;
   }
 
   .cta-grid {
