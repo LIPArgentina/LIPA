@@ -1,7 +1,55 @@
 
 .hero__logo{
-  width: clamp(180px, 18vw, 260px);
+  width: clamp(150px, 15vw, 210px);
   height: auto;
+}
+
+.hero{
+  padding:28px 16px 32px;
+  gap:15px;
+}
+
+.hero__logo-wrap{
+  width:180px;
+  height:180px;
+}
+
+.title{
+  font-size:clamp(1.65rem, 2.8vw, 1.95rem);
+}
+
+.well{
+  width:min(820px, 92%);
+  height:138px;
+  padding:16px 20px;
+  display:flex;
+  align-items:flex-start;
+}
+
+.birthday-ticker{
+  width:100%;
+  overflow:hidden;
+  background:transparent;
+  color:#ffd966;
+  font-size:.78rem;
+  line-height:1;
+  letter-spacing:.03em;
+  white-space:nowrap;
+  padding:6px 0;
+  border-bottom:1px solid rgba(255,217,102,.08);
+}
+
+.birthday-ticker__track{
+  display:inline-block;
+  min-width:100%;
+  padding-left:100%;
+  animation:birthday-ticker-scroll 42s linear infinite;
+  will-change:transform;
+}
+
+@keyframes birthday-ticker-scroll{
+  from{ transform:translateX(0); }
+  to{ transform:translateX(-100%); }
 }
 
 #bannerModal .modal__panel {
@@ -88,9 +136,28 @@
 
 #bannerMessage {
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 100%;
   white-space: pre-line;
   line-height: 1.45;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,217,102,.55) rgba(255,255,255,.08);
+}
+
+#bannerMessage::-webkit-scrollbar{
+  width:7px;
+}
+
+#bannerMessage::-webkit-scrollbar-track{
+  background:rgba(255,255,255,.08);
+  border-radius:999px;
+}
+
+#bannerMessage::-webkit-scrollbar-thumb{
+  background:rgba(255,217,102,.55);
+  border-radius:999px;
 }
 
 .banner-slide {
@@ -110,8 +177,8 @@
 
 
 .featured-actions{
-  width:min(980px, 100%);
-  margin:1.35rem auto 0;
+  width:min(900px, 100%);
+  margin:1rem auto 0;
   display:grid;
   grid-template-columns:repeat(3, minmax(180px, 1fr));
   gap:14px;
@@ -119,10 +186,10 @@
 
 .btn-video-replay{
   width:100%;
-  min-height:58px;
+  min-height:50px;
   margin:0;
-  padding:12px 22px;
-  border-radius:14px;
+  padding:10px 18px;
+  border-radius:12px;
   border:1px solid #8e6a12;
   background:linear-gradient(180deg, #ffe07a 0%, #f2bd36 52%, #d79b12 100%);
   color:#111;
@@ -163,8 +230,8 @@
 }
 
 .btn-video-replay__icon{
-  width:30px;
-  height:30px;
+  width:26px;
+  height:26px;
   flex:0 0 auto;
   object-fit:contain;
   filter:drop-shadow(0 1px 1px rgba(255,255,255,.45));
@@ -501,8 +568,8 @@
 }
 
 .cta-grid{
-  width:min(980px, 100%);
-  margin:.85rem auto 0;
+  width:min(900px, 100%);
+  margin:.65rem auto 0;
   display:grid;
   grid-template-columns:repeat(3, minmax(180px, 1fr));
   gap:14px;
@@ -512,9 +579,9 @@
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  min-height:58px;
-  padding:12px 22px;
-  border-radius:14px;
+  min-height:50px;
+  padding:10px 18px;
+  border-radius:12px;
   background:linear-gradient(180deg, #ffd86a 0%, #e8b127 100%);
   border:1px solid #8e6a12;
   color:#111;
@@ -623,19 +690,35 @@
 
 
   .hero {
-    padding: 1.3rem 1rem 2rem;
+    padding: 1rem .85rem 1.6rem;
+    gap: .75rem;
+  }
+
+  .hero__logo-wrap{
+    width: 138px;
+    height: 138px;
   }
 
   .title {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     text-align: center;
     padding: 0 0.5rem;
   }
 
   .well {
     margin-top: 0.9rem;
-    padding: 0.7rem 0.9rem;
-    font-size: 0.9rem;
+    height: 118px;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.84rem;
+  }
+
+  .birthday-ticker{
+    font-size:.68rem;
+    padding:5px 0;
+  }
+
+  .birthday-ticker__track{
+    animation-duration:36s;
   }
 
   .cta-grid {

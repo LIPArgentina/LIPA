@@ -179,6 +179,7 @@ function setupAuthBridge() {
 }
 
 const MAX_BANNERS = 5;
+const BANNER_ROTATE_MS = 10000;
 
 
 function getApiBase() {
@@ -299,8 +300,36 @@ function goToBanner(index, restartTimer = false) {
     if (banners.length > 1) {
       bannerState.intervalId = setInterval(() => {
         goToBanner(bannerState.currentIndex + 1, false);
-      }, 6000);
+      }, BANNER_ROTATE_MS);
     }
+  }
+}
+
+async function loadBirthdayTicker() {
+  const ticker = document.getElementById("birthdayTicker");
+  const track = document.getElementById("birthdayTickerTrack");
+  if (!ticker || !track) return;
+
+  try {
+    const res = await fetch(apiUrl("/api/players-public/birthdays/today"), { cache: "no-store" });
+    if (!res.ok) throw new Error("GET /api/players-public/birthdays/today failed");
+    const data = await res.json();
+    const names = (data.players || [])
+      .map((player) => String(player.nombre || "").trim())
+      .filter(Boolean);
+
+    if (!names.length) {
+      ticker.classList.add("hidden");
+      track.textContent = "";
+      return;
+    }
+
+    const message = `La Liga Independiente de Pool Argentina le desea un Feliz Cumpleaños a ${names.join(", ")}`;
+    track.textContent = `${message}   •   ${message}`;
+    ticker.classList.remove("hidden");
+  } catch (err) {
+    console.error("Birthday ticker load error:", err);
+    ticker.classList.add("hidden");
   }
 }
 
@@ -809,6 +838,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureJugadoresViewButton();
   setupAuthBridge();
   setupBannerAdmin();
+  loadBirthdayTicker();
   loadBannerForHome();
   startPublicStats();
   setupFlyerAldoModal();

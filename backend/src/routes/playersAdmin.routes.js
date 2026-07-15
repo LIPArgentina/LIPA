@@ -750,6 +750,37 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   });
 
+  router.get('/players-public/birthdays/today', async (_req, res) => {
+    try {
+      await ensureSchema();
+
+      const result = await pool.query(
+        `
+        SELECT DISTINCT ON (LOWER(TRIM(j.nombre)))
+          j.id,
+          j.nombre,
+          TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento
+        FROM jugadores j
+        WHERE j.fecha_nacimiento IS NOT NULL
+          AND TO_CHAR(j.fecha_nacimiento, 'MM-DD') = TO_CHAR((NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date, 'MM-DD')
+        ORDER BY LOWER(TRIM(j.nombre)), j.id ASC
+        `
+      );
+
+      return res.json({
+        ok: true,
+        players: result.rows.map((row) => ({
+          id: row.id,
+          nombre: row.nombre,
+          fechaNacimiento: row.fecha_nacimiento
+        }))
+      });
+    } catch (err) {
+      console.error('players-public/birthdays/today', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   router.get('/players-admin/search', requireAdmin, async (req, res) => {
     try {
       await ensureSchema();
