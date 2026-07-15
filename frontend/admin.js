@@ -233,6 +233,39 @@ async function impersonateTeam(team, target){
   }
 }
 
+async function setTeamActive(tr, active){
+  const rawId = tr?.dataset?.teamId;
+  const teamName = tr?.querySelector('.team')?.value?.trim() || 'equipo';
+  const teamId = rawId ? Number(rawId) : NaN;
+
+  if (!Number.isFinite(teamId) || teamId <= 0) {
+    alert('Ese equipo todavía no tiene ID en la base. Guardalo primero y después vas a poder cambiar su estado.');
+    return;
+  }
+
+  const action = active ? 'reactivar' : 'desactivar';
+  if (!confirm(`¿Querés ${action} "${teamName}"?`)) return;
+
+  const resp = await fetch(`${API_BASE}/api/teams/${encodeURIComponent(teamId)}/active`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    credentials: 'include',
+    body: JSON.stringify({ activo: active })
+  });
+
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+  tr.dataset.active = active ? '1' : '0';
+  tr.classList.toggle('team-inactive', !active);
+  const toggleBtn = tr.querySelector('.btn-toggle-team-active');
+  if (toggleBtn) toggleBtn.textContent = active ? 'Desactivar' : 'Reactivar';
+  tr.querySelectorAll('.btn-team-planilla, .btn-team-cruces').forEach(btn => {
+    btn.disabled = !active || !teamName;
+  });
+  toast(active ? 'Equipo reactivado' : 'Equipo desactivado');
+}
+
 function renderRows(users){
   const tbody = $('#tbodyTeams');
   tbody.innerHTML = '';
@@ -243,15 +276,19 @@ function renderRows(users){
     captain: new Map(teams.map(u => [u.username, u.captain || u.capitan || ''])),
     subcaptain: new Map(teams.map(u => [u.username, u.subcaptain || u.subcapitan || ''])),
     id:   new Map(teams.map(u => [u.username, u.id || null])),
+    activo: new Map(teams.map(u => [u.username, u.activo !== false])),
   };
   const names = teams.map(u => u.username);
 
-  for(let i=0;i<20;i++){
+  for(let i=0;i<Math.max(20, names.length);i++){
     const name  = names[i] || '';
     const teamId = by.id.get(name) || '';
     const canReset = Boolean(teamId);
+    const isActive = name ? by.activo.get(name) !== false : true;
     const tr = document.createElement('tr');
     if (teamId) tr.dataset.teamId = String(teamId);
+    tr.dataset.active = isActive ? '1' : '0';
+    tr.classList.toggle('team-inactive', !isActive);
 
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
@@ -261,9 +298,10 @@ function renderRows(users){
       <td><input class="input sala" type="text" value="${escapeHtml(by.sala.get(name)||'')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
       <td><input class="input location" type="url" value="${escapeHtml(normalizeLocation(by.ubicacion.get(name)||''))}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
       <td class="team-actions-cell">
-        <button class="btn-reset-pass btn-team-planilla" type="button" title="Ingresar como capitán y abrir planilla" aria-label="Ingresar como capitán y abrir planilla de ${escapeHtml(name || ('fila ' + (i+1)))}" ${name ? '' : 'disabled'}>📋</button>
-        <button class="btn-reset-pass btn-team-cruces" type="button" title="Ingresar como capitán y abrir cruces" aria-label="Ingresar como capitán y abrir cruces de ${escapeHtml(name || ('fila ' + (i+1)))}" ${name ? '' : 'disabled'}>⚔️</button>
+        <button class="btn-reset-pass btn-team-planilla" type="button" title="Ingresar como capitán y abrir planilla" aria-label="Ingresar como capitán y abrir planilla de ${escapeHtml(name || ('fila ' + (i+1)))}" ${name && isActive ? '' : 'disabled'}>📋</button>
+        <button class="btn-reset-pass btn-team-cruces" type="button" title="Ingresar como capitán y abrir cruces" aria-label="Ingresar como capitán y abrir cruces de ${escapeHtml(name || ('fila ' + (i+1)))}" ${name && isActive ? '' : 'disabled'}>⚔️</button>
         <button class="btn-reset-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${escapeHtml(name || ('fila ' + (i+1)))}" ${canReset ? '' : 'disabled'}>🔑</button>
+        <button class="btn-toggle-team-active" type="button" ${teamId ? '' : 'disabled'}>${isActive ? 'Desactivar' : 'Reactivar'}</button>
         <button class="btn-del-team" type="button">Eliminar</button>
       </td>`;
 
@@ -272,6 +310,16 @@ function renderRows(users){
       const teamValue = tr.querySelector('.team')?.value?.trim() || `fila ${i+1}`;
       if(!confirm(`¿Eliminar el equipo "${teamValue}" de la tabla?`)) return;
       tr.remove();
+    });
+
+    tr.querySelector('.btn-toggle-team-active')?.addEventListener('click', async () => {
+      const nextActive = tr.dataset.active === '0';
+      try {
+        await setTeamActive(tr, nextActive);
+      } catch (err) {
+        console.error('set-team-active', err);
+        alert(err?.message || 'No se pudo cambiar el estado del equipo');
+      }
     });
 
     const getTeamForImpersonation = () => ({
@@ -339,8 +387,9 @@ function collectRows(){
     const subcaptain = tr.querySelector('.subcaptain')?.value.trim() || '';
     const sala      = tr.querySelector('.sala')?.value.trim()      || '';
     const ubicacion = tr.querySelector('.location')?.value.trim()  || '';
+    const activo = tr.dataset.active !== '0';
     if(!name) return;
-    rows.push({ username:name, role:'team', captain, subcaptain, email:sala, phone:ubicacion });
+    rows.push({ username:name, role:'team', captain, subcaptain, email:sala, phone:ubicacion, activo });
   });
   return rows;
 }
@@ -586,7 +635,7 @@ async function saveRoster(){
 
 async function loadTeamsForDivision(div){
   try {
-    const r = await fetch(`${API_BASE}/api/teams?division=${encodeURIComponent(div)}`, {
+    const r = await fetch(`${API_BASE}/api/teams?division=${encodeURIComponent(div)}&includeInactive=1`, {
       cache: 'no-store',
       credentials: 'include'
     });
@@ -612,7 +661,8 @@ async function loadTeamsForDivision(div){
         subcaptain: u.subcaptain || u.subcapitan || '',
         email: u.sala || u.email || '',
         phone: u.ubicacion || u.location || u.phone || '',
-        slug: u.slug || slugify(u.username || u.name || '')
+        slug: u.slug || slugify(u.username || u.name || ''),
+        activo: u.activo !== false
       }))
       .filter(u => u.username);
   } catch (e) {
@@ -795,7 +845,8 @@ function exportTeamsTable(){
     capitan: item.captain || '',
     subcapitan: item.subcaptain || '',
     sala: item.email || '',
-    ubicacion: item.phone || ''
+    ubicacion: item.phone || '',
+    activo: item.activo !== false
   }));
 
   downloadJson(makeExportFilename('teams'), {
@@ -914,7 +965,7 @@ async function loadDivision(div){
   const users = await loadTeamsForDivision(div);
   renderRows(users);
 
-  teamsInDiv = users.map(u => ({
+  teamsInDiv = users.filter(u => u.activo !== false).map(u => ({
     id: u.id,
     name: u.username,
     slug: u.slug || slugify(u.username)

@@ -56,13 +56,37 @@ tr:last-child td{ border-bottom:0; }
 .input{ width:100%; background:var(--input-bg); color:var(--white); border:1px solid var(--input-border); border-radius:10px; padding:8px 10px; outline:none; }
 .input::placeholder{ color:#8a93a3; }
 .sala{ max-width:320px; } .location{ max-width:420px; }
-#teamsAdminView table{ min-width:1300px; }
+#teamsAdminView table{ min-width:1450px; }
 #teamsAdminView thead th:nth-child(2), #teamsAdminView tbody td:nth-child(2){width:240px;}
 #teamsAdminView thead th:nth-child(3), #teamsAdminView tbody td:nth-child(3){width:220px;}
 #teamsAdminView thead th:nth-child(4), #teamsAdminView tbody td:nth-child(4){width:220px;}
 #teamsAdminView thead th:nth-child(5), #teamsAdminView tbody td:nth-child(5){width:240px;}
 #teamsAdminView thead th:nth-child(6), #teamsAdminView tbody td:nth-child(6){width:320px;}
-#teamsAdminView thead th:nth-child(7), #teamsAdminView tbody td:nth-child(7){width:150px;}
+#teamsAdminView thead th:nth-child(7), #teamsAdminView tbody td:nth-child(7){width:300px;}
+.team-inactive{
+  opacity:.58;
+}
+.team-inactive .team{
+  text-decoration:line-through;
+}
+.btn-toggle-team-active,
+.btn-del-team{
+  border:1px solid var(--border-2);
+  background:#1a1a1a;
+  color:#d6d6d6;
+  border-radius:12px;
+  padding:7px 9px;
+  font-weight:800;
+  cursor:pointer;
+}
+.btn-toggle-team-active{
+  border-color:var(--gold-border);
+  color:var(--gold);
+}
+.btn-toggle-team-active:disabled{
+  opacity:.35;
+  cursor:not-allowed;
+}
 .footer{ display:flex; justify-content:flex-end; gap:10px; padding:14px 16px 18px; border-top:1px solid var(--border-2); background:rgba(0,0,0,.06); }
 .btn{ border:1px solid var(--gold-border); background:transparent; color:var(--gold); padding:9px 14px; border-radius:12px; font-weight:800; cursor:pointer; }
 
@@ -89,7 +113,7 @@ select{ width:100%; background:#0f1116; color:var(--white); border:1px solid var
 
 .team-actions-cell{
   white-space:nowrap;
-  width:190px;
+  width:290px;
 }
 .btn-reset-pass{
   display:inline-flex;

@@ -151,7 +151,8 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   async function getTeamOptions() {
-    const { rows } = await pool.query(`SELECT display_name, slug_uid, slug_base, division FROM equipos WHERE COALESCE(display_name, '') <> '' AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '') ORDER BY display_name ASC, id ASC`);
+    await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
+    const { rows } = await pool.query(`SELECT display_name, slug_uid, slug_base, division FROM equipos WHERE activo = true AND COALESCE(display_name, '') <> '' AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '') ORDER BY display_name ASC, id ASC`);
     const seen = new Set();
     const options = [];
     for (const row of rows) {
