@@ -50,9 +50,9 @@
           <h1 class="title">Ficha</h1>
         </div>
         <div class="player-form__body">
-          <div class="photo-box photo-box--large">
+          <button id="photoPreviewButton" class="photo-box photo-box--large photo-view-trigger" type="button" aria-label="Ver foto en pantalla completa">
             <img id="photoPreview" src="../logo_liga.png" alt="Foto del jugador">
-          </div>
+          </button>
 
           <label>Nombre y apellido</label>
           <input id="playerName" class="input" type="text" readonly>
@@ -96,6 +96,13 @@
       <div class="modal__footer">
         <button id="btnCloseHistory" class="btn btn-ghost" type="button">Cerrar</button>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="photoDialog" class="modal photo-dialog" aria-label="Foto del jugador">
+    <div class="modal__panel photo-dialog__panel">
+      <button id="btnClosePhoto" class="btn btn-ghost photo-dialog__close" type="button" aria-label="Cerrar foto">Cerrar</button>
+      <img id="photoDialogImage" src="../logo_liga.png" alt="Foto del jugador ampliada">
     </div>
   </dialog>
 

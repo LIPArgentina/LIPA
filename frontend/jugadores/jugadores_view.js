@@ -3,6 +3,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 const $ = (selector) => document.querySelector(selector);
 
 let currentPlayers = [];
+let selectedPlayer = null;
 const teamsCache = new Map();
 
 function readSession(){
@@ -122,6 +123,7 @@ async function refreshSearchTeams(selected = ''){
 }
 
 function clearFicha(){
+  selectedPlayer = null;
   $('#photoPreview').src = '../logo_liga.png';
   $('#playerName').value = '';
   $('#playerDni').value = '';
@@ -132,6 +134,7 @@ function clearFicha(){
 }
 
 function fillFicha(player){
+  selectedPlayer = player || null;
   $('#photoPreview').src = photoSrc(player);
   $('#playerName').value = player?.nombre || player?.name || '';
   $('#playerDni').value = player?.dni || '';
@@ -139,6 +142,15 @@ function fillFicha(player){
   $('#playerCategory').value = (player?.categoria || '').toUpperCase();
   $('#playerTeam').value = player?.equipo || player?.teamName || '';
   setStatus(`Viendo ficha de ${player?.nombre || player?.name || 'jugador'}.`);
+}
+
+function openPhoto(player = selectedPlayer){
+  const dialog = $('#photoDialog');
+  const image = $('#photoDialogImage');
+  if (!dialog || !image) return;
+  image.src = photoSrc(player);
+  image.alt = `Foto de ${player?.nombre || player?.name || 'jugador'}`;
+  dialog.showModal();
 }
 
 function renderPlayers(players = []){
@@ -154,7 +166,9 @@ function renderPlayers(players = []){
 
   results.innerHTML = players.map((player, idx) => `
     <article class="player-card" data-index="${idx}" tabindex="0">
-      <img src="${escapeHtml(photoSrc(player))}" alt="Foto de ${escapeHtml(player.nombre || player.name || 'jugador')}">
+      <button class="player-card__photo" type="button" aria-label="Ver foto de ${escapeHtml(player.nombre || player.name || 'jugador')}">
+        <img src="${escapeHtml(photoSrc(player))}" alt="Foto de ${escapeHtml(player.nombre || player.name || 'jugador')}">
+      </button>
       <div>
         <h3>${escapeHtml(player.nombre || player.name || '')}</h3>
         <p>DNI ${escapeHtml(player.dni || '-')} · Nac. ${escapeHtml(showDate(player.fechaNacimiento || player.fecha_nacimiento) || '-')}</p>
@@ -175,6 +189,7 @@ function renderPlayers(players = []){
     };
     card.addEventListener('click', (ev) => {
       if (ev.target.closest('.btn-history-player')) return;
+      if (ev.target.closest('.player-card__photo')) return;
       select();
     });
     card.addEventListener('keydown', (ev) => {
@@ -182,6 +197,10 @@ function renderPlayers(players = []){
         ev.preventDefault();
         select();
       }
+    });
+    card.querySelector('.player-card__photo')?.addEventListener('click', () => {
+      select();
+      openPhoto(player);
     });
     card.querySelector('.btn-history-player')?.addEventListener('click', () => showHistory(player));
   });
@@ -264,6 +283,11 @@ $('#playerSearchForm')?.addEventListener('submit', searchPlayers);
 $('#teamSearchForm')?.addEventListener('submit', searchByTeam);
 $('#teamCategory')?.addEventListener('change', () => refreshSearchTeams());
 $('#btnCloseHistory')?.addEventListener('click', () => $('#historyDialog')?.close());
+$('#photoPreviewButton')?.addEventListener('click', () => openPhoto());
+$('#btnClosePhoto')?.addEventListener('click', () => $('#photoDialog')?.close());
+$('#photoDialog')?.addEventListener('click', (ev) => {
+  if (ev.target === ev.currentTarget) ev.currentTarget.close();
+});
 
 refreshSearchTeams();
 clearFicha();

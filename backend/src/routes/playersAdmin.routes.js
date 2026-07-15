@@ -98,19 +98,51 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS desde DATE DEFAULT CURRENT_DATE`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS hasta DATE`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS orden INTEGER`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`);
 
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugadores_dni ON jugadores (dni)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugadores_nombre_norm ON jugadores (nombre_normalizado)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_equipos_equipo ON jugador_equipos (equipo_id, categoria, activo)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_equipos_jugador ON jugador_equipos (jugador_id)`);
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS uniq_jugador_categoria_activo
-        ON jugador_equipos (jugador_id, categoria)
-       WHERE activo = true
-    `);
+    await ensureUniquePlayerCategoryIndex(client);
 
     await migrateLegacyPlayers(client);
     schemaReady = true;
+  }
+
+  async function ensureUniquePlayerCategoryIndex(client) {
+    const duplicates = await client.query(`
+      SELECT jugador_id, categoria, COUNT(*)::int AS total
+        FROM jugador_equipos
+       WHERE activo = true
+       GROUP BY jugador_id, categoria
+      HAVING COUNT(*) > 1
+       LIMIT 5
+    `);
+
+    if (duplicates.rowCount > 0) {
+      console.warn('No se crea uniq_jugador_categoria_activo: hay asociaciones activas duplicadas', duplicates.rows);
+      return;
+    }
+
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_jugador_categoria_activo
+          ON jugador_equipos (jugador_id, categoria)
+         WHERE activo = true
+      `);
+    } catch (err) {
+      if (err?.code === '23505') {
+        console.warn('No se crea uniq_jugador_categoria_activo: aparecieron duplicados durante la migración');
+        return;
+      }
+      throw err;
+    }
   }
 
   async function migrateLegacyPlayers(client) {
@@ -426,6 +458,14 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         LIMIT 1`,
       [playerId, teamId, normalizedCategory]
     );
+
+    await deactivateConflictingIdentityAssociations(client, {
+      playerId,
+      teamId,
+      category: normalizedCategory,
+      startDate
+    });
+
     if (same.rows[0]?.id) return same.rows[0].id;
 
     await client.query(
@@ -448,6 +488,34 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       [playerId, teamId, normalizedCategory, startDate]
     );
     return inserted.rows[0]?.id || null;
+  }
+
+  async function deactivateConflictingIdentityAssociations(client, { playerId, teamId, category, startDate }) {
+    const player = await client.query(
+      `SELECT dni, nombre_normalizado, nombre FROM jugadores WHERE id = $1 LIMIT 1`,
+      [playerId]
+    );
+    const row = player.rows[0] || {};
+    const dni = normalizeDni(row.dni || '');
+    const normalizedName = normalizeText(row.nombre_normalizado || row.nombre || '');
+
+    await client.query(
+      `UPDATE jugador_equipos je
+          SET activo = false,
+              hasta = ($5::date - INTERVAL '1 day')::date,
+              updated_at = NOW()
+         FROM jugadores j
+        WHERE j.id = je.jugador_id
+          AND je.categoria = $1
+          AND je.activo = true
+          AND je.equipo_id <> $2
+          AND (
+            je.jugador_id = $3
+            OR ($4 <> '' AND j.dni = $4)
+            OR ($6 <> '' AND COALESCE(j.nombre_normalizado, '') = $6)
+          )`,
+      [category, teamId, playerId, dni, startDate, normalizedName]
+    );
   }
 
   async function findPlayerByDni(client, dni) {

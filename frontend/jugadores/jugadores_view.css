@@ -3,7 +3,47 @@
 }
 
 .players-view .photo-box--large{
-  width:168px;
+  width:130px;
+  height:130px;
+}
+
+.players-view .photo-view-trigger,
+.players-view .player-card__photo{
+  padding:0;
+  cursor:pointer;
+}
+
+.players-view .photo-view-trigger{
+  border:1px solid var(--border-2);
+}
+
+.players-view .player-card__photo{
+  border:0;
+}
+
+.players-view .photo-box img{
+  object-position:center center;
+}
+
+.players-view .photo-view-trigger:focus-visible,
+.players-view .player-card__photo:focus-visible{
+  outline:2px solid var(--gold);
+  outline-offset:3px;
+}
+
+.players-view .player-card__photo{
+  width:64px;
+  height:64px;
+  border-radius:8px;
+  background:#0c0d10;
+  overflow:hidden;
+}
+
+.players-view .player-card img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center center;
 }
 
 .players-view .player-card{
@@ -19,8 +59,57 @@
   white-space:nowrap;
 }
 
+.photo-dialog{
+  width:min(96vw, 1200px);
+  max-width:none;
+  padding:0;
+  background:transparent;
+  border:0;
+}
+
+.photo-dialog::backdrop{
+  background:rgba(0,0,0,.88);
+}
+
+.photo-dialog__panel{
+  width:100%;
+  min-height:80vh;
+  padding:54px 18px 18px;
+  border:1px solid var(--gold-border);
+  border-radius:14px;
+  background:#07080b;
+  display:grid;
+  place-items:center;
+  position:relative;
+}
+
+.photo-dialog__panel img{
+  max-width:100%;
+  max-height:calc(96vh - 96px);
+  object-fit:contain;
+  border-radius:12px;
+  background:#0c0d10;
+}
+
+.photo-dialog__close{
+  position:absolute;
+  top:12px;
+  right:12px;
+}
+
 @media (max-width: 900px){
   .players-view .photo-box--large{
-    width:132px;
+    width:130px;
+  }
+
+  .photo-dialog{
+    width:100vw;
+  }
+
+  .photo-dialog__panel{
+    min-height:100vh;
+    border-radius:0;
+    border-left:0;
+    border-right:0;
   }
 }

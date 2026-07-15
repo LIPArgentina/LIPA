@@ -52,8 +52,8 @@
 }
 
 .photo-box{
-  width:132px;
-  aspect-ratio:1;
+  width:130px;
+  height:130px;
   border:1px solid var(--border-2);
   border-radius:10px;
   background:#0c0d10;
@@ -64,6 +64,7 @@
   width:100%;
   height:100%;
   object-fit:cover;
+  object-position:center center;
 }
 
 .form-grid{
@@ -107,7 +108,8 @@
   width:64px;
   height:64px;
   border-radius:8px;
-  object-fit:cover;
+  object-fit:contain;
+  object-position:center center;
   background:#0c0d10;
 }
 
