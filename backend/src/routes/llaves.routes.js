@@ -436,7 +436,7 @@ module.exports = function createLlavesRouter() {
   function applyAutomaticAdvance(data, category, standings, edition) {
     if (!data || !Array.isArray(data.rounds)) return data;
 
-    if (category === 'tercera' && Number(edition) < 6) {
+    if (category === 'tercera') {
       const q1 = seriesWinner(getRound(data, 'q1'));
       const q2 = seriesWinner(getRound(data, 'q2'));
       const q3 = seriesWinner(getRound(data, 'q3'));

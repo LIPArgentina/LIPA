@@ -249,6 +249,10 @@ module.exports = function createFechasRouter(deps) {
       );
 
       if (!dbResult.rowCount) {
+        if (edition === 6) {
+          res.set('Cache-Control', 'no-store');
+          return res.json({ ok: true, source: 'empty', edition, data: { fechas: [] } });
+        }
         return res.status(404).json({ ok: false, error: 'fixture_no_encontrado_en_db' });
       }
 

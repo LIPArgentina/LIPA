@@ -101,13 +101,6 @@ function unique(list){
 
 
 function getCategoryConfig(category = currentCategory){
-  if (currentEdition >= 6 && category === 'tercera') {
-    return {
-      ...CATEGORY_CONFIG.segunda,
-      subtitle: 'TERCERA',
-      teamSource: 'tercera'
-    };
-  }
   return CATEGORY_CONFIG[category] || CATEGORY_CONFIG.tercera;
 }
 
@@ -400,11 +393,18 @@ async function applyAutomaticEntrants(data, category){
   const standings = computeStandings(category, ida, vuelta);
   const team = (group, pos) => standings[group]?.find(row => row.pos === pos)?.equipo || 'WO';
 
-  if (category === 'tercera' && currentEdition < 6) {
-    setTwoLegTie(data, 'q1', team('A', 1), team('B', 2));
-    setTwoLegTie(data, 'q2', team('C', 1), team('D', 2));
-    setTwoLegTie(data, 'q3', team('B', 1), team('A', 2));
-    setTwoLegTie(data, 'q4', team('D', 1), team('C', 2));
+  if (category === 'tercera') {
+    if (currentEdition >= 6) {
+      setTwoLegTie(data, 'q1', team('A', 1), team('B', 4));
+      setTwoLegTie(data, 'q2', team('A', 2), team('B', 3));
+      setTwoLegTie(data, 'q3', team('B', 1), team('A', 4));
+      setTwoLegTie(data, 'q4', team('B', 2), team('A', 3));
+    } else {
+      setTwoLegTie(data, 'q1', team('A', 1), team('B', 2));
+      setTwoLegTie(data, 'q2', team('C', 1), team('D', 2));
+      setTwoLegTie(data, 'q3', team('B', 1), team('A', 2));
+      setTwoLegTie(data, 'q4', team('D', 1), team('C', 2));
+    }
   } else {
     setTwoLegTie(data, 's1', team('A', 1), team('B', 2));
     setTwoLegTie(data, 's2', team('B', 1), team('A', 2));
@@ -414,7 +414,7 @@ async function applyAutomaticEntrants(data, category){
 }
 
 function getAutoEntrantRoundIds(category){
-  return category === 'tercera' && currentEdition < 6
+  return category === 'tercera'
     ? new Set(['q1','q2','q3','q4'])
     : new Set(['s1','s2']);
 }
@@ -881,7 +881,7 @@ function compareSportingAdvantage(teamA, teamB, data, standings){
 function applyAutomaticAdvance(data, standings = CURRENT_STANDINGS){
   llEnsureExtraIfNeeded(data);
 
-  if (currentCategory === 'tercera' && currentEdition < 6) {
+  if (currentCategory === 'tercera') {
     const q1 = llSeriesWinner(llGetRound(data, 'q1'));
     const q2 = llSeriesWinner(llGetRound(data, 'q2'));
     const q3 = llSeriesWinner(llGetRound(data, 'q3'));

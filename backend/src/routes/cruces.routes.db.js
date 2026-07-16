@@ -1774,7 +1774,7 @@ function llavesAutoCompareSportingAdvantage(teamA, teamB, data, standings) {
 function llavesAutoApplyAutomaticAdvance(data, category, standings, edition) {
   if (!data || !Array.isArray(data.rounds)) return data;
 
-  if (category === 'tercera' && Number(edition) < 6) {
+  if (category === 'tercera') {
     const q1 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q1'));
     const q2 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q2'));
     const q3 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q3'));
