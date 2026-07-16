@@ -230,3 +230,7 @@ select.field-control optgroup {
   background: rgba(250, 204, 21, 0.12);
   border-color: rgba(250, 204, 21, 0.38);
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

@@ -118,3 +118,7 @@ header img{height:34px;width:auto;display:block;}
   letter-spacing:.05em;font-size:13px;transition:all .15s ease;border:1px solid #159947;
 }
 .btn-contacto:hover{filter:brightness(1.06);transform:translateY(-1px);}
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

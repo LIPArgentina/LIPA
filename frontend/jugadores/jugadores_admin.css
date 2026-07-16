@@ -172,3 +172,7 @@
     flex:1;
   }
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

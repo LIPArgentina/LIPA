@@ -609,3 +609,7 @@ body.photos-open{ overflow:hidden; }
     border-radius:10px;
   }
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

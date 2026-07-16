@@ -136,3 +136,7 @@ select.score-badge {
   opacity: 1;
   transform: translateY(0);
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

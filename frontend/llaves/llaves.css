@@ -345,3 +345,7 @@ header img{ height:60px; width:auto; display:block; }
 .match-block-extra .score-badge{
   width:34px;
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

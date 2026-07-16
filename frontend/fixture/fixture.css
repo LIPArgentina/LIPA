@@ -191,3 +191,7 @@ select.team-name{
   white-space:nowrap;
   display:block;
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

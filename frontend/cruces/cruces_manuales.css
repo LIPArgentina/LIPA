@@ -304,3 +304,7 @@ input,select{
   .totalbox{width:24px;height:24px;font-size:11px}
   .winsbox{width:28px;height:28px;font-size:14px}
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

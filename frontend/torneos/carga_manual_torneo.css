@@ -49,3 +49,7 @@ header img{height:34px;width:auto;display:block;}
 .torneo-slot__actions .btn{flex:1;padding:8px;font-size:11px;}
 [hidden]{display:none!important;}
 @media(max-width:680px){.container{padding:8px 6px;}header{grid-template-columns:auto 1fr;}.actions{grid-column:1 / -1;width:100%;justify-content:center;}header img{height:32px;}.btn{padding:6px 8px;font-size:11px;}.torneo-slot{width:min(100%,300px);}}
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

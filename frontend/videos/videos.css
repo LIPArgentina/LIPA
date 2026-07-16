@@ -277,3 +277,7 @@ header img{
   .video-controls{grid-template-columns:repeat(5, minmax(0, 1fr));gap:5px;padding:8px;}
   .video-control{min-height:34px;font-size:10px;padding:5px 3px;}
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

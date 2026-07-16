@@ -960,3 +960,7 @@ body{
 .send-error-accept:hover{
   filter:brightness(.95);
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

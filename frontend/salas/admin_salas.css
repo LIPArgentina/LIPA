@@ -63,3 +63,7 @@ dialog.modal::backdrop{background:rgba(0,0,0,.55);}
 [hidden]{display:none!important;}
 @media(max-width:1040px){.torneos-admin-grid{grid-template-columns:repeat(2, 300px);}}
 @media(max-width:680px){.container{padding:8px 6px;}header{grid-template-columns:auto 1fr;}.actions{grid-column:1 / -1;width:100%;justify-content:center;}header img{height:32px;}.btn{padding:6px 8px;font-size:11px;}.torneos-admin-grid{grid-template-columns:1fr;}.torneo-slot{width:min(100%, 300px);margin:0 auto;}}
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

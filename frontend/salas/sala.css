@@ -297,3 +297,7 @@ header img{
 .map-empty[hidden]{
   display:none !important;
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

@@ -223,3 +223,7 @@ body.modal-open { overflow: hidden; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .modal-dialog { width: calc(100vw - 20px); margin: 10px auto; max-height: calc(100vh - 20px); }
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}

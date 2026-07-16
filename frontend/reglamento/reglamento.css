@@ -110,3 +110,7 @@
   .image-lightbox{padding:10px}
   .image-lightbox__close{right:4px;top:4px}
 }
+
+@media (min-width: 769px){
+  body{ zoom:.8; }
+}
