@@ -450,6 +450,7 @@ async function switchFixture(kind){
 function applyEditionLayout(){
   GROUPS = selectedEdition >= 6 ? ['A', 'B'] : ['A', 'B', 'C', 'D'];
   document.getElementById('tables')?.classList.toggle('two-group-layout', selectedEdition >= 6);
+  document.getElementById('tables')?.classList.toggle('four-group-layout', selectedEdition < 6);
   const rowCount = selectedEdition >= 6 ? 6 : 4;
   document.querySelectorAll('[data-group-board]').forEach(board => {
     while (board.querySelectorAll('.row[role="row"]').length < rowCount) {
@@ -461,6 +462,7 @@ function applyEditionLayout(){
     }
     Array.from(board.querySelectorAll('.row[role="row"]')).forEach((row, index) => {
       row.hidden = index >= rowCount;
+      row.classList.toggle('edition-hidden-row', index >= rowCount);
       const team = row.querySelector('[data-field="team"]');
       if (!team) return;
       team.classList.remove('yellow', 'white');

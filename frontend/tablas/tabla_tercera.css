@@ -635,6 +635,28 @@ header .logo-link{ display:inline-block; line-height:0; }
   margin-bottom:14px;
 }
 
+#posiciones .row.edition-hidden-row{
+  display:none !important;
+}
+
+#posiciones .tables.four-group-layout{
+  grid-template-columns:repeat(4,minmax(290px,1fr)) !important;
+  width:min(1500px,100%) !important;
+  max-width:min(1500px,100%) !important;
+}
+
+#posiciones .tables.four-group-layout .cols,
+#posiciones .tables.four-group-layout .row{
+  grid-template-columns:28px minmax(0,1fr) 28px 42px 28px;
+  gap:6px;
+}
+
+#posiciones .tables.four-group-layout .pill{
+  padding-left:10px;
+  padding-right:10px;
+  letter-spacing:.02em;
+}
+
 #posiciones .tables.two-group-layout{
   grid-template-columns:repeat(2,minmax(280px,1fr)) !important;
   width:min(900px,100%) !important;
