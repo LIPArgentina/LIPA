@@ -80,6 +80,13 @@
   flex-wrap:wrap;
 }
 
+.player-form input[readonly]{
+  color:#d7dbe5;
+  background:#101217;
+  border-color:#30343d;
+  cursor:not-allowed;
+}
+
 .form-status{
   min-height:18px;
   margin:0;

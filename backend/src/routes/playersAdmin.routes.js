@@ -1015,16 +1015,25 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
         const fotoPath = req.file?.filename || null;
         if (finalPlayerId) {
+          if (Number.isFinite(playerId)) {
+            const currentPlayer = await client.query(
+              `SELECT nombre, nombre_normalizado FROM jugadores WHERE id = $1 LIMIT 1`,
+              [finalPlayerId]
+            );
+            const currentName = currentPlayer.rows[0]?.nombre_normalizado || currentPlayer.rows[0]?.nombre || '';
+            if (normalizeText(nombre) !== normalizeText(currentName)) {
+              throw new Error('Para cargar otro jugador tocá Nuevo antes de guardar.');
+            }
+          }
+
           await client.query(
             `UPDATE jugadores
-                SET nombre = $1,
-                    dni = COALESCE(NULLIF($2, ''), dni),
-                    fecha_nacimiento = COALESCE($3::date, fecha_nacimiento),
-                    nombre_normalizado = $4,
-                    foto_path = COALESCE($5, foto_path),
+                SET dni = COALESCE(NULLIF($1, ''), dni),
+                    fecha_nacimiento = COALESCE($2::date, fecha_nacimiento),
+                    foto_path = COALESCE($3, foto_path),
                     updated_at = NOW()
-              WHERE id = $6`,
-            [nombre, dni, fechaNacimiento, normalizeText(nombre), fotoPath, finalPlayerId]
+              WHERE id = $4`,
+            [dni, fechaNacimiento, fotoPath, finalPlayerId]
           );
         } else {
           const inserted = await client.query(
