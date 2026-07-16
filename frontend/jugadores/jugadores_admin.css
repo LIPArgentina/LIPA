@@ -95,13 +95,26 @@
 
 .player-card{
   display:grid;
-  grid-template-columns:64px 1fr auto;
+  grid-template-columns:34px 64px 1fr auto;
   gap:12px;
   align-items:center;
   padding:12px;
   border:1px solid var(--border);
   border-radius:10px;
   background:#14161c;
+}
+
+.player-card__number{
+  width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--gold);
+  border-radius:8px;
+  color:#111;
+  background:linear-gradient(180deg, #ffe978, #efb80f);
+  font-weight:900;
+  font-size:14px;
 }
 
 .player-card img{
@@ -160,7 +173,7 @@
   }
 
   .player-card{
-    grid-template-columns:54px 1fr;
+    grid-template-columns:30px 54px 1fr;
   }
 
   .player-actions{

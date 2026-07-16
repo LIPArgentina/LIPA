@@ -406,6 +406,24 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
   }
 
+  async function ensureTeamHasRoom(client, { playerId, teamId, category }) {
+    const count = await client.query(
+      `
+      SELECT COUNT(DISTINCT j.id)::int AS total
+      FROM jugador_equipos je
+      JOIN jugadores j ON j.id = je.jugador_id
+      WHERE je.equipo_id = $1
+        AND je.categoria = $2
+        AND je.activo = true
+        AND je.jugador_id <> $3
+      `,
+      [teamId, category, playerId]
+    );
+    if (Number(count.rows[0]?.total || 0) >= 20) {
+      throw new Error('Ese equipo ya tiene 20 jugadores activos. Quitá uno antes de agregar otro.');
+    }
+  }
+
   async function upsertAssociation(client, { playerId, teamId, category, associationId = null }) {
     const normalizedCategory = normalizeCategory(category);
     const startDate = seasonStartDate(normalizedCategory) || new Date().toISOString().slice(0, 10);
@@ -467,6 +485,8 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     });
 
     if (same.rows[0]?.id) return same.rows[0].id;
+
+    await ensureTeamHasRoom(client, { playerId, teamId, category: normalizedCategory });
 
     await client.query(
       `UPDATE jugador_equipos

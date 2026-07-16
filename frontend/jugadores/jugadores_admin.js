@@ -56,6 +56,7 @@ function setStatus(message, isError = false){
 }
 
 const teamsCache = new Map();
+const MAX_TEAM_PLAYERS = 20;
 
 async function loadTeams(category){
   if (teamsCache.has(category)) return teamsCache.get(category);
@@ -156,6 +157,7 @@ function renderPlayers(players = []){
 
   results.innerHTML = players.map((player, idx) => `
     <article class="player-card" data-index="${idx}">
+      <div class="player-card__number">${idx + 1}</div>
       <img src="${escapeHtml(photoSrc(player))}" alt="Foto de ${escapeHtml(player.nombre || player.name || 'jugador')}">
       <div>
         <h3>${escapeHtml(player.nombre || player.name || '')}</h3>
@@ -176,6 +178,20 @@ function renderPlayers(players = []){
     card.querySelector('.btn-history-player')?.addEventListener('click', () => showHistory(player));
     card.querySelector('.btn-deactivate-player')?.addEventListener('click', () => deactivateAssociation(player));
   });
+}
+
+async function ensureTeamHasRoom({ category, team, associationId, playerId }){
+  if (!category || !team) return true;
+  const data = await fetchJson(`/api/players-admin/by-team?category=${encodeURIComponent(category)}&team=${encodeURIComponent(team)}`);
+  const players = data.players || [];
+  const alreadyInTeam = players.some(player =>
+    (associationId && String(player.associationId || '') === String(associationId)) ||
+    (playerId && String(player.id || '') === String(playerId))
+  );
+  if (!alreadyInTeam && players.length >= MAX_TEAM_PLAYERS) {
+    throw new Error(`Ese equipo ya tiene ${MAX_TEAM_PLAYERS} jugadores activos. Quitá uno antes de agregar otro.`);
+  }
+  return true;
 }
 
 async function fetchJson(path, options = {}){
@@ -226,19 +242,25 @@ async function searchByTeam(ev){
 
 async function savePlayer(ev){
   ev?.preventDefault();
+  const category = $('#playerCategory').value;
+  const team = $('#playerTeam').value.trim();
+  const associationId = $('#associationId').value;
+  const playerId = $('#playerId').value;
+
   const form = new FormData();
   const photo = croppedPlayerPhoto || $('#playerPhoto').files?.[0];
-  if ($('#playerId').value) form.set('id', $('#playerId').value);
-  if ($('#associationId').value) form.set('associationId', $('#associationId').value);
+  if (playerId) form.set('id', playerId);
+  if (associationId) form.set('associationId', associationId);
   form.set('nombre', $('#playerName').value.trim());
   form.set('dni', $('#playerDni').value.trim());
   form.set('fechaNacimiento', $('#playerBirth').value);
-  form.set('categoria', $('#playerCategory').value);
-  form.set('team', $('#playerTeam').value.trim());
+  form.set('categoria', category);
+  form.set('team', team);
   if (photo) form.set('foto', photo);
 
   try {
     setStatus('Guardando...');
+    await ensureTeamHasRoom({ category, team, associationId, playerId });
     const data = await fetchJson('/api/players-admin/save', {
       method: 'POST',
       body: form,
