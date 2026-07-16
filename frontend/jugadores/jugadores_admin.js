@@ -2,6 +2,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 
 const $ = (selector) => document.querySelector(selector);
 let croppedPlayerPhoto = null;
+let editingOriginalName = '';
 
 function readSession(){
   for (const key of ['lpi.session', 'lpi_team_session']) {
@@ -122,6 +123,8 @@ function clearForm(){
   $('#playerId').value = '';
   $('#associationId').value = '';
   $('#playerName').value = '';
+  $('#playerName').readOnly = false;
+  editingOriginalName = '';
   $('#playerDni').value = '';
   $('#playerBirth').value = '';
   $('#playerPhoto').value = '';
@@ -133,9 +136,11 @@ function clearForm(){
 }
 
 async function fillForm(player){
+  editingOriginalName = player?.nombre || player?.name || '';
   $('#playerId').value = player?.id || '';
   $('#associationId').value = player?.associationId || '';
-  $('#playerName').value = player?.nombre || player?.name || '';
+  $('#playerName').value = editingOriginalName;
+  $('#playerName').readOnly = true;
   $('#playerDni').value = player?.dni || '';
   $('#playerBirth').value = player?.fechaNacimiento || player?.fecha_nacimiento || '';
   $('#playerCategory').value = player?.categoria || 'tercera';
@@ -246,12 +251,18 @@ async function savePlayer(ev){
   const team = $('#playerTeam').value.trim();
   const associationId = $('#associationId').value;
   const playerId = $('#playerId').value;
+  const playerName = $('#playerName').value.trim();
+
+  if (playerId && slugify(playerName) !== slugify(editingOriginalName)) {
+    setStatus('Para cargar otro jugador tocá Nuevo antes de guardar.', true);
+    return;
+  }
 
   const form = new FormData();
   const photo = croppedPlayerPhoto || $('#playerPhoto').files?.[0];
   if (playerId) form.set('id', playerId);
   if (associationId) form.set('associationId', associationId);
-  form.set('nombre', $('#playerName').value.trim());
+  form.set('nombre', playerName);
   form.set('dni', $('#playerDni').value.trim());
   form.set('fechaNacimiento', $('#playerBirth').value);
   form.set('categoria', category);
