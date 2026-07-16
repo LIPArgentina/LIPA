@@ -16,6 +16,8 @@
   const $ranking = document.getElementById('rankingBox');
   const $rankingButtons = Array.from(document.querySelectorAll('[data-ranking-limit]'));
   const $rankingTabs = Array.from(document.querySelectorAll('[data-ranking-tab]'));
+  const $searchEditionButtons = Array.from(document.querySelectorAll('[data-search-edition]'));
+  const $rankingEdition = document.getElementById('rankingEditionSelect');
   const $reload = document.getElementById('btnRecargar');
   const $radInfo = document.getElementById('btnRadInfo');
   const $radModal = document.getElementById('radModal');
@@ -26,6 +28,8 @@
   let lastTeamSuggestions = [];
   let teamDebounceTimer = null;
   let currentRankingTab = 'players';
+  let currentSearchEdition = '6';
+  let currentRankingEdition = 'total';
   let lastRankingData = null;
   let lastRankingLimit = 10;
   let lastRankingMode = 'players';
@@ -37,6 +41,36 @@
   function withCacheBust(path) {
     const sep = path.includes('?') ? '&' : '?';
     return path + sep + '_=' + Date.now();
+  }
+
+  function editionLabel(value) {
+    if (String(value || '').toLowerCase() === 'total') return 'TOTAL';
+    return `${Number(value || 6)}TA EDICIÓN`;
+  }
+
+  function setSearchEdition(value) {
+    currentSearchEdition = String(value || '6').toLowerCase();
+    $searchEditionButtons.forEach((btn) => {
+      btn.classList.toggle('active', String(btn.dataset.searchEdition || '').toLowerCase() === currentSearchEdition);
+    });
+  }
+
+  function getTeamEdition() {
+    return currentSearchEdition === 'total' ? '6' : currentSearchEdition;
+  }
+
+  function updateRankingEditionOptions() {
+    if (!$rankingEdition) return;
+    const previous = String($rankingEdition.value || currentRankingEdition || 'total').toLowerCase();
+    $rankingEdition.innerHTML = currentRankingTab === 'teams'
+      ? '<option value="6">6ta</option><option value="5">5ta</option>'
+      : '<option value="total">Total</option><option value="6">6ta</option><option value="5">5ta</option>';
+    if (Array.from($rankingEdition.options).some((option) => option.value === previous)) {
+      $rankingEdition.value = previous;
+    } else {
+      $rankingEdition.value = currentRankingTab === 'teams' ? '6' : 'total';
+    }
+    currentRankingEdition = $rankingEdition.value;
   }
 
   async function fetchJson(url) {
@@ -196,7 +230,7 @@
     }
 
     try {
-      const data = await fetchJson(apiUrl('/api/cruces/player-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q) + '&suggest=1'));
+      const data = await fetchJson(apiUrl('/api/cruces/player-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q) + '&edition=' + encodeURIComponent(currentSearchEdition) + '&suggest=1'));
       renderSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
     } catch (err) {
       console.error(err);
@@ -217,7 +251,7 @@
     }
 
     try {
-      const data = await fetchJson(apiUrl('/api/cruces/team-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q)));
+      const data = await fetchJson(apiUrl('/api/cruces/team-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q) + '&edition=' + encodeURIComponent(getTeamEdition())));
       renderTeamSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
     } catch (err) {
       console.error(err);
@@ -239,12 +273,18 @@
   function renderSummary(data) {
     const player = data?.player || {};
     const matches = Array.isArray(data?.matches) ? data.matches : [];
-    const ganados = matches.filter((item) => item.result === 'ganado').length;
-    const perdidos = matches.filter((item) => item.result === 'perdido').length;
-    const triangulosFavorTotal = matches.reduce((acc, item) => acc + (Number(item.triangulosFavor || 0) || 0), 0);
-    const triangulosContraTotal = matches.reduce((acc, item) => acc + (Number(item.triangulosContra || 0) || 0), 0);
-    const played = Number(data.total || matches.length || 0);
-    const efectividad = played > 0 ? Math.round((ganados / played) * 100) : 0;
+    const ganados = player.wins !== undefined ? toNumber(player.wins) : matches.filter((item) => item.result === 'ganado').length;
+    const perdidos = player.losses !== undefined ? toNumber(player.losses) : matches.filter((item) => item.result === 'perdido').length;
+    const triangulosFavorTotal = player.triangulosFavor !== undefined
+      ? toNumber(player.triangulosFavor)
+      : matches.reduce((acc, item) => acc + (Number(item.triangulosFavor || 0) || 0), 0);
+    const triangulosContraTotal = player.triangulosContra !== undefined
+      ? toNumber(player.triangulosContra)
+      : matches.reduce((acc, item) => acc + (Number(item.triangulosContra || 0) || 0), 0);
+    const played = player.played !== undefined ? toNumber(player.played) : Number(data.total || matches.length || 0);
+    const efectividad = player.effectiveness !== undefined
+      ? round1(player.effectiveness)
+      : (played > 0 ? Math.round((ganados / played) * 100) : 0);
 
     const radValue =
       data?.rad !== undefined && data?.rad !== null
@@ -265,7 +305,7 @@
     $summary.innerHTML = `
       <div class="summary-player">
         <h2 class="summary-title">${player.name || 'Jugador'}</h2>
-        <p class="summary-meta">${player.teamName || ''} · Categoría ${(data.category || '').toUpperCase()}</p>
+        <p class="summary-meta">${player.teamName || ''} · Categoría ${(data.category || '').toUpperCase()} · ${data?.editionLabel || editionLabel(data?.edition || currentSearchEdition)}</p>
       </div>
       <div class="summary-stats">
         <div class="summary-count">
@@ -289,7 +329,7 @@
           <span>triángulos en contra</span>
         </div>
         <div class="summary-count summary-eff">
-          <strong>${efectividad}%</strong>
+          <strong>${Number(efectividad || 0).toFixed(Number(efectividad || 0) % 1 ? 1 : 0)}%</strong>
           <span>efectividad</span>
         </div>
         <div class="summary-count summary-rad">
@@ -385,7 +425,7 @@
     $ranking.innerHTML = `
       <div class="ranking-head">
         <div>
-          <h2 class="ranking-title">Ranking Top ${limit}</h2>
+          <h2 class="ranking-title">Ranking Top ${limit} · ${data?.editionLabel || editionLabel(currentRankingEdition)}</h2>
           <p class="ranking-meta">Ranking realizado sobre una base de ${Number(data?.totalRegisteredPlayers || 0)} jugadores registrados y ${Number(data?.totalActivePlayers || 0)} jugadores activos.</p>
         </div>
       </div>
@@ -458,7 +498,7 @@
     $ranking.innerHTML = `
       <div class="ranking-head">
         <div>
-          <h2 class="ranking-title">Ranking Equipos Top ${limit}</h2>
+          <h2 class="ranking-title">Ranking Equipos Top ${limit} · ${data?.editionLabel || editionLabel(currentRankingEdition)}</h2>
           <p class="ranking-meta">Ordenado por puntos a favor. Desempate: diferencia de puntos y diferencia de triángulos.</p>
         </div>
       </div>
@@ -519,7 +559,7 @@
     $ranking.innerHTML = `
       <div class="ranking-head">
         <div>
-          <h2 class="ranking-title">Jugadores de ${team.name || 'equipo'}</h2>
+          <h2 class="ranking-title">Jugadores de ${team.name || 'equipo'} · ${data?.editionLabel || editionLabel(getTeamEdition())}</h2>
           <p class="ranking-meta">${Number(data?.totalActivePlayers || 0)} jugadores activos sobre ${Number(data?.totalRegisteredPlayers || 0)} registrados.</p>
         </div>
       </div>
@@ -550,6 +590,7 @@
     clearResults();
     clearRanking();
     setStatus('Buscando equipo…', 'info');
+    if (currentSearchEdition === 'total') setSearchEdition('6');
 
     const q = String($team?.value || '').trim();
     const category = String($category?.value || '').trim();
@@ -560,7 +601,7 @@
     }
 
     try {
-      const data = await fetchJson(apiUrl('/api/cruces/team-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q)));
+      const data = await fetchJson(apiUrl('/api/cruces/team-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q) + '&edition=' + encodeURIComponent(getTeamEdition())));
       renderTeamSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : lastTeamSuggestions);
 
       if (!data?.team) {
@@ -601,7 +642,8 @@
       const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
       const requestedLimit = Number(limit || 10);
       const fetchLimit = requestedLimit;
-      const data = await fetchJson(apiUrl(withCacheBust(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit))));
+      const edition = currentRankingTab === 'teams' && currentRankingEdition === 'total' ? '6' : currentRankingEdition;
+      const data = await fetchJson(apiUrl(withCacheBust(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit) + '&edition=' + encodeURIComponent(edition))));
 
       setStatus('', 'info');
       lastRankingData = data;
@@ -637,7 +679,7 @@
     }
 
     try {
-      const data = await fetchJson(apiUrl('/api/cruces/player-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q)));
+      const data = await fetchJson(apiUrl('/api/cruces/player-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q) + '&edition=' + encodeURIComponent(currentSearchEdition)));
       renderSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : lastSuggestions);
 
       if (!data?.player) {
@@ -671,6 +713,7 @@
     if (String($team.value || '').trim()) {
       if ($player) $player.value = '';
       renderSuggestions([]);
+      if (currentSearchEdition === 'total') setSearchEdition('6');
     }
     scheduleTeamSuggestions();
   });
@@ -681,6 +724,19 @@
     scheduleSuggestions();
     scheduleTeamSuggestions();
   });
+  $searchEditionButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setSearchEdition(btn.dataset.searchEdition || '6');
+      clearResults();
+      clearRanking();
+      scheduleSuggestions();
+      scheduleTeamSuggestions();
+    });
+  });
+  $rankingEdition?.addEventListener('change', () => {
+    currentRankingEdition = String($rankingEdition.value || 'total').toLowerCase();
+    if (lastRankingData) loadRanking(lastRankingLimit);
+  });
   $rankingButtons.forEach((btn) => {
     btn.addEventListener('click', () => loadRanking(Number(btn.getAttribute('data-ranking-limit') || btn.dataset.rankingLimit || 10)));
   });
@@ -688,6 +744,7 @@
     btn.addEventListener('click', () => {
       currentRankingTab = btn.dataset.rankingTab || 'players';
       $rankingTabs.forEach((item) => item.classList.toggle('active', item === btn));
+      updateRankingEditionOptions();
       renderRankingSwitch();
     });
   });
@@ -701,4 +758,6 @@
   });
   $reload?.addEventListener('click', () => window.location.reload());
   $form?.addEventListener('submit', searchPlayer);
+  setSearchEdition(currentSearchEdition);
+  updateRankingEditionOptions();
 })();

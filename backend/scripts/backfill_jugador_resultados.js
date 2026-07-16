@@ -8,6 +8,7 @@ const pool = require('../db');
 const WRITE = process.argv.includes('--write');
 const EXPORT_UNRESOLVED = process.argv.includes('--export-unresolved');
 const CATEGORY_FILTER = readArg('--category');
+const EDITION = Number(readArg('--edition') || 5) || 5;
 const OVERRIDES = loadOverrides();
 
 function readArg(name) {
@@ -135,6 +136,7 @@ async function ensureTable(client) {
       id BIGSERIAL PRIMARY KEY,
       fecha_key TEXT NOT NULL,
       fecha_iso DATE NOT NULL,
+      edicion INTEGER NOT NULL DEFAULT 5,
       categoria TEXT,
       jugador_id INTEGER REFERENCES jugadores(id) ON DELETE SET NULL,
       jugador_key TEXT NOT NULL,
@@ -160,6 +162,8 @@ async function ensureTable(client) {
   await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_jugador_id ON jugador_resultados (jugador_id)`);
   await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_categoria ON jugador_resultados (categoria)`);
   await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_equipo ON jugador_resultados (equipo_slug)`);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_edicion ON jugador_resultados (edicion)`);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_categoria_edicion ON jugador_resultados (categoria, edicion)`);
 }
 
 async function loadTeams(client) {
@@ -678,7 +682,7 @@ async function writeRows(client, rows) {
   await client.query('BEGIN');
   try {
     await client.query('TRUNCATE jugador_resultados');
-    const columnsPerRow = 19;
+    const columnsPerRow = 20;
     const chunkSize = 100;
     for (let start = 0; start < rows.length; start += chunkSize) {
       const chunk = rows.slice(start, start + chunkSize);
@@ -688,6 +692,7 @@ async function writeRows(client, rows) {
         params.push(
           row.fecha_key,
           row.fecha_iso,
+          EDITION,
           row.categoria,
           row.jugador_id,
           row.jugador_key,
@@ -709,15 +714,15 @@ async function writeRows(client, rows) {
         return `(
           $${offset + 1}, $${offset + 2}::date, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6},
           $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12},
-          $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16},
-          $${offset + 17}::timestamptz, $${offset + 18}::jsonb, $${offset + 19}::timestamptz
+          $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17},
+          $${offset + 18}::timestamptz, $${offset + 19}::jsonb, $${offset + 20}::timestamptz
         )`;
       }).join(',\n');
 
       await client.query(
         `
         INSERT INTO jugador_resultados (
-          fecha_key, fecha_iso, categoria, jugador_id, jugador_key, jugador_nombre,
+          fecha_key, fecha_iso, edicion, categoria, jugador_id, jugador_key, jugador_nombre,
           equipo_slug, equipo_nombre, rival_slug, rival_nombre, modalidad, slot,
           pareja_index, triangulos_favor, triangulos_contra, resultado,
           source_updated_at, snapshot_json, updated_at
@@ -725,6 +730,7 @@ async function writeRows(client, rows) {
         VALUES ${values}
         ON CONFLICT (fecha_key, equipo_slug, modalidad, slot, jugador_key)
         DO UPDATE SET
+          edicion = EXCLUDED.edicion,
           categoria = EXCLUDED.categoria,
           jugador_id = EXCLUDED.jugador_id,
           jugador_nombre = EXCLUDED.jugador_nombre,
@@ -763,6 +769,7 @@ async function main() {
       ok: true,
       mode: WRITE ? 'write' : 'dry-run',
       category: CATEGORY_FILTER || null,
+      edition: EDITION,
       unresolvedExport,
       ...stats
     }, null, 2));

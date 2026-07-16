@@ -11,7 +11,54 @@ const CATEGORY_KEYS = {
 };
 
 const ARG_TZ_OFFSET = '-03:00';
+const CURRENT_EDITION = 6;
+const DEFAULT_HISTORIC_EDITION = 5;
+const EDITION_START_DATES = {
+  6: '2026-07-27'
+};
 let ensureCrucesAdminStoragePromise = null;
+let ensureJugadorResultadosEditionPromise = null;
+
+function normalizeEdition(value, options = {}) {
+  const allowTotal = !!options.allowTotal;
+  const defaultEdition = options.defaultEdition ?? CURRENT_EDITION;
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (allowTotal && (raw === 'total' || raw === 'todos' || raw === 'all')) return 'total';
+  const num = Number(raw || defaultEdition);
+  if (Number.isInteger(num) && num > 0) return num;
+  return defaultEdition;
+}
+
+function getEditionLabel(edition) {
+  if (edition === 'total') return 'TOTAL';
+  return `${Number(edition || CURRENT_EDITION)}TA EDICIÓN`;
+}
+
+function inferEditionFromDate(dateValue) {
+  const dateKey = normalizeDateOnly(dateValue);
+  if (dateKey && dateKey >= EDITION_START_DATES[6]) return 6;
+  return DEFAULT_HISTORIC_EDITION;
+}
+
+function filterItemsByEdition(items = [], edition = CURRENT_EDITION) {
+  if (edition === 'total') return items;
+  return items.filter((item) => inferEditionFromDate(item?.fechaISO || item?.fecha_iso || item?.date) === Number(edition));
+}
+
+async function ensureJugadorResultadosEditionColumn() {
+  if (!ensureJugadorResultadosEditionPromise) {
+    ensureJugadorResultadosEditionPromise = (async () => {
+      await pool.query(`ALTER TABLE jugador_resultados ADD COLUMN IF NOT EXISTS edicion INTEGER NOT NULL DEFAULT 5`);
+      await pool.query(`UPDATE jugador_resultados SET edicion = 5 WHERE edicion IS NULL`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_edicion ON jugador_resultados (edicion)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_categoria_edicion ON jugador_resultados (categoria, edicion)`);
+    })().catch((err) => {
+      ensureJugadorResultadosEditionPromise = null;
+      throw err;
+    });
+  }
+  return ensureJugadorResultadosEditionPromise;
+}
 
 function normalizeCrucesAdminKey(team) {
   return String(team || '').trim().toLowerCase();
@@ -2402,9 +2449,20 @@ async function findRegisteredPlayerSuggestionsByCategory(category = '', q = '') 
   const division = String(category || '').trim().toLowerCase();
   const query = parsePlayerQuery(q).name;
   if (!division || normalizeText(query).length < 2) return [];
+  await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
 
   const { rows } = await pool.query(
     `
+    WITH active_links AS (
+      SELECT DISTINCT ON (je.jugador_id, je.categoria)
+        je.jugador_id,
+        je.categoria,
+        je.equipo_id
+      FROM jugador_equipos je
+      WHERE je.activo = true
+        AND LOWER(je.categoria) = $1
+      ORDER BY je.jugador_id, je.categoria, je.desde DESC NULLS LAST, je.id DESC
+    )
     SELECT
       j.id,
       TRIM(j.nombre) AS name,
@@ -2412,8 +2470,10 @@ async function findRegisteredPlayerSuggestionsByCategory(category = '', q = '') 
       e.slug_base,
       e.display_name AS team_name
     FROM jugadores j
-    INNER JOIN equipos e ON e.id = j.equipo_id
-    WHERE LOWER(e.division) = $1
+    INNER JOIN active_links al ON al.jugador_id = j.id
+    INNER JOIN equipos e ON e.id = al.equipo_id
+    WHERE LOWER(al.categoria) = $1
+      AND COALESCE(e.activo, true) = true
       AND TRIM(COALESCE(j.nombre, '')) <> ''
     ORDER BY j.nombre ASC, e.display_name ASC, j.id ASC
     `,
@@ -2524,33 +2584,34 @@ router.get('/player-query', async (req, res) => {
     const category = String(req.query.category || '').trim().toLowerCase();
     const q = String(req.query.q || '').trim();
     const suggestOnly = String(req.query.suggest || '') === '1';
+    const edition = normalizeEdition(req.query.edition, { allowTotal: true, defaultEdition: CURRENT_EDITION });
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
     if (!q || normalizeText(q).length < 2) {
-      return res.json({ ok: true, category, q, suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
+      return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
     const registeredSuggestions = await findRegisteredPlayerSuggestionsByCategory(category, q);
-    const resultadoSuggestions = await findJugadorResultadoSuggestionsByCategory(category, q);
-    const suggestions = mergePlayerSuggestions(resultadoSuggestions, registeredSuggestions);
+    const resultadoSuggestions = await findJugadorResultadoSuggestionsByCategory(category, q, edition);
+    const suggestions = mergePlayerSuggestions(registeredSuggestions, resultadoSuggestions);
     if (suggestOnly) {
-      return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
+      return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
     const exact = resolveExactPlayerSuggestion(suggestions, q);
     if (!exact) {
-      return res.json({ ok: true, category, q, suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
+      return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const { ranking: categoryRanking, radContext } = await buildRadRankingForCategory(category);
+    const { ranking: categoryRanking, radContext } = await buildRadRankingForCategory(category, edition);
     const playerRadRow = categoryRanking.find((item) =>
       (Number(item.id || 0) && Number(item.id) === Number(exact.id)) ||
       (sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug))
     ) || null;
-    const { matches, pairMatches } = await getJugadorResultadoMatches(category, exact.id || playerRadRow?.id || null);
+    const { matches, pairMatches } = await getJugadorResultadoMatches(category, exact.id || playerRadRow?.id || null, edition);
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
@@ -2563,8 +2624,22 @@ router.get('/player-query', async (req, res) => {
       ok: true,
       category,
       q,
+      edition,
+      editionLabel: getEditionLabel(edition),
       suggestions,
-      player: playerRadRow ? { ...exact, ...playerRadRow } : exact,
+      player: playerRadRow ? { ...exact, ...playerRadRow } : {
+        ...exact,
+        played: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        triangulosFavor: 0,
+        triangulosContra: 0,
+        diff: 0,
+        effectiveness: 0,
+        rad: 0,
+        radPenalty: 0
+      },
       rad: playerRadRow?.rad ?? null,
       radPenalty: playerRadRow?.radPenalty ?? null,
       radContext,
@@ -2746,9 +2821,14 @@ function buildRadRankingFromResults(results = []) {
   };
 }
 
-async function buildPlayerRowsFromJugadorResultados(category = '') {
+async function buildPlayerRowsFromJugadorResultados(category = '', edition = CURRENT_EDITION) {
   const division = String(category || '').trim().toLowerCase();
   if (!division) return [];
+  await ensureJugadorResultadosEditionColumn();
+
+  const normalizedEdition = normalizeEdition(edition, { allowTotal: true, defaultEdition: CURRENT_EDITION });
+  const editionFilter = normalizedEdition === 'total' ? '' : 'AND edicion = $2';
+  const params = normalizedEdition === 'total' ? [division] : [division, Number(normalizedEdition)];
 
   const { rows } = await pool.query(
     `
@@ -2767,6 +2847,7 @@ async function buildPlayerRowsFromJugadorResultados(category = '') {
       WHERE categoria = $1
         AND modalidad = 'individual'
         AND jugador_id IS NOT NULL
+        ${editionFilter}
       GROUP BY jugador_id, categoria
     ),
     latest AS (
@@ -2779,13 +2860,26 @@ async function buildPlayerRowsFromJugadorResultados(category = '') {
       WHERE categoria = $1
         AND modalidad = 'individual'
         AND jugador_id IS NOT NULL
+        ${editionFilter}
       ORDER BY jugador_id, categoria, fecha_iso DESC, id DESC
+    ),
+    active_team AS (
+      SELECT DISTINCT ON (je.jugador_id, je.categoria)
+        je.jugador_id,
+        je.categoria,
+        e.slug_uid AS equipo_slug,
+        e.display_name AS equipo_nombre
+      FROM jugador_equipos je
+      INNER JOIN equipos e ON e.id = je.equipo_id
+      WHERE LOWER(je.categoria) = $1
+        AND je.activo = true
+      ORDER BY je.jugador_id, je.categoria, je.desde DESC NULLS LAST, je.id DESC
     )
     SELECT
       agg.jugador_id AS id,
       agg.name,
-      latest.equipo_slug,
-      latest.equipo_nombre,
+      COALESCE(active_team.equipo_slug, latest.equipo_slug) AS equipo_slug,
+      COALESCE(active_team.equipo_nombre, latest.equipo_nombre) AS equipo_nombre,
       agg.played,
       agg.wins,
       agg.losses,
@@ -2796,9 +2890,12 @@ async function buildPlayerRowsFromJugadorResultados(category = '') {
     LEFT JOIN latest
       ON latest.jugador_id = agg.jugador_id
      AND latest.categoria = agg.categoria
+    LEFT JOIN active_team
+      ON active_team.jugador_id = agg.jugador_id
+     AND LOWER(active_team.categoria) = LOWER(agg.categoria)
     ORDER BY agg.name ASC
     `,
-    [division]
+    params
   );
 
   return rows.map((row) => ({
@@ -2819,8 +2916,8 @@ async function buildPlayerRowsFromJugadorResultados(category = '') {
   }));
 }
 
-async function buildRadRankingFromJugadorResultados(category = '') {
-  const baseRows = await buildPlayerRowsFromJugadorResultados(category);
+async function buildRadRankingFromJugadorResultados(category = '', edition = CURRENT_EDITION) {
+  const baseRows = await buildPlayerRowsFromJugadorResultados(category, edition);
   const activeRows = baseRows.filter((item) => radNumber(item.played) > 0);
   const rawContext = buildRadContextFromRows(activeRows);
 
@@ -2839,9 +2936,9 @@ async function buildRadRankingFromJugadorResultados(category = '') {
   };
 }
 
-async function buildRadRankingForCategory(category = '') {
+async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITION) {
   try {
-    const rankingData = await buildRadRankingFromJugadorResultados(category);
+    const rankingData = await buildRadRankingFromJugadorResultados(category, edition);
     if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {
       return rankingData;
     }
@@ -2849,17 +2946,21 @@ async function buildRadRankingForCategory(category = '') {
     console.warn('Falling back to cruces_validations for player ranking', err?.code || err?.message || err);
   }
 
-  const results = await buildAllValidatedCrucesForPlayerQuery(category);
+  const results = filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition);
   return buildRadRankingFromResults(results);
 }
 
-async function findJugadorResultadoSuggestionsByCategory(category = '', q = '') {
+async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', edition = CURRENT_EDITION) {
   const division = String(category || '').trim().toLowerCase();
   const query = parsePlayerQuery(q).name;
   if (!division || normalizeText(query).length < 2) return [];
+  const normalizedEdition = normalizeEdition(edition, { allowTotal: true, defaultEdition: CURRENT_EDITION });
+  const editionFilter = normalizedEdition === 'total' ? '' : 'AND jr.edicion = $2';
+  const params = normalizedEdition === 'total' ? [division] : [division, Number(normalizedEdition)];
 
   let rows = [];
   try {
+    await ensureJugadorResultadosEditionColumn();
     const result = await pool.query(
       `
       SELECT DISTINCT ON (jr.jugador_id)
@@ -2871,9 +2972,10 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '') 
       WHERE jr.categoria = $1
         AND jr.jugador_id IS NOT NULL
         AND TRIM(COALESCE(jr.jugador_nombre, '')) <> ''
+        ${editionFilter}
       ORDER BY jr.jugador_id, jr.fecha_iso DESC, jr.id DESC
       `,
-      [division]
+      params
     );
     rows = result.rows;
   } catch (err) {
@@ -2894,13 +2996,17 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '') 
     .slice(0, 12);
 }
 
-async function getJugadorResultadoMatches(category = '', playerId = null) {
+async function getJugadorResultadoMatches(category = '', playerId = null, edition = CURRENT_EDITION) {
   const division = String(category || '').trim().toLowerCase();
   const id = Number(playerId || 0);
   if (!division || !id) return { matches: [], pairMatches: [] };
+  const normalizedEdition = normalizeEdition(edition, { allowTotal: true, defaultEdition: CURRENT_EDITION });
+  const editionFilter = normalizedEdition === 'total' ? '' : 'AND edicion = $3';
+  const params = normalizedEdition === 'total' ? [division, id] : [division, id, Number(normalizedEdition)];
 
   let rows = [];
   try {
+    await ensureJugadorResultadosEditionColumn();
     const result = await pool.query(
       `
       SELECT
@@ -2921,9 +3027,10 @@ async function getJugadorResultadoMatches(category = '', playerId = null) {
       FROM jugador_resultados
       WHERE categoria = $1
         AND jugador_id = $2
+        ${editionFilter}
       ORDER BY fecha_iso ASC, modalidad ASC, slot ASC, id ASC
       `,
-      [division, id]
+      params
     );
     rows = result.rows;
   } catch (err) {
@@ -2979,13 +3086,14 @@ router.get('/player-ranking', async (req, res) => {
     const category = String(req.query.category || '').trim().toLowerCase();
     const rawLimit = Number(req.query.limit || 10);
     const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
+    const edition = normalizeEdition(req.query.edition, { allowTotal: true, defaultEdition: 'total' });
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
     const [{ ranking: fullRanking, radContext }, totalRegisteredPlayers] = await Promise.all([
-      buildRadRankingForCategory(category),
+      buildRadRankingForCategory(category, edition),
       countRegisteredIndividualPlayersByCategory(category)
     ]);
 
@@ -2995,6 +3103,8 @@ router.get('/player-ranking', async (req, res) => {
     return res.json({
       ok: true,
       category,
+      edition,
+      editionLabel: getEditionLabel(edition),
       limit,
       total: ranking.length,
       totalRegisteredPlayers,
@@ -3034,12 +3144,13 @@ router.get('/team-ranking', async (req, res) => {
     const category = String(req.query.category || '').trim().toLowerCase();
     const rawLimit = Number(req.query.limit || 10);
     const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
+    const edition = normalizeEdition(req.query.edition, { allowTotal: false, defaultEdition: CURRENT_EDITION });
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
-    const results = await buildAllValidatedCrucesForPlayerQuery(category);
+    const results = filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition);
     const rankingMap = new Map();
     const countedMatches = new Set();
 
@@ -3111,6 +3222,8 @@ router.get('/team-ranking', async (req, res) => {
     return res.json({
       ok: true,
       category,
+      edition,
+      editionLabel: getEditionLabel(edition),
       limit,
       total: ranking.length,
       ranking
@@ -3188,13 +3301,14 @@ router.get('/team-query', async (req, res) => {
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
     const q = String(req.query.q || '').trim();
+    const edition = normalizeEdition(req.query.edition, { allowTotal: false, defaultEdition: CURRENT_EDITION });
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
     if (!q || normalizeText(q).length < 2) {
-      return res.json({ ok: true, category, q, suggestions: [], team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
+      return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions: [], team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
     }
 
     const teams = await findTeamsByCategory(category);
@@ -3220,12 +3334,12 @@ router.get('/team-query', async (req, res) => {
       : null;
 
     if (!exactTeam) {
-      return res.json({ ok: true, category, q, suggestions, team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
+      return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
     }
 
     const [registeredPlayers, rankingData] = await Promise.all([
       getRegisteredPlayersForTeam(exactTeam.id),
-      buildRadRankingForCategory(category)
+      buildRadRankingForCategory(category, edition)
     ]);
 
     const { ranking: categoryRanking, radContext } = rankingData;
@@ -3269,10 +3383,13 @@ router.get('/team-query', async (req, res) => {
       return playersMap.get(key);
     };
 
-    registeredPlayers.forEach(ensureTeamPlayer);
-    categoryRanking
-      .filter((item) => teamInfoMatchesSide(exactTeam, item.teamSlug, item.teamName))
-      .forEach(ensureTeamPlayer);
+    if (Number(edition) === CURRENT_EDITION) {
+      registeredPlayers.forEach(ensureTeamPlayer);
+    } else {
+      categoryRanking
+        .filter((item) => teamInfoMatchesSide(exactTeam, item.teamSlug, item.teamName))
+        .forEach(ensureTeamPlayer);
+    }
 
     const players = Array.from(playersMap.values()).sort(sortPlayerRadRows);
     const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
@@ -3281,6 +3398,8 @@ router.get('/team-query', async (req, res) => {
       ok: true,
       category,
       q,
+      edition,
+      editionLabel: getEditionLabel(edition),
       suggestions,
       team: {
         id: exactTeam.id,

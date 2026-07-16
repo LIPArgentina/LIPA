@@ -32,6 +32,12 @@
           <button class="btn tab-btn active" type="button" data-ranking-tab="players">Jugadores</button>
           <button class="btn tab-btn" type="button" data-ranking-tab="teams">Equipos</button>
         </div>
+        <label class="ranking-edition-label" for="rankingEditionSelect">Edición</label>
+        <select id="rankingEditionSelect" class="edition-select" aria-label="Edición del ranking">
+          <option value="total">Total</option>
+          <option value="6">6ta</option>
+          <option value="5">5ta</option>
+        </select>
         <button class="btn ranking-btn" type="button" data-ranking-limit="10">Top 10</button>
         <button class="btn ranking-btn" type="button" data-ranking-limit="20">Top 20</button>
         <button class="btn ranking-btn" type="button" data-ranking-limit="50">Top 50</button>
@@ -62,6 +68,12 @@
 
         <button id="btnBuscar" class="btn btn-primary" type="submit">Buscar</button>
       </form>
+      <div class="edition-switch" aria-label="Edición de consulta">
+        <span>Edición</span>
+        <button class="edition-pill active" type="button" data-search-edition="6">6ta</button>
+        <button class="edition-pill" type="button" data-search-edition="5">5ta</button>
+        <button class="edition-pill edition-total" type="button" data-search-edition="total">Total</button>
+      </div>
     </section>
 
     <section id="rankingBox" class="ranking-box" hidden></section>
