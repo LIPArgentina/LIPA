@@ -2578,6 +2578,127 @@ function samePlayerRef(player, exact, teamSlug = '') {
   return sameNormalizedName(player?.name, exact?.name) && samePlayerTeamSlug(teamSlug, exact?.teamSlug);
 }
 
+function samePlayerIdentity(player, exact) {
+  const playerId = Number(player?.id || 0) || null;
+  const exactId = Number(exact?.id || 0) || null;
+  if (playerId && exactId) return playerId === exactId;
+  return sameNormalizedName(player?.name, exact?.name);
+}
+
+function resultFromScores(ownScore, opponentScore) {
+  const own = Number(ownScore || 0);
+  const opponent = Number(opponentScore || 0);
+  if (own > opponent) return 'ganado';
+  if (own < opponent) return 'perdido';
+  return 'empatado';
+}
+
+function buildPlayerMatchesFromValidatedResults(results = [], exact = {}) {
+  const matches = [];
+  const pairMatches = [];
+
+  for (const item of results) {
+    const localPlayers = getIndividualPlayerRefs(item.localPlanilla);
+    const visitantePlayers = getIndividualPlayerRefs(item.visitantePlanilla);
+    const localScores = Array.isArray(item.local?.scoreRows) ? item.local.scoreRows : [];
+    const visitanteScores = Array.isArray(item.visitante?.scoreRows) ? item.visitante.scoreRows : [];
+    const maxIndividual = Math.max(localPlayers.length, visitantePlayers.length, 7);
+
+    for (let idx = 0; idx < maxIndividual; idx++) {
+      const localPlayer = localPlayers[idx] || { id: null, name: '' };
+      const visitantePlayer = visitantePlayers[idx] || { id: null, name: '' };
+      const localScore = Number(localScores[idx] ?? 0) || 0;
+      const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
+
+      if (localPlayer.name && samePlayerIdentity(localPlayer, exact)) {
+        matches.push({
+          fechaISO: item.fechaISO,
+          category: item.category,
+          playerId: localPlayer.id,
+          playerName: localPlayer.name,
+          teamSlug: item.localSlug,
+          teamName: item.localName,
+          opponentSlug: item.visitanteSlug,
+          opponentName: item.visitanteName,
+          opponentPlayerName: visitantePlayer.name || '',
+          row: idx + 1,
+          triangulosFavor: localScore,
+          triangulosContra: visitanteScore,
+          result: resultFromScores(localScore, visitanteScore)
+        });
+      }
+
+      if (visitantePlayer.name && samePlayerIdentity(visitantePlayer, exact)) {
+        matches.push({
+          fechaISO: item.fechaISO,
+          category: item.category,
+          playerId: visitantePlayer.id,
+          playerName: visitantePlayer.name,
+          teamSlug: item.visitanteSlug,
+          teamName: item.visitanteName,
+          opponentSlug: item.localSlug,
+          opponentName: item.localName,
+          opponentPlayerName: localPlayer.name || '',
+          row: idx + 1,
+          triangulosFavor: visitanteScore,
+          triangulosContra: localScore,
+          result: resultFromScores(visitanteScore, localScore)
+        });
+      }
+    }
+
+    for (let pairIndex = 0; pairIndex < 2; pairIndex++) {
+      const section = pairIndex === 0 ? 'pareja1' : 'pareja2';
+      const localPair = getPlanillaPlayerRefs(item.localPlanilla, section);
+      const visitantePair = getPlanillaPlayerRefs(item.visitantePlanilla, section);
+      const localScore = getPairScore(localScores, item.localPlanilla, pairIndex);
+      const visitanteScore = getPairScore(visitanteScores, item.visitantePlanilla, pairIndex);
+      const localHit = localPair.find((player) => samePlayerIdentity(player, exact));
+      const visitanteHit = visitantePair.find((player) => samePlayerIdentity(player, exact));
+
+      if (localHit) {
+        pairMatches.push({
+          fechaISO: item.fechaISO,
+          category: item.category,
+          playerId: localHit.id,
+          playerName: localHit.name,
+          teamSlug: item.localSlug,
+          teamName: item.localName,
+          opponentSlug: item.visitanteSlug,
+          opponentName: item.visitanteName,
+          companionName: localPair.find((player) => !samePlayerIdentity(player, exact))?.name || '',
+          opponentPairPlayers: visitantePair.map((player) => player.name).filter(Boolean),
+          pairNumber: pairIndex + 1,
+          triangulosFavor: localScore,
+          triangulosContra: visitanteScore,
+          result: resultFromScores(localScore, visitanteScore)
+        });
+      }
+
+      if (visitanteHit) {
+        pairMatches.push({
+          fechaISO: item.fechaISO,
+          category: item.category,
+          playerId: visitanteHit.id,
+          playerName: visitanteHit.name,
+          teamSlug: item.visitanteSlug,
+          teamName: item.visitanteName,
+          opponentSlug: item.localSlug,
+          opponentName: item.localName,
+          companionName: visitantePair.find((player) => !samePlayerIdentity(player, exact))?.name || '',
+          opponentPairPlayers: localPair.map((player) => player.name).filter(Boolean),
+          pairNumber: pairIndex + 1,
+          triangulosFavor: visitanteScore,
+          triangulosContra: localScore,
+          result: resultFromScores(visitanteScore, localScore)
+        });
+      }
+    }
+  }
+
+  return { matches, pairMatches };
+}
+
 router.get('/player-query', async (req, res) => {
   setNoCache(res);
   try {
@@ -2614,11 +2735,21 @@ router.get('/player-query', async (req, res) => {
     ) || categoryRanking.find((item) =>
       sameNormalizedName(item.name, exact.name)
     ) || null;
-    const { matches, pairMatches } = await getJugadorResultadoMatches(category, {
+    let { matches, pairMatches } = await getJugadorResultadoMatches(category, {
       id: exact.id || playerRadRow?.id || null,
       name: exact.name || playerRadRow?.name || '',
       names: [exact.name, playerRadRow?.name].filter(Boolean)
     }, edition);
+
+    if (!matches.length && !pairMatches.length) {
+      const validatedResults = filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition);
+      const fallbackDetail = buildPlayerMatchesFromValidatedResults(validatedResults, {
+        id: exact.id || playerRadRow?.id || null,
+        name: exact.name || playerRadRow?.name || ''
+      });
+      matches = fallbackDetail.matches;
+      pairMatches = fallbackDetail.pairMatches;
+    }
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
