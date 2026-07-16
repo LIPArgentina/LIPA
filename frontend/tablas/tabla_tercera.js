@@ -310,7 +310,7 @@ function calcRowsFromEntries(entries){
         ((triangulos[g][normalizeName(b.equipo)] || 0) - (triangulos[g][normalizeName(a.equipo)] || 0)) ||
         String(a.equipo).localeCompare(String(b.equipo))
       )
-      .slice(0, 4)
+      .slice(0, selectedEdition >= 6 ? 6 : 4)
       .map((r, i) => ({
         pos: i + 1,
         equipo: r.equipo,
@@ -449,6 +449,24 @@ async function switchFixture(kind){
 
 function applyEditionLayout(){
   GROUPS = selectedEdition >= 6 ? ['A', 'B'] : ['A', 'B', 'C', 'D'];
+  const rowCount = selectedEdition >= 6 ? 6 : 4;
+  document.querySelectorAll('[data-group-board]').forEach(board => {
+    while (board.querySelectorAll('.row[role="row"]').length < rowCount) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.setAttribute('role', 'row');
+      row.innerHTML = '<div class="square" data-field="pos"></div><div class="pill white" data-field="team"></div><div class="square" data-field="ju"></div><div class="square" data-field="tr"></div><div class="square" data-field="pts"></div>';
+      board.appendChild(row);
+    }
+    Array.from(board.querySelectorAll('.row[role="row"]')).forEach((row, index) => {
+      row.hidden = index >= rowCount;
+      const team = row.querySelector('[data-field="team"]');
+      if (!team) return;
+      team.classList.remove('yellow', 'white');
+      const classified = selectedEdition >= 6 ? index < 4 : index < 2;
+      team.classList.add(classified ? 'yellow' : 'white');
+    });
+  });
   document.querySelectorAll('[data-group-board], section.card[data-group]').forEach(el => {
     const group = el.getAttribute('data-group-board') || el.getAttribute('data-group');
     const wrapper = el.matches('[data-group-board]') ? el.closest('.poster') : el;

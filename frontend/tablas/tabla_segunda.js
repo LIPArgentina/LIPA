@@ -89,7 +89,7 @@ async function fetchFixture(kind){
   const apiData = await apiRes.json().catch(() => null);
 
   if (apiRes.status === 404 && selectedEdition === 6) {
-    cache[kind] = { fechas: [] };
+    cache[kind] = buildEmptyCurrentFixture();
     return cache[kind];
   }
 
@@ -97,8 +97,27 @@ async function fetchFixture(kind){
     throw new Error(apiData?.error || `No se pudo cargar fixture ${kind} desde PostgreSQL`);
   }
 
-  cache[kind] = apiData.data;
-  return apiData.data;
+  cache[kind] = selectedEdition === 6 && !apiData.data.fechas?.length
+    ? buildEmptyCurrentFixture()
+    : apiData.data;
+  return cache[kind];
+}
+
+function buildEmptyCurrentFixture(){
+  return {
+    fechas: Array.from({ length: 5 }, () => ({
+      date: '',
+      tablas: ['A', 'B'].map(grupo => ({
+        grupo,
+        equipos: Array.from({ length: 6 }, (_, index) => ({
+          equipo: 'WO',
+          puntos: 0,
+          puntosExtra: 0,
+          categoria: index % 2 === 0 ? 'local' : 'visitante'
+        }))
+      }))
+    }))
+  };
 }
 
 function ensureFechaBlock(section, fechaIndex, fechaText){
