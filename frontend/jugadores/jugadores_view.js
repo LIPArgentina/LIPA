@@ -166,6 +166,7 @@ function renderPlayers(players = []){
 
   results.innerHTML = players.map((player, idx) => `
     <article class="player-card" data-index="${idx}" tabindex="0">
+      <div class="player-card__number">${idx + 1}</div>
       <button class="player-card__photo" type="button" aria-label="Ver foto de ${escapeHtml(player.nombre || player.name || 'jugador')}">
         <img src="${escapeHtml(photoSrc(player))}" alt="Foto de ${escapeHtml(player.nombre || player.name || 'jugador')}">
       </button>
