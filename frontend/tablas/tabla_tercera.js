@@ -449,6 +449,7 @@ async function switchFixture(kind){
 
 function applyEditionLayout(){
   GROUPS = selectedEdition >= 6 ? ['A', 'B'] : ['A', 'B', 'C', 'D'];
+  document.getElementById('tables')?.classList.toggle('two-group-layout', selectedEdition >= 6);
   const rowCount = selectedEdition >= 6 ? 6 : 4;
   document.querySelectorAll('[data-group-board]').forEach(board => {
     while (board.querySelectorAll('.row[role="row"]').length < rowCount) {
