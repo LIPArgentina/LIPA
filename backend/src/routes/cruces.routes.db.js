@@ -2616,7 +2616,8 @@ router.get('/player-query', async (req, res) => {
     ) || null;
     const { matches, pairMatches } = await getJugadorResultadoMatches(category, {
       id: exact.id || playerRadRow?.id || null,
-      name: exact.name || playerRadRow?.name || ''
+      name: exact.name || playerRadRow?.name || '',
+      names: [exact.name, playerRadRow?.name].filter(Boolean)
     }, edition);
 
     const sortByDateAndRow = (a, b) =>
@@ -3014,7 +3015,11 @@ async function getJugadorResultadoMatches(category = '', player = {}, edition = 
   const division = String(category || '').trim().toLowerCase();
   const id = Number(player?.id || player || 0);
   const playerName = String(player?.name || '').trim();
-  if (!division || (!id && normalizeText(playerName).length < 2)) return { matches: [], pairMatches: [] };
+  const playerNames = Array.from(new Set([
+    playerName,
+    ...(Array.isArray(player?.names) ? player.names : [])
+  ].map((name) => String(name || '').trim()).filter((name) => normalizeText(name).length >= 2)));
+  if (!division || (!id && !playerNames.length)) return { matches: [], pairMatches: [] };
   const normalizedEdition = normalizeEdition(edition, { allowTotal: true, defaultEdition: CURRENT_EDITION });
   const clauses = ['categoria = $1'];
   const params = [division];
@@ -3023,9 +3028,23 @@ async function getJugadorResultadoMatches(category = '', player = {}, edition = 
     params.push(id);
     playerClauses.push(`jugador_id = $${params.length}`);
   }
-  if (playerName) {
-    params.push(playerName.toLowerCase());
-    playerClauses.push(`LOWER(TRIM(jugador_nombre)) = $${params.length}`);
+  for (const name of playerNames) {
+    const rawWords = String(name || '').trim().toLowerCase().split(/\s+/);
+    const normalizedWords = normalizeText(name).split(' ');
+    const wordVariants = rawWords
+      .map((word, index) => Array.from(new Set([word, normalizedWords[index]].filter(Boolean))))
+      .map((variants) => variants.map((token) => token.trim()).filter((token) => token.length >= 2))
+      .filter((variants) => variants.length)
+      .slice(0, 4);
+    if (!wordVariants.length) continue;
+    const tokenClauses = wordVariants.map((variants) => {
+      const variantClauses = variants.map((token) => {
+        params.push(`%${token}%`);
+        return `LOWER(TRIM(jugador_nombre)) LIKE $${params.length}`;
+      });
+      return `(${variantClauses.join(' OR ')})`;
+    });
+    playerClauses.push(`(${tokenClauses.join(' AND ')})`);
   }
   clauses.push(`(${playerClauses.join(' OR ')})`);
   if (normalizedEdition !== 'total') {
