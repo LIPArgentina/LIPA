@@ -49,6 +49,7 @@ let currentCategory = 'tercera';
 let currentEdition = Number(new URLSearchParams(window.location.search).get('edition')) || 6;
 let TEAM_OPTIONS = ['WO'];
 let CURRENT_STANDINGS = null;
+let currentPublicVisible = currentEdition < 6;
 
 function readSession(){
   try {
@@ -636,8 +637,16 @@ function setActiveCategoryButton(category){
   if (subtitle) subtitle.textContent = getCategoryConfig(category).subtitle;
 }
 
+function syncPublicVisibilityButton(){
+  const button = document.getElementById('togglePublicBracket');
+  if (!button) return;
+  button.textContent = currentPublicVisible ? 'OCULTAR LLAVES' : 'MOSTRAR LLAVES';
+  button.setAttribute('aria-pressed', String(currentPublicVisible));
+}
+
 async function saveOnServer(){
   const data = readBracketFromUI();
+  data.publicVisible = currentPublicVisible;
   applyAutomaticAdvance(data);
   const resp = await fetch(`${API_BASE}/llaves`, {
     method: 'POST',
@@ -951,6 +960,10 @@ async function renderCategory(category){
   CURRENT_STANDINGS = await applyAutomaticEntrants(data, category);
 
   const savedDbData = await loadFromServer(category);
+  currentPublicVisible = typeof savedDbData?.publicVisible === 'boolean'
+    ? savedDbData.publicVisible
+    : currentEdition < 6;
+  syncPublicVisibilityButton();
   mergeSavedEditableData(data, savedDbData);
 
   applyAutomaticAdvance(data);
@@ -1003,6 +1016,21 @@ async function bootstrap(){
     } catch (err) {
       console.error(err);
       alert(err?.message || 'No se pudo guardar');
+    }
+  });
+
+  document.getElementById('togglePublicBracket')?.addEventListener('click', async () => {
+    const previous = currentPublicVisible;
+    currentPublicVisible = !currentPublicVisible;
+    syncPublicVisibilityButton();
+    try {
+      await saveOnServer();
+      showToast(currentPublicVisible ? 'Llaves visibles en las tablas' : 'Llaves ocultas en las tablas');
+    } catch (err) {
+      currentPublicVisible = previous;
+      syncPublicVisibilityButton();
+      console.error(err);
+      alert(err?.message || 'No se pudo cambiar la visibilidad');
     }
   });
 }
