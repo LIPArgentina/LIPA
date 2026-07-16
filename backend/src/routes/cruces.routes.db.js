@@ -2608,10 +2608,16 @@ router.get('/player-query', async (req, res) => {
 
     const { ranking: categoryRanking, radContext } = await buildRadRankingForCategory(category, edition);
     const playerRadRow = categoryRanking.find((item) =>
-      (Number(item.id || 0) && Number(item.id) === Number(exact.id)) ||
-      (sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug))
+      Number(item.id || 0) && Number(item.id) === Number(exact.id)
+    ) || categoryRanking.find((item) =>
+      sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
+    ) || categoryRanking.find((item) =>
+      sameNormalizedName(item.name, exact.name)
     ) || null;
-    const { matches, pairMatches } = await getJugadorResultadoMatches(category, exact.id || playerRadRow?.id || null, edition);
+    const { matches, pairMatches } = await getJugadorResultadoMatches(category, {
+      id: exact.id || playerRadRow?.id || null,
+      name: exact.name || playerRadRow?.name || ''
+    }, edition);
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
@@ -2627,7 +2633,14 @@ router.get('/player-query', async (req, res) => {
       edition,
       editionLabel: getEditionLabel(edition),
       suggestions,
-      player: playerRadRow ? { ...exact, ...playerRadRow } : {
+      player: playerRadRow ? {
+        ...playerRadRow,
+        id: exact.id || playerRadRow.id,
+        name: exact.name || playerRadRow.name,
+        teamSlug: exact.teamSlug || playerRadRow.teamSlug,
+        teamName: exact.teamName || playerRadRow.teamName,
+        label: exact.label || playerRadRow.label
+      } : {
         ...exact,
         played: 0,
         wins: 0,
@@ -2834,7 +2847,8 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
     `
     WITH agg AS (
       SELECT
-        jugador_id,
+        COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))) AS player_key,
+        MAX(jugador_id) AS jugador_id,
         categoria,
         MAX(jugador_nombre) AS name,
         COUNT(*)::int AS played,
@@ -2846,12 +2860,13 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
       FROM jugador_resultados
       WHERE categoria = $1
         AND modalidad = 'individual'
-        AND jugador_id IS NOT NULL
+        AND TRIM(COALESCE(jugador_nombre, '')) <> ''
         ${editionFilter}
-      GROUP BY jugador_id, categoria
+      GROUP BY COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria
     ),
     latest AS (
-      SELECT DISTINCT ON (jugador_id, categoria)
+      SELECT DISTINCT ON (COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria)
+        COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))) AS player_key,
         jugador_id,
         categoria,
         equipo_slug,
@@ -2859,9 +2874,9 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
       FROM jugador_resultados
       WHERE categoria = $1
         AND modalidad = 'individual'
-        AND jugador_id IS NOT NULL
+        AND TRIM(COALESCE(jugador_nombre, '')) <> ''
         ${editionFilter}
-      ORDER BY jugador_id, categoria, fecha_iso DESC, id DESC
+      ORDER BY COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria, fecha_iso DESC, id DESC
     ),
     active_team AS (
       SELECT DISTINCT ON (je.jugador_id, je.categoria)
@@ -2888,7 +2903,7 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
       agg.triangulos_contra
     FROM agg
     LEFT JOIN latest
-      ON latest.jugador_id = agg.jugador_id
+      ON latest.player_key = agg.player_key
      AND latest.categoria = agg.categoria
     LEFT JOIN active_team
       ON active_team.jugador_id = agg.jugador_id
@@ -2963,17 +2978,16 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', 
     await ensureJugadorResultadosEditionColumn();
     const result = await pool.query(
       `
-      SELECT DISTINCT ON (jr.jugador_id)
+      SELECT DISTINCT ON (COALESCE(jr.jugador_id::text, 'name:' || LOWER(TRIM(jr.jugador_nombre))))
         jr.jugador_id AS id,
         jr.jugador_nombre AS name,
         jr.equipo_slug,
         jr.equipo_nombre
       FROM jugador_resultados jr
       WHERE jr.categoria = $1
-        AND jr.jugador_id IS NOT NULL
         AND TRIM(COALESCE(jr.jugador_nombre, '')) <> ''
         ${editionFilter}
-      ORDER BY jr.jugador_id, jr.fecha_iso DESC, jr.id DESC
+      ORDER BY COALESCE(jr.jugador_id::text, 'name:' || LOWER(TRIM(jr.jugador_nombre))), jr.fecha_iso DESC, jr.id DESC
       `,
       params
     );
@@ -2996,13 +3010,28 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', 
     .slice(0, 12);
 }
 
-async function getJugadorResultadoMatches(category = '', playerId = null, edition = CURRENT_EDITION) {
+async function getJugadorResultadoMatches(category = '', player = {}, edition = CURRENT_EDITION) {
   const division = String(category || '').trim().toLowerCase();
-  const id = Number(playerId || 0);
-  if (!division || !id) return { matches: [], pairMatches: [] };
+  const id = Number(player?.id || player || 0);
+  const playerName = String(player?.name || '').trim();
+  if (!division || (!id && normalizeText(playerName).length < 2)) return { matches: [], pairMatches: [] };
   const normalizedEdition = normalizeEdition(edition, { allowTotal: true, defaultEdition: CURRENT_EDITION });
-  const editionFilter = normalizedEdition === 'total' ? '' : 'AND edicion = $3';
-  const params = normalizedEdition === 'total' ? [division, id] : [division, id, Number(normalizedEdition)];
+  const clauses = ['categoria = $1'];
+  const params = [division];
+  const playerClauses = [];
+  if (id) {
+    params.push(id);
+    playerClauses.push(`jugador_id = $${params.length}`);
+  }
+  if (playerName) {
+    params.push(playerName.toLowerCase());
+    playerClauses.push(`LOWER(TRIM(jugador_nombre)) = $${params.length}`);
+  }
+  clauses.push(`(${playerClauses.join(' OR ')})`);
+  if (normalizedEdition !== 'total') {
+    params.push(Number(normalizedEdition));
+    clauses.push(`edicion = $${params.length}`);
+  }
 
   let rows = [];
   try {
@@ -3025,9 +3054,7 @@ async function getJugadorResultadoMatches(category = '', playerId = null, editio
         triangulos_contra,
         resultado
       FROM jugador_resultados
-      WHERE categoria = $1
-        AND jugador_id = $2
-        ${editionFilter}
+      WHERE ${clauses.join('\n        AND ')}
       ORDER BY fecha_iso ASC, modalidad ASC, slot ASC, id ASC
       `,
       params
