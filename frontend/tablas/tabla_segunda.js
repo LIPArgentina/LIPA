@@ -27,6 +27,7 @@ window.addEventListener('load', () => {
 const GROUPS = ['A', 'B'];
 const cache = { ida: null, vuelta: null };
 let selectedKind = 'ida';
+let selectedEdition = Number(new URLSearchParams(window.location.search).get('edition')) || 6;
 let standingsSteps = [];
 let selectedStandingsIndex = -1;
 let podiumRefreshId = null;
@@ -83,9 +84,14 @@ const API_BASE = (() => {
 })();
 
 async function fetchFixture(kind){
-  const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=segunda`;
+  const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=segunda&edition=${encodeURIComponent(selectedEdition)}`;
   const apiRes = await fetch(apiUrl, { cache: 'no-store' });
   const apiData = await apiRes.json().catch(() => null);
+
+  if (apiRes.status === 404 && selectedEdition === 6) {
+    cache[kind] = { fechas: [] };
+    return cache[kind];
+  }
 
   if (!apiRes.ok || !apiData?.ok || !apiData?.data) {
     throw new Error(apiData?.error || `No se pudo cargar fixture ${kind} desde PostgreSQL`);
@@ -388,7 +394,30 @@ async function switchFixture(kind){
   setActive(kind);
 }
 
+function applyEditionState(){
+  document.querySelectorAll('.edition-option').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.edition) === selectedEdition);
+  });
+  const url = new URL(window.location.href);
+  url.searchParams.set('edition', String(selectedEdition));
+  window.history.replaceState({}, '', url);
+}
+
+async function switchEdition(edition){
+  selectedEdition = Number(edition) || 6;
+  cache.ida = null;
+  cache.vuelta = null;
+  applyEditionState();
+  await Promise.all([fetchFixture('ida'), fetchFixture('vuelta')]);
+  buildStandingsSteps();
+  populateStandingsControls();
+  renderStandings();
+  renderSelectedFixture();
+  window.dispatchEvent(new CustomEvent('tournament:edition-changed', { detail: { edition: selectedEdition } }));
+}
+
 async function init(){
+  applyEditionState();
   try { selectedKind = localStorage.getItem('fixture_kind_segunda') || 'ida'; } catch(_) { selectedKind = 'ida'; }
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -398,6 +427,12 @@ async function init(){
         alert(err.message || String(err));
       });
     });
+  });
+  document.querySelectorAll('.edition-option').forEach(btn => {
+    btn.addEventListener('click', () => switchEdition(btn.dataset.edition).catch(err => {
+      console.error(err);
+      alert('No se pudo cambiar la edición.');
+    }));
   });
 
   const select = document.getElementById('standingsStep');

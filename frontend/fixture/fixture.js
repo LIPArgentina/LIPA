@@ -343,29 +343,29 @@ function restoreDatesFromFixture(fx, groups){
   }
 }
 
-function loadUsersJS(cat){
-  return new Promise((resolve, reject) => {
-    const ID = 'users-script';
-    const old = document.getElementById(ID);
-    if (old) old.remove();
-
-    try { delete window.LPI_USERS; } catch(_) { window.LPI_USERS = undefined; }
-
-    const s = document.createElement('script');
-    s.id = ID;
-    s.src = `../data/usuarios.${cat}.js`;
-    s.onload = () => {
-      const arr = (window.LPI_USERS || [])
-        .filter(u => u.role === 'team')
-        .map(u => u.username);
-      const uniq = Array.from(new Set(arr.filter(n => n && n.trim() !== '')));
-      const resto = uniq.filter(n => n !== 'WO')
-        .sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
-      resolve(['WO', ...resto]);
-    };
-    s.onerror = () => reject(new Error(`No se pudo cargar usuarios.${cat}.js`));
-    document.head.appendChild(s);
+async function loadUsersJS(cat){
+  const resp = await fetch(`${API_BASE}/teams?division=${encodeURIComponent(cat)}`, {
+    credentials: 'include',
+    cache: 'no-store'
   });
+  const data = await resp.json().catch(() => null);
+
+  if (!resp.ok || !Array.isArray(data?.teams)) {
+    throw new Error(data?.error || `No se pudieron cargar los equipos activos de ${cat}`);
+  }
+
+  const names = data.teams
+    .map(item => typeof item === 'string'
+      ? item
+      : (item?.username || item?.display_name || item?.displayName || item?.name || ''))
+    .map(normalizeTeamName)
+    .filter(Boolean)
+    .filter(name => name !== 'WO');
+
+  const uniqueNames = Array.from(new Set(names))
+    .sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
+
+  return ['WO', ...uniqueNames];
 }
 
 function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup){

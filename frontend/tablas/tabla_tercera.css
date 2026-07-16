@@ -630,6 +630,11 @@ header .logo-link{ display:inline-block; line-height:0; }
   }
 }
 
+.edition-progress{
+  margin-top:14px;
+  margin-bottom:14px;
+}
+
 @media (min-width: 769px){
   body{ zoom:.8; }
 }
