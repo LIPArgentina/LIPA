@@ -1,0 +1,2077 @@
+{
+  "source": "staging",
+  "apiBase": "https://liga-backend-staging.onrender.com/api",
+  "capturedAt": "2026-07-16T11:30:41.281Z",
+  "assumedEdition": 5,
+  "resources": [
+    {
+      "type": "fixture",
+      "category": "primera",
+      "kind": "ida",
+      "url": "https://liga-backend-staging.onrender.com/api/fixture?kind=ida&category=primera",
+      "status": 404,
+      "ok": false,
+      "body": {
+        "ok": false,
+        "error": "fixture_no_encontrado_en_db"
+      }
+    },
+    {
+      "type": "fixture",
+      "category": "primera",
+      "kind": "vuelta",
+      "url": "https://liga-backend-staging.onrender.com/api/fixture?kind=vuelta&category=primera",
+      "status": 404,
+      "ok": false,
+      "body": {
+        "ok": false,
+        "error": "fixture_no_encontrado_en_db"
+      }
+    },
+    {
+      "type": "llaves",
+      "category": "primera",
+      "url": "https://liga-backend-staging.onrender.com/api/llaves?category=primera",
+      "status": 400,
+      "ok": false,
+      "body": {
+        "ok": false,
+        "error": "category inválida"
+      }
+    },
+    {
+      "type": "fixture",
+      "category": "segunda",
+      "kind": "ida",
+      "url": "https://liga-backend-staging.onrender.com/api/fixture?kind=ida&category=segunda",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "ok": true,
+        "source": "db",
+        "data": {
+          "fechas": [
+            {
+              "date": "2026-03-16",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 37
+                    },
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 44
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 39
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 46
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 27
+                    },
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 46
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 45
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 41
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-03-23",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 47
+                    },
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 37
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 36
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 41
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 49
+                    },
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 42
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 36
+                    },
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 40
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-03-30",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 40
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 37
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 43
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 39
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 42
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 39
+                    },
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 43
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 37
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-04-06",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 29
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 48
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 30
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 47
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 35
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 37
+                    },
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-04-13",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 39
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 41
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 41
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 41
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 35
+                    },
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 49
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 31
+                    },
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 43
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "fixture",
+      "category": "segunda",
+      "kind": "vuelta",
+      "url": "https://liga-backend-staging.onrender.com/api/fixture?kind=vuelta&category=segunda",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "ok": true,
+        "source": "db",
+        "data": {
+          "fechas": [
+            {
+              "date": "2026-04-20",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 44
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 36
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 48
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 40
+                    },
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 43
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 24
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 44
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-04-27",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 44
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 42
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 38
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 42
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 42
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 42
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 44
+                    },
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 37
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-05-04",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 43
+                    },
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 43
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 48
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 27
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 46
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 35
+                    },
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 42
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 9,
+                      "categoria": "local",
+                      "puntosExtra": 52
+                    },
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 17
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-05-11",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 48
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 21
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 43
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 33
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 48
+                    },
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 27
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 29
+                    },
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 46
+                    },
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-05-18",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "EL TREBOL MORENO",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 48
+                    },
+                    {
+                      "equipo": "ANEXO 2DA",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "MALENA",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 46
+                    },
+                    {
+                      "equipo": "DUCK HUNTERS 2DA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 30
+                    },
+                    {
+                      "equipo": "WO",
+                      "puntos": 0,
+                      "categoria": "local",
+                      "puntosExtra": 0
+                    },
+                    {
+                      "equipo": "TAKOS FUSION",
+                      "puntos": 0,
+                      "categoria": "visitante",
+                      "puntosExtra": 0
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "OLDIES",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 40
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL ARGENTINA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 35
+                    },
+                    {
+                      "equipo": "LOS PATOS DE LA LIGA",
+                      "puntos": 8,
+                      "categoria": "local",
+                      "puntosExtra": 51
+                    },
+                    {
+                      "equipo": "TAKOS PRO",
+                      "puntos": 1,
+                      "categoria": "visitante",
+                      "puntosExtra": 24
+                    },
+                    {
+                      "equipo": "VICTORIA",
+                      "puntos": 8,
+                      "categoria": "local",
+                      "puntosExtra": 49
+                    },
+                    {
+                      "equipo": "SEGUNDA DEL TREBOL",
+                      "puntos": 1,
+                      "categoria": "visitante",
+                      "puntosExtra": 22
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "llaves",
+      "category": "segunda",
+      "url": "https://liga-backend-staging.onrender.com/api/llaves?category=segunda",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "ok": true,
+        "category": "segunda",
+        "data": {
+          "rounds": [
+            {
+              "id": "s1",
+              "legs": [
+                {
+                  "away": {
+                    "team": "EL TREBOL MORENO",
+                    "puntos": 6,
+                    "puntosExtra": 48
+                  },
+                  "date": "2026-05-25",
+                  "home": {
+                    "team": "VICTORIA",
+                    "puntos": 3,
+                    "puntosExtra": 35
+                  }
+                },
+                {
+                  "away": {
+                    "team": "VICTORIA",
+                    "puntos": 1,
+                    "puntosExtra": 26
+                  },
+                  "date": "2026-06-01",
+                  "home": {
+                    "team": "EL TREBOL MORENO",
+                    "puntos": 8,
+                    "puntosExtra": 50
+                  }
+                }
+              ],
+              "title": "Semifinal",
+              "extraDeleted": false
+            },
+            {
+              "id": "final",
+              "legs": [
+                {
+                  "away": {
+                    "team": "MALENA",
+                    "puntos": 4,
+                    "puntosExtra": 37
+                  },
+                  "date": "2026-06-14",
+                  "home": {
+                    "team": "EL TREBOL MORENO",
+                    "puntos": 5,
+                    "puntosExtra": 43
+                  }
+                }
+              ],
+              "title": "Final",
+              "extraDeleted": false
+            },
+            {
+              "id": "third",
+              "legs": [
+                {
+                  "away": {
+                    "team": "OLDIES",
+                    "puntos": 5,
+                    "puntosExtra": 39
+                  },
+                  "date": "2026-06-14",
+                  "home": {
+                    "team": "VICTORIA",
+                    "puntos": 4,
+                    "puntosExtra": 45
+                  }
+                }
+              ],
+              "title": "3er y 4to puesto",
+              "extraDeleted": false
+            },
+            {
+              "id": "s2",
+              "legs": [
+                {
+                  "away": {
+                    "team": "OLDIES",
+                    "puntos": 3,
+                    "puntosExtra": 35
+                  },
+                  "date": "2026-05-25",
+                  "home": {
+                    "team": "MALENA",
+                    "puntos": 6,
+                    "puntosExtra": 43
+                  }
+                },
+                {
+                  "away": {
+                    "team": "MALENA",
+                    "puntos": 5,
+                    "puntosExtra": 42
+                  },
+                  "date": "2026-06-01",
+                  "home": {
+                    "team": "OLDIES",
+                    "puntos": 4,
+                    "puntosExtra": 35
+                  }
+                }
+              ],
+              "title": "Semifinal",
+              "extraDeleted": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "fixture",
+      "category": "tercera",
+      "kind": "ida",
+      "url": "https://liga-backend-staging.onrender.com/api/fixture?kind=ida&category=tercera",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "ok": true,
+        "source": "db",
+        "data": {
+          "fechas": [
+            {
+              "date": "2026-03-17",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "OLDIES 3RA",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "CHUAVECHITO",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 25
+                    },
+                    {
+                      "equipo": "DUCK HUNTER",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "ANEXO",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 33
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "BAIRES",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "8910 BALL",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 24
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 24
+                    },
+                    {
+                      "equipo": "IMPERIO SUR",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    }
+                  ]
+                },
+                {
+                  "grupo": "C",
+                  "equipos": [
+                    {
+                      "equipo": "WHY NOT",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 25
+                    },
+                    {
+                      "equipo": "LOS PATOS DEL TREBOL",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 31
+                    },
+                    {
+                      "equipo": "EL TREBOL DE PACHECO",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 36
+                    },
+                    {
+                      "equipo": "TAKO'S",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 25
+                    }
+                  ]
+                },
+                {
+                  "grupo": "D",
+                  "equipos": [
+                    {
+                      "equipo": "EL TREBOL",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 30
+                    },
+                    {
+                      "equipo": "DOGOS BILLARDS",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 28
+                    },
+                    {
+                      "equipo": "PR BAR",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 27
+                    },
+                    {
+                      "equipo": "THE CUES",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 36
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-03-24",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "CHUAVECHITO",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 30
+                    },
+                    {
+                      "equipo": "DUCK HUNTER",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "ANEXO",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 26
+                    },
+                    {
+                      "equipo": "OLDIES 3RA",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 35
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "IMPERIO SUR",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "BAIRES",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "8910 BALL",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 29
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 30
+                    }
+                  ]
+                },
+                {
+                  "grupo": "C",
+                  "equipos": [
+                    {
+                      "equipo": "LOS PATOS DEL TREBOL",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 25
+                    },
+                    {
+                      "equipo": "EL TREBOL DE PACHECO",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 36
+                    },
+                    {
+                      "equipo": "TAKO'S",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "WHY NOT",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 30
+                    }
+                  ]
+                },
+                {
+                  "grupo": "D",
+                  "equipos": [
+                    {
+                      "equipo": "DOGOS BILLARDS",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 36
+                    },
+                    {
+                      "equipo": "PR BAR",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 22
+                    },
+                    {
+                      "equipo": "THE CUES",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 30
+                    },
+                    {
+                      "equipo": "EL TREBOL",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 32
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-03-31",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "OLDIES 3RA",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "DUCK HUNTER",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 28
+                    },
+                    {
+                      "equipo": "ANEXO",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "CHUAVECHITO",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 24
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "8910 BALL",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "IMPERIO SUR",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 23
+                    },
+                    {
+                      "equipo": "BAIRES",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 33
+                    }
+                  ]
+                },
+                {
+                  "grupo": "C",
+                  "equipos": [
+                    {
+                      "equipo": "LOS PATOS DEL TREBOL",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "TAKO'S",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "EL TREBOL DE PACHECO",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 41
+                    },
+                    {
+                      "equipo": "WHY NOT",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 25
+                    }
+                  ]
+                },
+                {
+                  "grupo": "D",
+                  "equipos": [
+                    {
+                      "equipo": "DOGOS BILLARDS",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 37
+                    },
+                    {
+                      "equipo": "THE CUES",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 28
+                    },
+                    {
+                      "equipo": "PR BAR",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 26
+                    },
+                    {
+                      "equipo": "EL TREBOL",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 38
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "fixture",
+      "category": "tercera",
+      "kind": "vuelta",
+      "url": "https://liga-backend-staging.onrender.com/api/fixture?kind=vuelta&category=tercera",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "ok": true,
+        "source": "db",
+        "data": {
+          "fechas": [
+            {
+              "date": "2026-04-14",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "CHUAVECHITO",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 36
+                    },
+                    {
+                      "equipo": "OLDIES 3RA",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "ANEXO",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "DUCK HUNTER",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 28
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "8910 BALL",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 31
+                    },
+                    {
+                      "equipo": "BAIRES",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 29
+                    },
+                    {
+                      "equipo": "IMPERIO SUR",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 32
+                    }
+                  ]
+                },
+                {
+                  "grupo": "C",
+                  "equipos": [
+                    {
+                      "equipo": "LOS PATOS DEL TREBOL",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 29
+                    },
+                    {
+                      "equipo": "WHY NOT",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 35
+                    },
+                    {
+                      "equipo": "TAKO'S",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 28
+                    },
+                    {
+                      "equipo": "EL TREBOL DE PACHECO",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 40
+                    }
+                  ]
+                },
+                {
+                  "grupo": "D",
+                  "equipos": [
+                    {
+                      "equipo": "DOGOS BILLARDS",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 25
+                    },
+                    {
+                      "equipo": "EL TREBOL",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 38
+                    },
+                    {
+                      "equipo": "THE CUES",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "PR BAR",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 25
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-04-21",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "DUCK HUNTER",
+                      "puntos": 4,
+                      "categoria": "local",
+                      "puntosExtra": 29
+                    },
+                    {
+                      "equipo": "CHUAVECHITO",
+                      "puntos": 5,
+                      "categoria": "visitante",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "OLDIES 3RA",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 22
+                    },
+                    {
+                      "equipo": "ANEXO",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 39
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "BAIRES",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "IMPERIO SUR",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL",
+                      "puntos": 2,
+                      "categoria": "local",
+                      "puntosExtra": 26
+                    },
+                    {
+                      "equipo": "8910 BALL",
+                      "puntos": 7,
+                      "categoria": "visitante",
+                      "puntosExtra": 35
+                    }
+                  ]
+                },
+                {
+                  "grupo": "C",
+                  "equipos": [
+                    {
+                      "equipo": "EL TREBOL DE PACHECO",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "LOS PATOS DEL TREBOL",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 30
+                    },
+                    {
+                      "equipo": "WHY NOT",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 34
+                    },
+                    {
+                      "equipo": "TAKO'S",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 26
+                    }
+                  ]
+                },
+                {
+                  "grupo": "D",
+                  "equipos": [
+                    {
+                      "equipo": "PR BAR",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 33
+                    },
+                    {
+                      "equipo": "DOGOS BILLARDS",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 22
+                    },
+                    {
+                      "equipo": "EL TREBOL",
+                      "puntos": 7,
+                      "categoria": "local",
+                      "puntosExtra": 36
+                    },
+                    {
+                      "equipo": "THE CUES",
+                      "puntos": 2,
+                      "categoria": "visitante",
+                      "puntosExtra": 23
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "date": "2026-04-28",
+              "tablas": [
+                {
+                  "grupo": "A",
+                  "equipos": [
+                    {
+                      "equipo": "DUCK HUNTER",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "OLDIES 3RA",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 35
+                    },
+                    {
+                      "equipo": "CHUAVECHITO",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 24
+                    },
+                    {
+                      "equipo": "ANEXO",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 36
+                    }
+                  ]
+                },
+                {
+                  "grupo": "B",
+                  "equipos": [
+                    {
+                      "equipo": "IMPERIO SUR",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 29
+                    },
+                    {
+                      "equipo": "8910 BALL",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 37
+                    },
+                    {
+                      "equipo": "BAIRES",
+                      "puntos": 3,
+                      "categoria": "local",
+                      "puntosExtra": 29
+                    },
+                    {
+                      "equipo": "ACADEMIA DE POOL",
+                      "puntos": 6,
+                      "categoria": "visitante",
+                      "puntosExtra": 31
+                    }
+                  ]
+                },
+                {
+                  "grupo": "C",
+                  "equipos": [
+                    {
+                      "equipo": "TAKO'S",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 31
+                    },
+                    {
+                      "equipo": "LOS PATOS DEL TREBOL",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 26
+                    },
+                    {
+                      "equipo": "WHY NOT",
+                      "puntos": 5,
+                      "categoria": "local",
+                      "puntosExtra": 32
+                    },
+                    {
+                      "equipo": "EL TREBOL DE PACHECO",
+                      "puntos": 4,
+                      "categoria": "visitante",
+                      "puntosExtra": 25
+                    }
+                  ]
+                },
+                {
+                  "grupo": "D",
+                  "equipos": [
+                    {
+                      "equipo": "THE CUES",
+                      "puntos": 8,
+                      "categoria": "local",
+                      "puntosExtra": 41
+                    },
+                    {
+                      "equipo": "DOGOS BILLARDS",
+                      "puntos": 1,
+                      "categoria": "visitante",
+                      "puntosExtra": 17
+                    },
+                    {
+                      "equipo": "EL TREBOL",
+                      "puntos": 6,
+                      "categoria": "local",
+                      "puntosExtra": 31
+                    },
+                    {
+                      "equipo": "PR BAR",
+                      "puntos": 3,
+                      "categoria": "visitante",
+                      "puntosExtra": 21
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "llaves",
+      "category": "tercera",
+      "url": "https://liga-backend-staging.onrender.com/api/llaves?category=tercera",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "ok": true,
+        "category": "tercera",
+        "data": {
+          "rounds": [
+            {
+              "id": "q1",
+              "legs": [
+                {
+                  "away": {
+                    "team": "ANEXO",
+                    "puntos": 4,
+                    "puntosExtra": 35
+                  },
+                  "date": "2026-05-12",
+                  "home": {
+                    "team": "BAIRES",
+                    "puntos": 5,
+                    "puntosExtra": 32
+                  }
+                },
+                {
+                  "away": {
+                    "team": "BAIRES",
+                    "puntos": 3,
+                    "puntosExtra": 25
+                  },
+                  "date": "2026-05-19",
+                  "home": {
+                    "team": "ANEXO",
+                    "puntos": 6,
+                    "puntosExtra": 37
+                  }
+                }
+              ],
+              "title": "Cuartos de final",
+              "extraDeleted": false
+            },
+            {
+              "id": "q2",
+              "legs": [
+                {
+                  "away": {
+                    "team": "EL TREBOL DE PACHECO",
+                    "puntos": 6,
+                    "puntosExtra": 36
+                  },
+                  "date": "2026-05-12",
+                  "home": {
+                    "team": "THE CUES",
+                    "puntos": 3,
+                    "puntosExtra": 28
+                  }
+                },
+                {
+                  "away": {
+                    "team": "THE CUES",
+                    "puntos": 4,
+                    "puntosExtra": 31
+                  },
+                  "date": "2026-05-19",
+                  "home": {
+                    "team": "EL TREBOL DE PACHECO",
+                    "puntos": 5,
+                    "puntosExtra": 37
+                  }
+                }
+              ],
+              "title": "Cuartos de final",
+              "extraDeleted": false
+            },
+            {
+              "id": "s1",
+              "legs": [
+                {
+                  "away": {
+                    "team": "EL TREBOL DE PACHECO",
+                    "puntos": 2,
+                    "puntosExtra": 28
+                  },
+                  "date": "2026-05-26",
+                  "home": {
+                    "team": "ANEXO",
+                    "puntos": 7,
+                    "puntosExtra": 40
+                  }
+                },
+                {
+                  "away": {
+                    "team": "ANEXO",
+                    "puntos": 4,
+                    "puntosExtra": 28
+                  },
+                  "date": "2026-06-02",
+                  "home": {
+                    "team": "EL TREBOL DE PACHECO",
+                    "puntos": 5,
+                    "puntosExtra": 37
+                  }
+                }
+              ],
+              "title": "Semifinal",
+              "extraDeleted": false
+            },
+            {
+              "id": "final",
+              "legs": [
+                {
+                  "away": {
+                    "team": "EL TREBOL",
+                    "puntos": 7,
+                    "puntosExtra": 37
+                  },
+                  "date": "2026-06-14",
+                  "home": {
+                    "team": "ANEXO",
+                    "puntos": 2,
+                    "puntosExtra": 25
+                  }
+                }
+              ],
+              "title": "Final",
+              "extraDeleted": false
+            },
+            {
+              "id": "third",
+              "legs": [
+                {
+                  "away": {
+                    "team": "8910 BALL",
+                    "puntos": 3,
+                    "puntosExtra": 23
+                  },
+                  "date": "2026-06-14",
+                  "home": {
+                    "team": "EL TREBOL DE PACHECO",
+                    "puntos": 6,
+                    "puntosExtra": 36
+                  }
+                }
+              ],
+              "title": "3er y 4to puesto",
+              "extraDeleted": false
+            },
+            {
+              "id": "s2",
+              "legs": [
+                {
+                  "away": {
+                    "team": "EL TREBOL",
+                    "puntos": 8,
+                    "puntosExtra": 42
+                  },
+                  "date": "2026-05-26",
+                  "home": {
+                    "team": "8910 BALL",
+                    "puntos": 1,
+                    "puntosExtra": 22
+                  }
+                },
+                {
+                  "away": {
+                    "team": "8910 BALL",
+                    "puntos": 3,
+                    "puntosExtra": 28
+                  },
+                  "date": "2026-06-02",
+                  "home": {
+                    "team": "EL TREBOL",
+                    "puntos": 6,
+                    "puntosExtra": 34
+                  }
+                }
+              ],
+              "title": "Semifinal",
+              "extraDeleted": false
+            },
+            {
+              "id": "q3",
+              "legs": [
+                {
+                  "away": {
+                    "team": "8910 BALL",
+                    "puntos": 3,
+                    "puntosExtra": 30
+                  },
+                  "date": "2026-05-12",
+                  "home": {
+                    "team": "OLDIES 3RA",
+                    "puntos": 6,
+                    "puntosExtra": 32
+                  }
+                },
+                {
+                  "away": {
+                    "team": "OLDIES 3RA",
+                    "puntos": 3,
+                    "puntosExtra": 28
+                  },
+                  "date": "2026-05-19",
+                  "home": {
+                    "team": "8910 BALL",
+                    "puntos": 6,
+                    "puntosExtra": 37
+                  }
+                }
+              ],
+              "title": "Cuartos de final",
+              "extraDeleted": false
+            },
+            {
+              "id": "q4",
+              "legs": [
+                {
+                  "away": {
+                    "team": "EL TREBOL",
+                    "puntos": 5,
+                    "puntosExtra": 32
+                  },
+                  "date": "2026-05-12",
+                  "home": {
+                    "team": "TAKO'S",
+                    "puntos": 4,
+                    "puntosExtra": 30
+                  }
+                },
+                {
+                  "away": {
+                    "team": "TAKO'S",
+                    "puntos": 1,
+                    "puntosExtra": 18
+                  },
+                  "date": "2026-05-19",
+                  "home": {
+                    "team": "EL TREBOL",
+                    "puntos": 8,
+                    "puntosExtra": 41
+                  }
+                }
+              ],
+              "title": "Cuartos de final",
+              "extraDeleted": false
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

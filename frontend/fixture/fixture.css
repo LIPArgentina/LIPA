@@ -67,6 +67,8 @@ select.score-badge-white {
     .pill-wrap { display:flex; justify-content:flex-start; gap:16px; margin-top:28px; flex-wrap:wrap; }
     .pill-btn { display:inline-block; padding:12px 22px; border:2px solid #b28900; border-radius:14px; background:#0f0f11; color:#ffd966; font-weight:900; letter-spacing:.06em; text-transform:uppercase; font-size:clamp(16px,2vw,20px); text-decoration:none; box-shadow:inset 0 0 0 3px #1b1600; user-select:none; cursor:pointer; opacity:.5; transition:opacity .15s ease-in-out; }
     .pill-btn.active { background:#1b1b1b; opacity:1; }
+    .edition-btn{ display:inline-block; padding:9px 16px; border:1px solid #b28900; border-radius:12px; background:#0f0f11; color:#ffd966; font-weight:900; letter-spacing:.05em; cursor:pointer; opacity:.55; }
+    .edition-btn.active{ opacity:1; background:#ffd966; color:#1b1600; }
 
 
     .grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; margin-top:22px; }

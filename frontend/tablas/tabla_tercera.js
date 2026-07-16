@@ -24,9 +24,10 @@ window.addEventListener('load', () => {
   document.querySelectorAll('.board').forEach(b => ro.observe(b));
 });
 
-const GROUPS = ['A', 'B', 'C', 'D'];
+let GROUPS = ['A', 'B'];
 const cache = { ida: null, vuelta: null };
 let selectedKind = 'ida';
+let selectedEdition = Number(new URLSearchParams(window.location.search).get('edition')) || 6;
 let standingsSteps = [];
 let selectedStandingsIndex = -1;
 let podiumRefreshId = null;
@@ -87,7 +88,7 @@ const API_BASE = (() => {
 })();
 
 async function fetchFixture(kind){
-  const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=tercera`;
+  const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=tercera&edition=${encodeURIComponent(selectedEdition)}`;
 
   try {
     const apiRes = await fetch(apiUrl, { cache: 'no-store' });
@@ -101,8 +102,17 @@ async function fetchFixture(kind){
         return apiData.data;
       }
     }
+    if (apiRes.status === 404 && selectedEdition === 6) {
+      cache[kind] = { fechas: [] };
+      return cache[kind];
+    }
   } catch (err) {
     console.warn('fallback JSON', err);
+  }
+
+  if (selectedEdition !== 5) {
+    cache[kind] = { fechas: [] };
+    return cache[kind];
   }
 
   const file = kind === 'vuelta'
@@ -437,7 +447,36 @@ async function switchFixture(kind){
   setActive(kind);
 }
 
+function applyEditionLayout(){
+  GROUPS = selectedEdition >= 6 ? ['A', 'B'] : ['A', 'B', 'C', 'D'];
+  document.querySelectorAll('[data-group-board], section.card[data-group]').forEach(el => {
+    const group = el.getAttribute('data-group-board') || el.getAttribute('data-group');
+    const wrapper = el.matches('[data-group-board]') ? el.closest('.poster') : el;
+    if (wrapper) wrapper.hidden = !GROUPS.includes(group);
+  });
+  document.querySelectorAll('.edition-option').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.edition) === selectedEdition);
+  });
+  const url = new URL(window.location.href);
+  url.searchParams.set('edition', String(selectedEdition));
+  window.history.replaceState({}, '', url);
+}
+
+async function switchEdition(edition){
+  selectedEdition = Number(edition) || 6;
+  cache.ida = null;
+  cache.vuelta = null;
+  applyEditionLayout();
+  await Promise.all([fetchFixture('ida'), fetchFixture('vuelta')]);
+  buildStandingsSteps();
+  populateStandingsControls();
+  renderStandings();
+  renderSelectedFixture();
+  window.dispatchEvent(new CustomEvent('tournament:edition-changed', { detail: { edition: selectedEdition } }));
+}
+
 async function init(){
+  applyEditionLayout();
   try { selectedKind = localStorage.getItem('fixture_kind') || 'ida'; } catch(_) { selectedKind = 'ida'; }
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -447,6 +486,12 @@ async function init(){
         alert(err.message || String(err));
       });
     });
+  });
+  document.querySelectorAll('.edition-option').forEach(btn => {
+    btn.addEventListener('click', () => switchEdition(btn.dataset.edition).catch(err => {
+      console.error(err);
+      alert('No se pudo cambiar la edición.');
+    }));
   });
 
   const select = document.getElementById('standingsStep');

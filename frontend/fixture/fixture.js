@@ -6,6 +6,8 @@ const CATEGORY_LAYOUTS = {
 
 const KIND_KEY = 'fixture_kind';
 const CAT_KEY  = 'fixture_cat';
+const EDITION_KEY = 'fixture_edition';
+const CURRENT_EDITION = 6;
 const API_BASE = (() => {
   const configured = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   if (configured) return configured + '/api';
@@ -54,7 +56,8 @@ function setStored(key, val){
 function currentCategoryKind(){
   return {
     cat: (getStored(CAT_KEY, 'tercera') || 'tercera').toLowerCase(),
-    kind: getStored(KIND_KEY, 'ida') || 'ida'
+    kind: getStored(KIND_KEY, 'ida') || 'ida',
+    edition: Number(getStored(EDITION_KEY, String(CURRENT_EDITION))) || CURRENT_EDITION
   };
 }
 
@@ -89,17 +92,29 @@ async function loadFixtureJSON(src, meta = null){
     throw new Error('Falta metadata para cargar fixture desde la API');
   }
 
-  const apiResp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(meta.kind)}&category=${encodeURIComponent(meta.category)}`, {
+  const apiResp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(meta.kind)}&category=${encodeURIComponent(meta.category)}&edition=${encodeURIComponent(meta.edition)}`, {
     cache: 'no-store'
   });
 
   const apiData = await apiResp.json().catch(() => null);
+  if (apiResp.status === 404 && Number(meta.edition) === CURRENT_EDITION) {
+    window.LPI_FIXTURE = { fechas: [] };
+    return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}&edition=${meta.edition}`;
+  }
   if (!apiResp.ok || !apiData?.ok || !apiData?.data || typeof apiData.data !== 'object') {
     throw new Error(apiData?.error || 'No se pudo cargar el fixture desde PostgreSQL');
   }
 
   window.LPI_FIXTURE = apiData.data;
-  return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}`;
+  return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}&edition=${meta.edition}`;
+}
+
+function markActiveEdition(edition){
+  document.querySelectorAll('[data-edition]').forEach(el => {
+    const active = Number(el.getAttribute('data-edition')) === Number(edition);
+    el.classList.toggle('active', active);
+    el.setAttribute('aria-pressed', String(active));
+  });
 }
 
 function markActiveKind(kind){
@@ -120,6 +135,7 @@ function markActiveCat(cat){
 window.FixtureSwitcher = {
   async switch(kind, opts = {}){
     const category = (opts.category || getStored(CAT_KEY, 'tercera')).toLowerCase();
+    const edition = Number(opts.edition || getStored(EDITION_KEY, String(CURRENT_EDITION))) || CURRENT_EDITION;
     const base = opts.base || './';
     const persist = opts.persist !== false;
 
@@ -134,12 +150,13 @@ window.FixtureSwitcher = {
     }
 
     const src = (base.endsWith('/') ? base : base + '/') + file;
-    await loadFixtureJSON(src, { kind, category });
+    await loadFixtureJSON(src, { kind, category, edition });
 
     markActiveKind(kind);
     markActiveCat(category);
+    markActiveEdition(edition);
 
-    const detail = { src, kind, category, fixture: window.LPI_FIXTURE || null };
+    const detail = { src, kind, category, edition, fixture: window.LPI_FIXTURE || null };
     document.dispatchEvent(new CustomEvent('fixture:data-ready', { detail }));
 
     if (typeof window.applyFixture === 'function'){
@@ -149,6 +166,7 @@ window.FixtureSwitcher = {
     if (persist){
       setStored(KIND_KEY, kind);
       setStored(CAT_KEY, category);
+      setStored(EDITION_KEY, String(edition));
     }
     return detail;
   },
@@ -157,7 +175,19 @@ window.FixtureSwitcher = {
     const category = String(cat || 'tercera').toLowerCase();
     setStored(CAT_KEY, category);
     markActiveCat(category);
-    return this.switch('ida', { base: opts.base, category, persist: true });
+    return this.switch('ida', { base: opts.base, category, edition: opts.edition, persist: true });
+  },
+
+  async setEdition(value, opts = {}){
+    const edition = Number(value) || CURRENT_EDITION;
+    setStored(EDITION_KEY, String(edition));
+    markActiveEdition(edition);
+    return this.switch(getStored(KIND_KEY, 'ida'), {
+      base: opts.base,
+      category: getStored(CAT_KEY, 'tercera'),
+      edition,
+      persist: true
+    });
   },
 
   bind(opts = {}){
@@ -166,8 +196,9 @@ window.FixtureSwitcher = {
         if (el.tagName === 'A') ev.preventDefault();
         const kind = el.getAttribute('data-fixture') || 'ida';
         const category = getStored(CAT_KEY, 'tercera');
+        const edition = Number(getStored(EDITION_KEY, String(CURRENT_EDITION))) || CURRENT_EDITION;
         try {
-          await this.switch(kind, { category, base: opts.base });
+          await this.switch(kind, { category, edition, base: opts.base });
         } catch(err){
           console.error(err);
           alert(err.message || String(err));
@@ -201,21 +232,36 @@ window.FixtureSwitcher = {
         }
       });
     });
+
+    document.querySelectorAll(opts.selectorEdition || '[data-edition]').forEach(el => {
+      el.addEventListener('click', async () => {
+        try {
+          await this.setEdition(el.getAttribute('data-edition'), { base: opts.base });
+        } catch(err){
+          console.error(err);
+          alert(err.message || String(err));
+        }
+      });
+    });
   },
 
   restore(opts = {}){
     const category = getStored(CAT_KEY, 'tercera');
+    const edition = Number(getStored(EDITION_KEY, String(CURRENT_EDITION))) || CURRENT_EDITION;
     let kind = getStored(KIND_KEY, null);
     if (!kind) kind = opts.fallback || 'ida';
     markActiveCat(category);
     markActiveKind(kind);
-    return this.switch(kind, { base: opts.base, category });
+    markActiveEdition(edition);
+    return this.switch(kind, { base: opts.base, category, edition });
   }
 };
 
-function getCategoryConfig(cat, fixture){
+function getCategoryConfig(cat, fixture, edition){
   const key = String(cat || 'tercera').toLowerCase();
-  const base = CATEGORY_LAYOUTS[key] || CATEGORY_LAYOUTS.tercera;
+  const base = Number(edition) >= 6 && key === 'tercera'
+    ? CATEGORY_LAYOUTS.segunda
+    : (CATEGORY_LAYOUTS[key] || CATEGORY_LAYOUTS.tercera);
   const fixtureGroups = Array.from(new Set((fixture?.fechas || [])
     .flatMap(fecha => Array.isArray(fecha.tablas) ? fecha.tablas : [])
     .map(tabla => String(tabla?.grupo || '').toUpperCase())
@@ -459,9 +505,9 @@ window.applyFixture = async function applyFixture(){
     return;
   }
 
-  const cat = currentCategoryKind().cat;
+  const { cat, edition } = currentCategoryKind();
   const equiposCat = await loadUsersJS(cat);
-  const config = getCategoryConfig(cat, fx);
+  const config = getCategoryConfig(cat, fx, edition);
 
   buildFixtureLayout(config);
   restoreDatesFromFixture(fx, config.groups);
@@ -551,7 +597,7 @@ function buildFixtureFromUI(){
 }
 
 async function saveFixtureJSONOnServer(){
-  const { cat, kind } = currentCategoryKind();
+  const { cat, kind, edition } = currentCategoryKind();
   const data = buildFixtureFromUI();
 
   assignCategoriasAlternadas(data);
@@ -563,6 +609,7 @@ async function saveFixtureJSONOnServer(){
     body: JSON.stringify({
       kind,
       category: cat,
+      edition,
       data
     })
   });

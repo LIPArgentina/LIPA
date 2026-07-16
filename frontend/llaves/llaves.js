@@ -46,6 +46,7 @@ const CATEGORY_CONFIG = {
 };
 
 let currentCategory = 'tercera';
+let currentEdition = Number(new URLSearchParams(window.location.search).get('edition')) || 6;
 let TEAM_OPTIONS = ['WO'];
 let CURRENT_STANDINGS = null;
 
@@ -100,6 +101,13 @@ function unique(list){
 
 
 function getCategoryConfig(category = currentCategory){
+  if (currentEdition >= 6 && category === 'tercera') {
+    return {
+      ...CATEGORY_CONFIG.segunda,
+      subtitle: 'TERCERA',
+      teamSource: 'tercera'
+    };
+  }
   return CATEGORY_CONFIG[category] || CATEGORY_CONFIG.tercera;
 }
 
@@ -160,7 +168,7 @@ function getDefaultData(category = currentCategory){
 
 async function loadFromServer(category = currentCategory){
   try {
-    const resp = await fetch(`${API_BASE}/llaves?category=${encodeURIComponent(category)}`, {
+    const resp = await fetch(`${API_BASE}/llaves?category=${encodeURIComponent(category)}&edition=${encodeURIComponent(currentEdition)}`, {
       cache: 'no-store',
       credentials: 'include'
     });
@@ -173,7 +181,9 @@ async function loadFromServer(category = currentCategory){
 }
 
 function getGroupsForCategory(category){
-  return category === 'segunda' ? ['A','B'] : ['A','B','C','D'];
+  return category === 'segunda' || (category === 'tercera' && currentEdition >= 6)
+    ? ['A','B']
+    : ['A','B','C','D'];
 }
 
 function normalizeForCompare(name){
@@ -189,10 +199,13 @@ function parseScore(value){
 }
 
 async function fetchFixtureData(kind, category){
-  const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}`, {
+  const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}&edition=${encodeURIComponent(currentEdition)}`, {
     cache: 'no-store'
   });
   const data = await resp.json().catch(() => null);
+  if (resp.status === 404 && currentEdition >= 6) {
+    return { fechas: [] };
+  }
   if (!resp.ok || !data?.ok || !data?.data) {
     throw new Error(data?.error || `No se pudo cargar fixture ${kind} de ${category}`);
   }
@@ -387,7 +400,7 @@ async function applyAutomaticEntrants(data, category){
   const standings = computeStandings(category, ida, vuelta);
   const team = (group, pos) => standings[group]?.find(row => row.pos === pos)?.equipo || 'WO';
 
-  if (category === 'tercera') {
+  if (category === 'tercera' && currentEdition < 6) {
     setTwoLegTie(data, 'q1', team('A', 1), team('B', 2));
     setTwoLegTie(data, 'q2', team('C', 1), team('D', 2));
     setTwoLegTie(data, 'q3', team('B', 1), team('A', 2));
@@ -401,7 +414,7 @@ async function applyAutomaticEntrants(data, category){
 }
 
 function getAutoEntrantRoundIds(category){
-  return category === 'tercera'
+  return category === 'tercera' && currentEdition < 6
     ? new Set(['q1','q2','q3','q4'])
     : new Set(['s1','s2']);
 }
@@ -632,6 +645,7 @@ async function saveOnServer(){
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       category: currentCategory,
+      edition: currentEdition,
       data
     })
   });
@@ -867,7 +881,7 @@ function compareSportingAdvantage(teamA, teamB, data, standings){
 function applyAutomaticAdvance(data, standings = CURRENT_STANDINGS){
   llEnsureExtraIfNeeded(data);
 
-  if (currentCategory === 'tercera') {
+  if (currentCategory === 'tercera' && currentEdition < 6) {
     const q1 = llSeriesWinner(llGetRound(data, 'q1'));
     const q2 = llSeriesWinner(llGetRound(data, 'q2'));
     const q3 = llSeriesWinner(llGetRound(data, 'q3'));
@@ -961,6 +975,24 @@ async function bootstrap(){
       } catch (err) {
         console.error(err);
         alert(err?.message || 'No se pudieron cargar las llaves');
+      }
+    });
+  });
+
+  document.querySelectorAll('.edition-btn[data-edition]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      currentEdition = Number(btn.dataset.edition) || 6;
+      document.querySelectorAll('.edition-btn[data-edition]').forEach(item => {
+        item.classList.toggle('active', Number(item.dataset.edition) === currentEdition);
+      });
+      const url = new URL(window.location.href);
+      url.searchParams.set('edition', String(currentEdition));
+      window.history.replaceState({}, '', url);
+      try {
+        await renderCategory(currentCategory);
+      } catch (err) {
+        console.error(err);
+        alert(err?.message || 'No se pudo cambiar la edición');
       }
     });
   });

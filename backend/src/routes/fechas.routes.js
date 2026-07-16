@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { requireTeam, requireAdmin } = require('../middleware/auth');
 const pool = require('../../db');
+const { normalizeTournamentEdition } = require('../config/tournamentEdition');
 
 module.exports = function createFechasRouter(deps) {
   const { FRONTEND_DIR, FRONTEND_FECHA } = deps;
@@ -227,6 +228,7 @@ module.exports = function createFechasRouter(deps) {
     try {
       const kind = String(req.query.kind || '').trim().toLowerCase();
       const category = String(req.query.category || '').trim().toLowerCase();
+      const edition = normalizeTournamentEdition(req.query.edition);
 
       if (!isValidFixtureKind(kind)) {
         return res.status(400).json({ ok: false, error: 'kind inválido' });
@@ -240,10 +242,10 @@ module.exports = function createFechasRouter(deps) {
         `
           SELECT data
           FROM fixtures
-          WHERE kind = $1 AND category = $2
+          WHERE kind = $1 AND category = $2 AND edicion = $3
           LIMIT 1
         `,
-        [kind, category]
+        [kind, category, edition]
       );
 
       if (!dbResult.rowCount) {
@@ -252,7 +254,7 @@ module.exports = function createFechasRouter(deps) {
 
       const normalizedData = normalizeFixtureData(dbResult.rows[0].data);
       res.set('Cache-Control', 'no-store');
-      return res.json({ ok: true, source: 'db', data: normalizedData });
+      return res.json({ ok: true, source: 'db', edition, data: normalizedData });
     } catch (err) {
       console.error('Error al leer fixture', err);
       return res.status(500).json({ ok: false, error: 'Error interno' });
@@ -263,6 +265,7 @@ module.exports = function createFechasRouter(deps) {
     try {
       const kind = String(req.body?.kind || '').trim().toLowerCase();
       const category = String(req.body?.category || '').trim().toLowerCase();
+      const edition = normalizeTournamentEdition(req.body?.edition ?? req.query.edition);
       const data = normalizeFixtureData(req.body?.data);
 
       if (!isValidFixtureKind(kind)) {
@@ -279,20 +282,21 @@ module.exports = function createFechasRouter(deps) {
 
       const result = await pool.query(
         `
-          INSERT INTO fixtures (kind, category, data, created_at, updated_at)
-          VALUES ($1, $2, $3::jsonb, NOW(), NOW())
-          ON CONFLICT (kind, category)
+          INSERT INTO fixtures (kind, category, edicion, data, created_at, updated_at)
+          VALUES ($1, $2, $3, $4::jsonb, NOW(), NOW())
+          ON CONFLICT (edicion, category, kind)
           DO UPDATE SET
             data = EXCLUDED.data,
             updated_at = NOW()
-          RETURNING id, kind, category, updated_at
+          RETURNING id, kind, category, edicion, updated_at
         `,
-        [kind, category, JSON.stringify(data)]
+        [kind, category, edition, JSON.stringify(data)]
       );
 
       return res.json({
         ok: true,
         message: 'Fixture guardado en PostgreSQL',
+        edition,
         fixture: result.rows[0]
       });
     } catch (err) {

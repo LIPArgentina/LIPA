@@ -246,8 +246,8 @@ async function fetchAutomationLlavesInfo(category) {
   if (!category) return [];
   try {
     const { rows } = await pool.query(
-      `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
-      [category]
+      `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
+      [category, CURRENT_EDITION]
     );
     return collectLlavesAutomationDates(rows?.[0]?.data || null, []);
   } catch (err) {
@@ -275,13 +275,13 @@ async function fetchAutomationFixtureInfo(team) {
     `
       SELECT kind, data, updated_at, id
       FROM fixtures
-      WHERE category = $1
+      WHERE category = $1 AND edicion = $2
       ORDER BY
         CASE kind WHEN 'ida' THEN 0 WHEN 'vuelta' THEN 1 ELSE 9 END,
         updated_at DESC,
         id DESC
     `,
-    [category]
+    [category, CURRENT_EDITION]
   );
 
   const fixtures = [];
@@ -514,8 +514,8 @@ async function fetchCrucesFromDB(team) {
   if (!category) throw new Error('Categoría inválida');
 
   const { rows } = await pool.query(
-    "SELECT data FROM fixtures WHERE kind='ida' AND category=$1 ORDER BY id DESC LIMIT 1",
-    [category]
+    "SELECT data FROM fixtures WHERE kind='ida' AND category=$1 AND edicion=$2 ORDER BY id DESC LIMIT 1",
+    [category, CURRENT_EDITION]
   );
 
   const fechas = rows[0]?.data?.fechas || [];
@@ -1013,7 +1013,11 @@ async function findLlavesSeriesForMatch({ fechaISO, localSlug, visitanteSlug }) 
 
   const localCandidates = buildLlavesTeamCandidates(localInfo, localSlug);
   const visitanteCandidates = buildLlavesTeamCandidates(visitanteInfo, visitanteSlug);
-  const { rows } = await pool.query(`SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`, [category]);
+  const edition = inferEditionFromDate(dateKey);
+  const { rows } = await pool.query(
+    `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
+    [category, edition]
+  );
   const data = rows[0]?.data && typeof rows[0].data === 'object' ? rows[0].data : null;
   const rounds = Array.isArray(data?.rounds) ? data.rounds : [];
 
@@ -1061,6 +1065,7 @@ function legHasAnyScore(leg) {
 
 async function getTiebreakRows(fechaISO, localSlug, visitanteSlug) {
   const fechaKey = buildTiebreakFechaKey(fechaISO, localSlug, visitanteSlug);
+  const edition = inferEditionFromDate(dateKey);
   const { rows } = await pool.query(
     `SELECT team, status_json, validated, locked_until, updated_at
      FROM cruces_validations
@@ -1264,6 +1269,7 @@ async function syncValidatedMatchIntoFixture({
   snapshot
 }) {
   const dateKey = normalizeDateOnly(fechaISO);
+  const edition = inferEditionFromDate(dateKey);
   if (!dateKey || !snapshot) {
     return { updated: false, reason: 'missing_data' };
   }
@@ -1285,13 +1291,13 @@ async function syncValidatedMatchIntoFixture({
     `
     SELECT id, kind, category, data
     FROM fixtures
-    WHERE category = $1
+    WHERE category = $1 AND edicion = $2
     ORDER BY
       CASE kind WHEN 'ida' THEN 0 WHEN 'vuelta' THEN 1 ELSE 9 END,
       updated_at DESC,
       id DESC
     `,
-    [category]
+    [category, edition]
   );
 
   for (const row of rows) {
@@ -1512,11 +1518,11 @@ function llavesAutoParseScore(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function llavesAutoFetchFixtureData(kind, category) {
+async function llavesAutoFetchFixtureData(kind, category, edition = CURRENT_EDITION) {
   try {
     const result = await pool.query(
-      `SELECT data FROM fixtures WHERE kind = $1 AND category = $2 ORDER BY id DESC LIMIT 1`,
-      [kind, category]
+      `SELECT data FROM fixtures WHERE kind = $1 AND category = $2 AND edicion = $3 ORDER BY id DESC LIMIT 1`,
+      [kind, category, edition]
     );
     return result.rows[0]?.data || null;
   } catch (err) {
@@ -1595,12 +1601,14 @@ function llavesAutoComputeHeadToHead(group, tiedKeys, entries) {
   return table;
 }
 
-function llavesAutoGetGroupsForCategory(category) {
-  return category === 'segunda' ? ['A', 'B'] : ['A', 'B', 'C', 'D'];
+function llavesAutoGetGroupsForCategory(category, edition) {
+  return category === 'segunda' || (category === 'tercera' && Number(edition) >= 6)
+    ? ['A', 'B']
+    : ['A', 'B', 'C', 'D'];
 }
 
-function llavesAutoComputeStandings(category, ida, vuelta) {
-  const groups = llavesAutoGetGroupsForCategory(category);
+function llavesAutoComputeStandings(category, ida, vuelta, edition) {
+  const groups = llavesAutoGetGroupsForCategory(category, edition);
   const entries = llavesAutoCollectFixtureEntries(ida, vuelta);
   const stats = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
 
@@ -1763,10 +1771,10 @@ function llavesAutoCompareSportingAdvantage(teamA, teamB, data, standings) {
   return llavesAutoStableTieSeed(a) <= llavesAutoStableTieSeed(b) ? [a, b] : [b, a];
 }
 
-function llavesAutoApplyAutomaticAdvance(data, category, standings) {
+function llavesAutoApplyAutomaticAdvance(data, category, standings, edition) {
   if (!data || !Array.isArray(data.rounds)) return data;
 
-  if (category === 'tercera') {
+  if (category === 'tercera' && Number(edition) < 6) {
     const q1 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q1'));
     const q2 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q2'));
     const q3 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 'q3'));
@@ -1788,16 +1796,16 @@ function llavesAutoApplyAutomaticAdvance(data, category, standings) {
   return data;
 }
 
-async function buildLlavesAutoData(data, category) {
+async function buildLlavesAutoData(data, category, edition = CURRENT_EDITION) {
   const autoData = JSON.parse(JSON.stringify(data || {}));
   if (!autoData || !Array.isArray(autoData.rounds)) return null;
 
   const [ida, vuelta] = await Promise.all([
-    llavesAutoFetchFixtureData('ida', category),
-    llavesAutoFetchFixtureData('vuelta', category)
+    llavesAutoFetchFixtureData('ida', category, edition),
+    llavesAutoFetchFixtureData('vuelta', category, edition)
   ]);
-  const standings = llavesAutoComputeStandings(category, ida, vuelta);
-  return llavesAutoApplyAutomaticAdvance(autoData, category, standings);
+  const standings = llavesAutoComputeStandings(category, ida, vuelta, edition);
+  return llavesAutoApplyAutomaticAdvance(autoData, category, standings, edition);
 }
 
 function findLlavesLegInData(data, { dateKey, localCandidates, visitanteCandidates }) {
@@ -1839,6 +1847,7 @@ async function syncValidatedMatchIntoLlaves({
   snapshot
 }) {
   const dateKey = normalizeDateOnly(fechaISO);
+  const edition = inferEditionFromDate(dateKey);
   if (!dateKey || !snapshot) {
     return { updated: false, reason: 'missing_data' };
   }
@@ -1857,8 +1866,8 @@ async function syncValidatedMatchIntoLlaves({
   const visitanteExtra = Number(snapshot?.visitante?.triangulosTotales ?? snapshot?.visitante?.triangulos ?? 0);
 
   const { rows } = await pool.query(
-    `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
-    [category]
+    `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
+    [category, edition]
   );
 
   const data = rows[0]?.data && typeof rows[0].data === 'object'
@@ -1875,11 +1884,11 @@ async function syncValidatedMatchIntoLlaves({
 
   const persistLlavesSync = async ({ round, legIndex, mode }) => {
     await pool.query(
-      `INSERT INTO llaves_data (category, data, created_at, updated_at)
-       VALUES ($1, $2::jsonb, NOW(), NOW())
-       ON CONFLICT (category)
+      `INSERT INTO llaves_data (category, edicion, data, created_at, updated_at)
+       VALUES ($1, $2, $3::jsonb, NOW(), NOW())
+       ON CONFLICT (edicion, category)
        DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-      [category, JSON.stringify(data)]
+      [category, edition, JSON.stringify(data)]
     );
 
     return {
@@ -1939,7 +1948,7 @@ async function syncValidatedMatchIntoLlaves({
 
 
 
-  const autoData = await buildLlavesAutoData(data, category);
+  const autoData = await buildLlavesAutoData(data, category, edition);
   const autoFound = findLlavesLegInData(autoData, { dateKey, localCandidates, visitanteCandidates });
 
   if (autoFound.found && autoFound.roundId) {
@@ -2081,11 +2090,11 @@ async function syncTiebreakIntoLlaves({ fechaISO, localSlug, visitanteSlug, snap
   }
 
   await pool.query(
-    `INSERT INTO llaves_data (category, data, created_at, updated_at)
-     VALUES ($1, $2::jsonb, NOW(), NOW())
-     ON CONFLICT (category)
+    `INSERT INTO llaves_data (category, edicion, data, created_at, updated_at)
+     VALUES ($1, $2, $3::jsonb, NOW(), NOW())
+     ON CONFLICT (edicion, category)
      DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-    [found.category, JSON.stringify(found.data)]
+    [found.category, inferEditionFromDate(dateKey), JSON.stringify(found.data)]
   );
 
   return { updated: true, category: found.category, roundId: round?.id || null, legIndex: 2, date: dateKey };

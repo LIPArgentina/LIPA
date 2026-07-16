@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../../db');
 const { requireAdmin } = require('../middleware/auth');
+const { normalizeTournamentEdition } = require('../config/tournamentEdition');
 
 module.exports = function createLlavesRouter() {
   const router = express.Router();
@@ -179,11 +180,11 @@ module.exports = function createLlavesRouter() {
     return Number.isFinite(n) ? n : 0;
   }
 
-  async function fetchFixtureData(kind, category) {
+  async function fetchFixtureData(kind, category, edition) {
     try {
       const result = await pool.query(
-        `SELECT data FROM fixtures WHERE kind = $1 AND category = $2 ORDER BY id DESC LIMIT 1`,
-        [kind, category]
+        `SELECT data FROM fixtures WHERE kind = $1 AND category = $2 AND edicion = $3 ORDER BY id DESC LIMIT 1`,
+        [kind, category, edition]
       );
       return result.rows[0]?.data || null;
     } catch (err) {
@@ -262,12 +263,14 @@ module.exports = function createLlavesRouter() {
     return table;
   }
 
-  function getGroupsForCategory(category) {
-    return category === 'segunda' ? ['A', 'B'] : ['A', 'B', 'C', 'D'];
+  function getGroupsForCategory(category, edition) {
+    return category === 'segunda' || (category === 'tercera' && Number(edition) >= 6)
+      ? ['A', 'B']
+      : ['A', 'B', 'C', 'D'];
   }
 
-  function computeStandings(category, ida, vuelta) {
-    const groups = getGroupsForCategory(category);
+  function computeStandings(category, ida, vuelta, edition) {
+    const groups = getGroupsForCategory(category, edition);
     const entries = collectFixtureEntries(ida, vuelta);
     const stats = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
 
@@ -430,10 +433,10 @@ module.exports = function createLlavesRouter() {
     return stableTieSeed(a) <= stableTieSeed(b) ? [a, b] : [b, a];
   }
 
-  function applyAutomaticAdvance(data, category, standings) {
+  function applyAutomaticAdvance(data, category, standings, edition) {
     if (!data || !Array.isArray(data.rounds)) return data;
 
-    if (category === 'tercera') {
+    if (category === 'tercera' && Number(edition) < 6) {
       const q1 = seriesWinner(getRound(data, 'q1'));
       const q2 = seriesWinner(getRound(data, 'q2'));
       const q3 = seriesWinner(getRound(data, 'q3'));
@@ -458,10 +461,12 @@ module.exports = function createLlavesRouter() {
   async function ensureTables() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS llaves_data (
-        category TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        edicion INTEGER NOT NULL DEFAULT 6,
         data JSONB NOT NULL DEFAULT '{}'::jsonb,
         created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (edicion, category)
       );
     `);
   }
@@ -469,6 +474,7 @@ module.exports = function createLlavesRouter() {
   async function getLlaves(req, res) {
     try {
       const category = cleanCategory(req.query.category);
+      const edition = normalizeTournamentEdition(req.query.edition);
 
       if (!VALID_CATEGORIES.has(category)) {
         return res.status(400).json({ ok: false, error: 'category inválida' });
@@ -477,14 +483,15 @@ module.exports = function createLlavesRouter() {
       await ensureTables();
 
       const result = await pool.query(
-        `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
-        [category]
+        `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
+        [category, edition]
       );
 
       res.set('Cache-Control', 'no-store');
       res.json({
         ok: true,
         category,
+        edition,
         data: result.rows[0]?.data || null
       });
     } catch (err) {
@@ -496,6 +503,7 @@ module.exports = function createLlavesRouter() {
   async function saveLlaves(req, res) {
     try {
       const category = cleanCategory(req.body?.category || req.query.category);
+      const edition = normalizeTournamentEdition(req.body?.edition ?? req.query.edition);
       const data = req.body?.data;
 
       if (!VALID_CATEGORIES.has(category)) {
@@ -509,14 +517,14 @@ module.exports = function createLlavesRouter() {
       await ensureTables();
 
       await pool.query(
-        `INSERT INTO llaves_data (category, data, created_at, updated_at)
-         VALUES ($1, $2::jsonb, NOW(), NOW())
-         ON CONFLICT (category)
+        `INSERT INTO llaves_data (category, edicion, data, created_at, updated_at)
+         VALUES ($1, $2, $3::jsonb, NOW(), NOW())
+         ON CONFLICT (edicion, category)
          DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-        [category, JSON.stringify(data)]
+        [category, edition, JSON.stringify(data)]
       );
 
-      res.json({ ok: true, category });
+      res.json({ ok: true, category, edition });
     } catch (err) {
       console.error('POST /api/llaves', err);
       res.status(500).json({ ok: false, error: 'No se pudieron guardar las llaves' });
@@ -526,6 +534,7 @@ module.exports = function createLlavesRouter() {
   async function getProximoCruce(req, res) {
     try {
       const category = cleanCategory(req.query.category);
+      const edition = normalizeTournamentEdition(req.query.edition);
       const team = cleanTeamName(req.query.team);
       const teamKey = normalizeTeam(team);
 
@@ -540,8 +549,8 @@ module.exports = function createLlavesRouter() {
       await ensureTables();
 
       const result = await pool.query(
-        `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
-        [category]
+        `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
+        [category, edition]
       );
 
       const rawData = result.rows[0]?.data || null;
@@ -552,11 +561,11 @@ module.exports = function createLlavesRouter() {
 
       if (data && Array.isArray(data.rounds)) {
         const [ida, vuelta] = await Promise.all([
-          fetchFixtureData('ida', category),
-          fetchFixtureData('vuelta', category)
+          fetchFixtureData('ida', category, edition),
+          fetchFixtureData('vuelta', category, edition)
         ]);
-        const standings = computeStandings(category, ida, vuelta);
-        applyAutomaticAdvance(data, category, standings);
+        const standings = computeStandings(category, ida, vuelta, edition);
+        applyAutomaticAdvance(data, category, standings, edition);
       }
 
       const rounds = Array.isArray(data?.rounds) ? data.rounds : [];
@@ -598,6 +607,7 @@ module.exports = function createLlavesRouter() {
       res.json({
         ok: true,
         category,
+        edition,
         team,
         match
       });
@@ -611,6 +621,7 @@ module.exports = function createLlavesRouter() {
   async function deleteDesempate(req, res) {
     try {
       const category = cleanCategory(req.body?.category || req.query.category);
+      const edition = normalizeTournamentEdition(req.body?.edition ?? req.query.edition);
       const roundId = String(req.body?.roundId || req.query.roundId || '').trim();
 
       if (!VALID_CATEGORIES.has(category)) {
@@ -624,8 +635,8 @@ module.exports = function createLlavesRouter() {
       await ensureTables();
 
       const result = await pool.query(
-        `SELECT data FROM llaves_data WHERE category = $1 LIMIT 1`,
-        [category]
+        `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
+        [category, edition]
       );
 
       const data = result.rows[0]?.data || { rounds: [] };
@@ -645,14 +656,14 @@ module.exports = function createLlavesRouter() {
       }
 
       await pool.query(
-        `INSERT INTO llaves_data (category, data, created_at, updated_at)
-         VALUES ($1, $2::jsonb, NOW(), NOW())
-         ON CONFLICT (category)
+        `INSERT INTO llaves_data (category, edicion, data, created_at, updated_at)
+         VALUES ($1, $2, $3::jsonb, NOW(), NOW())
+         ON CONFLICT (edicion, category)
          DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-        [category, JSON.stringify(data)]
+        [category, edition, JSON.stringify(data)]
       );
 
-      res.json({ ok: true, category, roundId });
+      res.json({ ok: true, category, edition, roundId });
     } catch (err) {
       console.error('DELETE /api/llaves/desempate', err);
       res.status(500).json({ ok: false, error: 'No se pudo borrar el desempate' });
