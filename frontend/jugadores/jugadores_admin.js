@@ -3,6 +3,8 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 const $ = (selector) => document.querySelector(selector);
 let croppedPlayerPhoto = null;
 let editingOriginalName = '';
+let currentResultsMode = 'players';
+const UNASSIGNED_TEAM_VALUE = '__sin_equipo__';
 
 function readSession(){
   for (const key of ['lpi.session', 'lpi_team_session']) {
@@ -94,7 +96,10 @@ async function fillTeamDropdown(selector, category, selected = ''){
   const select = $(selector);
   if (!select) return;
   const current = selected || select.value;
-  select.innerHTML = '<option value="">Seleccionar equipo</option>';
+  const isSearchTeam = selector === '#teamSearch';
+  select.innerHTML = isSearchTeam
+    ? '<option value="__sin_equipo__">Buscar jugadores sin equipo</option>'
+    : '<option value="">Seleccionar equipo</option>';
 
   try {
     const teams = await loadTeams(category);
@@ -104,7 +109,7 @@ async function fillTeamDropdown(selector, category, selected = ''){
       option.textContent = team.name;
       select.appendChild(option);
     });
-    selectExistingOption(select, current);
+    selectExistingOption(select, current || (isSearchTeam ? UNASSIGNED_TEAM_VALUE : ''));
   } catch (err) {
     select.innerHTML = '<option value="">No se pudieron cargar equipos</option>';
     toast(err.message || 'No se pudieron cargar equipos');
@@ -151,9 +156,10 @@ async function fillForm(player){
   setStatus(`Editando ${player?.nombre || player?.name || 'jugador'}`);
 }
 
-function renderPlayers(players = []){
+function renderPlayers(players = [], { mode = currentResultsMode } = {}){
   const results = $('#results');
   if (!results) return;
+  currentResultsMode = mode;
 
   if (!players.length) {
     results.innerHTML = '<p class="hint">No hay jugadores para mostrar.</p>';
@@ -171,8 +177,11 @@ function renderPlayers(players = []){
       </div>
       <div class="player-actions">
         <button class="btn btn-edit-player" type="button">Editar</button>
+        <button class="btn btn-rename-player" type="button">Editar nombre</button>
         <button class="btn btn-history-player" type="button">Historial</button>
-        ${player.associationId ? '<button class="btn btn-deactivate-player" type="button">Quitar</button>' : ''}
+        ${mode === 'unassigned'
+          ? '<button class="btn btn-delete-player" type="button">Eliminar</button>'
+          : (player.associationId ? '<button class="btn btn-deactivate-player" type="button">Quitar</button>' : '')}
       </div>
     </article>
   `).join('');
@@ -180,8 +189,10 @@ function renderPlayers(players = []){
   results.querySelectorAll('.player-card').forEach(card => {
     const player = players[Number(card.dataset.index)];
     card.querySelector('.btn-edit-player')?.addEventListener('click', () => fillForm(player));
+    card.querySelector('.btn-rename-player')?.addEventListener('click', () => renamePlayer(player));
     card.querySelector('.btn-history-player')?.addEventListener('click', () => showHistory(player));
     card.querySelector('.btn-deactivate-player')?.addEventListener('click', () => deactivateAssociation(player));
+    card.querySelector('.btn-delete-player')?.addEventListener('click', () => deletePlayer(player));
   });
 }
 
@@ -221,9 +232,9 @@ async function searchPlayers(ev){
   }
   try {
     const data = await fetchJson(`/api/players-admin/search?q=${encodeURIComponent(q)}`);
-    renderPlayers(data.players || []);
+    renderPlayers(data.players || [], { mode: 'players' });
   } catch (err) {
-    renderPlayers([]);
+    renderPlayers([], { mode: 'players' });
     toast(err.message || 'No se pudo buscar');
   }
 }
@@ -232,15 +243,25 @@ async function searchByTeam(ev){
   ev?.preventDefault();
   const category = $('#teamCategory').value;
   const team = $('#teamSearch').value.trim();
+  if (team === UNASSIGNED_TEAM_VALUE) {
+    try {
+      const data = await fetchJson('/api/players-admin/unassigned');
+      renderPlayers(data.players || [], { mode: 'unassigned' });
+    } catch (err) {
+      renderPlayers([], { mode: 'unassigned' });
+      toast(err.message || 'No se pudo buscar jugadores sin equipo');
+    }
+    return;
+  }
   if (!team) {
     toast('Elegí un equipo');
     return;
   }
   try {
     const data = await fetchJson(`/api/players-admin/by-team?category=${encodeURIComponent(category)}&team=${encodeURIComponent(team)}`);
-    renderPlayers(data.players || []);
+    renderPlayers(data.players || [], { mode: 'team' });
   } catch (err) {
-    renderPlayers([]);
+    renderPlayers([], { mode: 'team' });
     toast(err.message || 'No se pudo buscar el equipo');
   }
 }
@@ -299,6 +320,53 @@ async function deactivateAssociation(player){
     searchByTeam();
   } catch (err) {
     toast(err.message || 'No se pudo quitar');
+  }
+}
+
+async function renamePlayer(player){
+  if (!player?.id) return;
+  const currentName = player.nombre || player.name || '';
+  const newName = prompt('Corregir nombre del jugador:', currentName);
+  if (newName === null) return;
+  const cleanName = newName.trim();
+  if (!cleanName) {
+    toast('El nombre no puede estar vacío');
+    return;
+  }
+  if (slugify(cleanName) === slugify(currentName)) return;
+
+  try {
+    const data = await fetchJson('/api/players-admin/rename-player', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: player.id, nombre: cleanName }),
+    });
+    toast('Nombre actualizado');
+    const updated = data.player || { ...player, nombre: cleanName, name: cleanName };
+    await fillForm(updated);
+    if (currentResultsMode === 'players') searchPlayers();
+    else searchByTeam();
+  } catch (err) {
+    toast(err.message || 'No se pudo editar el nombre');
+  }
+}
+
+async function deletePlayer(player){
+  if (!player?.id) return;
+  const name = player.nombre || player.name || 'este jugador';
+  const ok = confirm(`¿Eliminar definitivamente a ${name} de la base de datos?\n\nEste cambio es irreversible y también se borrará su historial y su foto si existe.`);
+  if (!ok) return;
+  try {
+    await fetchJson('/api/players-admin/delete-player', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: player.id }),
+    });
+    toast('Jugador eliminado');
+    clearForm();
+    searchByTeam();
+  } catch (err) {
+    toast(err.message || 'No se pudo eliminar');
   }
 }
 

@@ -911,6 +911,44 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   });
 
+  router.get('/players-admin/unassigned', requireAdmin, async (_req, res) => {
+    try {
+      await ensureSchema();
+      const result = await pool.query(
+        `
+        SELECT
+          j.id,
+          j.nombre,
+          j.dni,
+          TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
+          j.foto_path,
+          j.nombre_normalizado,
+          NULL::int AS association_id,
+          NULL::text AS categoria,
+          false AS activo,
+          NULL::date AS desde,
+          NULL::date AS hasta,
+          NULL::int AS equipo_id,
+          NULL::text AS equipo,
+          NULL::text AS slug_uid
+        FROM jugadores j
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM jugador_equipos je
+          WHERE je.jugador_id = j.id
+            AND je.activo = true
+        )
+        ORDER BY j.nombre ASC, j.id ASC
+        `
+      );
+
+      return res.json({ ok: true, players: canonicalizePlayerRows(result.rows) });
+    } catch (err) {
+      console.error('players-admin/unassigned', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   router.get('/players-admin/history/:id', requireAdmin, async (req, res) => {
     try {
       await ensureSchema();
@@ -965,6 +1003,33 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       return res.json({ ok: true, history: dedupeHistoryRows(result.rows) });
     } catch (err) {
       console.error('players-admin/history', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  router.post('/players-admin/rename-player', requireAdmin, async (req, res) => {
+    try {
+      await ensureSchema();
+      const playerId = Number(req.body?.playerId || req.body?.id);
+      const nombre = String(req.body?.nombre || req.body?.name || '').trim();
+      if (!Number.isFinite(playerId)) return res.status(400).json({ ok: false, error: 'Jugador inválido' });
+      if (!nombre) return res.status(400).json({ ok: false, error: 'Falta nombre' });
+
+      const updated = await pool.query(
+        `UPDATE jugadores
+            SET nombre = $1,
+                nombre_normalizado = $2,
+                updated_at = NOW()
+          WHERE id = $3
+          RETURNING id`,
+        [nombre, normalizeText(nombre), playerId]
+      );
+      if (!updated.rows[0]?.id) return res.status(404).json({ ok: false, error: 'Jugador no encontrado' });
+
+      const players = await readPlayer(playerId);
+      return res.json({ ok: true, player: players[0] || { id: playerId, nombre, name: nombre } });
+    } catch (err) {
+      console.error('players-admin/rename-player', err);
       return res.status(500).json({ ok: false, error: err.message });
     }
   });
@@ -1088,6 +1153,58 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     } catch (err) {
       console.error('players-admin/deactivate', err);
       return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  router.post('/players-admin/delete-player', requireAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await ensureSchema();
+      const playerId = Number(req.body?.playerId || req.body?.id);
+      if (!Number.isFinite(playerId)) return res.status(400).json({ ok: false, error: 'Jugador inválido' });
+
+      await client.query('BEGIN');
+      const player = await client.query(
+        `SELECT id, nombre, foto_path FROM jugadores WHERE id = $1 LIMIT 1`,
+        [playerId]
+      );
+      if (!player.rows[0]) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ ok: false, error: 'Jugador no encontrado' });
+      }
+
+      const active = await client.query(
+        `SELECT COUNT(*)::int AS total
+           FROM jugador_equipos
+          WHERE jugador_id = $1
+            AND activo = true`,
+        [playerId]
+      );
+      if (Number(active.rows[0]?.total || 0) > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ ok: false, error: 'No se puede eliminar un jugador asociado a un equipo activo. Primero usá Quitar.' });
+      }
+
+      await client.query(`DELETE FROM jugadores WHERE id = $1`, [playerId]);
+      await client.query('COMMIT');
+
+      const photoPath = player.rows[0]?.foto_path || '';
+      if (photoPath) {
+        try {
+          const safe = safeName(path.basename(photoPath));
+          const root = path.resolve(playersRoot);
+          const fullPath = path.resolve(path.join(root, safe));
+          if (fullPath.startsWith(root + path.sep)) await fs.promises.unlink(fullPath);
+        } catch (_) {}
+      }
+
+      return res.json({ ok: true });
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      console.error('players-admin/delete-player', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    } finally {
+      client.release();
     }
   });
 
