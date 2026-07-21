@@ -60,10 +60,10 @@
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
-  function safeArr(value, expected){
+  function safeArr(value, expected, { keepEmpty = false } = {}){
     const arr = Array.isArray(value) ? value.map(v => String(v || '').trim()) : [];
     const hasContent = arr.some(Boolean);
-    if (!hasContent) return [];
+    if (!hasContent && !keepEmpty) return [];
     while (arr.length < expected) arr.push('');
     return arr.slice(0, expected);
   }
@@ -329,7 +329,7 @@
       'INDIVIDUALES': safeArr(planilla?.individuales, INDIVIDUAL_COUNT),
       'PAREJA 1': safeArr(planilla?.pareja1, 2),
       'PAREJA 2': safeArr(planilla?.pareja2, 2),
-      'SUPLENTES': safeArr(planilla?.suplentes, SUBSTITUTE_COUNT)
+      'SUPLENTES': safeArr(planilla?.suplentes, SUBSTITUTE_COUNT, { keepEmpty: true })
     };
 
     const secs = card.querySelector('.sections');
