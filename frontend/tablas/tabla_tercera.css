@@ -387,11 +387,11 @@ header .logo-link{ display:inline-block; line-height:0; }
 
 .grid > section.card[data-group] .row{
   display:grid !important;
-  grid-template-columns:35px 35px minmax(0,210px) 40px minmax(0,210px) 35px 35px;
+  grid-template-columns:30px 30px minmax(0,1fr) 28px minmax(0,1fr) 30px 30px;
   align-items:center;
   justify-content:center;
-  gap:8px;
-  padding:8px 0;
+  gap:5px;
+  padding:7px 0;
   position:relative;
 }
 
@@ -406,8 +406,8 @@ header .logo-link{ display:inline-block; line-height:0; }
 }
 
 .grid > section.card[data-group] .score-badge{
-  width:32px;
-  height:32px;
+  width:30px;
+  height:30px;
   border-radius:10px;
   background:var(--gold);
   box-shadow:0 5px 0 #b28900;
@@ -416,7 +416,7 @@ header .logo-link{ display:inline-block; line-height:0; }
   justify-content:center;
   font-weight:900;
   color:#1b1600;
-  flex:0 0 32px;
+  flex:0 0 30px;
 }
 
 .grid > section.card[data-group] .extra-badge{
@@ -433,8 +433,8 @@ header .logo-link{ display:inline-block; line-height:0; }
   color:#fff;
   border:1px solid #444;
   border-radius:10px;
-  padding:6px 10px;
-  font-size:16px;
+  padding:6px 8px;
+  font-size:14px;
   font-weight:800;
   letter-spacing:.04em;
   white-space:nowrap;
@@ -444,13 +444,13 @@ header .logo-link{ display:inline-block; line-height:0; }
 }
 
 .grid > section.card[data-group] .vs{
-  width:40px;
-  min-width:40px;
+  width:28px;
+  min-width:28px;
   text-align:center;
   color:#fff;
   font-weight:900;
-  letter-spacing:.18em;
-  font-size:14px;
+  letter-spacing:.08em;
+  font-size:12px;
   justify-self:center;
 }
 
