@@ -54,6 +54,10 @@
   const CAPTAIN_COUNT = Number(MATCH_FORMAT.captainCount || 2);
   const SUBSTITUTE_COUNT = Number(MATCH_FORMAT.substituteCount || 2);
   const TOTAL_POINTS = Number(MATCH_FORMAT.totalPoints || INDIVIDUAL_COUNT + PAIR_COUNT);
+  const SCORE_MAX_BY_CATEGORY = MATCH_FORMAT.scoreMaxByCategory || {
+    tercera: 5,
+    segunda: 6
+  };
   const CATEGORY_KEYS = {
     tercera: '__categoria_tercera__',
     segunda: '__categoria_segunda__'
@@ -270,6 +274,11 @@ function apiUrl(path){
 
   function deriveCategory(){
     return getCrucesTeamContext().category || '';
+  }
+
+  function getRegulationScoreMax(){
+    const configuredMax = Number(SCORE_MAX_BY_CATEGORY[deriveCategory()]);
+    return Number.isFinite(configuredMax) ? configuredMax : 6;
   }
 
   function teamNameFromRef(ref){
@@ -802,7 +811,8 @@ function apiUrl(path){
     wrap.className = 'pts-edit';
     const sel = document.createElement('select');
     sel.className = 'pts-select';
-    for (let v = 0; v <= 6; v++) {
+    const maxScore = getRegulationScoreMax();
+    for (let v = 0; v <= maxScore; v++) {
       const opt = document.createElement('option');
       opt.value = String(v);
       opt.textContent = String(v);
@@ -1503,10 +1513,16 @@ function readAllSelects(rootId) {
 }
 function writeAllSelects(rootId, values) {
   const root = document.getElementById(rootId);
+  if (!root) return;
   const selects = Array.from(root.querySelectorAll('.pts-select'));
+  const maxScore = getRegulationScoreMax();
   selects.forEach((sel,i) => {
     if (i < values.length) {
-      sel.value = String(values[i]);
+      const value = Number(values[i]);
+      const safeValue = Number.isFinite(value)
+        ? Math.max(0, Math.min(maxScore, Math.trunc(value)))
+        : 0;
+      sel.value = String(safeValue);
       sel.dispatchEvent(new Event('change',{bubbles:true}));
     }
   });
@@ -1544,6 +1560,15 @@ function validateRegulationRows() {
 
   if (leftScores.length !== INDIVIDUAL_COUNT || rightScores.length !== INDIVIDUAL_COUNT) {
     return `La planilla debe tener exactamente ${INDIVIDUAL_COUNT} partidos individuales.`;
+  }
+
+  const maxScore = getRegulationScoreMax();
+  for (let i = 0; i < INDIVIDUAL_COUNT; i++) {
+    if (leftScores[i] < 0 || leftScores[i] > maxScore || rightScores[i] < 0 || rightScores[i] > maxScore) {
+      markPtsError('planilla-root-left', i);
+      markPtsError('planilla-root-right', i);
+      return `Los puntos de cada partido deben estar entre 0 y ${maxScore}.`;
+    }
   }
 
   const leftPlayers = Array.from(leftRoot?.querySelectorAll('.section') || [])

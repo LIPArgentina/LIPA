@@ -5,7 +5,11 @@
     pairSize: 2,
     totalPoints: 11,
     captainCount: 2,
-    substituteCount: 2
+    substituteCount: 2,
+    scoreMaxByCategory: {
+      tercera: 5,
+      segunda: 6
+    }
   };
 
   window.LIPA_getMatchFormat = function () {
