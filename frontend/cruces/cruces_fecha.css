@@ -989,6 +989,7 @@ header.lpi-top {
 }
 
 .export-a4-sheet{
+  box-sizing:border-box;
   width:793.701px;
   min-height:1122.52px;
   background:#fff;

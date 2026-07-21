@@ -222,6 +222,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
   .btn-cruces.is-disabled{ opacity:.5; pointer-events:none; filter:grayscale(0.2); }
 
   .model-a4-sheet{
+    box-sizing:border-box;
     width:794px;
     min-height:1123px;
     padding:34px 38px 42px;
