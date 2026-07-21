@@ -41,16 +41,18 @@
 
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const MATCH_FORMAT = window.LIPA_getMatchFormat?.() || {
-    individualCount: 7,
-    pairCount: 2,
+    individualCount: 11,
+    pairCount: 0,
     pairSize: 2,
-    totalPoints: 9,
+    totalPoints: 11,
     captainCount: 2,
     substituteCount: 2
   };
-  const INDIVIDUAL_COUNT = Number(MATCH_FORMAT.individualCount || 7);
+  const INDIVIDUAL_COUNT = Number(MATCH_FORMAT.individualCount || 11);
   const PAIR_COUNT = Number(MATCH_FORMAT.pairCount || 0);
   const PAIR_SIZE = Number(MATCH_FORMAT.pairSize || 2);
+  const CAPTAIN_COUNT = Number(MATCH_FORMAT.captainCount || 2);
+  const SUBSTITUTE_COUNT = Number(MATCH_FORMAT.substituteCount || 2);
   const TOTAL_POINTS = Number(MATCH_FORMAT.totalPoints || INDIVIDUAL_COUNT + PAIR_COUNT);
   const CATEGORY_KEYS = {
     tercera: '__categoria_tercera__',
@@ -663,11 +665,11 @@ function apiUrl(path){
   function emptyPlanilla(team = '') {
     return {
       team,
-      capitan: ['', ''],
+      capitan: Array(CAPTAIN_COUNT).fill(''),
       individuales: Array(INDIVIDUAL_COUNT).fill(''),
       pareja1: PAIR_COUNT >= 1 ? Array(PAIR_SIZE).fill('') : [],
       pareja2: PAIR_COUNT >= 2 ? Array(PAIR_SIZE).fill('') : [],
-      suplentes: ['', '', '']
+      suplentes: Array(SUBSTITUTE_COUNT).fill('')
     };
   }
 
@@ -715,11 +717,11 @@ function apiUrl(path){
           const planTeam = plan?.team || '';
           const normalizedPlan = {
             team: item?.team || rawTeam || planTeam || '',
-            capitan: Array.isArray(plan.capitan) ? plan.capitan : ['', ''],
+            capitan: Array.isArray(plan.capitan) ? plan.capitan : Array(CAPTAIN_COUNT).fill(''),
             individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(INDIVIDUAL_COUNT).fill(''),
             pareja1: PAIR_COUNT >= 1 && Array.isArray(plan.pareja1) ? plan.pareja1 : [],
             pareja2: PAIR_COUNT >= 2 && Array.isArray(plan.pareja2) ? plan.pareja2 : [],
-            suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', ''],
+            suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : Array(SUBSTITUTE_COUNT).fill(''),
             jugadorIds: plan.jugadorIds && typeof plan.jugadorIds === 'object' ? plan.jugadorIds : {}
           };
 
@@ -779,11 +781,11 @@ function apiUrl(path){
 
         return {
           team: data?.team || plan?.team || slug || key,
-          capitan: Array.isArray(plan.capitan) ? plan.capitan : ['', ''],
+          capitan: Array.isArray(plan.capitan) ? plan.capitan : Array(CAPTAIN_COUNT).fill(''),
           individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(INDIVIDUAL_COUNT).fill(''),
           pareja1: PAIR_COUNT >= 1 && Array.isArray(plan.pareja1) ? plan.pareja1 : [],
           pareja2: PAIR_COUNT >= 2 && Array.isArray(plan.pareja2) ? plan.pareja2 : [],
-          suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : ['', '', ''],
+          suplentes: Array.isArray(plan.suplentes) ? plan.suplentes : Array(SUBSTITUTE_COUNT).fill(''),
           jugadorIds: plan.jugadorIds && typeof plan.jugadorIds === 'object' ? plan.jugadorIds : {}
         };
       } catch (e) {
@@ -1532,6 +1534,38 @@ function getScorableRowCount(rootId) {
   const root = document.getElementById(rootId);
   if (!root) return 0;
   return root.querySelectorAll('.pts-select').length;
+}
+
+function validateRegulationRows() {
+  const leftRoot = document.getElementById('planilla-root-left');
+  const rightRoot = document.getElementById('planilla-root-right');
+  const leftScores = collectScoreRows('planilla-root-left');
+  const rightScores = collectScoreRows('planilla-root-right');
+
+  if (leftScores.length !== INDIVIDUAL_COUNT || rightScores.length !== INDIVIDUAL_COUNT) {
+    return `La planilla debe tener exactamente ${INDIVIDUAL_COUNT} partidos individuales.`;
+  }
+
+  const leftPlayers = Array.from(leftRoot?.querySelectorAll('.section') || [])
+    .find(section => String(section.querySelector('h2')?.textContent || '').toUpperCase().includes('INDIVIDUALES'))
+    ?.querySelectorAll('.slot') || [];
+  const rightPlayers = Array.from(rightRoot?.querySelectorAll('.section') || [])
+    .find(section => String(section.querySelector('h2')?.textContent || '').toUpperCase().includes('INDIVIDUALES'))
+    ?.querySelectorAll('.slot') || [];
+
+  if (Array.from(leftPlayers).some(slot => !getSlotValue(slot)) || Array.from(rightPlayers).some(slot => !getSlotValue(slot))) {
+    return 'Todos los partidos deben tener un jugador de cada equipo.';
+  }
+
+  for (let i = 0; i < INDIVIDUAL_COUNT; i++) {
+    if (leftScores[i] === rightScores[i]) {
+      markPtsError('planilla-root-left', i);
+      markPtsError('planilla-root-right', i);
+      return `El partido individual ${i + 1} debe tener un ganador.`;
+    }
+  }
+
+  return '';
 }
 
 
@@ -2318,6 +2352,14 @@ btn.onclick = async () => {
 
     updateScoresFor();
 
+    clearMismatchVisual();
+    const regulationError = validateRegulationRows();
+    if (regulationError) {
+      setBtnState('error', `ERROR: ${regulationError}`);
+      setTimeout(() => restoreValidateButton(), 3000);
+      return;
+    }
+
     const leftCount = getScorableRowCount('planilla-root-left');
     const rightCount = getScorableRowCount('planilla-root-right');
     if (leftCount !== rightCount) {
@@ -2614,8 +2656,8 @@ function isAndroidAppWebView(){
   }
 
   function buildExportDoublesRows(localPair, visitantePair){
-    const l = safeArr(localPair, 2);
-    const r = safeArr(visitantePair, 2);
+    const l = safeArr(localPair, PAIR_SIZE);
+    const r = safeArr(visitantePair, PAIR_SIZE);
     return `<tr>
       <td>${escapeHtml(l[0])}</td>
       <td rowspan="2"></td>
@@ -2630,7 +2672,7 @@ function isAndroidAppWebView(){
   }
 
   function buildExportSubsRows(items){
-    return safeArr(items, 2).map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join('');
+    return safeArr(items, SUBSTITUTE_COUNT).map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join('');
   }
 
   function buildExportSheetElement(){
@@ -2664,7 +2706,7 @@ function isAndroidAppWebView(){
             </tr>
             <tr>
               <td class="label-cell">CAPITANÍA</td>
-              <td>${escapeHtml(safeArr(localPlan.capitan, 2).filter(Boolean).join(' / '))}</td>
+              <td>${escapeHtml(safeArr(localPlan.capitan, CAPTAIN_COUNT).filter(Boolean).join(' / '))}</td>
             </tr>
           </table>
         </div>
@@ -2680,7 +2722,7 @@ function isAndroidAppWebView(){
               <td class="label-cell">SALA</td>
             </tr>
             <tr>
-              <td>${escapeHtml(safeArr(visitantePlan.capitan, 2).filter(Boolean).join(' / '))}</td>
+              <td>${escapeHtml(safeArr(visitantePlan.capitan, CAPTAIN_COUNT).filter(Boolean).join(' / '))}</td>
               <td class="label-cell">CAPITANÍA</td>
             </tr>
           </table>

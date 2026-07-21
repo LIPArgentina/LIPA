@@ -1,4 +1,17 @@
 const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+const MATCH_FORMAT = window.LIPA_getMatchFormat?.() || {
+  individualCount: 11,
+  pairCount: 0,
+  pairSize: 2,
+  totalPoints: 11,
+  captainCount: 2,
+  substituteCount: 2
+};
+const INDIVIDUAL_COUNT = Number(MATCH_FORMAT.individualCount || 11);
+const PAIR_COUNT = Number(MATCH_FORMAT.pairCount || 0);
+const PAIR_SIZE = Number(MATCH_FORMAT.pairSize || 2);
+const CAPTAIN_COUNT = Number(MATCH_FORMAT.captainCount || 2);
+const SUBSTITUTE_COUNT = Number(MATCH_FORMAT.substituteCount || 2);
 const CATEGORY_KEYS = {
   tercera: '__categoria_tercera__',
   segunda: '__categoria_segunda__'
@@ -473,15 +486,15 @@ function escapeHtml(value){
 }
 
 function individualRows(local, visitante){
-  const left = safeArr(local?.individuales, 7);
-  const right = safeArr(visitante?.individuales, 7);
+  const left = safeArr(local?.individuales, INDIVIDUAL_COUNT);
+  const right = safeArr(visitante?.individuales, INDIVIDUAL_COUNT);
 
   return left.map((name, idx) => {
     if(idx === 0){
       return `<tr class="ind-row">
         <td>${escapeHtml(name)}</td>
         <td></td>
-        <td class="center-col" rowspan="7">VS.</td>
+        <td class="center-col" rowspan="${INDIVIDUAL_COUNT}">VS.</td>
         <td></td>
         <td>${escapeHtml(right[idx])}</td>
       </tr>`;
@@ -496,8 +509,8 @@ function individualRows(local, visitante){
 }
 
 function doublesRows(localPair, visitantePair){
-  const l = safeArr(localPair, 2);
-  const r = safeArr(visitantePair, 2);
+  const l = safeArr(localPair, PAIR_SIZE);
+  const r = safeArr(visitantePair, PAIR_SIZE);
   return `<tr>
     <td>${escapeHtml(l[0])}</td>
     <td rowspan="2"></td>
@@ -512,7 +525,7 @@ function doublesRows(localPair, visitantePair){
 }
 
 function subsRows(items){
-  const rows = safeArr(items, 2);
+  const rows = safeArr(items, SUBSTITUTE_COUNT);
   return rows.map((v) => `<tr><td>${escapeHtml(v)}</td></tr>`).join('');
 }
 
@@ -521,8 +534,8 @@ function renderSheet(item, index){
   const visitanteTeam = text(item.visitanteTeamName);
   const localPlan = item.localPlan || {};
   const visitantePlan = item.visitantePlan || {};
-  const localCap = safeArr(localPlan.capitan, 2).filter(Boolean).join(' / ');
-  const visitCap = safeArr(visitantePlan.capitan, 2).filter(Boolean).join(' / ');
+  const localCap = safeArr(localPlan.capitan, CAPTAIN_COUNT).filter(Boolean).join(' / ');
+  const visitCap = safeArr(visitantePlan.capitan, CAPTAIN_COUNT).filter(Boolean).join(' / ');
 
   const article = document.createElement('article');
   article.className = 'sheet-shell';
@@ -596,7 +609,7 @@ function renderSheet(item, index){
           </table>
         </div>
 
-        <div class="doubles-section">
+        ${PAIR_COUNT >= 1 ? `<div class="doubles-section">
           <div class="doubles-label">Parejas 1</div>
           <table class="doubles" aria-label="Partidos de parejas 1">
             <colgroup>
@@ -608,9 +621,9 @@ function renderSheet(item, index){
             </colgroup>
             <tbody>${doublesRows(localPlan.pareja1, visitantePlan.pareja1)}</tbody>
           </table>
-        </div>
+        </div>` : ''}
 
-        <div class="doubles-section">
+        ${PAIR_COUNT >= 2 ? `<div class="doubles-section">
           <div class="doubles-label">Parejas 2</div>
           <table class="doubles" aria-label="Partidos de parejas 2">
             <colgroup>
@@ -622,7 +635,7 @@ function renderSheet(item, index){
             </colgroup>
             <tbody>${doublesRows(localPlan.pareja2, visitantePlan.pareja2)}</tbody>
           </table>
-        </div>
+        </div>` : ''}
 
         <div class="result-section">
           <table class="result" aria-label="Resultado final">

@@ -73,9 +73,9 @@ function generarPlanilla(team, jugadores) {
   return {
     team,
     capitan: [mix[0], mix[1]],
-    individuales: mix.slice(2, 9),
-    pareja1: mix.slice(9, 11),
-    pareja2: mix.slice(11, 13),
+    individuales: mix.slice(2, 13),
+    pareja1: [],
+    pareja2: [],
     suplentes: mix.slice(13, 15),
     createdAt: new Date().toISOString()
   };

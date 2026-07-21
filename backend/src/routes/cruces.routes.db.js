@@ -610,6 +610,41 @@ function scoreDiffs(side, arrA = [], arrB = []) {
   return diffs;
 }
 
+const CURRENT_INDIVIDUAL_COUNT = 11;
+
+function validateCurrentMatchStatus(status = {}) {
+  const localScores = Array.isArray(status?.local?.scoreRows) ? status.local.scoreRows.map(Number) : [];
+  const visitanteScores = Array.isArray(status?.visitante?.scoreRows) ? status.visitante.scoreRows.map(Number) : [];
+  const localPlayers = Array.isArray(status?.localPlanilla?.individuales) ? status.localPlanilla.individuales : [];
+  const visitantePlayers = Array.isArray(status?.visitantePlanilla?.individuales) ? status.visitantePlanilla.individuales : [];
+
+  if (localScores.length !== CURRENT_INDIVIDUAL_COUNT || visitanteScores.length !== CURRENT_INDIVIDUAL_COUNT) {
+    return `La planilla debe tener exactamente ${CURRENT_INDIVIDUAL_COUNT} partidos individuales.`;
+  }
+  if (localPlayers.slice(0, CURRENT_INDIVIDUAL_COUNT).some(player => !String(player || '').trim()) ||
+      visitantePlayers.slice(0, CURRENT_INDIVIDUAL_COUNT).some(player => !String(player || '').trim()) ||
+      localPlayers.length < CURRENT_INDIVIDUAL_COUNT || visitantePlayers.length < CURRENT_INDIVIDUAL_COUNT) {
+    return 'Todos los partidos deben tener un jugador de cada equipo.';
+  }
+  for (let i = 0; i < CURRENT_INDIVIDUAL_COUNT; i++) {
+    if (!Number.isFinite(localScores[i]) || !Number.isFinite(visitanteScores[i]) || localScores[i] < 0 || visitanteScores[i] < 0) {
+      return `El resultado del partido individual ${i + 1} no es válido.`;
+    }
+    if (localScores[i] === visitanteScores[i]) {
+      return `El partido individual ${i + 1} debe tener un ganador.`;
+    }
+  }
+  const localPoints = localScores.filter((score, index) => score > visitanteScores[index]).length;
+  const visitantePoints = visitanteScores.filter((score, index) => score > localScores[index]).length;
+  if (localPoints + visitantePoints !== CURRENT_INDIVIDUAL_COUNT) {
+    return `La suma de puntos debe ser ${CURRENT_INDIVIDUAL_COUNT}.`;
+  }
+  if (Number(status?.local?.puntosTotales ?? -1) !== localPoints || Number(status?.visitante?.puntosTotales ?? -1) !== visitantePoints) {
+    return 'Los puntos totales no coinciden con los resultados individuales.';
+  }
+  return '';
+}
+
 function compareFullStatus(mine = {}, rival = {}) {
   const diffs = [];
 
@@ -796,6 +831,11 @@ router.post('/validate', async (req, res) => {
 
     if (!fechaISO || !localSlug || !visitanteSlug || !equipoSlug || !status) {
       return res.status(400).json({ ok: false, error: 'Faltan datos' });
+    }
+
+    const statusError = validateCurrentMatchStatus(status);
+    if (statusError) {
+      return res.status(400).json({ ok: false, error: statusError });
     }
 
     const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
