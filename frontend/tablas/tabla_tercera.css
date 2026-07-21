@@ -491,15 +491,15 @@ header .logo-link{ display:inline-block; line-height:0; }
   }
 
   .grid > section.card[data-group] .row{
-    grid-template-columns:22px 22px minmax(0,1fr) 17px minmax(0,1fr) 22px 22px;
-    gap:2px;
+    grid-template-columns:20px 20px minmax(0,1fr) 15px minmax(0,1fr) 20px 20px;
+    gap:1px;
     padding:6px 0;
   }
 
   .grid > section.card[data-group] .score-badge{
-    width:22px;
-    height:24px;
-    flex-basis:22px;
+    width:20px;
+    height:22px;
+    flex-basis:20px;
     border-radius:8px;
     font-size:11px;
     box-shadow:0 4px 0 #b28900;
@@ -510,16 +510,16 @@ header .logo-link{ display:inline-block; line-height:0; }
   }
 
   .grid > section.card[data-group] .team-name{
-    padding:5px;
+    padding:5px 4px;
     border-radius:8px;
-    font-size:10px;
+    font-size:9px;
     letter-spacing:.02em;
   }
 
   .grid > section.card[data-group] .vs{
-    width:17px;
-    min-width:17px;
-    font-size:9px;
+    width:15px;
+    min-width:15px;
+    font-size:8px;
     letter-spacing:0;
   }
 }
