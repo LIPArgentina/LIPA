@@ -13,9 +13,6 @@ const CATEGORY_KEYS = {
 const ARG_TZ_OFFSET = '-03:00';
 const CURRENT_EDITION = 6;
 const DEFAULT_HISTORIC_EDITION = 5;
-const EDITION_START_DATES = {
-  6: '2026-07-27'
-};
 let ensureCrucesAdminStoragePromise = null;
 let ensureJugadorResultadosEditionPromise = null;
 
@@ -34,15 +31,42 @@ function getEditionLabel(edition) {
   return `${Number(edition || CURRENT_EDITION)}TA EDICIÓN`;
 }
 
-function inferEditionFromDate(dateValue) {
+async function getEditionStartDate(edition = CURRENT_EDITION, category = '') {
+  const params = [Number(edition)];
+  const categoryFilter = category ? 'AND category = $2' : '';
+  if (category) params.push(String(category).trim().toLowerCase());
+  const { rows } = await pool.query(
+    `SELECT data FROM fixtures WHERE edicion = $1 ${categoryFilter}`,
+    params
+  );
+  const dates = [];
+  rows.forEach(row => {
+    const fechas = Array.isArray(row?.data?.fechas) ? row.data.fechas : [];
+    fechas.forEach(fecha => {
+      const dateKey = normalizeDateOnly(fecha?.date);
+      if (dateKey) dates.push(dateKey);
+    });
+  });
+  return dates.sort()[0] || null;
+}
+
+async function inferEditionFromDate(dateValue, category = '') {
   const dateKey = normalizeDateOnly(dateValue);
-  if (dateKey && dateKey >= EDITION_START_DATES[6]) return 6;
+  const currentEditionStart = await getEditionStartDate(CURRENT_EDITION, category);
+  if (dateKey && currentEditionStart && dateKey >= currentEditionStart) return CURRENT_EDITION;
   return DEFAULT_HISTORIC_EDITION;
 }
 
-function filterItemsByEdition(items = [], edition = CURRENT_EDITION) {
+async function filterItemsByEdition(items = [], edition = CURRENT_EDITION, category = '') {
   if (edition === 'total') return items;
-  return items.filter((item) => inferEditionFromDate(item?.fechaISO || item?.fecha_iso || item?.date) === Number(edition));
+  const currentEditionStart = await getEditionStartDate(CURRENT_EDITION, category);
+  return items.filter((item) => {
+    const dateKey = normalizeDateOnly(item?.fechaISO || item?.fecha_iso || item?.date);
+    const itemEdition = dateKey && currentEditionStart && dateKey >= currentEditionStart
+      ? CURRENT_EDITION
+      : DEFAULT_HISTORIC_EDITION;
+    return itemEdition === Number(edition);
+  });
 }
 
 async function ensureJugadorResultadosEditionColumn() {
@@ -1053,7 +1077,7 @@ async function findLlavesSeriesForMatch({ fechaISO, localSlug, visitanteSlug }) 
 
   const localCandidates = buildLlavesTeamCandidates(localInfo, localSlug);
   const visitanteCandidates = buildLlavesTeamCandidates(visitanteInfo, visitanteSlug);
-  const edition = inferEditionFromDate(dateKey);
+  const edition = await inferEditionFromDate(dateKey, category);
   const { rows } = await pool.query(
     `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
     [category, edition]
@@ -1105,7 +1129,6 @@ function legHasAnyScore(leg) {
 
 async function getTiebreakRows(fechaISO, localSlug, visitanteSlug) {
   const fechaKey = buildTiebreakFechaKey(fechaISO, localSlug, visitanteSlug);
-  const edition = inferEditionFromDate(dateKey);
   const { rows } = await pool.query(
     `SELECT team, status_json, validated, locked_until, updated_at
      FROM cruces_validations
@@ -1309,7 +1332,6 @@ async function syncValidatedMatchIntoFixture({
   snapshot
 }) {
   const dateKey = normalizeDateOnly(fechaISO);
-  const edition = inferEditionFromDate(dateKey);
   if (!dateKey || !snapshot) {
     return { updated: false, reason: 'missing_data' };
   }
@@ -1318,6 +1340,7 @@ async function syncValidatedMatchIntoFixture({
   if (!category) {
     return { updated: false, reason: 'category_not_found' };
   }
+  const edition = await inferEditionFromDate(dateKey, category);
 
   const localCandidates = buildTeamMatchCandidates(localInfo, localSlug);
   const visitanteCandidates = buildTeamMatchCandidates(visitanteInfo, visitanteSlug);
@@ -1887,7 +1910,6 @@ async function syncValidatedMatchIntoLlaves({
   snapshot
 }) {
   const dateKey = normalizeDateOnly(fechaISO);
-  const edition = inferEditionFromDate(dateKey);
   if (!dateKey || !snapshot) {
     return { updated: false, reason: 'missing_data' };
   }
@@ -1896,6 +1918,7 @@ async function syncValidatedMatchIntoLlaves({
   if (!category) {
     return { updated: false, reason: 'category_not_found' };
   }
+  const edition = await inferEditionFromDate(dateKey, category);
 
   const localCandidates = buildLlavesTeamCandidates(localInfo, localSlug);
   const visitanteCandidates = buildLlavesTeamCandidates(visitanteInfo, visitanteSlug);
@@ -2134,7 +2157,7 @@ async function syncTiebreakIntoLlaves({ fechaISO, localSlug, visitanteSlug, snap
      VALUES ($1, $2, $3::jsonb, NOW(), NOW())
      ON CONFLICT (edicion, category)
      DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-    [found.category, inferEditionFromDate(dateKey), JSON.stringify(found.data)]
+    [found.category, await inferEditionFromDate(dateKey, found.category), JSON.stringify(found.data)]
   );
 
   return { updated: true, category: found.category, roundId: round?.id || null, legIndex: 2, date: dateKey };
@@ -2791,7 +2814,7 @@ router.get('/player-query', async (req, res) => {
     }, edition);
 
     if (!matches.length && !pairMatches.length) {
-      const validatedResults = filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition);
+      const validatedResults = await filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition, category);
       const fallbackDetail = buildPlayerMatchesFromValidatedResults(validatedResults, {
         id: exact.id || playerRadRow?.id || null,
         name: exact.name || playerRadRow?.name || ''
@@ -3142,7 +3165,7 @@ async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITI
     console.warn('Falling back to cruces_validations for player ranking', err?.code || err?.message || err);
   }
 
-  const results = filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition);
+  const results = await filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition, category);
   return buildRadRankingFromResults(results);
 }
 
@@ -3376,7 +3399,7 @@ router.get('/team-ranking', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
-    const results = filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition);
+    const results = await filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition, category);
     const rankingMap = new Map();
     const countedMatches = new Set();
 
