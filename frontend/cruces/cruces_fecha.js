@@ -1241,7 +1241,7 @@ function apiUrl(path){
     document.querySelectorAll('#planilla-root-left .slot, #planilla-root-right .slot').forEach(slot => {
       slot.style.pointerEvents = 'none';
       slot.style.cursor = 'default';
-      slot.classList.remove('slot-selected-sub', 'slot-sub-in', 'slot-sub-out');
+      slot.classList.remove('slot-selected-sub');
     });
 
     const btn = document.getElementById('btnValidarGlobal');
@@ -1256,6 +1256,55 @@ function apiUrl(path){
     root.querySelectorAll('.slot').forEach(s => {
       s.classList.remove('slot-selected-sub', 'slot-sub-in', 'slot-sub-out');
     });
+  }
+
+  const substitutionsByRoot = new WeakMap();
+
+  function getSectionSlots(root, sectionKey){
+    const wanted = String(sectionKey || '').toLowerCase();
+    const section = Array.from(root.querySelectorAll('.section')).find(sec =>
+      sectionKeyToPlanKey(sec.querySelector('h2')?.textContent || '') === wanted
+    );
+    return section ? Array.from(section.querySelectorAll('.slot')) : [];
+  }
+
+  function normalizeSubstitutions(value){
+    if (!Array.isArray(value)) return [];
+    return value.slice(0, SUBSTITUTE_COUNT).map(item => {
+      const benchIndex = Number(item?.benchIndex);
+      const fieldIndex = Number(item?.fieldIndex);
+      const fieldSection = sectionKeyToPlanKey(item?.fieldSection || 'INDIVIDUALES');
+      if (!Number.isInteger(benchIndex) || benchIndex < 0 || benchIndex >= SUBSTITUTE_COUNT) return null;
+      if (!Number.isInteger(fieldIndex) || fieldIndex < 0 || fieldSection !== 'individuales') return null;
+      return {
+        benchIndex,
+        fieldSection,
+        fieldIndex,
+        substitute: String(item?.substitute || '').trim(),
+        substituteId: String(item?.substituteId || '').trim(),
+        starter: String(item?.starter || '').trim(),
+        starterId: String(item?.starterId || '').trim()
+      };
+    }).filter(Boolean);
+  }
+
+  function getRootSubstitutions(root){
+    return substitutionsByRoot.get(root) || [];
+  }
+
+  function applySubstitutionMarks(root){
+    clearSwapMarks(root);
+    const benchSlots = getSectionSlots(root, 'suplentes');
+    const fieldSlots = getSectionSlots(root, 'individuales');
+    getRootSubstitutions(root).forEach(change => {
+      benchSlots[change.benchIndex]?.classList.add('slot-sub-out');
+      fieldSlots[change.fieldIndex]?.classList.add('slot-sub-in');
+    });
+  }
+
+  function setRootSubstitutions(root, substitutions){
+    substitutionsByRoot.set(root, normalizeSubstitutions(substitutions));
+    applySubstitutionMarks(root);
   }
 
 
@@ -1339,29 +1388,7 @@ function apiUrl(path){
     };
 
     const isBenchSlot = (slot) => getSectionName(slot).includes('SUPLENTES');
-    const isSwappableField = (slot) => {
-      const name = getSectionName(slot);
-      return name.includes('INDIVIDUALES') || name.includes('PAREJA 1') || name.includes('PAREJA 2');
-    };
-
-    const normalizePlayerName = (value) => String(value || '')
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toUpperCase();
-
-    const findDuplicateFieldSlots = (playerName, exceptSlot) => {
-      const normalizedTarget = normalizePlayerName(playerName);
-      if (!normalizedTarget) return [];
-
-      return Array.from(root.querySelectorAll('.slot')).filter(candidate => {
-        if (candidate === exceptSlot) return false;
-        if (!isSwappableField(candidate)) return false;
-        const candidateValue = getSlotValue(candidate);
-        return candidateValue && normalizePlayerName(candidateValue) === normalizedTarget;
-      });
-    };
+    const isSwappableField = (slot) => getSectionName(slot).includes('INDIVIDUALES');
 
     root.querySelectorAll('.slot').forEach(slot => {
       if (slot.dataset.swapWired === '1') return;
@@ -1374,10 +1401,8 @@ function apiUrl(path){
 
         if (isBenchSlot(slot)) {
           root.querySelectorAll('.slot.slot-selected-sub').forEach(s => s.classList.remove('slot-selected-sub'));
-          slot.classList.remove('slot-sub-in', 'slot-sub-out');
           slot.classList.add('slot-selected-sub');
           selectedBenchSlot = slot;
-          root.dispatchEvent(new Event('cruces:changed'));
           return;
         }
 
@@ -1391,46 +1416,41 @@ function apiUrl(path){
         const selectedSubId = getSlotPlayerId(selectedBenchSlot);
         if (!currentFieldPlayer || !selectedSub) return;
 
-        const duplicateSlots = findDuplicateFieldSlots(currentFieldPlayer, slot);
-        let replaceAllOccurrences = false;
+        const benchSlots = getSectionSlots(root, 'suplentes');
+        const fieldSlots = getSectionSlots(root, 'individuales');
+        const benchIndex = benchSlots.indexOf(selectedBenchSlot);
+        const fieldIndex = fieldSlots.indexOf(slot);
+        const substitutions = getRootSubstitutions(root);
+        const activeChange = substitutions.find(change => change.benchIndex === benchIndex);
 
-        if (duplicateSlots.length > 0) {
-          const alsoPlaysIn = duplicateSlots.map(dupSlot => {
-            const secName = getSectionName(dupSlot);
-            const row = dupSlot.closest('.row');
-            const badge = row?.querySelector('.badge')?.textContent?.trim() || '?';
-            return `${secName} ${badge}`;
-          }).join(', ');
-
-          replaceAllOccurrences = await niceConfirm(
-            `"${currentFieldPlayer}" también figura en ${alsoPlaysIn}. ¿Querés reemplazarlo también en ese/os lugar/es por "${selectedSub}"?`,
-            'Jugador repetido'
-          );
+        if (activeChange) {
+          if (activeChange.fieldIndex !== fieldIndex) {
+            showToast('Ese jugador solo puede volver a la posición del suplente que lo reemplazó.', 'info');
+            return;
+          }
+          setSlotValue(slot, activeChange.starter, activeChange.starterId);
+          setSlotValue(selectedBenchSlot, activeChange.substitute, activeChange.substituteId);
+          setRootSubstitutions(root, substitutions.filter(change => change !== activeChange));
+        } else {
+          if (substitutions.some(change => change.fieldIndex === fieldIndex)) {
+            showToast('Esa posición ya tiene un cambio realizado.', 'info');
+            return;
+          }
+          setSlotValue(slot, selectedSub, selectedSubId);
+          setSlotValue(selectedBenchSlot, currentFieldPlayer, currentFieldPlayerId);
+          setRootSubstitutions(root, [...substitutions, {
+            benchIndex,
+            fieldSection: 'individuales',
+            fieldIndex,
+            substitute: selectedSub,
+            substituteId: selectedSubId,
+            starter: currentFieldPlayer,
+            starterId: currentFieldPlayerId
+          }]);
         }
 
-        root.querySelectorAll('.slot.slot-sub-in, .slot.slot-sub-out').forEach(s => {
-          s.classList.remove('slot-sub-in', 'slot-sub-out');
-        });
-
-        const benchSlotToKeepSelected = selectedBenchSlot;
-
-        setSlotValue(slot, selectedSub, selectedSubId);
-        slot.classList.remove('slot-selected-sub');
-        slot.classList.add('slot-sub-in');
-
-        if (replaceAllOccurrences) {
-          duplicateSlots.forEach(dupSlot => {
-            setSlotValue(dupSlot, selectedSub, selectedSubId);
-            dupSlot.classList.remove('slot-selected-sub', 'slot-sub-out');
-            dupSlot.classList.add('slot-sub-in');
-          });
-        }
-
-        setSlotValue(benchSlotToKeepSelected, currentFieldPlayer, currentFieldPlayerId);
-        benchSlotToKeepSelected.classList.remove('slot-selected-sub');
-        benchSlotToKeepSelected.classList.add('slot-sub-out');
-        benchSlotToKeepSelected.classList.add('slot-selected-sub');
-        selectedBenchSlot = benchSlotToKeepSelected;
+        selectedBenchSlot.classList.remove('slot-selected-sub');
+        selectedBenchSlot = null;
 
         root.dispatchEvent(new Event('cruces:changed'));
       });
@@ -1461,7 +1481,7 @@ function apiUrl(path){
       });
     });
 
-    clearSwapMarks(root);
+    setRootSubstitutions(root, plan.substitutions || []);
   }
 
   function planillaTieneContenido(plan) {
@@ -1836,7 +1856,13 @@ async function saveMatchStatus(validated = false) {
 
 function autosaveSave() {
   try {
-    const payload = { fechaISO: getCurrentFechaISO(), left: readAllSelects('planilla-root-left'), right: readAllSelects('planilla-root-right') };
+    const payload = {
+      fechaISO: getCurrentFechaISO(),
+      left: readAllSelects('planilla-root-left'),
+      right: readAllSelects('planilla-root-right'),
+      localPlanilla: collectPlanilla('planilla-root-left'),
+      visitantePlanilla: collectPlanilla('planilla-root-right')
+    };
     localStorage.setItem(getAutosaveKey(), JSON.stringify(payload));
   } catch {}
 }
@@ -1844,6 +1870,8 @@ function autosaveLoad() { try{ const raw=localStorage.getItem(getAutosaveKey());
 function autosaveApplyIfAny() {
   const data = autosaveLoad();
   if (!data || data.fechaISO !== getCurrentFechaISO()) return;
+  if (data.localPlanilla) applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
+  if (data.visitantePlanilla) applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
   writeAllSelects('planilla-root-left', data.left||[]);
   writeAllSelects('planilla-root-right', data.right||[]);
 }
@@ -1897,9 +1925,8 @@ async function tryApplyStatusIfExists(){
 
     const data = result.data;
 
-
-
-
+    if (data.localPlanilla) applyCollectedPlanilla('planilla-root-left', data.localPlanilla);
+    if (data.visitantePlanilla) applyCollectedPlanilla('planilla-root-right', data.visitantePlanilla);
     const L = [...(data.local?.jugadores||[])];
     const R = [...(data.visitante?.jugadores||[])];
     if (PAIR_COUNT >= 1) {
@@ -2501,7 +2528,8 @@ btn.onclick = async () => {
         pareja1: [],
         pareja2: [],
         suplentes: []
-      }
+      },
+      substitutions: getRootSubstitutions(root).map(change => ({ ...change }))
     };
 
     root.querySelectorAll('.section').forEach(sec => {

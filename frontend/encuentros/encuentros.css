@@ -1,5 +1,17 @@
 @import url("../cruces/cruces_fecha.css");
 
+.encuentros-page .slot.slot-sub-in{
+  background:#c8ffb8 !important;
+  box-shadow:0 0 0 2px #55c44d inset;
+  color:#16320f !important;
+}
+
+.encuentros-page .slot.slot-sub-out{
+  background:#ffb6b6 !important;
+  box-shadow:0 0 0 2px #d94b4b inset;
+  color:#4a1010 !important;
+}
+
 .encuentros-page{
   padding-top: 18px;
   max-width: 1560px;

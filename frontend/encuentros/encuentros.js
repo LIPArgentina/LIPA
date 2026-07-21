@@ -2,6 +2,9 @@
   'use strict';
 
   const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  const MATCH_FORMAT = window.LIPA_getMatchFormat?.() || { individualCount: 11, substituteCount: 2 };
+  const INDIVIDUAL_COUNT = Number(MATCH_FORMAT.individualCount || 11);
+  const SUBSTITUTE_COUNT = Number(MATCH_FORMAT.substituteCount || 2);
   const dtf = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' });
 
   const photosModal = document.getElementById('photosModal');
@@ -211,7 +214,7 @@
     return wrap;
   }
 
-  function makeRow(num, text, side, pointsValue = null, sectionKey = ''){
+  function makeRow(num, text, side, pointsValue = null, sectionKey = '', slotClass = ''){
     const row = document.createElement('div');
     row.className = 'row';
     if (sectionKey) row.dataset.section = sectionKey;
@@ -223,6 +226,7 @@
     const slot = document.createElement('div');
     const isEmpty = !text || !String(text).trim();
     slot.className = 'slot' + (isEmpty ? ' is-empty' : '');
+    if (slotClass) slot.classList.add(slotClass);
     if (!isEmpty) {
       slot.setAttribute('data-full', String(text).trim());
       slot.textContent = String(text).trim();
@@ -243,14 +247,15 @@
     return row;
   }
 
-  function renderSection(section, items, side, scoreRows){
+  function renderSection(section, items, side, scoreRows, substitutions = []){
     const div = document.createElement('div');
     div.className = 'section';
     div.innerHTML = `<h2>${section}</h2>`;
 
     if (section === 'INDIVIDUALES') {
       items.forEach((name, idx) => {
-        div.appendChild(makeRow(idx + 1, name, side, scoreRows[idx] ?? 0, section));
+        const changed = substitutions.some(change => Number(change?.fieldIndex) === idx);
+        div.appendChild(makeRow(idx + 1, name, side, scoreRows[idx] ?? 0, section, changed ? 'slot-sub-in' : ''));
       });
     } else if (section === 'PAREJA 1') {
       div.appendChild(makeRow(1, items[0] || '', side, scoreRows[7] ?? 0, section));
@@ -260,7 +265,8 @@
       div.appendChild(makeRow(2, items[1] || '', side, null, section));
     } else {
       items.forEach((name, idx) => {
-        div.appendChild(makeRow(idx + 1, name, side, null, section));
+        const changed = section === 'SUPLENTES' && substitutions.some(change => Number(change?.benchIndex) === idx);
+        div.appendChild(makeRow(idx + 1, name, side, null, section, changed ? 'slot-sub-out' : ''));
       });
     }
 
@@ -317,19 +323,20 @@
     if (hint) hint.remove();
 
     const scoreRows = Array.isArray(scoreData?.scoreRows) ? scoreData.scoreRows : [];
+    const substitutions = Array.isArray(planilla?.substitutions) ? planilla.substitutions : [];
     const data = {
       'CAPITÁN': safeArr(planilla?.capitan, 2),
-      'INDIVIDUALES': safeArr(planilla?.individuales, 7),
+      'INDIVIDUALES': safeArr(planilla?.individuales, INDIVIDUAL_COUNT),
       'PAREJA 1': safeArr(planilla?.pareja1, 2),
       'PAREJA 2': safeArr(planilla?.pareja2, 2),
-      'SUPLENTES': safeArr(planilla?.suplentes, 3)
+      'SUPLENTES': safeArr(planilla?.suplentes, SUBSTITUTE_COUNT)
     };
 
     const secs = card.querySelector('.sections');
     ['CAPITÁN', 'INDIVIDUALES', 'PAREJA 1', 'PAREJA 2', 'SUPLENTES'].forEach((section) => {
       const items = data[section] || [];
       if (!items.length) return;
-      secs.appendChild(renderSection(section, items, side, scoreRows));
+      secs.appendChild(renderSection(section, items, side, scoreRows, substitutions));
     });
 
     const totalInput = card.querySelector('.total-input');
