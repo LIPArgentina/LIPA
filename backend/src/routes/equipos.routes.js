@@ -21,6 +21,24 @@ module.exports = function createEquiposRouter() {
     await client.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
   }
 
+  async function deactivatePlayersFromInactiveTeams(client, { teamId = null, division = null } = {}) {
+    const result = await client.query(
+      `UPDATE jugador_equipos je
+          SET activo = false,
+              hasta = CURRENT_DATE,
+              updated_at = NOW()
+         FROM equipos e
+        WHERE e.id = je.equipo_id
+          AND e.activo = false
+          AND je.activo = true
+          AND ($1::int IS NULL OR e.id = $1::int)
+          AND ($2::text IS NULL OR e.division = $2::text)
+      RETURNING je.id`,
+      [teamId, division]
+    );
+    return result.rowCount;
+  }
+
   router.post('/save-teams', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
@@ -107,8 +125,10 @@ module.exports = function createEquiposRouter() {
         await client.query(`UPDATE equipos SET activo = false WHERE division = $1`, [division]);
       }
 
+      const playersDeactivated = await deactivatePlayersFromInactiveTeams(client, { division });
+
       await client.query('COMMIT');
-      res.json({ ok: true });
+      res.json({ ok: true, playersDeactivated });
 
     } catch (err) {
       await client.query('ROLLBACK');
@@ -157,8 +177,9 @@ module.exports = function createEquiposRouter() {
   });
 
   router.patch('/teams/:id/active', requireAdmin, async (req, res) => {
+    const client = await pool.connect();
     try {
-      await ensureActivoColumn();
+      await ensureActivoColumn(client);
 
       const id = Number(req.params.id);
       if (!Number.isFinite(id) || id <= 0) {
@@ -166,7 +187,8 @@ module.exports = function createEquiposRouter() {
       }
 
       const active = req.body?.activo !== false && req.body?.active !== false;
-      const result = await pool.query(
+      await client.query('BEGIN');
+      const result = await client.query(
         `UPDATE equipos
             SET activo = $1
           WHERE id = $2
@@ -175,13 +197,22 @@ module.exports = function createEquiposRouter() {
       );
 
       if (!result.rowCount) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ ok: false, error: 'equipo no encontrado' });
       }
 
-      return res.json({ ok: true, team: result.rows[0] });
+      const playersDeactivated = active
+        ? 0
+        : await deactivatePlayersFromInactiveTeams(client, { teamId: id });
+
+      await client.query('COMMIT');
+      return res.json({ ok: true, team: result.rows[0], playersDeactivated });
     } catch (err) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
       console.error(err);
       return res.status(500).json({ ok: false, error: err.message });
+    } finally {
+      client.release();
     }
   });
 
