@@ -12,6 +12,20 @@ const API_BASE = (() => {
   ).replace(/\/+$/, "");
 })();
 
+function readSession(){
+  try {
+    const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function authHeaders(extra = {}){
+  const sess = readSession();
+  return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
+}
+
 (function(){
   const $ = s => document.querySelector(s);
   const MATCH_FORMAT = window.LIPA_getMatchFormat?.() || {
@@ -34,21 +48,6 @@ const API_BASE = (() => {
       segunda: new Set()
     }
   };
-
-  function readSession(){
-    try {
-      const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
-      return raw ? JSON.parse(raw) : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function authHeaders(extra = {}){
-    const sess = readSession();
-    return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
-  }
-
 
   function showAlert(msg){
     const a = $('#alert');
