@@ -472,7 +472,7 @@ header .logo-link{ display:inline-block; line-height:0; }
 
   .grid > section.card[data-group]{
     max-width:none;
-    padding:16px 10px 8px;
+    padding:16px 6px 8px;
   }
 
   .grid > section.card[data-group] > .h1{
@@ -491,28 +491,28 @@ header .logo-link{ display:inline-block; line-height:0; }
   }
 
   .grid > section.card[data-group] .row{
-    grid-template-columns:30px 30px minmax(0,120px) 28px minmax(0,120px) 30px 30px;
-    gap:6px;
+    grid-template-columns:26px 26px minmax(0,1fr) 20px minmax(0,1fr) 26px 26px;
+    gap:3px;
     padding:7px 0;
   }
 
   .grid > section.card[data-group] .score-badge{
-    width:30px;
-    height:30px;
-    flex-basis:30px;
-    font-size:14px;
+    width:26px;
+    height:28px;
+    flex-basis:26px;
+    font-size:13px;
   }
 
   .grid > section.card[data-group] .team-name{
-    padding:6px 8px;
-    font-size:12px;
+    padding:6px;
+    font-size:11px;
   }
 
   .grid > section.card[data-group] .vs{
-    width:28px;
-    min-width:28px;
-    font-size:12px;
-    letter-spacing:.10em;
+    width:20px;
+    min-width:20px;
+    font-size:11px;
+    letter-spacing:0;
   }
 }
 
