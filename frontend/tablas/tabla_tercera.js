@@ -418,6 +418,20 @@ function setActive(kind){
   });
 }
 
+function fixtureHasDates(kind){
+  return Array.isArray(cache[kind]?.fechas) && cache[kind].fechas.length > 0;
+}
+
+function selectAvailableFixture(){
+  if (fixtureHasDates(selectedKind)) return;
+
+  const fallbackKind = selectedKind === 'ida' ? 'vuelta' : 'ida';
+  if (!fixtureHasDates(fallbackKind)) return;
+
+  selectedKind = fallbackKind;
+  try { localStorage.setItem('fixture_kind', selectedKind); } catch(_) {}
+}
+
 async function renderPodium(){
   const mount = document.getElementById('podioSuperligaMount');
   if (!mount) return;
@@ -489,10 +503,12 @@ async function switchEdition(edition){
   cache.vuelta = null;
   applyEditionLayout();
   await Promise.all([fetchFixture('ida'), fetchFixture('vuelta')]);
+  selectAvailableFixture();
   buildStandingsSteps();
   populateStandingsControls();
   renderStandings();
   renderSelectedFixture();
+  setActive(selectedKind);
   window.dispatchEvent(new CustomEvent('tournament:edition-changed', { detail: { edition: selectedEdition } }));
 }
 
@@ -531,6 +547,7 @@ async function init(){
 
   try {
     await Promise.all([fetchFixture('ida'), fetchFixture('vuelta')]);
+    selectAvailableFixture();
     startPodiumRefresh();
     buildStandingsSteps();
     populateStandingsControls();
