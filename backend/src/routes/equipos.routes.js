@@ -21,11 +21,19 @@ module.exports = function createEquiposRouter() {
     await client.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
   }
 
+  async function ensurePlayerTeamDeactivationColumn(client = pool) {
+    await client.query(`
+      ALTER TABLE jugador_equipos
+      ADD COLUMN IF NOT EXISTS inactivado_por_equipo BOOLEAN NOT NULL DEFAULT false
+    `);
+  }
+
   async function deactivatePlayersFromInactiveTeams(client, { teamId = null, division = null } = {}) {
     const result = await client.query(
       `UPDATE jugador_equipos je
           SET activo = false,
               hasta = CURRENT_DATE,
+              inactivado_por_equipo = true,
               updated_at = NOW()
          FROM equipos e
         WHERE e.id = je.equipo_id
@@ -39,6 +47,66 @@ module.exports = function createEquiposRouter() {
     return result.rowCount;
   }
 
+  async function reactivatePlayersFromActiveTeams(client, { teamId = null, division = null } = {}) {
+    const restored = await client.query(
+      `WITH active_counts AS (
+         SELECT equipo_id, categoria, COUNT(DISTINCT jugador_id)::int AS total
+           FROM jugador_equipos
+          WHERE activo = true
+          GROUP BY equipo_id, categoria
+       ), candidates AS (
+         SELECT je.id,
+                ROW_NUMBER() OVER (PARTITION BY je.equipo_id, je.categoria ORDER BY je.id) AS position,
+                GREATEST(0, 20 - COALESCE(ac.total, 0)) AS available_slots
+           FROM jugador_equipos je
+           JOIN equipos e ON e.id = je.equipo_id
+           LEFT JOIN active_counts ac
+             ON ac.equipo_id = je.equipo_id
+            AND ac.categoria = je.categoria
+          WHERE e.activo = true
+            AND je.activo = false
+            AND je.inactivado_por_equipo = true
+            AND ($1::int IS NULL OR e.id = $1::int)
+            AND ($2::text IS NULL OR e.division = $2::text)
+            AND NOT EXISTS (
+              SELECT 1
+                FROM jugador_equipos other
+               WHERE other.jugador_id = je.jugador_id
+                 AND other.categoria = je.categoria
+                 AND other.activo = true
+                 AND other.equipo_id <> je.equipo_id
+            )
+       )
+       UPDATE jugador_equipos je
+          SET activo = true,
+              hasta = NULL,
+              inactivado_por_equipo = false,
+              updated_at = NOW()
+         FROM candidates c
+        WHERE je.id = c.id
+          AND c.position <= c.available_slots
+      RETURNING je.id`,
+      [teamId, division]
+    );
+
+    const skipped = await client.query(
+      `SELECT COUNT(*)::int AS total
+         FROM jugador_equipos je
+         JOIN equipos e ON e.id = je.equipo_id
+        WHERE e.activo = true
+          AND je.activo = false
+          AND je.inactivado_por_equipo = true
+          AND ($1::int IS NULL OR e.id = $1::int)
+          AND ($2::text IS NULL OR e.division = $2::text)`,
+      [teamId, division]
+    );
+
+    return {
+      restored: restored.rowCount,
+      skipped: Number(skipped.rows[0]?.total || 0),
+    };
+  }
+
   router.post('/save-teams', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
@@ -50,6 +118,7 @@ module.exports = function createEquiposRouter() {
 
       await client.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS subcaptain TEXT`);
       await ensureActivoColumn(client);
+      await ensurePlayerTeamDeactivationColumn(client);
 
       const processed = teams.map(t => {
         const username = String(t.username || '').trim();
@@ -126,9 +195,10 @@ module.exports = function createEquiposRouter() {
       }
 
       const playersDeactivated = await deactivatePlayersFromInactiveTeams(client, { division });
+      const playersReactivated = await reactivatePlayersFromActiveTeams(client, { division });
 
       await client.query('COMMIT');
-      res.json({ ok: true, playersDeactivated });
+      res.json({ ok: true, playersDeactivated, playersReactivated });
 
     } catch (err) {
       await client.query('ROLLBACK');
@@ -180,6 +250,7 @@ module.exports = function createEquiposRouter() {
     const client = await pool.connect();
     try {
       await ensureActivoColumn(client);
+      await ensurePlayerTeamDeactivationColumn(client);
 
       const id = Number(req.params.id);
       if (!Number.isFinite(id) || id <= 0) {
@@ -204,9 +275,12 @@ module.exports = function createEquiposRouter() {
       const playersDeactivated = active
         ? 0
         : await deactivatePlayersFromInactiveTeams(client, { teamId: id });
+      const playersReactivated = active
+        ? await reactivatePlayersFromActiveTeams(client, { teamId: id })
+        : { restored: 0, skipped: 0 };
 
       await client.query('COMMIT');
-      return res.json({ ok: true, team: result.rows[0], playersDeactivated });
+      return res.json({ ok: true, team: result.rows[0], playersDeactivated, playersReactivated });
     } catch (err) {
       try { await client.query('ROLLBACK'); } catch (_) {}
       console.error(err);
