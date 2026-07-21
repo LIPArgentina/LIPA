@@ -2052,6 +2052,104 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+(function setupModelSheetDownload(){
+  function blankIndividualRows(){
+    return Array.from({ length: 11 }, (_, index) => index === 0
+      ? '<tr><td></td><td></td><td class="model-vs" rowspan="11">VS.</td><td></td><td></td></tr>'
+      : '<tr><td></td><td></td><td></td><td></td></tr>'
+    ).join('');
+  }
+
+  function buildModelSheet(){
+    const sheet = document.createElement('section');
+    sheet.className = 'model-a4-sheet';
+    sheet.innerHTML = `
+      <div class="model-meta"><span>Categoría:</span><span>Planilla modelo</span></div>
+      <h1 class="model-title">L.I.P.A.</h1>
+      <div class="model-bar"></div>
+      <div class="model-header">
+        <table class="model-form" aria-label="Datos del equipo local"><tbody>
+          <tr><td class="model-label">SALA</td><td></td></tr>
+          <tr><td class="model-label">CAPITANÍA</td><td></td></tr>
+        </tbody></table>
+        <div class="model-logo"><img src="../logo_liga.png" alt="Logo LIPA"></div>
+        <table class="model-form" aria-label="Datos del equipo visitante"><tbody>
+          <tr><td></td><td class="model-label">SALA</td></tr>
+          <tr><td></td><td class="model-label">CAPITANÍA</td></tr>
+        </tbody></table>
+      </div>
+      <div class="model-section">
+        <table class="model-individuals" aria-label="Once partidos individuales">
+          <colgroup><col style="width:32.5%"><col style="width:5%"><col style="width:25%"><col style="width:5%"><col style="width:32.5%"></colgroup>
+          <thead><tr><th colspan="2">NOMBRE Y APELLIDO</th><th>INDIVIDUALES</th><th colspan="2">NOMBRE Y APELLIDO</th></tr></thead>
+          <tbody>${blankIndividualRows()}</tbody>
+        </table>
+      </div>
+      <table class="model-result" aria-label="Resultado final">
+        <colgroup><col style="width:42%"><col style="width:8%"><col style="width:8%"><col style="width:42%"></colgroup>
+        <thead><tr><th>SALA</th><th colspan="2">RESULTADO FINAL</th><th>SALA</th></tr></thead>
+        <tbody><tr><td></td><td></td><td></td><td></td></tr><tr><td class="model-tri-left">TRIÁNGULOS TOTALES :</td><td></td><td></td><td class="model-tri-right">: TRIÁNGULOS TOTALES</td></tr></tbody>
+      </table>
+      <div class="model-subs">
+        <table><thead><tr><th>SUPLENTES</th></tr></thead><tbody><tr><td></td></tr><tr><td></td></tr></tbody></table>
+        <table><thead><tr><th>SUPLENTES</th></tr></thead><tbody><tr><td></td></tr><tr><td></td></tr></tbody></table>
+      </div>
+      <div class="model-signatures">
+        <div class="model-signature"><div class="model-signature-line"></div><div class="model-signature-label">FIRMA LOCAL</div></div>
+        <div class="model-signature"><div class="model-signature-line"></div><div class="model-signature-label">FIRMA VISITANTE</div></div>
+      </div>`;
+    return sheet;
+  }
+
+  async function downloadModelSheet(){
+    if (!window.html2canvas) throw new Error('No se pudo cargar el generador de imágenes.');
+    const previousBodyZoom = document.body.style.zoom;
+    let sheet = null;
+    try {
+      document.body.style.zoom = '1';
+      sheet = buildModelSheet();
+      document.body.appendChild(sheet);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const canvas = await window.html2canvas(sheet, {
+        backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false,
+        width:794, height:1123, windowWidth:794, windowHeight:1123
+      });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.96));
+      if (!blob) throw new Error('No se pudo generar la planilla modelo.');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'planilla-modelo-11-individuales.jpg';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } finally {
+      sheet?.remove();
+      document.body.style.zoom = previousBodyZoom;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const button = document.getElementById('btnPlanillaModelo');
+    if (!button) return;
+    button.addEventListener('click', async () => {
+      const originalText = button.textContent;
+      try {
+        button.disabled = true;
+        button.textContent = 'GENERANDO...';
+        await downloadModelSheet();
+      } catch (error) {
+        console.error(error);
+        alert(error?.message || 'No se pudo descargar la planilla modelo.');
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    });
+  });
+})();
+
 
 
 

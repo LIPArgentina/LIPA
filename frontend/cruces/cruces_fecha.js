@@ -2835,11 +2835,18 @@ function isAndroidAppWebView(){
 
   async function renderExportCanvas(){
     if (!window.html2canvas) throw new Error('Falta html2canvas para exportar.');
-    const sheet = buildExportSheetElement();
-    document.body.appendChild(sheet);
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const previousBodyZoom = document.body.style.zoom;
+    let sheet = null;
 
     try {
+      // El layout de escritorio usa body { zoom: .8 }. html2canvas hereda ese
+      // zoom y comprime la hoja y los glifos. La exportación debe renderizarse
+      // siempre en las dimensiones A4 reales.
+      document.body.style.zoom = '1';
+      sheet = buildExportSheetElement();
+      document.body.appendChild(sheet);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
       return await window.html2canvas(sheet, {
         backgroundColor: '#ffffff',
         scale: 2,
@@ -2851,7 +2858,8 @@ function isAndroidAppWebView(){
         windowHeight: 1123
       });
     } finally {
-      sheet.remove();
+      sheet?.remove();
+      document.body.style.zoom = previousBodyZoom;
     }
   }
 

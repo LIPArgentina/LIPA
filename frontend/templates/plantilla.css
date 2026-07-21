@@ -201,6 +201,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
     flex: 1;
     display: flex;
     justify-content: center;
+    gap: 8px;
   }
   .btn-cruces{
     background: transparent;
@@ -211,11 +212,53 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
     font-weight: 800;
     text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
   }
   .btn-cruces:hover{ background: rgba(255,255,255,.08); }
 
 
   .btn-cruces.is-disabled{ opacity:.5; pointer-events:none; filter:grayscale(0.2); }
+
+  .model-a4-sheet{
+    width:794px;
+    min-height:1123px;
+    padding:34px 38px 42px;
+    background:#fff;
+    color:#000;
+    border:1px solid #000;
+    position:fixed;
+    left:-10000px;
+    top:0;
+    z-index:-1;
+    font-family:Arial, Helvetica, sans-serif;
+  }
+  .model-a4-sheet *{ box-sizing:border-box; }
+  .model-meta{ display:flex; justify-content:space-between; font-size:12px; color:#333; margin-bottom:8px; }
+  .model-title{ margin:0; text-align:center; font-size:24px; font-weight:800; letter-spacing:.5px; }
+  .model-bar{ height:14px; background:#b5b5b5; margin:6px 0 14px; }
+  .model-header{ display:grid; grid-template-columns:1fr 140px 1fr; gap:18px; align-items:start; }
+  .model-logo{ display:grid; place-items:center; min-height:64px; }
+  .model-logo img{ max-width:100%; max-height:64px; object-fit:contain; }
+  .model-a4-sheet table{ width:100%; border-collapse:collapse; table-layout:fixed; color:#000; }
+  .model-a4-sheet td,.model-a4-sheet th{ border:2px solid #000; padding:0 4px; background:#fff; color:#000; font-size:14px; height:26px; }
+  .model-form td{ height:30px; }
+  .model-label{ width:95px; font-weight:800; text-align:center; text-transform:uppercase; white-space:nowrap; }
+  .model-section{ margin-top:14px; }
+  .model-individuals th{ height:28px; font-weight:800; text-align:center; text-transform:uppercase; letter-spacing:.3px; }
+  .model-vs{ text-align:center; vertical-align:middle; font-weight:700; }
+  .model-result{ margin-top:18px; }
+  .model-result th,.model-result td{ height:28px; }
+  .model-result th{ text-align:center; text-transform:uppercase; font-weight:800; }
+  .model-tri-left{ text-align:right; padding-right:10px !important; font-size:12px !important; font-weight:800; }
+  .model-tri-right{ text-align:left; padding-left:10px !important; font-size:12px !important; font-weight:800; }
+  .model-subs{ display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-top:18px; }
+  .model-subs th{ text-align:center; text-transform:uppercase; font-weight:800; }
+  .model-signatures{ display:grid; grid-template-columns:1fr 1fr; gap:120px; margin-top:70px; }
+  .model-signature{ display:grid; justify-items:center; gap:12px; padding-top:10px; }
+  .model-signature-line{ width:85%; border-top:1px dotted #000; }
+  .model-signature-label{ font-size:14px; font-weight:800; text-transform:uppercase; }
 
 
 .tap-selecting { outline: 2px solid #4cd964 !important; }
