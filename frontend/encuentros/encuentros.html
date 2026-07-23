@@ -100,6 +100,18 @@
       </div>
     </div>
 
+    <div class="player-photo-modal" id="playerPhotoModal" hidden>
+      <div class="player-photo-backdrop" data-close-player-photo="1"></div>
+      <div class="player-photo-dialog" role="dialog" aria-modal="true" aria-labelledby="playerPhotoName">
+        <button class="player-photo-close" id="btnClosePlayerPhoto" type="button" aria-label="Cerrar">×</button>
+        <h2 id="playerPhotoName">Jugador</h2>
+        <div class="player-photo-frame">
+          <img id="playerPhotoImage" src="../logo_liga.png" alt="Foto del jugador" />
+        </div>
+        <div class="player-photo-status" id="playerPhotoStatus"></div>
+      </div>
+    </div>
+
     <script src="../config.js"></script>
     <script src="../match-format.js"></script>
     <script src="./encuentros.js" defer></script>

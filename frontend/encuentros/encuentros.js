@@ -14,10 +14,17 @@
   const photosCounter = document.getElementById('photosCounter');
   const photosModalSubtitle = document.getElementById('photosModalSubtitle');
   const btnClosePhotos = document.getElementById('btnClosePhotos');
+  const playerPhotoModal = document.getElementById('playerPhotoModal');
+  const playerPhotoName = document.getElementById('playerPhotoName');
+  const playerPhotoImage = document.getElementById('playerPhotoImage');
+  const playerPhotoStatus = document.getElementById('playerPhotoStatus');
+  const btnClosePlayerPhoto = document.getElementById('btnClosePlayerPhoto');
 
   let currentPhotos = [];
   let currentPhotoIndex = 0;
   let currentObjectUrl = '';
+  let currentCategory = 'tercera';
+  const teamPlayersCache = new Map();
 
   function apiUrl(path){
     return API_BASE + path;
@@ -66,6 +73,95 @@
     if (!hasContent && !keepEmpty) return [];
     while (arr.length < expected) arr.push('');
     return arr.slice(0, expected);
+  }
+
+  function normalizePlayerName(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+  }
+
+  function playerPhotoUrl(player){
+    return player?.fotoUrl ? apiUrl(player.fotoUrl) : '../logo_liga.png';
+  }
+
+  async function loadTeamPlayers(teamRef){
+    const cacheKey = `${currentCategory}:${normalizePlayerName(teamRef)}`;
+    if (!teamPlayersCache.has(cacheKey)) {
+      const params = new URLSearchParams({ category: currentCategory, team: String(teamRef || '') });
+      teamPlayersCache.set(cacheKey, fetchJson(apiUrl('/api/players-public/by-team?' + params.toString()), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      }).then(data => Array.isArray(data?.players) ? data.players : []).catch(err => {
+        teamPlayersCache.delete(cacheKey);
+        throw err;
+      }));
+    }
+    return teamPlayersCache.get(cacheKey);
+  }
+
+  async function findPlayer(playerNameValue, teamRef){
+    const wanted = normalizePlayerName(playerNameValue);
+    const teamPlayers = await loadTeamPlayers(teamRef).catch(() => []);
+    const teamMatch = teamPlayers.find(player => normalizePlayerName(player?.nombre || player?.name) === wanted);
+    if (teamMatch) return teamMatch;
+
+    const data = await fetchJson(apiUrl('/api/players-public/search?q=' + encodeURIComponent(playerNameValue)), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    }).catch(() => null);
+    const candidates = Array.isArray(data?.players) ? data.players : [];
+    return candidates.find(player =>
+      normalizePlayerName(player?.nombre || player?.name) === wanted &&
+      (!player?.categoria || String(player.categoria).toLowerCase() === currentCategory)
+    ) || candidates.find(player => normalizePlayerName(player?.nombre || player?.name) === wanted) || null;
+  }
+
+  function closePlayerPhoto(){
+    if (!playerPhotoModal) return;
+    playerPhotoModal.hidden = true;
+    document.body.classList.remove('player-photo-open');
+  }
+
+  async function openPlayerPhoto(playerNameValue, teamRef){
+    if (!playerPhotoModal || !playerPhotoImage) return;
+    playerPhotoName.textContent = String(playerNameValue || 'Jugador');
+    playerPhotoImage.src = '../logo_liga.png';
+    playerPhotoImage.alt = `Foto de ${playerNameValue || 'jugador'}`;
+    playerPhotoStatus.textContent = 'Buscando foto…';
+    playerPhotoModal.hidden = false;
+    document.body.classList.add('player-photo-open');
+
+    const player = await findPlayer(playerNameValue, teamRef);
+    if (!player) {
+      playerPhotoStatus.textContent = 'No se encontró la ficha del jugador.';
+      return;
+    }
+    playerPhotoImage.src = playerPhotoUrl(player);
+    playerPhotoStatus.textContent = player?.fotoUrl ? '' : 'Este jugador todavía no tiene una foto cargada.';
+  }
+
+  function wirePlayerPhotoSlots(container, teamRef){
+    container.querySelectorAll('.slot').forEach(slot => {
+      const playerNameValue = String(slot.dataset.full || slot.textContent || '').trim();
+      if (!playerNameValue) return;
+      slot.classList.add('player-photo-trigger');
+      slot.tabIndex = 0;
+      slot.setAttribute('role', 'button');
+      slot.setAttribute('aria-label', `Ver foto de ${playerNameValue}`);
+      const open = () => openPlayerPhoto(playerNameValue, teamRef).catch(() => {
+        if (playerPhotoStatus) playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
+      });
+      slot.addEventListener('click', open);
+      slot.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        open();
+      });
+    });
   }
 
   function setPhotosStatus(text, type = ''){
@@ -310,11 +406,12 @@
     score.textContent = String(puntos);
 
     card.append(title, meta, section, score);
+    wirePlayerPhotoSlots(card, isLeft ? (item.localSlug || item.localName) : (item.visitanteSlug || item.visitanteName));
     wrap.appendChild(card);
     return wrap;
   }
 
-  function renderSideCard(planilla, scoreData, opponent, date, teamName, side){
+  function renderSideCard(planilla, scoreData, opponent, date, teamName, teamRef, side){
     const card = document.querySelector('#card-template').content.cloneNode(true).querySelector('.card');
     card.querySelector('.title').textContent = String(teamName || '').toUpperCase();
     const formattedDate = formatDate(date);
@@ -347,6 +444,7 @@
 
     const wrap = card.parentElement;
     wrap.classList.add(side === 'left' ? 'readonly-left' : 'readonly-right');
+    wirePlayerPhotoSlots(card, teamRef || teamName);
     return wrap;
   }
 
@@ -380,6 +478,7 @@
           item.visitanteName || item.visitanteSlug || '',
           item.fechaISO,
           item.localName || item.localSlug || '',
+          item.localSlug || item.localName || '',
           'left'
         )
       );
@@ -391,6 +490,7 @@
           item.localName || item.localSlug || '',
           item.fechaISO,
           item.visitanteName || item.visitanteSlug || '',
+          item.visitanteSlug || item.visitanteName || '',
           'right'
         )
       );
@@ -425,6 +525,7 @@
   async function init(){
     const params = new URLSearchParams(location.search);
     const category = String(params.get('category') || 'segunda').trim().toLowerCase();
+    currentCategory = category;
     const rawDate = params.get('date') || params.get('fechaISO') || '';
     const rawFecha = params.get('fecha') || '';
     const tipoFiltro = String(params.get('tipo') || '').trim().toLowerCase();
@@ -444,11 +545,16 @@
     });
 
     btnClosePhotos?.addEventListener('click', closePhotosModal);
+    btnClosePlayerPhoto?.addEventListener('click', closePlayerPhoto);
+    playerPhotoModal?.addEventListener('click', ev => {
+      if (ev.target?.matches('[data-close-player-photo]')) closePlayerPhoto();
+    });
     photosModal?.addEventListener('click', (ev) => {
       if (ev.target?.matches('[data-close-photos]')) closePhotosModal();
     });
     document.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape' && photosModal && !photosModal.hidden) closePhotosModal();
+      if (ev.key === 'Escape' && playerPhotoModal && !playerPhotoModal.hidden) closePlayerPhoto();
     });
 
     const data = await fetchJson(
