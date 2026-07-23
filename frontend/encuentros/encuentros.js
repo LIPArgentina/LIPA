@@ -82,7 +82,7 @@
 
   function resolvePlanillaFormat(planilla, scoreData){
     if (currentEdition === 5) {
-      return { individualCount: 7, pairCount: 2, substituteCount: 3 };
+      return { individualCount: 7, pairCount: 2, substituteCount: 2 };
     }
     if (currentEdition >= 6) {
       return { individualCount: INDIVIDUAL_COUNT, pairCount: 0, substituteCount: SUBSTITUTE_COUNT };
@@ -94,7 +94,7 @@
       (individualItems.length > 0 && individualItems.length <= 7 && scoreRows.length <= 9);
 
     return historicFormat
-      ? { individualCount: 7, pairCount: 2, substituteCount: 3 }
+      ? { individualCount: 7, pairCount: 2, substituteCount: 2 }
       : { individualCount: INDIVIDUAL_COUNT, pairCount: 0, substituteCount: SUBSTITUTE_COUNT };
   }
 
