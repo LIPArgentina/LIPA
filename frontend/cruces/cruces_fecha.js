@@ -62,6 +62,7 @@
     tercera: '__categoria_tercera__',
     segunda: '__categoria_segunda__'
   };
+  const teamPlayersCache = new Map();
 
   const normalizeCategoryValue = (raw) => {
     const v = String(raw || '').trim().toLowerCase();
@@ -274,6 +275,106 @@ function apiUrl(path){
 
   function deriveCategory(){
     return getCrucesTeamContext().category || '';
+  }
+
+  function normalizePlayerName(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+  }
+
+  function closePlayerPhoto(){
+    const modal = document.getElementById('playerPhotoModal');
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.classList.remove('player-photo-open');
+  }
+
+  async function loadTeamPlayers(teamRef){
+    const category = deriveCategory();
+    const cacheKey = `${category}:${normalizePlayerName(teamRef)}`;
+    if (!teamPlayersCache.has(cacheKey)) {
+      const params = new URLSearchParams({ category, team: String(teamRef || '') });
+      teamPlayersCache.set(cacheKey, fetchJson(apiUrl('/api/players-public/by-team?' + params.toString()), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      }).then(data => Array.isArray(data?.players) ? data.players : []).catch(err => {
+        teamPlayersCache.delete(cacheKey);
+        throw err;
+      }));
+    }
+    return teamPlayersCache.get(cacheKey);
+  }
+
+  async function findPlayer(playerNameValue, teamRef){
+    const wanted = normalizePlayerName(playerNameValue);
+    const players = await loadTeamPlayers(teamRef).catch(() => []);
+    const teamMatch = players.find(player => normalizePlayerName(player?.nombre || player?.name) === wanted);
+    if (teamMatch) return teamMatch;
+
+    const data = await fetchJson(apiUrl('/api/players-public/search?q=' + encodeURIComponent(playerNameValue)), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    }).catch(() => null);
+    const candidates = Array.isArray(data?.players) ? data.players : [];
+    const category = deriveCategory();
+    return candidates.find(player =>
+      normalizePlayerName(player?.nombre || player?.name) === wanted &&
+      (!player?.categoria || String(player.categoria).toLowerCase() === category)
+    ) || candidates.find(player => normalizePlayerName(player?.nombre || player?.name) === wanted) || null;
+  }
+
+  async function openPlayerPhoto(playerNameValue, teamRef){
+    const modal = document.getElementById('playerPhotoModal');
+    const name = document.getElementById('playerPhotoName');
+    const image = document.getElementById('playerPhotoImage');
+    const status = document.getElementById('playerPhotoStatus');
+    if (!modal || !name || !image || !status) return;
+
+    name.textContent = String(playerNameValue || 'Jugador');
+    image.src = '../logo_liga.png';
+    image.alt = `Foto de ${playerNameValue || 'jugador'}`;
+    status.textContent = 'Buscando foto…';
+    modal.hidden = false;
+    document.body.classList.add('player-photo-open');
+
+    const player = await findPlayer(playerNameValue, teamRef);
+    if (!player) {
+      status.textContent = 'No se encontró la ficha del jugador.';
+      return;
+    }
+    image.src = player?.fotoUrl ? apiUrl(player.fotoUrl) : '../logo_liga.png';
+    status.textContent = player?.fotoUrl ? '' : 'Este jugador todavía no tiene una foto cargada.';
+  }
+
+  function renderSlotContents(slot, playerNameValue){
+    const text = String(playerNameValue || '').trim();
+    slot.textContent = '';
+    if (!text) return;
+
+    const name = document.createElement('span');
+    name.className = 'slot-player-name';
+    name.textContent = text;
+
+    const photoButton = document.createElement('button');
+    photoButton.type = 'button';
+    photoButton.className = 'slot-photo-btn';
+    photoButton.textContent = '📷';
+    photoButton.setAttribute('aria-label', `Ver foto de ${text}`);
+    photoButton.addEventListener('click', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const root = slot.closest('#planilla-root-left, #planilla-root-right');
+      openPlayerPhoto(text, root?.dataset?.teamRef || '').catch(() => {
+        const status = document.getElementById('playerPhotoStatus');
+        if (status) status.textContent = 'No se pudo cargar la foto.';
+      });
+    });
+
+    slot.append(name, photoButton);
   }
 
   function getRegulationScoreMax(){
@@ -857,7 +958,7 @@ function apiUrl(path){
     if (playerId) slot.dataset.playerId = String(playerId);
     if (!isEmpty) {
       slot.setAttribute('data-full', String(text).trim());
-      slot.textContent = String(text).trim();
+      renderSlotContents(slot, text);
     }
 
     let ptsElement = null;
@@ -965,10 +1066,11 @@ function apiUrl(path){
     }
   }
 
-  function renderSide(rootId, planilla, opponent, date, teamName) {
+  function renderSide(rootId, planilla, opponent, date, teamName, teamRef = teamName) {
     const root = document.getElementById(rootId);
     if (!root) return;
     root.innerHTML = '';
+    root.dataset.teamRef = String(teamRef || teamName || '');
 
     const card = document.querySelector('#card-template').content.cloneNode(true).querySelector('.card');
     card.querySelector('.title').textContent = teamName.toUpperCase();
@@ -1213,7 +1315,7 @@ function apiUrl(path){
     const txt = String(value || '').trim();
     const id = String(playerId || '').trim();
     if (txt) {
-      slot.textContent = txt;
+      renderSlotContents(slot, txt);
       slot.setAttribute('data-full', txt);
       slot.classList.remove('is-empty');
     } else {
@@ -3134,8 +3236,17 @@ function isAndroidAppWebView(){
         visitantePlan
       };
 
-      renderSide('planilla-root-left',  localPlan,     visitante.name, match.date, local.name);
-      renderSide('planilla-root-right', visitantePlan, local.name,     match.date, visitante.name);
+      renderSide('planilla-root-left',  localPlan,     visitante.name, match.date, local.name, local.teamSlug);
+      renderSide('planilla-root-right', visitantePlan, local.name,     match.date, visitante.name, visitante.teamSlug);
+
+      document.getElementById('btnClosePlayerPhoto')?.addEventListener('click', closePlayerPhoto);
+      document.getElementById('playerPhotoModal')?.addEventListener('click', ev => {
+        if (ev.target?.matches('[data-close-player-photo]')) closePlayerPhoto();
+      });
+      document.addEventListener('keydown', ev => {
+        const modal = document.getElementById('playerPhotoModal');
+        if (ev.key === 'Escape' && modal && !modal.hidden) closePlayerPhoto();
+      });
 
       ['planilla-root-left', 'planilla-root-right'].forEach(id => {
         const root = document.getElementById(id);
