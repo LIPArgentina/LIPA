@@ -124,28 +124,29 @@ body {
 .slot-photo-btn{
   position:absolute;
   top:50%;
-  right:5px;
-  width:24px;
-  height:24px;
+  right:4px;
+  width:26px;
+  height:26px;
   padding:0;
   transform:translateY(-50%);
-  border:1px solid #b28900;
-  border-radius:999px;
-  background:#ffe65a;
-  color:#1b1600;
-  font-size:13px;
-  line-height:22px;
+  border:0;
+  background:transparent;
+  color:inherit;
+  font-size:18px;
+  line-height:1;
   text-align:center;
   cursor:pointer;
   pointer-events:auto;
   z-index:2;
 }
 
-.slot-photo-btn:hover,
+.slot-photo-btn:hover{
+  transform:translateY(-50%) scale(1.08);
+}
+
 .slot-photo-btn:focus-visible{
-  background:#ffd21f;
-  outline:2px solid #b28900;
-  outline-offset:1px;
+  outline:1px dotted currentColor;
+  outline-offset:0;
 }
 
 .slot.is-empty {
