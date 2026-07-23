@@ -24,6 +24,7 @@
   let currentPhotoIndex = 0;
   let currentObjectUrl = '';
   let currentCategory = 'tercera';
+  let currentEdition = 0;
   const teamPlayersCache = new Map();
 
   function apiUrl(path){
@@ -73,6 +74,28 @@
     if (!hasContent && !keepEmpty) return [];
     while (arr.length < expected) arr.push('');
     return arr.slice(0, expected);
+  }
+
+  function hasContent(value){
+    return Array.isArray(value) && value.some(item => String(item || '').trim());
+  }
+
+  function resolvePlanillaFormat(planilla, scoreData){
+    if (currentEdition === 5) {
+      return { individualCount: 7, pairCount: 2, substituteCount: 3 };
+    }
+    if (currentEdition >= 6) {
+      return { individualCount: INDIVIDUAL_COUNT, pairCount: 0, substituteCount: SUBSTITUTE_COUNT };
+    }
+
+    const individualItems = Array.isArray(planilla?.individuales) ? planilla.individuales : [];
+    const scoreRows = Array.isArray(scoreData?.scoreRows) ? scoreData.scoreRows : [];
+    const historicFormat = hasContent(planilla?.pareja1) || hasContent(planilla?.pareja2) ||
+      (individualItems.length > 0 && individualItems.length <= 7 && scoreRows.length <= 9);
+
+    return historicFormat
+      ? { individualCount: 7, pairCount: 2, substituteCount: 3 }
+      : { individualCount: INDIVIDUAL_COUNT, pairCount: 0, substituteCount: SUBSTITUTE_COUNT };
   }
 
   function normalizePlayerName(value){
@@ -421,12 +444,13 @@
 
     const scoreRows = Array.isArray(scoreData?.scoreRows) ? scoreData.scoreRows : [];
     const substitutions = Array.isArray(planilla?.substitutions) ? planilla.substitutions : [];
+    const format = resolvePlanillaFormat(planilla, scoreData);
     const data = {
       'CAPITÁN': safeArr(planilla?.capitan, 2),
-      'INDIVIDUALES': safeArr(planilla?.individuales, INDIVIDUAL_COUNT),
-      'PAREJA 1': safeArr(planilla?.pareja1, 2),
-      'PAREJA 2': safeArr(planilla?.pareja2, 2),
-      'SUPLENTES': safeArr(planilla?.suplentes, SUBSTITUTE_COUNT, { keepEmpty: true })
+      'INDIVIDUALES': safeArr(planilla?.individuales, format.individualCount),
+      'PAREJA 1': format.pairCount >= 1 ? safeArr(planilla?.pareja1, 2) : [],
+      'PAREJA 2': format.pairCount >= 2 ? safeArr(planilla?.pareja2, 2) : [],
+      'SUPLENTES': safeArr(planilla?.suplentes, format.substituteCount, { keepEmpty: true })
     };
 
     const secs = card.querySelector('.sections');
@@ -526,6 +550,7 @@
     const params = new URLSearchParams(location.search);
     const category = String(params.get('category') || 'segunda').trim().toLowerCase();
     currentCategory = category;
+    currentEdition = Number(params.get('edition')) || 0;
     const rawDate = params.get('date') || params.get('fechaISO') || '';
     const rawFecha = params.get('fecha') || '';
     const tipoFiltro = String(params.get('tipo') || '').trim().toLowerCase();

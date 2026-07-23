@@ -129,7 +129,7 @@ function ensureFechaBlock(section, fechaIndex, fechaText){
   const encuentrosBtn = clone.querySelector('.encuentros-btn');
   if (encuentrosBtn) {
     const dateValue = String(fechaText || '').trim();
-    const href = `../encuentros/encuentros.html?category=segunda&kind=${encodeURIComponent(selectedKind)}&date=${encodeURIComponent(dateValue)}&fecha=${encodeURIComponent(String(fechaIndex))}`;
+    const href = `../encuentros/encuentros.html?category=segunda&kind=${encodeURIComponent(selectedKind)}&edition=${encodeURIComponent(String(selectedEdition))}&date=${encodeURIComponent(dateValue)}&fecha=${encodeURIComponent(String(fechaIndex))}`;
     encuentrosBtn.href = href;
   }
 

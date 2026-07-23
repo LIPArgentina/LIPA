@@ -147,6 +147,7 @@ function ensureFechaBlock(section, fechaIndex, fechaText){
     const params = new URLSearchParams({
       category: 'tercera',
       kind: selectedKind,
+      edition: String(selectedEdition),
       date: buildDateKey(fechaText),
       fecha: String(fechaIndex)
     });
