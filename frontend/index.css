@@ -1020,6 +1020,7 @@
     width: 100%;
     height: 28px;
     padding: 2px 3px;
+    font-size: 0;
   }
 
   #btnAdminEquipos::after {
@@ -1071,9 +1072,12 @@
   }
 
   .actions > .btn,
-  #btnAdminEquipos,
   #btnAdminEquipos::after {
     font-size: 8px;
+  }
+
+  #btnAdminEquipos {
+    font-size: 0;
   }
 
   #sessionBox {
