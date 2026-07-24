@@ -962,3 +962,127 @@
     content: "Adm. equipos";
   }
 }
+
+/* Encabezado móvil: identidad arriba y accesos alineados en una sola fila. */
+@media (max-width: 768px) {
+  .topbar {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 7px;
+    padding: 7px 8px 8px;
+  }
+
+  .brand {
+    width: 100%;
+    min-height: 30px;
+    padding-right: 82px;
+    justify-content: center;
+  }
+
+  .brand__logo {
+    width: 27px;
+    height: 27px;
+  }
+
+  .brand__cta {
+    max-width: none;
+    font-size: 9px;
+    line-height: 1.05;
+    text-align: center;
+  }
+
+  .actions {
+    position: static;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .actions > .btn {
+    width: 100%;
+    min-width: 0;
+    height: 28px;
+    padding: 2px 3px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: none;
+  }
+
+  #btnAdminEquipos {
+    width: 100%;
+    height: 28px;
+    padding: 2px 3px;
+  }
+
+  #btnAdminEquipos::after {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-size: 9px;
+    line-height: 1;
+    text-align: center;
+  }
+
+  #sessionBox {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    z-index: 2;
+  }
+
+  #sessionBox .btn {
+    width: 76px;
+    height: 27px;
+    min-width: 0;
+    padding: 2px 4px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 8px;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .topbar {
+    padding: 6px 7px 7px;
+  }
+
+  .brand {
+    padding-right: 76px;
+  }
+
+  .actions {
+    gap: 4px;
+  }
+
+  .actions > .btn,
+  #btnAdminEquipos,
+  #btnAdminEquipos::after {
+    font-size: 8px;
+  }
+
+  #sessionBox {
+    top: 6px;
+    right: 7px;
+  }
+
+  #sessionBox .btn {
+    width: 70px;
+    font-size: 7.5px;
+  }
+}
