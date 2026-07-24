@@ -243,15 +243,6 @@ header.site-header{ flex-direction:column; align-items:flex-start; }
     font-size:14px;
   }
 
-  #btnFecha {
-    font-size: 0;
-  }
-  #btnFecha::after {
-    content: "PLANILLAS";
-    font-size: 0.58rem;
-    line-height: 1;
-  }
-
   #btnChangePassword {
     font-size: 0;
   }
@@ -269,6 +260,96 @@ header.site-header{ flex-direction:column; align-items:flex-start; }
 }
 
 @media (max-width: 520px){
+  .admin-shortcuts{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .admin-shortcuts .btn{
+    min-height:44px;
+    padding:7px 6px;
+    font-size:11px;
+    line-height:1.15;
+    letter-spacing:.2px;
+    white-space:normal;
+  }
+  .wrap{
+    margin:18px auto;
+    padding:0 8px;
+  }
+  .title-row{
+    align-items:flex-start;
+    gap:10px;
+    padding:6px 0 10px;
+    margin-bottom:10px;
+  }
+  .title-row .h1{
+    width:100%;
+    margin:0;
+    font-size:18px;
+    line-height:1.1;
+  }
+  .switches{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    width:100%;
+    gap:7px;
+  }
+  .sw{
+    min-width:0;
+    padding:7px 8px;
+    border-width:1px;
+    border-radius:10px;
+    font-size:12px;
+  }
+  .card{
+    border-radius:9px;
+  }
+  .card-header{
+    padding:10px 12px;
+  }
+  .title{
+    font-size:16px;
+  }
+  #teamsAdminView table{
+    min-width:1120px;
+    font-size:11px;
+  }
+  #teamsAdminView thead th{
+    padding:8px 7px;
+  }
+  #teamsAdminView tbody td{
+    padding:7px;
+  }
+  #teamsAdminView .input{
+    padding:6px 7px;
+    border-radius:7px;
+    font-size:11px;
+  }
+  #teamsAdminView thead th:nth-child(2),
+  #teamsAdminView tbody td:nth-child(2){width:180px;}
+  #teamsAdminView thead th:nth-child(3),
+  #teamsAdminView tbody td:nth-child(3){width:160px;}
+  #teamsAdminView thead th:nth-child(4),
+  #teamsAdminView tbody td:nth-child(4){width:160px;}
+  #teamsAdminView thead th:nth-child(5),
+  #teamsAdminView tbody td:nth-child(5){width:180px;}
+  #teamsAdminView thead th:nth-child(6),
+  #teamsAdminView tbody td:nth-child(6){width:230px;}
+  #teamsAdminView thead th:nth-child(7),
+  #teamsAdminView tbody td:nth-child(7){width:220px;}
+  .team-actions-cell{
+    width:220px;
+  }
+  .btn-toggle-team-active,
+  .btn-del-team{
+    padding:5px 7px;
+    border-radius:8px;
+    font-size:11px;
+  }
+}
+
+@media (max-width: 340px){
   .admin-shortcuts{
     grid-template-columns:1fr;
   }
@@ -491,18 +572,6 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
   }
 }
 
-
-
-@media (max-width: 480px) {
-  #btnCargaManualTorneo {
-    font-size: 0;
-  }
-  #btnCargaManualTorneo::after {
-    content: "TORNEO";
-    font-size: 0.58rem;
-    line-height: 1;
-  }
-}
 
 
 .sala-contact{min-width:260px;}
