@@ -515,7 +515,8 @@ async function switchEdition(edition){
 
 async function init(){
   applyEditionLayout();
-  try { selectedKind = localStorage.getItem('fixture_kind') || 'ida'; } catch(_) { selectedKind = 'ida'; }
+  selectedKind = 'ida';
+  try { localStorage.setItem('fixture_kind', selectedKind); } catch(_) {}
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {
     btn.addEventListener('click', () => {
       const kind = btn.getAttribute('data-fixture') || 'ida';

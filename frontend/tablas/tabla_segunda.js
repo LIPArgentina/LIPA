@@ -443,7 +443,8 @@ async function switchEdition(edition){
 
 async function init(){
   applyEditionState();
-  try { selectedKind = localStorage.getItem('fixture_kind_segunda') || 'ida'; } catch(_) { selectedKind = 'ida'; }
+  selectedKind = 'ida';
+  try { localStorage.setItem('fixture_kind_segunda', selectedKind); } catch(_) {}
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {
     btn.addEventListener('click', () => {
       const kind = btn.getAttribute('data-fixture') || 'ida';
