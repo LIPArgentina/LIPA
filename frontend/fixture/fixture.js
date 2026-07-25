@@ -8,10 +8,10 @@ const EDITION_LAYOUTS = {
   6: {
     segunda: {
       groups: ['A', 'B'],
-      matchesPerGroup: 3,
-      minFechas: 5,
+      matchesPerGroup: 2,
+      minFechas: 3,
       groupSettings: {
-        A: { matchesPerGroup: 3, minFechas: 5 },
+        A: { matchesPerGroup: 2, minFechas: 3 },
         B: { matchesPerGroup: 2, minFechas: 3 }
       }
     }
