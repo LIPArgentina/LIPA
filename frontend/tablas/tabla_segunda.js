@@ -312,7 +312,7 @@ function buildStandingRow(d, idx){
   const row = document.createElement('div');
   row.className = 'row';
   row.setAttribute('role', 'row');
-  const classified = selectedEdition >= 6 ? idx < 4 : idx < 2;
+  const classified = idx < 2;
   const pillClass = classified ? 'yellow' : 'white';
   row.innerHTML = `
     <div class="square" data-field="pos">${d.pos ?? ''}</div>
@@ -328,8 +328,8 @@ function fillBoard(group, data){
   const holder = document.querySelector(`[data-group-rows="${group}"]`);
   if (!holder) return;
   holder.innerHTML = '';
-  const rows = Array.isArray(data) ? data.slice() : [];
-  const rowCount = selectedEdition >= 6 ? 6 : rows.length;
+  const rowCount = selectedEdition >= 6 ? 4 : (Array.isArray(data) ? data.length : 0);
+  const rows = Array.isArray(data) ? data.slice(0, rowCount) : [];
   while (rows.length < rowCount) {
     rows.push({ pos: rows.length + 1, equipo: '', ju: '', tr: '', pts: '' });
   }
