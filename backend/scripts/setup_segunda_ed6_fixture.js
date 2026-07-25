@@ -64,9 +64,15 @@ function team(equipo) {
 }
 
 function table(grupo, matches) {
+  const orderedMatches = matches.slice().sort((left, right) => {
+    const leftHasBye = left.includes('WO') ? 1 : 0;
+    const rightHasBye = right.includes('WO') ? 1 : 0;
+    return leftHasBye - rightHasBye;
+  });
+
   return {
     grupo,
-    equipos: matches.flatMap(([local, visitante]) => [team(local), team(visitante)])
+    equipos: orderedMatches.flatMap(([local, visitante]) => [team(local), team(visitante)])
   };
 }
 
