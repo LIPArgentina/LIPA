@@ -8,8 +8,7 @@ const EDITION = 6;
 const CATEGORY = 'tercera';
 const APPLY = process.argv.includes('--apply');
 const GROUP_A_IDA_START = '2026-07-28';
-const GROUP_A_VUELTA_START = '2026-09-15';
-const GROUP_B_VUELTA_START = '2026-09-08';
+const VUELTA_START = '2026-09-15';
 
 function addDays(dateText, days) {
   const date = new Date(`${dateText}T00:00:00.000Z`);
@@ -176,11 +175,16 @@ function groupTable(fixture, dateIndex, group) {
 
 function buildFixtures(currentIda) {
   const currentFirstA = matchesFromTable(groupTable(currentIda, 0, 'A'));
-  if (currentFirstA.length !== 3) {
-    throw new Error('La primera fecha actual del Grupo A no tiene tres partidos');
+  if (currentFirstA.length !== 3 && currentFirstA.length !== 4) {
+    throw new Error('La primera fecha actual del Grupo A no tiene tres o cuatro partidos');
   }
 
-  const firstRoundA = [...currentFirstA, ['ALBA', 'WO']];
+  const alreadyHasAlbaBye = currentFirstA.some(
+    ([local, visitante]) => local === 'ALBA' && visitante === 'WO'
+  );
+  const firstRoundA = alreadyHasAlbaBye
+    ? currentFirstA
+    : [...currentFirstA, ['ALBA', 'WO']];
   const pairingRoundsA = findPairingRounds(firstRoundA);
   const optimizedA = optimizeLocalities(pairingRoundsA);
   const idaA = optimizedA.rounds;
@@ -206,14 +210,13 @@ function buildFixtures(currentIda) {
     })
   };
 
-  const vueltaDates = Array.from({ length: 8 }, (_, index) =>
-    addDays(GROUP_B_VUELTA_START, index * 7)
+  const vueltaDates = Array.from({ length: 7 }, (_, index) =>
+    addDays(VUELTA_START, index * 7)
   );
   const vuelta = {
     fechas: vueltaDates.map((date, index) => {
-      const tablas = [];
+      const tablas = [tableFromMatches('A', vueltaA[index])];
       if (index < 5) tablas.push(tableFromMatches('B', vueltaB[index]));
-      if (index >= 1) tablas.unshift(tableFromMatches('A', vueltaA[index - 1]));
       return { date, tablas };
     })
   };
@@ -240,12 +243,12 @@ function validateFixtures(ida, vuelta, currentIda) {
 
   if (idaA.length !== 7 || vueltaA.length !== 7) throw new Error('Grupo A debe tener 7 fechas por tramo');
   if (idaB.length !== 5 || vueltaB.length !== 5) throw new Error('Grupo B debe tener 5 fechas por tramo');
-  if (ida.fechas.length !== 7 || vuelta.fechas.length !== 8) throw new Error('Cantidad incorrecta de fechas calendario');
+  if (ida.fechas.length !== 7 || vuelta.fechas.length !== 7) throw new Error('Cantidad incorrecta de fechas calendario');
 
-  const expectedFirstA = [
-    ...matchesFromTable(groupTable(currentIda, 0, 'A')),
-    ['ALBA', 'WO']
-  ];
+  const currentFirstA = matchesFromTable(groupTable(currentIda, 0, 'A'));
+  const expectedFirstA = currentFirstA.some(
+    ([local, visitante]) => local === 'ALBA' && visitante === 'WO'
+  ) ? currentFirstA : [...currentFirstA, ['ALBA', 'WO']];
   if (JSON.stringify(idaA[0]) !== JSON.stringify(expectedFirstA)) {
     throw new Error('La primera fecha del Grupo A fue modificada');
   }
@@ -291,11 +294,12 @@ function validateFixtures(ida, vuelta, currentIda) {
   if (ida.fechas[0].date !== '2026-07-28' || ida.fechas[6].date !== '2026-09-08') {
     throw new Error('Fechas de ida incorrectas');
   }
-  if (vuelta.fechas[0].date !== '2026-09-08' || vuelta.fechas[7].date !== '2026-10-27') {
+  if (vuelta.fechas[0].date !== '2026-09-15' || vuelta.fechas[6].date !== '2026-10-27') {
     throw new Error('Fechas de vuelta incorrectas');
   }
-  if (vuelta.fechas[0].tablas.some(tabla => tabla.grupo === 'A')) {
-    throw new Error('Grupo A no debe comenzar la vuelta el 08/09');
+  if (!vuelta.fechas[0].tablas.some(tabla => tabla.grupo === 'A') ||
+      !vuelta.fechas[0].tablas.some(tabla => tabla.grupo === 'B')) {
+    throw new Error('Ambos grupos deben comenzar la vuelta el 15/09');
   }
 }
 
