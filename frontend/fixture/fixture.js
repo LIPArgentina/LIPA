@@ -14,6 +14,15 @@ const EDITION_LAYOUTS = {
         A: { matchesPerGroup: 2, minFechas: 3 },
         B: { matchesPerGroup: 2, minFechas: 3 }
       }
+    },
+    tercera: {
+      groups: ['A', 'B'],
+      matchesPerGroup: 3,
+      minFechas: 7,
+      groupSettings: {
+        A: { matchesPerGroup: 4, minFechas: 7 },
+        B: { matchesPerGroup: 3, minFechas: 5 }
+      }
     }
   }
 };
@@ -287,11 +296,26 @@ function getCategoryConfig(cat, fixture, edition){
     if (!groups.includes(group)) groups.push(group);
   });
 
+  const visibleDatesByGroup = {};
+  const roundNumberByGroupAndDate = {};
+  (fixture?.fechas || []).forEach((fecha, index) => {
+    (Array.isArray(fecha?.tablas) ? fecha.tablas : []).forEach(tabla => {
+      const group = String(tabla?.grupo || '').toUpperCase();
+      if (!group) return;
+      if (!visibleDatesByGroup[group]) visibleDatesByGroup[group] = [];
+      if (!roundNumberByGroupAndDate[group]) roundNumberByGroupAndDate[group] = {};
+      visibleDatesByGroup[group].push(index + 1);
+      roundNumberByGroupAndDate[group][index + 1] = visibleDatesByGroup[group].length;
+    });
+  });
+
   return {
     ...base,
     category: key,
     groups,
-    minFechas: Math.max(base.minFechas || 0, fixture?.fechas?.length || 0)
+    minFechas: Math.max(base.minFechas || 0, fixture?.fechas?.length || 0),
+    visibleDatesByGroup,
+    roundNumberByGroupAndDate
   };
 }
 
@@ -301,17 +325,17 @@ function getRenderedGroups(){
     .filter((g, i, arr) => g && arr.indexOf(g) === i);
 }
 
-function createFechaCard(grupo, fecha){
+function createFechaCard(grupo, fecha, displayFecha = fecha){
   const section = document.createElement('section');
   section.className = 'card fecha-card';
   section.dataset.group = grupo;
   section.dataset.fecha = String(fecha);
-  section.setAttribute('aria-label', `Fixture GRUPO ${grupo} - ${fecha}ª fecha`);
+  section.setAttribute('aria-label', `Fixture GRUPO ${grupo} - ${displayFecha}ª fecha`);
 
   section.innerHTML = `
     <h1 class="h1">GRUPO ${grupo}</h1>
     <div class="fecha-header">
-      <div class="h2">${fecha}ª FECHA</div>
+      <div class="h2">${displayFecha}ª FECHA</div>
       <input type="date" class="fecha-input" aria-label="Fecha de calendario"/>
     </div>
     <div class="rule"></div>
@@ -334,10 +358,19 @@ function buildFixtureLayout(config){
     inner.className = 'fecha-grid';
 
     config.groups.forEach(grupo => {
+      const visibleDates = config.visibleDatesByGroup?.[grupo] || [];
+      const hasFixtureLayout = visibleDates.length > 0;
       const groupMaxFechas = config.groupSettings?.[grupo]?.minFechas ?? config.minFechas;
-      if (fecha <= groupMaxFechas) inner.appendChild(createFechaCard(grupo, fecha));
+      const shouldRender = hasFixtureLayout
+        ? visibleDates.includes(fecha)
+        : fecha <= groupMaxFechas;
+      if (!shouldRender) return;
+
+      const displayFecha = config.roundNumberByGroupAndDate?.[grupo]?.[fecha] ?? fecha;
+      inner.appendChild(createFechaCard(grupo, fecha, displayFecha));
     });
 
+    if (!inner.children.length) continue;
     block.appendChild(inner);
     grid.appendChild(block);
   }
