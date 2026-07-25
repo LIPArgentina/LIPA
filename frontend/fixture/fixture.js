@@ -4,6 +4,20 @@ const CATEGORY_LAYOUTS = {
   tercera: { groups: ['A', 'B', 'C', 'D'], matchesPerGroup: 2, minFechas: 3 }
 };
 
+const EDITION_LAYOUTS = {
+  6: {
+    segunda: {
+      groups: ['A', 'B'],
+      matchesPerGroup: 3,
+      minFechas: 5,
+      groupSettings: {
+        A: { matchesPerGroup: 2, minFechas: 3 },
+        B: { matchesPerGroup: 3, minFechas: 5 }
+      }
+    }
+  }
+};
+
 const KIND_KEY = 'fixture_kind';
 const CAT_KEY  = 'fixture_cat';
 const EDITION_KEY = 'fixture_edition';
@@ -259,9 +273,10 @@ window.FixtureSwitcher = {
 
 function getCategoryConfig(cat, fixture, edition){
   const key = String(cat || 'tercera').toLowerCase();
-  const base = Number(edition) >= 6 && key === 'tercera'
+  const editionLayout = EDITION_LAYOUTS[Number(edition)]?.[key];
+  const base = editionLayout || (Number(edition) >= 6 && key === 'tercera'
     ? CATEGORY_LAYOUTS.segunda
-    : (CATEGORY_LAYOUTS[key] || CATEGORY_LAYOUTS.tercera);
+    : (CATEGORY_LAYOUTS[key] || CATEGORY_LAYOUTS.tercera));
   const fixtureGroups = Array.from(new Set((fixture?.fechas || [])
     .flatMap(fecha => Array.isArray(fecha.tablas) ? fecha.tablas : [])
     .map(tabla => String(tabla?.grupo || '').toUpperCase())
@@ -318,7 +333,10 @@ function buildFixtureLayout(config){
     const inner = document.createElement('div');
     inner.className = 'fecha-grid';
 
-    config.groups.forEach(grupo => inner.appendChild(createFechaCard(grupo, fecha)));
+    config.groups.forEach(grupo => {
+      const groupMaxFechas = config.groupSettings?.[grupo]?.minFechas ?? config.minFechas;
+      if (fecha <= groupMaxFechas) inner.appendChild(createFechaCard(grupo, fecha));
+    });
 
     block.appendChild(inner);
     grid.appendChild(block);
@@ -518,7 +536,9 @@ window.applyFixture = async function applyFixture(){
       if (!cont) return;
       const tabla = (fx.fechas?.[fecha - 1]?.tablas || []).find(t => String(t?.grupo || '').toUpperCase() === grupo);
       const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
-      renderRows(cont, equipos, fecha, grupo, equiposCat, config.matchesPerGroup);
+      const matchesPerGroup = config.groupSettings?.[grupo]?.matchesPerGroup
+        ?? config.matchesPerGroup;
+      renderRows(cont, equipos, fecha, grupo, equiposCat, matchesPerGroup);
     });
   }
 
