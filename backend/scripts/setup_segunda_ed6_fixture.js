@@ -10,7 +10,7 @@ const START_IDA = '2026-07-27';
 const START_VUELTA = '2026-08-31';
 const APPLY = process.argv.includes('--apply');
 
-const GROUP_A = [
+const FOUR_TEAM_GROUP = [
   [
     ['ALBA POOL', 'VICTORIA'],
     ['LOS PATOS DE LA LIGA', 'OLDIES']
@@ -25,7 +25,7 @@ const GROUP_A = [
   ]
 ];
 
-const GROUP_B = [
+const FIVE_TEAM_GROUP = [
   [
     ['EL TREBOL', 'WEST'],
     ['TAKOS PRO', 'WO'],
@@ -78,8 +78,8 @@ function buildFixture(startDate, reverse = false) {
         : matches;
       const tablas = [];
 
-      if (GROUP_A[index]) tablas.push(table('A', reverseMatches(GROUP_A[index])));
-      tablas.push(table('B', reverseMatches(GROUP_B[index])));
+      tablas.push(table('A', reverseMatches(FIVE_TEAM_GROUP[index])));
+      if (FOUR_TEAM_GROUP[index]) tablas.push(table('B', reverseMatches(FOUR_TEAM_GROUP[index])));
 
       return {
         date: addDays(startDate, index * 7),
@@ -98,26 +98,26 @@ function validateFixture(data, kind) {
     throw new Error(`${kind}: se esperaban 5 fechas`);
   }
 
-  const expectedMatches = { A: 6, B: 10 };
+  const expectedMatches = { A: 10, B: 6 };
   const seen = { A: new Set(), B: new Set() };
 
   data.fechas.forEach((fecha, index) => {
     const groupA = fecha.tablas.find(item => item.grupo === 'A');
     const groupB = fecha.tablas.find(item => item.grupo === 'B');
 
-    if (index < 3 && groupA?.equipos?.length !== 4) {
-      throw new Error(`${kind}: Grupo A debe tener 2 partidos en fecha ${index + 1}`);
+    if (groupA?.equipos?.length !== 6) {
+      throw new Error(`${kind}: Grupo A debe tener 3 cruces en fecha ${index + 1}`);
     }
-    if (index >= 3 && groupA) {
-      throw new Error(`${kind}: Grupo A no debe jugar en fecha ${index + 1}`);
+    if (index < 3 && groupB?.equipos?.length !== 4) {
+      throw new Error(`${kind}: Grupo B debe tener 2 partidos en fecha ${index + 1}`);
     }
-    if (groupB?.equipos?.length !== 6) {
-      throw new Error(`${kind}: Grupo B debe tener 3 cruces en fecha ${index + 1}`);
+    if (index >= 3 && groupB) {
+      throw new Error(`${kind}: Grupo B no debe jugar en fecha ${index + 1}`);
     }
 
-    const woCount = groupB.equipos.filter(item => item.equipo === 'WO').length;
+    const woCount = groupA.equipos.filter(item => item.equipo === 'WO').length;
     if (woCount !== 1) {
-      throw new Error(`${kind}: Grupo B debe tener exactamente un WO en fecha ${index + 1}`);
+      throw new Error(`${kind}: Grupo A debe tener exactamente un WO en fecha ${index + 1}`);
     }
 
     fecha.tablas.forEach(({ grupo, equipos }) => {
