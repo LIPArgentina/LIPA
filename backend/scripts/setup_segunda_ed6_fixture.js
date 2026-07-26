@@ -19,27 +19,27 @@ const FOUR_TEAM_GROUP = [
     ['LOS PATOS DE LA LIGA', 'OLDIES']
   ],
   [
-    ['ALBA POOL', 'LOS PATOS DE LA LIGA'],
-    ['VICTORIA', 'OLDIES']
+    ['VICTORIA', 'LOS PATOS DE LA LIGA'],
+    ['OLDIES', 'ALBA POOL']
   ],
   [
-    ['OLDIES', 'ALBA POOL'],
-    ['LOS PATOS DE LA LIGA', 'VICTORIA']
+    ['ALBA POOL', 'LOS PATOS DE LA LIGA'],
+    ['OLDIES', 'VICTORIA']
   ]
 ];
 
 const FOUR_TEAM_GROUP_A = [
   [
     ['EL TREBOL', 'WEST'],
-    ['TOMAS', 'TAKOS PRO']
+    ['TAKOS PRO', 'TOMAS']
   ],
   [
-    ['TAKOS PRO', 'WEST'],
+    ['WEST', 'TAKOS PRO'],
     ['TOMAS', 'EL TREBOL']
   ],
   [
-    ['EL TREBOL', 'TAKOS PRO'],
-    ['WEST', 'TOMAS']
+    ['TAKOS PRO', 'EL TREBOL'],
+    ['TOMAS', 'WEST']
   ]
 ];
 
@@ -128,8 +128,8 @@ function validateFixture(data, kind) {
 }
 
 async function main() {
-  const ida = buildFixture(START_IDA, true);
-  const vuelta = buildFixture(START_VUELTA);
+  const ida = buildFixture(START_IDA);
+  const vuelta = buildFixture(START_VUELTA, true);
   validateFixture(ida, 'ida');
   validateFixture(vuelta, 'vuelta');
   const firstGroupA = ida.fechas[0].tablas.find(item => item.grupo === 'A');
