@@ -851,9 +851,10 @@ function apiUrl(path){
             if (key) map.set(key, normalizedPlan);
           });
 
-          const aliasSources = [];
-          if (!rawLookup.hasCategory) aliasSources.push(...rawLookup.variants);
-          if (planTeam && !planLookup.hasCategory) aliasSources.push(...planLookup.variants);
+          const aliasSources = [
+            ...rawLookup.variants,
+            ...(planTeam ? planLookup.variants : [])
+          ];
 
           aliasSources.forEach(aliasKey => {
             const normalizedAlias = normPlanillaSlug(aliasKey);
