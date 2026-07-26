@@ -128,10 +128,19 @@ function validateFixture(data, kind) {
 }
 
 async function main() {
-  const ida = buildFixture(START_IDA);
-  const vuelta = buildFixture(START_VUELTA, true);
+  const ida = buildFixture(START_IDA, true);
+  const vuelta = buildFixture(START_VUELTA);
   validateFixture(ida, 'ida');
   validateFixture(vuelta, 'vuelta');
+  const firstGroupA = ida.fechas[0].tablas.find(item => item.grupo === 'A');
+  const takosProVsTomas = firstGroupA.equipos.some((item, index, equipos) =>
+    index % 2 === 0 &&
+    item.equipo === 'TAKOS PRO' &&
+    equipos[index + 1]?.equipo === 'TOMAS'
+  );
+  if (!takosProVsTomas) {
+    throw new Error('La ida debe comenzar con TAKOS PRO como local ante TOMAS');
+  }
 
   if (!APPLY) {
     console.log(JSON.stringify({ ok: true, dryRun: true, ida, vuelta }, null, 2));
