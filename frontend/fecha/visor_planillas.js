@@ -818,11 +818,13 @@ function resetCategoryHeaderIndicators(){
 
 
 
-    const llavesSchedule = await loadNextScheduleFromLlaves(category);
-    if (llavesSchedule?.scheduledAt) {
-      const statusFixtureDate = parseDateKeyFromValue(status?.nextFixtureDate);
-      const llavesFixtureDate = parseDateKeyFromValue(llavesSchedule.fixtureDate);
-      if (!status?.scheduledAt || (llavesFixtureDate && (!statusFixtureDate || llavesFixtureDate > statusFixtureDate))) {
+    // El estado del backend ya contempla fixture y llaves, y siempre debe ser
+    // la fuente principal. Consultamos llaves directamente solo como respaldo
+    // cuando el backend no pudo determinar una próxima fecha.
+    if (!status?.scheduledAt) {
+      const llavesSchedule = await loadNextScheduleFromLlaves(category);
+      if (llavesSchedule?.scheduledAt) {
+        const llavesFixtureDate = parseDateKeyFromValue(llavesSchedule.fixtureDate);
         status.scheduledAt = llavesSchedule.scheduledAt;
         status.nextFixtureDate = llavesFixtureDate || status.nextFixtureDate;
         status.scheduleSource = 'llaves';
