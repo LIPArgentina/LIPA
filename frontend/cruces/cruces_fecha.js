@@ -822,11 +822,20 @@ function apiUrl(path){
       const arr = await r.json();
       if (Array.isArray(arr)) {
         arr.forEach(item => {
-          const rawTeam = item?.team || item?.slug || item?.equipo || item?.nombre || '';
           const plan = item?.planilla || item?.plan || item || {};
+          const requestedCategory = deriveCategory();
+          const itemCategory = normalizeCategoryValue(
+            item?.category ||
+            item?.division ||
+            plan?.category ||
+            plan?.categoria
+          );
+          if (requestedCategory && itemCategory && requestedCategory !== itemCategory) return;
+
+          const rawTeam = item?.slug_uid || item?.team || item?.slug || item?.equipo || item?.nombre || '';
           const planTeam = plan?.team || '';
           const normalizedPlan = {
-            team: item?.team || rawTeam || planTeam || '',
+            team: rawTeam || planTeam || '',
             capitan: Array.isArray(plan.capitan) ? plan.capitan : Array(CAPTAIN_COUNT).fill(''),
             individuales: Array.isArray(plan.individuales) ? plan.individuales : Array(INDIVIDUAL_COUNT).fill(''),
             pareja1: PAIR_COUNT >= 1 && Array.isArray(plan.pareja1) ? plan.pareja1 : [],
