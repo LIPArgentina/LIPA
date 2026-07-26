@@ -77,7 +77,10 @@ function buildRoundsFromArrangement(arrangement) {
   return rounds;
 }
 
-function findPairingRounds(firstRound, { requireAcademySecond = true } = {}) {
+function findPairingRounds(
+  firstRound,
+  { requireAcademySecond = true, forbidConsecutiveByes = false } = {}
+) {
   const indexes = firstRound.map((_, index) => index);
 
   for (const order of permutations(indexes)) {
@@ -94,7 +97,19 @@ function findPairingRounds(firstRound, { requireAcademySecond = true } = {}) {
 
       const rounds = buildRoundsFromArrangement(arrangement);
       const academySecondRound = rounds[1].find(pair => pair.includes('ACADEMIA DE POOL'));
-      if (!requireAcademySecond || (academySecondRound && !academySecondRound.includes('WO'))) {
+      const realTeams = [...new Set(firstRound.flat().filter(team => team !== 'WO'))];
+      const hasConsecutiveByes = forbidConsecutiveByes && realTeams.some(team => {
+        const byeRounds = rounds.map(round =>
+          round.some(pair => pair.includes(team) && pair.includes('WO'))
+        );
+        return byeRounds.some((isBye, roundIndex) =>
+          isBye && roundIndex > 0 && byeRounds[roundIndex - 1]
+        );
+      });
+      if (
+        !hasConsecutiveByes &&
+        (!requireAcademySecond || (academySecondRound && !academySecondRound.includes('WO')))
+      ) {
         rounds[0] = firstRound.map(pair => pair.slice());
         return rounds;
       }
@@ -266,7 +281,7 @@ function buildFixtures(currentIda) {
   }
   const pairingRoundsB = findPairingRounds(
     [...currentFirstB, ['WO', 'WO']],
-    { requireAcademySecond: false }
+    { requireAcademySecond: false, forbidConsecutiveByes: true }
   );
   const optimizedB = optimizeGroupBLocalities(pairingRoundsB);
   const idaB = optimizedB.rounds;
@@ -369,6 +384,15 @@ function validateFixtures(ida, vuelta, currentIda) {
     });
     if (sharedRoles[0] && sharedRoles[0] === sharedRoles[1]) {
       throw new Error(`Grupo B: conflicto de sala en fecha ${index + 1}`);
+    }
+  });
+  const groupBTeams = [...new Set(idaB.flat(2).filter(team => team !== 'WO'))];
+  groupBTeams.forEach(team => {
+    const byeRounds = idaB.map(round =>
+      round.some(pair => pair.includes(team) && pair.includes('WO'))
+    );
+    if (byeRounds.some((isBye, index) => isBye && index > 0 && byeRounds[index - 1])) {
+      throw new Error(`Grupo B: ${team} tiene dos fechas libres consecutivas`);
     }
   });
 
