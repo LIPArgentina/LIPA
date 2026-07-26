@@ -21,7 +21,7 @@ const EDITION_LAYOUTS = {
       minFechas: 7,
       groupSettings: {
         A: { matchesPerGroup: 4, minFechas: 7 },
-        B: { matchesPerGroup: 4, minFechas: 7 }
+        B: { matchesPerGroup: 3, minFechas: 7 }
       }
     }
   }
@@ -298,14 +298,22 @@ function getCategoryConfig(cat, fixture, edition){
 
   const visibleDatesByGroup = {};
   const roundNumberByGroupAndDate = {};
+  const restDatesByGroup = {};
+  const playedRoundsByGroup = {};
   (fixture?.fechas || []).forEach((fecha, index) => {
     (Array.isArray(fecha?.tablas) ? fecha.tablas : []).forEach(tabla => {
       const group = String(tabla?.grupo || '').toUpperCase();
       if (!group) return;
       if (!visibleDatesByGroup[group]) visibleDatesByGroup[group] = [];
       if (!roundNumberByGroupAndDate[group]) roundNumberByGroupAndDate[group] = {};
+      if (!restDatesByGroup[group]) restDatesByGroup[group] = [];
       visibleDatesByGroup[group].push(index + 1);
-      roundNumberByGroupAndDate[group][index + 1] = visibleDatesByGroup[group].length;
+      if (tabla?.fechaLibrePorReajuste) {
+        restDatesByGroup[group].push(index + 1);
+      } else {
+        playedRoundsByGroup[group] = (playedRoundsByGroup[group] || 0) + 1;
+        roundNumberByGroupAndDate[group][index + 1] = playedRoundsByGroup[group];
+      }
     });
   });
 
@@ -315,7 +323,8 @@ function getCategoryConfig(cat, fixture, edition){
     groups,
     minFechas: Math.max(base.minFechas || 0, fixture?.fechas?.length || 0),
     visibleDatesByGroup,
-    roundNumberByGroupAndDate
+    roundNumberByGroupAndDate,
+    restDatesByGroup
   };
 }
 
@@ -325,21 +334,28 @@ function getRenderedGroups(){
     .filter((g, i, arr) => g && arr.indexOf(g) === i);
 }
 
-function createFechaCard(grupo, fecha, displayFecha = fecha){
+function createFechaCard(grupo, fecha, displayFecha = fecha, isAdjustmentBreak = false){
   const section = document.createElement('section');
-  section.className = 'card fecha-card';
+  section.className = `card fecha-card${isAdjustmentBreak ? ' adjustment-break-card' : ''}`;
   section.dataset.group = grupo;
   section.dataset.fecha = String(fecha);
-  section.setAttribute('aria-label', `Fixture GRUPO ${grupo} - ${displayFecha}ª fecha`);
+  section.setAttribute(
+    'aria-label',
+    isAdjustmentBreak
+      ? `Fixture GRUPO ${grupo} - fecha libre por reajuste`
+      : `Fixture GRUPO ${grupo} - ${displayFecha}ª fecha`
+  );
 
   section.innerHTML = `
     <h1 class="h1">GRUPO ${grupo}</h1>
     <div class="fecha-header">
-      <div class="h2">${displayFecha}ª FECHA</div>
+      <div class="h2">${isAdjustmentBreak ? 'FECHA LIBRE' : `${displayFecha}ª FECHA`}</div>
       <input type="date" class="fecha-input" aria-label="Fecha de calendario"/>
     </div>
     <div class="rule"></div>
-    <div class="rows" data-fecha="${fecha}" data-group="${grupo}"></div>
+    <div class="rows${isAdjustmentBreak ? ' adjustment-break' : ''}" data-fecha="${fecha}" data-group="${grupo}">
+      ${isAdjustmentBreak ? '<div class="adjustment-break-message">FECHA LIBRE POR REAJUSTE</div>' : ''}
+    </div>
   `;
   return section;
 }
@@ -367,7 +383,8 @@ function buildFixtureLayout(config){
       if (!shouldRender) return;
 
       const displayFecha = config.roundNumberByGroupAndDate?.[grupo]?.[fecha] ?? fecha;
-      inner.appendChild(createFechaCard(grupo, fecha, displayFecha));
+      const isAdjustmentBreak = config.restDatesByGroup?.[grupo]?.includes(fecha) || false;
+      inner.appendChild(createFechaCard(grupo, fecha, displayFecha, isAdjustmentBreak));
     });
 
     if (!inner.children.length) continue;
@@ -568,6 +585,7 @@ window.applyFixture = async function applyFixture(){
       const cont = document.querySelector(`.rows[data-fecha="${fecha}"][data-group="${grupo}"]`);
       if (!cont) return;
       const tabla = (fx.fechas?.[fecha - 1]?.tablas || []).find(t => String(t?.grupo || '').toUpperCase() === grupo);
+      if (tabla?.fechaLibrePorReajuste) return;
       const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
       const matchesPerGroup = config.groupSettings?.[grupo]?.matchesPerGroup
         ?? config.matchesPerGroup;
@@ -640,7 +658,12 @@ function buildFixtureFromUI(){
         });
       });
 
-      entry.tablas.push({ grupo, equipos });
+      const fechaLibrePorReajuste = card.classList.contains('adjustment-break-card');
+      entry.tablas.push({
+        grupo,
+        equipos,
+        ...(fechaLibrePorReajuste ? { fechaLibrePorReajuste: true } : {})
+      });
     });
 
     return entry;

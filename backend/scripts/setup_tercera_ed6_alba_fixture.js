@@ -10,6 +10,8 @@ const APPLY = process.argv.includes('--apply');
 const GROUP_A_IDA_START = '2026-07-28';
 const VUELTA_START = '2026-09-15';
 const SHARED_VENUE_TEAMS = ['EL TREBOL', 'LOS PATOS DEL TREBOL'];
+const GROUP_B_IDA_ROUNDS_BY_SLOT = [0, 1, null, 2, 3, null, 4];
+const GROUP_B_VUELTA_ROUNDS_BY_SLOT = [0, null, 1, 2, null, 3, 4];
 
 function addDays(dateText, days) {
   const date = new Date(`${dateText}T00:00:00.000Z`);
@@ -39,6 +41,14 @@ function tableFromMatches(grupo, matches) {
       fixtureTeam(local, 'local'),
       fixtureTeam(visitante, 'visitante')
     ])
+  };
+}
+
+function adjustmentBreakTable(grupo) {
+  return {
+    grupo,
+    equipos: [],
+    fechaLibrePorReajuste: true
   };
 }
 
@@ -187,6 +197,40 @@ function optimizeGroupBLocalities(pairingRounds) {
   return { rounds: best, score: bestScore };
 }
 
+function findBestGroupBRounds(firstRound) {
+  const indexes = firstRound.map((_, index) => index);
+  const seenPairingOrders = new Set();
+  let best = null;
+
+  for (const order of permutations(indexes)) {
+    for (let flipMask = 0; flipMask < (1 << firstRound.length); flipMask++) {
+      const placedPairs = order.map((pairIndex, position) => {
+        const pair = firstRound[pairIndex].slice();
+        return (flipMask & (1 << position)) ? pair.reverse() : pair;
+      });
+      const arrangement = Array(firstRound.length * 2);
+      placedPairs.forEach((pair, index) => {
+        arrangement[index] = pair[0];
+        arrangement[arrangement.length - 1 - index] = pair[1];
+      });
+
+      const rounds = buildRoundsFromArrangement(arrangement);
+      rounds[0] = firstRound.map(pair => pair.slice());
+      const pairingKey = rounds.slice(1).map(round =>
+        round.map(([left, right]) => realPairKey(left, right)).sort().join('|')
+      ).join('::');
+      if (seenPairingOrders.has(pairingKey)) continue;
+      seenPairingOrders.add(pairingKey);
+
+      const optimized = optimizeGroupBLocalities(rounds);
+      if (!best || optimized.score < best.score) best = optimized;
+    }
+  }
+
+  if (!best) throw new Error('No se pudo sortear el calendario del Grupo B');
+  return best;
+}
+
 function optimizeLocalities(pairingRounds) {
   const variableMatches = [];
   for (let round = 1; round < pairingRounds.length; round++) {
@@ -275,22 +319,21 @@ function buildFixtures(currentIda) {
   const vueltaA = reverseMatches(idaA);
 
   const currentFirstB = matchesFromTable(groupTable(currentIda, 0, 'B'))
-    .filter(([local, visitante]) => local !== 'WO' || visitante !== 'WO');
+    .filter(([local, visitante]) => local !== 'WO' && visitante !== 'WO');
   if (currentFirstB.length !== 3) {
     throw new Error('La primera fecha actual del Grupo B no tiene tres partidos');
   }
-  const pairingRoundsB = findPairingRounds(
-    [...currentFirstB, ['WO', 'WO']],
-    { requireAcademySecond: false, forbidConsecutiveByes: true }
-  );
-  const optimizedB = optimizeGroupBLocalities(pairingRoundsB);
+  const optimizedB = findBestGroupBRounds(currentFirstB);
   const idaB = optimizedB.rounds;
   const vueltaB = reverseMatches(idaB);
 
   const ida = {
     fechas: Array.from({ length: 7 }, (_, index) => {
       const tablas = [tableFromMatches('A', idaA[index])];
-      tablas.push(tableFromMatches('B', idaB[index]));
+      const groupBRound = GROUP_B_IDA_ROUNDS_BY_SLOT[index];
+      tablas.push(groupBRound === null
+        ? adjustmentBreakTable('B')
+        : tableFromMatches('B', idaB[groupBRound]));
       return {
         date: addDays(GROUP_A_IDA_START, index * 7),
         tablas
@@ -304,7 +347,10 @@ function buildFixtures(currentIda) {
   const vuelta = {
     fechas: vueltaDates.map((date, index) => {
       const tablas = [tableFromMatches('A', vueltaA[index])];
-      tablas.push(tableFromMatches('B', vueltaB[index]));
+      const groupBRound = GROUP_B_VUELTA_ROUNDS_BY_SLOT[index];
+      tablas.push(groupBRound === null
+        ? adjustmentBreakTable('B')
+        : tableFromMatches('B', vueltaB[groupBRound]));
       return { date, tablas };
     })
   };
@@ -323,7 +369,7 @@ function realPairKey(local, visitante) {
 function collectGroupRounds(fixture, group) {
   return fixture.fechas
     .map(fecha => fecha.tablas.find(tabla => tabla.grupo === group))
-    .filter(Boolean)
+    .filter(tabla => tabla && !tabla.fechaLibrePorReajuste)
     .map(matchesFromTable);
 }
 
@@ -334,7 +380,7 @@ function validateFixtures(ida, vuelta, currentIda) {
   const vueltaB = collectGroupRounds(vuelta, 'B');
 
   if (idaA.length !== 7 || vueltaA.length !== 7) throw new Error('Grupo A debe tener 7 fechas por tramo');
-  if (idaB.length !== 7 || vueltaB.length !== 7) throw new Error('Grupo B debe tener 7 fechas por tramo');
+  if (idaB.length !== 5 || vueltaB.length !== 5) throw new Error('Grupo B debe tener 5 fechas jugadas por tramo');
   if (ida.fechas.length !== 7 || vuelta.fechas.length !== 7) throw new Error('Cantidad incorrecta de fechas calendario');
 
   const currentFirstA = matchesFromTable(groupTable(currentIda, 0, 'A'));
@@ -345,9 +391,8 @@ function validateFixtures(ida, vuelta, currentIda) {
     throw new Error('La primera fecha del Grupo A fue modificada');
   }
   const currentFirstB = matchesFromTable(groupTable(currentIda, 0, 'B'))
-    .filter(([local, visitante]) => local !== 'WO' || visitante !== 'WO');
-  const expectedFirstB = [...currentFirstB, ['WO', 'WO']];
-  if (JSON.stringify(idaB[0]) !== JSON.stringify(expectedFirstB)) {
+    .filter(([local, visitante]) => local !== 'WO' && visitante !== 'WO');
+  if (JSON.stringify(idaB[0]) !== JSON.stringify(currentFirstB)) {
     throw new Error('La primera fecha del Grupo B fue modificada');
   }
 
@@ -365,20 +410,15 @@ function validateFixtures(ida, vuelta, currentIda) {
     }
   });
   idaB.forEach((round, index) => {
-    const woMatches = round.filter(pair => pair.includes('WO')).length;
-    const expectedWoMatches = index === 0 ? 1 : 2;
-    if (round.length !== 4 || woMatches !== expectedWoMatches) {
+    if (round.length !== 3 || round.some(pair => pair.includes('WO'))) {
       throw new Error(`Grupo B: fecha ${index + 1} inválida`);
     }
-    if (round.some(([local, visitante]) => local === 'WO' && visitante !== 'WO')) {
-      throw new Error(`Grupo B: WO debe quedar como visitante en fecha ${index + 1}`);
-    }
-    const appearances = round.flat().filter(team => team !== 'WO');
+    const appearances = round.flat();
     if (appearances.length !== 6 || new Set(appearances).size !== 6) {
       throw new Error(`Grupo B: falta o se repite un equipo en fecha ${index + 1}`);
     }
     const sharedRoles = SHARED_VENUE_TEAMS.map(team => {
-      const match = round.find(pair => pair.includes(team) && !pair.includes('WO'));
+      const match = round.find(pair => pair.includes(team));
       if (!match) return null;
       return match[0] === team ? 'L' : 'V';
     });
@@ -386,14 +426,20 @@ function validateFixtures(ida, vuelta, currentIda) {
       throw new Error(`Grupo B: conflicto de sala en fecha ${index + 1}`);
     }
   });
-  const groupBTeams = [...new Set(idaB.flat(2).filter(team => team !== 'WO'))];
-  groupBTeams.forEach(team => {
-    const byeRounds = idaB.map(round =>
-      round.some(pair => pair.includes(team) && pair.includes('WO'))
-    );
-    if (byeRounds.some((isBye, index) => isBye && index > 0 && byeRounds[index - 1])) {
-      throw new Error(`Grupo B: ${team} tiene dos fechas libres consecutivas`);
-    }
+  [
+    [ida, [2, 5], 'ida'],
+    [vuelta, [1, 4], 'vuelta']
+  ].forEach(([fixture, expectedBreakSlots, kind]) => {
+    fixture.fechas.forEach((fecha, index) => {
+      const tablaB = fecha.tablas.find(tabla => tabla.grupo === 'B');
+      const shouldBeBreak = expectedBreakSlots.includes(index);
+      if (Boolean(tablaB?.fechaLibrePorReajuste) !== shouldBeBreak) {
+        throw new Error(`Grupo B: descanso de ${kind} incorrecto en semana ${index + 1}`);
+      }
+      if (shouldBeBreak && tablaB.equipos.length !== 0) {
+        throw new Error(`Grupo B: el descanso de ${kind} debe quedar sin equipos`);
+      }
+    });
   });
 
   const seen = { A: new Set(), B: new Set() };
