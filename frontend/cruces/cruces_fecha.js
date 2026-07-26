@@ -1103,7 +1103,10 @@ function apiUrl(path){
 
     const secs = card.querySelector('.sections');
     const data = {
-      'CAPITÁN': planilla.capitan || [],
+      'CAPITÁN': Array.from(
+        { length: CAPTAIN_COUNT },
+        (_, index) => String(planilla?.capitan?.[index] || '').trim()
+      ),
       'INDIVIDUALES': planilla.individuales || [],
       'PAREJA 1': planilla.pareja1 || [],
       'PAREJA 2': planilla.pareja2 || [],
