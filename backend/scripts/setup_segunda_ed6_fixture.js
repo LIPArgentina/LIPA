@@ -9,6 +9,9 @@ const CATEGORY = 'segunda';
 const START_IDA = '2026-07-27';
 const START_VUELTA = '2026-08-17';
 const APPLY = process.argv.includes('--apply');
+const PRODUCTION = process.argv.includes('--production');
+const TARGET_DATABASE = PRODUCTION ? 'lipa_db_prod' : 'lipa_db_staging';
+const TARGET_LABEL = PRODUCTION ? 'production' : 'staging';
 
 const FOUR_TEAM_GROUP = [
   [
@@ -137,8 +140,9 @@ async function main() {
   }
 
   const databaseUrl = String(process.env.DATABASE_URL || '');
-  if (!databaseUrl.includes('lipa_db_staging')) {
-    throw new Error('Este script solo puede ejecutarse contra lipa_db_staging');
+  const databaseName = new URL(databaseUrl).pathname.replace(/^\//, '');
+  if (databaseName !== TARGET_DATABASE) {
+    throw new Error(`Se esperaba ${TARGET_DATABASE}, pero DATABASE_URL apunta a ${databaseName}`);
   }
 
   const client = await pool.connect();
@@ -158,7 +162,7 @@ async function main() {
       __dirname,
       '..',
       'exports',
-      `fixture-segunda-ed6-staging-before-${timestamp}.json`
+      `fixture-segunda-ed6-${TARGET_LABEL}-before-${timestamp}.json`
     );
     fs.writeFileSync(backupPath, JSON.stringify({
       exportedAt: new Date().toISOString(),
