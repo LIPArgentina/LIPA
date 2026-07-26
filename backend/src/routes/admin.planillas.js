@@ -71,7 +71,8 @@ router.get('/planillas', async (req, res) => {
     const result = await pool.query(`
       SELECT
         e.id AS equipo_id,
-        e.slug_base AS team,
+        e.slug_uid AS team,
+        e.slug_base AS team_base,
         e.slug_uid,
         e.display_name,
         e.division,
@@ -84,6 +85,7 @@ router.get('/planillas', async (req, res) => {
 
     const out = await Promise.all(result.rows.map(async (r) => ({
       team: r.team,
+      team_base: r.team_base,
       slug_uid: r.slug_uid,
       teamName: r.display_name,
       division: r.division,

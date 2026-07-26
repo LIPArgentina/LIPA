@@ -448,7 +448,11 @@ function extractCruces(input){
 function buildPlanillaIndex(planillas, category){
   const index = new Map();
   planillas.forEach((item) => {
-    teamKeyVariants(item.team).forEach((variant) => {
+    const itemCategory = compactKey(item.category || item.division);
+    if (itemCategory && itemCategory !== compactKey(category)) return;
+
+    const identity = item.slug_uid || item.team;
+    teamKeyVariants(identity).forEach((variant) => {
       if (!index.has(variant)) index.set(variant, item);
     });
   });
