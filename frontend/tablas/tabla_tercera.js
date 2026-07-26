@@ -328,13 +328,14 @@ function calcRowsFromEntries(entries){
 
   const result = {};
   GROUPS.forEach(g => {
+    const maxRows = selectedEdition >= 6 ? (g === 'A' ? 7 : 6) : 4;
     result[g] = Object.values(puntos[g])
       .sort((a, b) =>
         (b.pts - a.pts) ||
         ((triangulos[g][normalizeName(b.equipo)] || 0) - (triangulos[g][normalizeName(a.equipo)] || 0)) ||
         String(a.equipo).localeCompare(String(b.equipo))
       )
-      .slice(0, selectedEdition >= 6 ? 6 : 4)
+      .slice(0, maxRows)
       .map((r, i) => ({
         pos: i + 1,
         equipo: r.equipo,
@@ -489,8 +490,9 @@ function applyEditionLayout(){
   GROUPS = selectedEdition >= 6 ? ['A', 'B'] : ['A', 'B', 'C', 'D'];
   document.getElementById('tables')?.classList.toggle('two-group-layout', selectedEdition >= 6);
   document.getElementById('tables')?.classList.toggle('four-group-layout', selectedEdition < 6);
-  const rowCount = selectedEdition >= 6 ? 6 : 4;
   document.querySelectorAll('[data-group-board]').forEach(board => {
+    const group = board.getAttribute('data-group-board');
+    const rowCount = selectedEdition >= 6 ? (group === 'A' ? 7 : 6) : 4;
     while (board.querySelectorAll('.row[role="row"]').length < rowCount) {
       const row = document.createElement('div');
       row.className = 'row';
