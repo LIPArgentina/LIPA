@@ -7,6 +7,9 @@ const pool = require('../db');
 const EDITION = 6;
 const CATEGORY = 'tercera';
 const APPLY = process.argv.includes('--apply');
+const PRODUCTION = process.argv.includes('--production');
+const TARGET_DATABASE = PRODUCTION ? 'lipa_db_prod' : 'lipa_db_staging';
+const TARGET_LABEL = PRODUCTION ? 'production' : 'staging';
 const GROUP_A_IDA_START = '2026-07-28';
 const VUELTA_START = '2026-09-15';
 const SHARED_VENUE_TEAMS = ['EL TREBOL', 'LOS PATOS DEL TREBOL'];
@@ -480,8 +483,9 @@ function validateFixtures(ida, vuelta, currentIda) {
 
 async function main() {
   const databaseUrl = String(process.env.DATABASE_URL || '');
-  if (!databaseUrl.includes('lipa_db_staging')) {
-    throw new Error('Este script solo puede ejecutarse contra lipa_db_staging');
+  const databaseName = new URL(databaseUrl).pathname.replace(/^\//, '');
+  if (databaseName !== TARGET_DATABASE) {
+    throw new Error(`Se esperaba ${TARGET_DATABASE}, pero DATABASE_URL apunta a ${databaseName}`);
   }
 
   const client = await pool.connect();
@@ -510,7 +514,7 @@ async function main() {
       __dirname,
       '..',
       'exports',
-      `fixture-tercera-ed6-staging-before-alba-${timestamp}.json`
+      `fixture-tercera-ed6-${TARGET_LABEL}-before-alba-${timestamp}.json`
     );
     fs.writeFileSync(backupPath, JSON.stringify({
       exportedAt: new Date().toISOString(),
