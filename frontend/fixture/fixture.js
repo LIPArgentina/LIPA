@@ -21,7 +21,7 @@ const EDITION_LAYOUTS = {
       minFechas: 7,
       groupSettings: {
         A: { matchesPerGroup: 4, minFechas: 7 },
-        B: { matchesPerGroup: 3, minFechas: 7 }
+        B: { matchesPerGroup: 4, minFechas: 7 }
       }
     }
   }

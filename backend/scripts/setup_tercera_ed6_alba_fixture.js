@@ -9,7 +9,6 @@ const CATEGORY = 'tercera';
 const APPLY = process.argv.includes('--apply');
 const GROUP_A_IDA_START = '2026-07-28';
 const VUELTA_START = '2026-09-15';
-const VIRTUAL_BYE = '__BYE__';
 const SHARED_VENUE_TEAMS = ['EL TREBOL', 'LOS PATOS DEL TREBOL'];
 
 function addDays(dateText, days) {
@@ -109,7 +108,7 @@ function optimizeGroupBLocalities(pairingRounds) {
   const variableMatches = [];
   for (let round = 1; round < pairingRounds.length; round++) {
     pairingRounds[round].forEach((pair, match) => {
-      if (!pair.includes('WO') && !pair.includes(VIRTUAL_BYE)) {
+      if (!pair.includes('WO')) {
         variableMatches.push([round, match]);
       }
     });
@@ -132,11 +131,7 @@ function optimizeGroupBLocalities(pairingRounds) {
       });
     });
 
-    const cleaned = rounds.map(round =>
-      round.filter(pair => !pair.includes(VIRTUAL_BYE))
-    );
-
-    const sharedVenueConflict = cleaned.some(round => {
+    const sharedVenueConflict = rounds.some(round => {
       const roles = SHARED_VENUE_TEAMS.map(team => {
         const match = round.find(pair => pair.includes(team) && !pair.includes('WO'));
         if (!match) return null;
@@ -147,7 +142,7 @@ function optimizeGroupBLocalities(pairingRounds) {
     if (sharedVenueConflict) continue;
 
     const histories = {};
-    cleaned.forEach(round => {
+    rounds.forEach(round => {
       round.forEach(([local, visitante]) => {
         if (local !== 'WO' && visitante !== 'WO') {
           (histories[local] ||= []).push('L');
@@ -169,7 +164,7 @@ function optimizeGroupBLocalities(pairingRounds) {
     const score = repetitions * 100 + imbalance;
     if (score < bestScore) {
       bestScore = score;
-      best = cleaned;
+      best = rounds;
     }
   }
 
@@ -264,12 +259,13 @@ function buildFixtures(currentIda) {
   const idaA = optimizedA.rounds;
   const vueltaA = reverseMatches(idaA);
 
-  const currentFirstB = matchesFromTable(groupTable(currentIda, 0, 'B'));
+  const currentFirstB = matchesFromTable(groupTable(currentIda, 0, 'B'))
+    .filter(([local, visitante]) => local !== 'WO' || visitante !== 'WO');
   if (currentFirstB.length !== 3) {
     throw new Error('La primera fecha actual del Grupo B no tiene tres partidos');
   }
   const pairingRoundsB = findPairingRounds(
-    [...currentFirstB, ['WO', VIRTUAL_BYE]],
+    [...currentFirstB, ['WO', 'WO']],
     { requireAcademySecond: false }
   );
   const optimizedB = optimizeGroupBLocalities(pairingRoundsB);
@@ -333,7 +329,9 @@ function validateFixtures(ida, vuelta, currentIda) {
   if (JSON.stringify(idaA[0]) !== JSON.stringify(expectedFirstA)) {
     throw new Error('La primera fecha del Grupo A fue modificada');
   }
-  const expectedFirstB = matchesFromTable(groupTable(currentIda, 0, 'B'));
+  const currentFirstB = matchesFromTable(groupTable(currentIda, 0, 'B'))
+    .filter(([local, visitante]) => local !== 'WO' || visitante !== 'WO');
+  const expectedFirstB = [...currentFirstB, ['WO', 'WO']];
   if (JSON.stringify(idaB[0]) !== JSON.stringify(expectedFirstB)) {
     throw new Error('La primera fecha del Grupo B fue modificada');
   }
@@ -352,14 +350,17 @@ function validateFixtures(ida, vuelta, currentIda) {
     }
   });
   idaB.forEach((round, index) => {
-    if (round.length !== 3 || round.filter(pair => pair.includes('WO')).length > 1) {
+    const woMatches = round.filter(pair => pair.includes('WO')).length;
+    const expectedWoMatches = index === 0 ? 1 : 2;
+    if (round.length !== 4 || woMatches !== expectedWoMatches) {
       throw new Error(`Grupo B: fecha ${index + 1} inválida`);
-    }
-    if (round.some(pair => pair.includes(VIRTUAL_BYE))) {
-      throw new Error(`Grupo B: descanso virtual visible en fecha ${index + 1}`);
     }
     if (round.some(([local, visitante]) => local === 'WO' && visitante !== 'WO')) {
       throw new Error(`Grupo B: WO debe quedar como visitante en fecha ${index + 1}`);
+    }
+    const appearances = round.flat().filter(team => team !== 'WO');
+    if (appearances.length !== 6 || new Set(appearances).size !== 6) {
+      throw new Error(`Grupo B: falta o se repite un equipo en fecha ${index + 1}`);
     }
     const sharedRoles = SHARED_VENUE_TEAMS.map(team => {
       const match = round.find(pair => pair.includes(team) && !pair.includes('WO'));
