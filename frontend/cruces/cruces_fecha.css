@@ -1547,3 +1547,196 @@ header.lpi-top {
 @media (min-width: 769px){
   body{ zoom:.8; }
 }
+
+/* Mobile: conserva ambas planillas y prioriza el ancho útil de los nombres. */
+@media (max-width: 520px) {
+  .header-bg .container {
+    padding: 4px 6px;
+  }
+
+  header.lpi-top {
+    grid-template-columns: 28px auto minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .liga-logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  .header-title {
+    font-size: 14px;
+    letter-spacing: .03em;
+  }
+
+  .actions {
+    justify-content: flex-end;
+    gap: 3px;
+    flex-wrap: nowrap;
+  }
+
+  .actions .btn,
+  #btnDownloadPdf,
+  #btnDownloadJpg {
+    min-width: 0;
+    min-height: 26px;
+    padding: 3px 5px;
+    border-radius: 6px;
+    font-size: 8px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .content-under-header {
+    padding: 5px 3px 0;
+  }
+
+  .cruces-grid {
+    gap: 3px;
+  }
+
+  .card {
+    padding: 7px 3px 10px;
+    border-radius: 10px;
+  }
+
+  #planilla-root-left .card .title,
+  #planilla-root-right .card .title {
+    min-height: 35px;
+    margin: 2px 0;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  #planilla-root-left .card .title::before,
+  #planilla-root-right .card .title::before {
+    margin-bottom: 1px;
+    font-size: 7px;
+  }
+
+  #planilla-root-left .card .meta,
+  #planilla-root-right .card .meta {
+    min-height: 23px;
+    margin-bottom: 2px;
+    font-size: 7px;
+  }
+
+  .team-map-btn {
+    padding: 3px 5px;
+    border-radius: 6px;
+    font-size: 8px;
+  }
+
+  .section {
+    margin-top: 7px;
+  }
+
+  #planilla-root-left .section h2,
+  #planilla-root-right .section h2 {
+    min-height: 12px;
+    margin: 4px 0 3px;
+    font-size: 10px;
+    letter-spacing: .02em;
+  }
+
+  .row,
+  #planilla-root-right .row {
+    min-height: 24px;
+    gap: 2px;
+    margin: 3px 0;
+  }
+
+  .badge,
+  #planilla-root-left .pts-edit,
+  #planilla-root-right .pts-edit {
+    display: grid;
+    width: 18px;
+    min-width: 18px;
+    max-width: 18px;
+    height: 22px;
+    flex: 0 0 18px;
+    border-radius: 5px;
+    font-size: 9px;
+  }
+
+  #planilla-root-left .pts-select,
+  #planilla-root-right .pts-select {
+    display: block;
+    width: 100%;
+    height: 100%;
+    font-size: 9px;
+    line-height: 22px;
+  }
+
+  .slot,
+  #planilla-root-left .row .slot,
+  #planilla-root-right .row .slot {
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 24px;
+    min-height: 24px;
+    padding: 0 3px;
+    border-radius: 6px;
+    font-size: 9px;
+    line-height: 24px;
+  }
+
+  .slot-player-name {
+    padding-right: 17px;
+  }
+
+  .slot-photo-btn {
+    right: 1px;
+    width: 16px;
+    height: 18px;
+    font-size: 11px;
+  }
+
+  .totals-wrap,
+  .wins-wrap {
+    margin-top: 6px;
+  }
+
+  .totals-chip,
+  .wins-chip {
+    gap: 3px;
+    padding: 3px 4px;
+    border-radius: 6px;
+  }
+
+  .totals-chip .label {
+    font-size: 7px;
+  }
+
+  .wins-chip .label {
+    font-size: 9px;
+  }
+
+  .wins-chip .wins-box,
+  .totals-chip .total-box {
+    width: 20px;
+    min-width: 20px;
+    max-width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    font-size: 9px;
+  }
+
+  .totals-chip .total-box input {
+    font-size: 9px;
+  }
+
+  .validate-cta {
+    margin: 10px 0 14px;
+    gap: 5px;
+  }
+
+  .btn-validate,
+  .btn-picture {
+    min-height: 30px;
+    padding: 5px 8px;
+    border-radius: 7px;
+    font-size: 9px;
+  }
+}
