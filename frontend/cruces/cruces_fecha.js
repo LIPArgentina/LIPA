@@ -332,9 +332,14 @@ function apiUrl(path){
     const name = document.getElementById('playerPhotoName');
     const image = document.getElementById('playerPhotoImage');
     const status = document.getElementById('playerPhotoStatus');
+    const profileButton = document.getElementById('btnPlayerProfile');
     if (!modal || !name || !image || !status) return;
 
     name.textContent = String(playerNameValue || 'Jugador');
+    if (profileButton) {
+      profileButton.dataset.player = String(playerNameValue || '').trim();
+      profileButton.dataset.category = deriveCategory();
+    }
     image.src = '../logo_liga.png';
     image.alt = `Foto de ${playerNameValue || 'jugador'}`;
     status.textContent = 'Buscando foto…';
@@ -348,6 +353,23 @@ function apiUrl(path){
     }
     image.src = player?.fotoUrl ? apiUrl(player.fotoUrl) : '../logo_liga.png';
     status.textContent = player?.fotoUrl ? '' : 'Este jugador todavía no tiene una foto cargada.';
+  }
+
+  function openPlayerProfile(){
+    const button = document.getElementById('btnPlayerProfile');
+    const status = document.getElementById('playerPhotoStatus');
+    const player = String(button?.dataset.player || '').trim();
+    const category = String(button?.dataset.category || deriveCategory()).trim().toLowerCase();
+    if (category !== 'tercera') {
+      if (status) status.textContent = 'Ficha no disponible por falta de datos para esta categoría.';
+      return;
+    }
+    if (!player) {
+      if (status) status.textContent = 'No se pudo identificar al jugador.';
+      return;
+    }
+    const params = new URLSearchParams({ category, player, auto: '1', edition: '6' });
+    location.href = `../consultas/consultas.html?${params.toString()}`;
   }
 
   function renderSlotContents(slot, playerNameValue){
@@ -3253,6 +3275,7 @@ function isAndroidAppWebView(){
       renderSide('planilla-root-right', visitantePlan, local.name,     match.date, visitante.name, visitante.teamSlug);
 
       document.getElementById('btnClosePlayerPhoto')?.addEventListener('click', closePlayerPhoto);
+      document.getElementById('btnPlayerProfile')?.addEventListener('click', openPlayerProfile);
       document.getElementById('playerPhotoModal')?.addEventListener('click', ev => {
         if (ev.target?.matches('[data-close-player-photo]')) closePlayerPhoto();
       });

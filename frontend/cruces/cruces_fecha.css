@@ -254,6 +254,19 @@ body.player-photo-open{ overflow:hidden; }
   font-weight:700;
 }
 
+.player-profile-btn{
+  width:100%;
+  min-height:38px;
+  margin-top:12px;
+  padding:7px 12px;
+  border:1px solid #b28900;
+  border-radius:10px;
+  background:#ffe65a;
+  color:#111;
+  font-weight:900;
+  cursor:pointer;
+}
+
 
 #planilla-root-left .row .slot,
 #planilla-root-right .row .slot {
