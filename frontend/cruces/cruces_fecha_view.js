@@ -13,7 +13,7 @@
     suplentes: Number(FORMAT.substituteCount || 2)
   };
   const state = {
-    category: new URLSearchParams(location.search).get('cat') || 'tercera',
+    category: 'tercera',
     matches: [],
     plans: new Map(),
     players: new Map()
@@ -29,29 +29,11 @@
     return API_BASE + path;
   }
 
-  function readSession() {
-    for (const key of ['lpi.session', 'lpi_team_session']) {
-      try {
-        const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
-        if (!raw) continue;
-        const parsed = JSON.parse(raw);
-        if (parsed?.token) return parsed;
-      } catch (_) {}
-    }
-    return null;
-  }
-
-  function authHeaders() {
-    const token = readSession()?.token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
   async function fetchJson(path, options = {}) {
     const response = await fetch(apiUrl(path), {
       cache: 'no-store',
-      credentials: 'include',
       ...options,
-      headers: { ...authHeaders(), ...(options.headers || {}) }
+      headers: { ...(options.headers || {}) }
     });
     const data = await response.json().catch(() => null);
     if (!response.ok) {
@@ -141,16 +123,21 @@
     return { date: selected?.date || '', matches: extractMatches(selected) };
   }
 
-  async function loadPlans() {
-    const rows = await fetchJson('/api/admin/planillas');
+  async function loadPlans(matches) {
+    const rows = await fetchJson('/api/planillas');
     const index = new Map();
-    for (const item of Array.isArray(rows) ? rows : []) {
-      const plan = item?.planilla || item?.plan || {};
-      const category = String(
-        item?.category || item?.division || plan?.category || plan?.categoria || ''
-      ).toLowerCase();
-      if (category && category !== state.category) continue;
-      const sources = [item?.slug_uid, item?.team, item?.team_base, plan?.team, item?.teamName];
+    const wanted = new Set(matches.flatMap(match => [...aliases(match.local), ...aliases(match.visitante)]));
+    const metadata = (Array.isArray(rows) ? rows : []).filter(item => {
+      if (String(item?.division || '').toLowerCase() !== state.category) return false;
+      return [item?.slug_uid, item?.team, item?.teamName].some(source =>
+        aliases(source).some(key => wanted.has(key))
+      );
+    });
+
+    await Promise.all(metadata.map(async item => {
+      const data = await fetchJson(`/api/planilla?team=${encodeURIComponent(item.slug_uid || item.team)}`);
+      const plan = data?.planilla || {};
+      const sources = [item?.slug_uid, item?.team, item?.teamName, plan?.team];
       const normalizedPlan = {
         ...plan,
         teamRef: item?.slug_uid || item?.team || item?.teamName || ''
@@ -160,7 +147,7 @@
           if (!index.has(key)) index.set(key, normalizedPlan);
         }
       }
-    }
+    }));
     return index;
   }
 
@@ -313,9 +300,9 @@
       button.classList.toggle('active', button.dataset.category === state.category);
     });
     try {
-      const [{ date, matches }, plans] = await Promise.all([
-        loadMatches(),
-        loadPlans(),
+      const { date, matches } = await loadMatches();
+      const [plans] = await Promise.all([
+        loadPlans(matches),
         loadReleaseStatus()
       ]);
       state.matches = matches;
@@ -336,18 +323,9 @@
   }
 
   async function init() {
-    if (!['segunda', 'tercera'].includes(state.category)) state.category = 'tercera';
-    try {
-      await fetchJson('/api/admin/session');
-    } catch (_) {
-      message.className = 'viewer-message error';
-      message.textContent = 'Acceso exclusivo para administradores. Volvé a iniciar sesión desde Administración.';
-      document.querySelector('.viewer-controls').hidden = true;
-      return;
-    }
-
     document.querySelectorAll('[data-category]').forEach(button => {
       button.addEventListener('click', () => {
+        if (button.disabled || button.dataset.category !== 'tercera') return;
         state.category = button.dataset.category;
         const url = new URL(location.href);
         url.searchParams.set('cat', state.category);
