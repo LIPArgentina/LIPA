@@ -234,6 +234,9 @@ button, select { font: inherit; }
   font-weight: 700;
 }
 
+@media (min-width: 681px) {
+  body { zoom: .5; }
+}
 @media (max-width: 900px) {
   .viewer-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
