@@ -760,4 +760,19 @@
   $form?.addEventListener('submit', searchPlayer);
   setSearchEdition(currentSearchEdition);
   updateRankingEditionOptions();
+
+  async function applyLinkedPlayerSearch() {
+    const params = new URLSearchParams(location.search);
+    if (params.get('auto') !== '1') return;
+    const category = String(params.get('category') || '').trim().toLowerCase();
+    const player = String(params.get('player') || '').trim();
+    if (category !== 'tercera' || player.length < 2) return;
+    if ($category) $category.value = category;
+    if ($player) $player.value = player;
+    if ($team) $team.value = '';
+    setSearchEdition(params.get('edition') || '6');
+    await searchPlayer(null);
+  }
+
+  applyLinkedPlayerSearch();
 })();

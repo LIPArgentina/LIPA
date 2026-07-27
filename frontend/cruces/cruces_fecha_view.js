@@ -188,7 +188,12 @@
     const title = document.getElementById('playerPhotoName');
     const image = document.getElementById('playerPhotoImage');
     const status = document.getElementById('playerPhotoStatus');
+    const profileButton = document.getElementById('playerProfileButton');
     title.textContent = entry.name;
+    if (profileButton) {
+      profileButton.dataset.player = entry.name;
+      profileButton.dataset.category = state.category;
+    }
     image.src = '../logo_liga.png';
     status.textContent = 'Buscando foto…';
     modal.hidden = false;
@@ -203,6 +208,33 @@
     }
     image.src = player?.fotoUrl ? apiUrl(player.fotoUrl) : '../logo_liga.png';
     status.textContent = player?.fotoUrl ? '' : 'Este jugador todavía no tiene una foto cargada.';
+  }
+
+  function openPlayerProfile() {
+    const button = document.getElementById('playerProfileButton');
+    const status = document.getElementById('playerPhotoStatus');
+    const player = String(button?.dataset.player || '').trim();
+    const category = String(button?.dataset.category || state.category).trim().toLowerCase();
+    if (category !== 'tercera') {
+      status.textContent = 'Ficha no disponible por falta de datos para esta categoría.';
+      return;
+    }
+    if (!player) {
+      status.textContent = 'No se pudo identificar al jugador.';
+      return;
+    }
+    const params = new URLSearchParams({ category, player, auto: '1', edition: '6' });
+    const modal = document.getElementById('playerProfileModal');
+    const frame = document.getElementById('playerProfileFrame');
+    frame.src = `../consultas/consultas.html?${params.toString()}`;
+    modal.hidden = false;
+  }
+
+  function closePlayerProfile() {
+    const modal = document.getElementById('playerProfileModal');
+    const frame = document.getElementById('playerProfileFrame');
+    modal.hidden = true;
+    frame.src = 'about:blank';
   }
 
   function createSection(title, entries, teamRef) {
@@ -346,9 +378,16 @@
     });
     matchSelect.addEventListener('change', renderSelectedMatch);
     document.getElementById('closePhotoButton').addEventListener('click', closePhoto);
+    document.getElementById('playerProfileButton').addEventListener('click', openPlayerProfile);
+    document.getElementById('closePlayerProfileButton').addEventListener('click', closePlayerProfile);
+    document.querySelector('[data-close-player-profile]').addEventListener('click', closePlayerProfile);
     document.querySelector('[data-close-photo]').addEventListener('click', closePhoto);
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') closePhoto();
+      if (event.key === 'Escape' && !document.getElementById('playerProfileModal').hidden) {
+        closePlayerProfile();
+      } else if (event.key === 'Escape') {
+        closePhoto();
+      }
     });
     await loadCategory();
   }

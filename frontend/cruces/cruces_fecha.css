@@ -254,6 +254,66 @@ body.player-photo-open{ overflow:hidden; }
   font-weight:700;
 }
 
+.player-profile-btn{
+  width:100%;
+  min-height:38px;
+  margin-top:12px;
+  padding:7px 12px;
+  border:1px solid #b28900;
+  border-radius:10px;
+  background:#ffe65a;
+  color:#111;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.player-profile-modal[hidden]{ display:none !important; }
+.player-profile-modal{
+  position:fixed;
+  inset:0;
+  z-index:1500;
+  display:grid;
+  place-items:center;
+  padding:14px;
+}
+.player-profile-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.86);
+}
+.player-profile-dialog{
+  position:relative;
+  z-index:1;
+  width:min(920px, calc(100vw - 28px));
+  height:min(820px, calc(100vh - 28px));
+  overflow:hidden;
+  border:1px solid #b28900;
+  border-radius:16px;
+  background:#0f0f10;
+  box-shadow:0 24px 70px rgba(0,0,0,.7);
+}
+.player-profile-dialog iframe{
+  width:100%;
+  height:100%;
+  border:0;
+  background:#0f0f10;
+}
+.player-profile-close{
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:2;
+  width:34px;
+  height:34px;
+  border:1px solid #ffe65a;
+  border-radius:50%;
+  background:#08090b;
+  color:#fff;
+  font-size:24px;
+  line-height:1;
+  cursor:pointer;
+}
+
 
 #planilla-root-left .row .slot,
 #planilla-root-right .row .slot {

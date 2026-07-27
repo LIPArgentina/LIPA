@@ -81,7 +81,16 @@
       <div class="player-photo-frame">
         <img id="playerPhotoImage" src="../logo_liga.png" alt="Foto del jugador" />
       </div>
+      <button class="player-profile-btn" id="btnPlayerProfile" type="button">FICHA DEL JUGADOR</button>
       <div class="player-photo-status" id="playerPhotoStatus"></div>
+    </div>
+  </div>
+
+  <div class="player-profile-modal" id="playerProfileModal" hidden>
+    <div class="player-profile-backdrop" data-close-player-profile="1"></div>
+    <div class="player-profile-dialog" role="dialog" aria-modal="true" aria-label="Ficha del jugador">
+      <button class="player-profile-close" id="btnClosePlayerProfile" type="button" aria-label="Cerrar ficha">×</button>
+      <iframe id="playerProfileFrame" title="Ficha del jugador"></iframe>
     </div>
   </div>
 
@@ -90,7 +99,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-  <script src="./cruces_fecha.js?v=20260726-3" defer></script>
+  <script src="./cruces_fecha.js?v=20260727-2" defer></script>
 
 </body>
 </html>
