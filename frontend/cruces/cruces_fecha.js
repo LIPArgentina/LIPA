@@ -361,7 +361,7 @@ function apiUrl(path){
     const player = String(button?.dataset.player || '').trim();
     const category = String(button?.dataset.category || deriveCategory()).trim().toLowerCase();
     if (category !== 'tercera') {
-      if (status) status.textContent = 'Ficha no disponible por falta de datos para esta categoría.';
+      if (status) status.textContent = 'Ficha no disponible por falta de datos para esta categoría. Pedir al capitán que lo complete.';
       return;
     }
     if (!player) {

@@ -216,7 +216,7 @@
     const player = String(button?.dataset.player || '').trim();
     const category = String(button?.dataset.category || state.category).trim().toLowerCase();
     if (category !== 'tercera') {
-      status.textContent = 'Ficha no disponible por falta de datos para esta categoría.';
+      status.textContent = 'Ficha no disponible por falta de datos para esta categoría. Pedir al capitán que lo complete.';
       return;
     }
     if (!player) {
