@@ -18,6 +18,7 @@
       ['btnPictures', 'pictures/pictures_admin.html'],
       ['btnCargaManualTorneo', 'torneos/carga_manual_torneo.html'],
       ['btnVideosAdmin', 'videos/videos_admin.html'],
+      ['btnCrucesView', 'cruces/cruces_fecha_view.html'],
     ].forEach(([id, fallback]) => {
       const btn = document.getElementById(id);
       if (btn) btn.href = withMode(btn.getAttribute('href') || fallback);
