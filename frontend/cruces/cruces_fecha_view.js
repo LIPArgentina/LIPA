@@ -224,7 +224,17 @@
       return;
     }
     const params = new URLSearchParams({ category, player, auto: '1', edition: '6' });
-    location.href = `../consultas/consultas.html?${params.toString()}`;
+    const modal = document.getElementById('playerProfileModal');
+    const frame = document.getElementById('playerProfileFrame');
+    frame.src = `../consultas/consultas.html?${params.toString()}`;
+    modal.hidden = false;
+  }
+
+  function closePlayerProfile() {
+    const modal = document.getElementById('playerProfileModal');
+    const frame = document.getElementById('playerProfileFrame');
+    modal.hidden = true;
+    frame.src = 'about:blank';
   }
 
   function createSection(title, entries, teamRef) {
@@ -369,9 +379,15 @@
     matchSelect.addEventListener('change', renderSelectedMatch);
     document.getElementById('closePhotoButton').addEventListener('click', closePhoto);
     document.getElementById('playerProfileButton').addEventListener('click', openPlayerProfile);
+    document.getElementById('closePlayerProfileButton').addEventListener('click', closePlayerProfile);
+    document.querySelector('[data-close-player-profile]').addEventListener('click', closePlayerProfile);
     document.querySelector('[data-close-photo]').addEventListener('click', closePhoto);
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') closePhoto();
+      if (event.key === 'Escape' && !document.getElementById('playerProfileModal').hidden) {
+        closePlayerProfile();
+      } else if (event.key === 'Escape') {
+        closePhoto();
+      }
     });
     await loadCategory();
   }
