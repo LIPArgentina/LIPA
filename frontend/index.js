@@ -118,6 +118,23 @@ function ensureJugadoresViewButton() {
   btn.removeAttribute("href");
 }
 
+function ensureCrucesViewButton() {
+  const btn = document.getElementById("btnCrucesView");
+  if (!btn) return;
+
+  btn.classList.add("btn", "btn-outline", "btn-sm");
+  btn.style.textDecoration = "none";
+
+  if (isAdmin()) {
+    btn.href = "./cruces/cruces_fecha_view.html";
+    btn.classList.remove("hidden");
+    return;
+  }
+
+  btn.classList.add("hidden");
+  btn.removeAttribute("href");
+}
+
 function redirectAfterLogin() {
   const sess = readSession();
   const role = (sess?.role || "").toLowerCase();
@@ -152,6 +169,7 @@ function setupAuthBridge() {
       ensureManageTeamButton();
       ensureConsultasButton();
       ensureJugadoresViewButton();
+      ensureCrucesViewButton();
       redirectAfterLogin();
     }
   });
@@ -161,6 +179,7 @@ function setupAuthBridge() {
       ensureManageTeamButton();
       ensureConsultasButton();
       ensureJugadoresViewButton();
+      ensureCrucesViewButton();
     }
   });
 
@@ -168,6 +187,7 @@ function setupAuthBridge() {
     ensureManageTeamButton();
     ensureConsultasButton();
     ensureJugadoresViewButton();
+    ensureCrucesViewButton();
     redirectAfterLogin();
   });
 
@@ -175,6 +195,7 @@ function setupAuthBridge() {
     ensureManageTeamButton();
     ensureConsultasButton();
     ensureJugadoresViewButton();
+    ensureCrucesViewButton();
   });
 }
 
@@ -843,6 +864,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureManageTeamButton();
   ensureConsultasButton();
   ensureJugadoresViewButton();
+  ensureCrucesViewButton();
   setupAuthBridge();
   setupBannerAdmin();
   loadBirthdayTicker();
