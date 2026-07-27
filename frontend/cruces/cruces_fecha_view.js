@@ -282,11 +282,14 @@
   async function loadReleaseStatus() {
     try {
       const data = await fetchJson(`/api/cruces/status?team=__categoria_${state.category}__`);
-      releaseStatus.textContent = data?.enabled ? 'CRUCES PUBLICADOS' : 'PUBLICACIÓN PENDIENTE';
-      releaseStatus.classList.toggle('is-open', Boolean(data?.enabled));
-    } catch (_) {
+      const enabled = Boolean(data?.enabled);
+      releaseStatus.textContent = enabled ? 'CRUCES PUBLICADOS' : 'PUBLICACIÓN PENDIENTE';
+      releaseStatus.classList.toggle('is-open', enabled);
+      return enabled;
+    } catch (error) {
       releaseStatus.textContent = 'ESTADO NO DISPONIBLE';
       releaseStatus.classList.remove('is-open');
+      throw error;
     }
   }
 
@@ -300,11 +303,19 @@
       button.classList.toggle('active', button.dataset.category === state.category);
     });
     try {
+      const enabled = await loadReleaseStatus();
+      if (!enabled) {
+        state.matches = [];
+        state.plans = new Map();
+        matchSelect.innerHTML = '';
+        fixtureDate.textContent = '—';
+        message.className = 'viewer-message';
+        message.textContent = 'Los cruces de Tercera todavía no están habilitados.';
+        return;
+      }
+
       const { date, matches } = await loadMatches();
-      const [plans] = await Promise.all([
-        loadPlans(matches),
-        loadReleaseStatus()
-      ]);
+      const plans = await loadPlans(matches);
       state.matches = matches;
       state.plans = plans;
       fixtureDate.textContent = formatDate(date).toUpperCase();
