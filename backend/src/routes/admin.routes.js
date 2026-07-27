@@ -106,6 +106,10 @@ module.exports = function createAdminRouter(deps) {
     return res.json({ ok: true, token });
   });
 
+  router.get('/admin/session', requireAdmin, (req, res) => {
+    return res.json({ ok: true, role: 'admin' });
+  });
+
   router.post('/admin/change-password', requireAdmin, async (req, res) => {
     const { oldPassword, newPassword } = req.body || {};
     if (!oldPassword || !newPassword) {

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visor de cruces</title>
+  <link rel="stylesheet" href="./cruces_fecha_view.css?v=20260727-4" />
+</head>
+<body>
+  <header class="viewer-header">
+    <a href="../admin.html" class="logo-link" aria-label="Volver a administración">
+      <img src="../logo_liga.png" alt="LIPA" />
+    </a>
+    <h1>VISOR DE CRUCES</h1>
+    <a class="header-button" href="../admin.html">VOLVER</a>
+  </header>
+
+  <main class="viewer-main">
+    <section class="viewer-controls" aria-label="Selección del cruce">
+      <div class="category-switch" role="group" aria-label="Categoría">
+        <button type="button" data-category="segunda" disabled aria-disabled="true" title="Próximamente">SEGUNDA</button>
+        <button type="button" data-category="tercera" class="active">TERCERA</button>
+      </div>
+      <label class="match-picker">
+        <span>CRUCE</span>
+        <select id="matchSelect" aria-label="Seleccionar cruce"></select>
+      </label>
+      <div class="fixture-date" id="fixtureDate">—</div>
+      <div class="release-status" id="releaseStatus">Comprobando publicación…</div>
+    </section>
+
+    <div class="viewer-message" id="viewerMessage">Validando acceso de administrador…</div>
+
+    <section class="teams-grid" id="teamsGrid" hidden>
+      <article class="team-card" id="localCard" aria-label="Equipo local"></article>
+      <article class="team-card" id="visitorCard" aria-label="Equipo visitante"></article>
+    </section>
+  </main>
+
+  <div class="player-photo-modal" id="playerPhotoModal" hidden>
+    <div class="player-photo-backdrop" data-close-photo="1"></div>
+    <div class="player-photo-dialog" role="dialog" aria-modal="true" aria-labelledby="playerPhotoName">
+      <button class="player-photo-close" id="closePhotoButton" type="button" aria-label="Cerrar">×</button>
+      <h2 id="playerPhotoName">Jugador</h2>
+      <div class="player-photo-frame">
+        <img id="playerPhotoImage" src="../logo_liga.png" alt="Foto del jugador" />
+      </div>
+      <div class="player-photo-status" id="playerPhotoStatus"></div>
+    </div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../match-format.js"></script>
+  <script src="./cruces_fecha_view.js?v=20260727-4" defer></script>
+</body>
+</html>
