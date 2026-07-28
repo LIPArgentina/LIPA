@@ -3203,11 +3203,10 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', 
     );
     rows = result.rows;
   } catch (err) {
-    console.warn('Skipping jugador_resultados suggestions', err?.code || err?.message || err);
-    return [];
+    console.warn('Falling back to cruces_validations for player suggestions', err?.code || err?.message || err);
   }
 
-  return rows
+  const storedSuggestions = rows
     .filter((row) => includesNormalizedName(row.name, query))
     .map((row) => ({
       id: Number(row.id),
@@ -3218,6 +3217,15 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', 
     }))
     .sort((a, b) => a.label.localeCompare(b.label, 'es'))
     .slice(0, 12);
+
+  if (storedSuggestions.length) return storedSuggestions;
+
+  const validatedResults = await filterItemsByEdition(
+    await buildAllValidatedCrucesForPlayerQuery(division),
+    normalizedEdition,
+    division
+  );
+  return buildValidatedPlayerSuggestions(validatedResults, q);
 }
 
 async function getJugadorResultadoMatches(category = '', player = {}, edition = CURRENT_EDITION) {
