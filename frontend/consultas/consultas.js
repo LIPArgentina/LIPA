@@ -795,10 +795,15 @@
     scheduleTeamSuggestions();
   });
   $searchEditionButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       setSearchEdition(btn.dataset.searchEdition || '6');
-      clearResults();
       clearRanking();
+      const playerQ = String($player?.value || '').trim();
+      if (playerQ.length >= 2) {
+        await searchPlayer();
+        return;
+      }
+      clearResults();
       scheduleSuggestions();
       scheduleTeamSuggestions();
     });
