@@ -446,7 +446,7 @@
     const substitutions = Array.isArray(planilla?.substitutions) ? planilla.substitutions : [];
     const format = resolvePlanillaFormat(planilla, scoreData);
     const data = {
-      'CAPITÁN': safeArr(planilla?.capitan, 2),
+      'CAPITÁN': safeArr(planilla?.capitan, 2, { keepEmpty: true }),
       'INDIVIDUALES': safeArr(planilla?.individuales, format.individualCount),
       'PAREJA 1': format.pairCount >= 1 ? safeArr(planilla?.pareja1, 2) : [],
       'PAREJA 2': format.pairCount >= 2 ? safeArr(planilla?.pareja2, 2) : [],
