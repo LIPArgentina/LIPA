@@ -18,7 +18,7 @@
   const manualFechaISO = document.getElementById('manualFechaISO');
   const manualTeamSlug = document.getElementById('manualTeamSlug');
   const blobUrlCache = new Map();
-  const REQUIRED_PICTURES = 9;
+  const REQUIRED_PICTURES = 11;
   let allGroups = [];
   let availableDates = [];
   let availableTeams = [];
@@ -388,7 +388,7 @@
 
     adminList.innerHTML = groups.map(group => {
       const itemCount = Array.isArray(group.items) ? group.items.length : 0;
-      const preview = (group.items || []).slice(0, 9).map(item => {
+      const preview = (group.items || []).slice(0, REQUIRED_PICTURES).map(item => {
         const candidates = buildImageCandidates(item, {
           dataset: {
             fecha: group.fechaISO || '',
@@ -504,7 +504,7 @@
     if (prefill.teamSlug) manualTeamSlug.value = String(prefill.teamSlug).trim();
     modal.hidden = false;
     document.body.classList.add('modal-open');
-    setStatus(manualStatusBox, 'Completá los datos y elegí exactamente 9 fotos.', 'info');
+    setStatus(manualStatusBox, `Completá los datos y elegí exactamente ${REQUIRED_PICTURES} fotos.`, 'info');
     setTimeout(() => manualFechaISO?.focus(), 0);
   }
 
@@ -599,7 +599,7 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'No se pudieron subir las fotos.');
 
-      setStatus(manualStatusBox, 'Las 9 fotos se subieron correctamente.', 'success');
+      setStatus(manualStatusBox, `Las ${REQUIRED_PICTURES} fotos se subieron correctamente.`, 'success');
       setStatus(adminStatus, `Carga manual completada para ${teamSlug} · ${fechaISO}.`, 'success');
       resetManualForm({ keepPrefill: true });
       await load();

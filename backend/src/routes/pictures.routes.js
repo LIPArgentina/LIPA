@@ -10,7 +10,7 @@ const { requireTeam, requireAdmin } = require('../middleware/auth');
 module.exports = function createPicturesRouter(deps) {
   const router = express.Router();
   const picturesRoot = deps.PICTURES_DIR;
-  const REQUIRED_PICTURES = 9;
+  const REQUIRED_PICTURES = 11;
   const HEIC_EXT_RE = /\.(heic|heif)$/i;
 
   function isHeicLike(file = {}) {
@@ -355,7 +355,7 @@ module.exports = function createPicturesRouter(deps) {
 
   const upload = multer({
     storage,
-    limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+    limits: { fileSize: 10 * 1024 * 1024, files: REQUIRED_PICTURES },
     fileFilter: (_req, file, cb) => {
       const mimetype = String(file.mimetype || '').toLowerCase();
       const ext = path.extname(file.originalname || '').toLowerCase();
@@ -367,7 +367,7 @@ module.exports = function createPicturesRouter(deps) {
   });
 
   function runUpload(req, res, next) {
-    upload.array('pictures', 10)(req, res, (err) => {
+    upload.array('pictures', REQUIRED_PICTURES)(req, res, (err) => {
       if (err) return res.status(400).json({ ok: false, error: err.message || 'No se pudo subir el archivo' });
       next();
     });
