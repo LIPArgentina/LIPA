@@ -16,6 +16,12 @@ const DEFAULT_HISTORIC_EDITION = 5;
 let ensureCrucesAdminStoragePromise = null;
 let ensureJugadorResultadosEditionPromise = null;
 
+function requireAdminForPrivateCategory(req, res, next) {
+  const category = String(req.query.category || '').trim().toLowerCase();
+  if (category !== 'segunda') return next();
+  return requireAdmin(req, res, next);
+}
+
 function normalizeEdition(value, options = {}) {
   const allowTotal = !!options.allowTotal;
   const defaultEdition = options.defaultEdition ?? CURRENT_EDITION;
@@ -2771,7 +2777,7 @@ function buildPlayerMatchesFromValidatedResults(results = [], exact = {}) {
   return { matches, pairMatches };
 }
 
-router.get('/player-query', async (req, res) => {
+router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => {
   setNoCache(res);
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
@@ -3329,7 +3335,7 @@ async function countRegisteredIndividualPlayersByCategory(category = '') {
   return Number(rows?.[0]?.total || 0);
 }
 
-router.get('/player-ranking', async (req, res) => {
+router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) => {
   setNoCache(res);
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
@@ -3387,7 +3393,7 @@ function ensureTeamRankingRow(map, teamSlug, teamName) {
   return map.get(key);
 }
 
-router.get('/team-ranking', async (req, res) => {
+router.get('/team-ranking', requireAdminForPrivateCategory, async (req, res) => {
   setNoCache(res);
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
@@ -3545,7 +3551,7 @@ function sortPlayerStatsRows(a, b) {
   return String(a.name || '').localeCompare(String(b.name || ''), 'es');
 }
 
-router.get('/team-query', async (req, res) => {
+router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
   setNoCache(res);
   try {
     const category = String(req.query.category || '').trim().toLowerCase();

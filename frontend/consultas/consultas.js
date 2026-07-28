@@ -33,9 +33,26 @@
   let lastRankingData = null;
   let lastRankingLimit = 10;
   let lastRankingMode = 'players';
+  let hasAdminAccess = false;
 
   function apiUrl(path) {
     return API_BASE + path;
+  }
+
+  function readSession() {
+    try {
+      const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function authHeaders(extra = {}) {
+    const session = readSession();
+    return session?.token
+      ? { ...extra, Authorization: `Bearer ${session.token}` }
+      : extra;
   }
 
   function withCacheBust(path) {
@@ -74,13 +91,35 @@
   }
 
   async function fetchJson(url) {
-    const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+    const response = await fetch(url, {
+      cache: 'no-store',
+      credentials: 'include',
+      headers: authHeaders()
+    });
     let data = null;
     try { data = await response.json(); } catch (_) {}
     if (!response.ok) {
       throw new Error(data?.error || data?.message || 'No se pudo consultar.');
     }
     return data;
+  }
+
+  async function enableAdminCategories() {
+    const session = readSession();
+    if (String(session?.role || '').toLowerCase() !== 'admin' || !session?.token) return false;
+
+    try {
+      await fetchJson(apiUrl('/api/admin/session'));
+      if ($category && !Array.from($category.options).some((option) => option.value === 'segunda')) {
+        const option = document.createElement('option');
+        option.value = 'segunda';
+        option.textContent = 'Segunda';
+        $category.insertBefore(option, $category.firstChild);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
 
@@ -766,7 +805,7 @@
     if (params.get('auto') !== '1') return;
     const category = String(params.get('category') || '').trim().toLowerCase();
     const player = String(params.get('player') || '').trim();
-    if (category !== 'tercera' || player.length < 2) return;
+    if (!['segunda', 'tercera'].includes(category) || (category === 'segunda' && !hasAdminAccess) || player.length < 2) return;
     if ($category) $category.value = category;
     if ($player) $player.value = player;
     if ($team) $team.value = '';
@@ -774,5 +813,10 @@
     await searchPlayer(null);
   }
 
-  applyLinkedPlayerSearch();
+  async function initializeAccess() {
+    hasAdminAccess = await enableAdminCategories();
+    await applyLinkedPlayerSearch();
+  }
+
+  initializeAccess();
 })();
