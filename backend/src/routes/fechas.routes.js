@@ -351,43 +351,84 @@ module.exports = function createFechasRouter(deps) {
 
       finalPlan = await enrichPlanillaWithPlayerIds(finalPlan, equipo.id);
 
-           const existingPlanilla = await pool.query(
-        `
-          SELECT id
-          FROM planillas
-          WHERE equipo_id = $1
-            AND estado = 'guardada'
-          ORDER BY updated_at DESC, id DESC
-          LIMIT 1
-        `,
-        [equipo.id]
-      );
+      const client = await pool.connect();
+      let confirmedPlanilla = null;
+      try {
+        await client.query('BEGIN');
+        const existingPlanilla = await client.query(
+          `
+            SELECT id
+            FROM planillas
+            WHERE equipo_id = $1
+              AND estado = 'guardada'
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+            FOR UPDATE
+          `,
+          [equipo.id]
+        );
 
-      if (existingPlanilla.rowCount > 0) {
-        await pool.query(
+        let savedId = null;
+        if (existingPlanilla.rowCount > 0) {
+          const updated = await client.query(
+            `
+              UPDATE planillas
+              SET
+                fecha_clave = CURRENT_DATE,
+                datos = $2::jsonb,
+                source_file = $3,
+                updated_at = NOW()
+              WHERE id = $1
+              RETURNING id
+            `,
+            [
+              existingPlanilla.rows[0].id,
+              JSON.stringify(finalPlan),
+              `${authSlug}.planilla.json`
+            ]
+          );
+          if (updated.rowCount !== 1) throw new Error('planilla_no_actualizada');
+          savedId = updated.rows[0].id;
+        } else {
+          const inserted = await client.query(
+            `
+              INSERT INTO planillas (equipo_id, fecha_clave, estado, datos, source_file)
+              VALUES ($1, CURRENT_DATE, 'guardada', $2::jsonb, $3)
+              RETURNING id
+            `,
+            [equipo.id, JSON.stringify(finalPlan), `${authSlug}.planilla.json`]
+          );
+          if (inserted.rowCount !== 1) throw new Error('planilla_no_insertada');
+          savedId = inserted.rows[0].id;
+        }
+
+        const verification = await client.query(
           `
-            UPDATE planillas
-            SET
-              fecha_clave = CURRENT_DATE,
-              datos = $2::jsonb,
-              source_file = $3,
-              updated_at = NOW()
+            SELECT
+              id,
+              datos = $2::jsonb AS contenido_confirmado,
+              TO_CHAR(
+                updated_at AT TIME ZONE current_setting('TIMEZONE')
+                  AT TIME ZONE 'America/Argentina/Buenos_Aires',
+                'YYYY-MM-DD HH24:MI'
+              ) AS recibida_en
+            FROM planillas
             WHERE id = $1
+              AND equipo_id = $3
+              AND estado = 'guardada'
           `,
-          [
-            existingPlanilla.rows[0].id,
-            JSON.stringify(finalPlan),
-            `${authSlug}.planilla.json`
-          ]
+          [savedId, JSON.stringify(finalPlan), equipo.id]
         );
-      } else {
-        await pool.query(
-          `
-            INSERT INTO planillas (equipo_id, fecha_clave, estado, datos, source_file)
-            VALUES ($1, CURRENT_DATE, 'guardada', $2::jsonb, $3)
-          `,
-          [equipo.id, JSON.stringify(finalPlan), `${authSlug}.planilla.json`]
-        );
+        if (verification.rowCount !== 1 || verification.rows[0].contenido_confirmado !== true) {
+          throw new Error('planilla_no_verificada');
+        }
+        confirmedPlanilla = verification.rows[0];
+        await client.query('COMMIT');
+      } catch (saveErr) {
+        await client.query('ROLLBACK');
+        throw saveErr;
+      } finally {
+        client.release();
       }
 
       try {
@@ -404,7 +445,10 @@ module.exports = function createFechasRouter(deps) {
         ok: true,
         message: 'Planilla guardada en PostgreSQL',
         team: authSlug,
-        source: 'db'
+        source: 'db',
+        planillaId: confirmedPlanilla.id,
+        receivedAtLocal: confirmedPlanilla.recibida_en,
+        verified: true
       });
     } catch (err) {
       console.error('Error al guardar planilla:', err);
@@ -433,7 +477,13 @@ const equipo = await resolveEquipoBySlug(requested);
 
       const result = await pool.query(
         `
-          SELECT datos
+          SELECT
+            datos,
+            TO_CHAR(
+              updated_at AT TIME ZONE current_setting('TIMEZONE')
+                AT TIME ZONE 'America/Argentina/Buenos_Aires',
+              'YYYY-MM-DD HH24:MI'
+            ) AS recibida_en
           FROM planillas
           WHERE equipo_id = $1
           ORDER BY updated_at DESC, id DESC
@@ -449,7 +499,12 @@ const equipo = await resolveEquipoBySlug(requested);
       const planilla = await enrichPlanillaWithPlayerIds(result.rows[0].datos || {}, equipo.id);
 
       res.set('Cache-Control', 'no-store');
-      return res.json({ ok:true, planilla });
+      return res.json({
+        ok:true,
+        planilla,
+        receivedAtLocal: result.rows[0].recibida_en,
+        verified: true
+      });
     } catch (err) {
       console.error('GET /team/planilla', err);
       return res.status(500).json({ ok:false, error:'Error interno' });

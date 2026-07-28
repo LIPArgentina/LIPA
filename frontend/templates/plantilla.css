@@ -876,6 +876,20 @@ body{
   color:#ff8a80;
 }
 
+.planilla-receipt{
+  display:none;
+  margin:8px 8px 0;
+  color:#ffe66d;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.35;
+  text-align:center;
+}
+
+.planilla-receipt.is-visible{
+  display:block;
+}
+
 
 .planilla-tools{ width:100%; display:flex; justify-content:center; margin:2px 0 6px; }
 .btn-vaciar-planilla{ width:200px; max-width:100%; padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.22); background:transparent; color:#fff1a6; font-weight:800; cursor:pointer; }

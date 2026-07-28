@@ -1152,6 +1152,15 @@ function collectPlanillaPayload(){
     if (typeof updateRepeatedHighlight === 'function') updateRepeatedHighlight();
   }
 
+  window.showPlanillaReceipt = function(receivedAtLocal){
+    const receipt = document.getElementById('planillaReceipt');
+    const match = String(receivedAtLocal || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+    if (!receipt || !match) return false;
+    receipt.textContent = `Su planilla llegó al servidor a las ${match[4]}:${match[5]}hs del ${match[3]}/${match[2]}.`;
+    receipt.classList.add('is-visible');
+    return true;
+  };
+
 async function savePlanilla(){
     if (window.__LPI_PLANILLA_SEND_ENABLED__ === false) {
       if (typeof showSendError === 'function') showSendError('La carga de planilla está cerrada mientras los cruces estén habilitados.');
@@ -1180,10 +1189,10 @@ async function savePlanilla(){
         return { ok:false };
       }
       const json = await r.json().catch(() => ({}));
-      if (json && json.ok) {
+      if (json && json.ok && json.verified === true && window.showPlanillaReceipt(json.receivedAtLocal)) {
         if (typeof showToastOK === 'function') showToastOK('Enviada correctamente');
       } else {
-        if (typeof showSendError === 'function') showSendError('No se pudo enviar la planilla. Intentá nuevamente.');
+        if (typeof showSendError === 'function') showSendError('La planilla se guardó, pero no se pudo verificar su recepción. Intentá nuevamente.');
       }
       return json;
     } catch (e) {
@@ -1812,6 +1821,9 @@ document.addEventListener('DOMContentLoaded', function(){
         const p = j && j.planilla;
         if (p) {
           applyPlanilla(p);
+          if (j.verified === true && typeof window.showPlanillaReceipt === 'function') {
+            window.showPlanillaReceipt(j.receivedAtLocal);
+          }
           return;
         }
       }
