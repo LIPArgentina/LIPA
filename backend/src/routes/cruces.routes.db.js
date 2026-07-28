@@ -3699,6 +3699,16 @@ function sortPlayerStatsRows(a, b) {
   return String(a.name || '').localeCompare(String(b.name || ''), 'es');
 }
 
+const HISTORIC_PLAYER_NAME_ALIASES = new Map([
+  ['NAUEL AROVI', 'NAHUEL AROVI'],
+  ['EDUARDO LOPEZ', 'JUAN EDUARDO LOPEZ']
+]);
+
+function canonicalTeamPlayerNameKey(value = '') {
+  const normalized = normalizeText(value);
+  return HISTORIC_PLAYER_NAME_ALIASES.get(normalized) || normalized;
+}
+
 router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
   setNoCache(res);
   try {
@@ -3760,12 +3770,19 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
     });
 
     const playersMap = new Map();
+    const playerKeyById = new Map();
+    const playerKeyByName = new Map();
     const ensureTeamPlayer = (playerInfo) => {
       const playerId = Number(playerInfo?.id || 0) || null;
       const playerName = String(playerInfo?.name || playerInfo || '').trim();
-      const key = normalizeText(playerName);
-      if (!key) return null;
-      const categoryNameKey = `${key}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
+      const normalizedName = normalizeText(playerName);
+      const identityName = canonicalTeamPlayerNameKey(playerName);
+      if (!normalizedName) return null;
+      const knownKey = (playerId ? playerKeyById.get(playerId) : null)
+        || playerKeyByName.get(identityName)
+        || null;
+      const key = knownKey || (playerId ? `id:${playerId}` : `name:${identityName}`);
+      const categoryNameKey = `${normalizedName}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
       const idCategoryRow = playerId ? categoryPlayersByKey.get(`id:${playerId}`) : null;
       const categoryRow = categoryPlayersByKey.get(categoryNameKey)
         || (idCategoryRow && teamInfoMatchesSide(exactTeam, idCategoryRow.teamSlug, idCategoryRow.teamName)
@@ -3790,8 +3807,15 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
           radPenalty: 0
         });
       } else if (categoryRow && Number(categoryRow.played || 0) > Number(playersMap.get(key).played || 0)) {
-        playersMap.set(key, { ...categoryRow });
+        const existing = playersMap.get(key);
+        playersMap.set(key, {
+          ...categoryRow,
+          id: Number(existing?.id || categoryRow.id || 0) || null,
+          name: String(existing?.name || categoryRow.name || '').trim()
+        });
       }
+      if (playerId) playerKeyById.set(playerId, key);
+      playerKeyByName.set(identityName, key);
       return playersMap.get(key);
     };
 
@@ -3806,13 +3830,17 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
     const pairStatsByName = new Map();
     pairStats.forEach((item) => {
       if (Number(item.id || 0)) pairStatsById.set(Number(item.id), item);
-      pairStatsByName.set(normalizeText(item.name), item);
+      pairStatsByName.set(canonicalTeamPlayerNameKey(item.name), item);
     });
     const pairPlayers = players.map((player) => {
       const stats = pairStatsById.get(Number(player.id || 0))
-        || pairStatsByName.get(normalizeText(player.name))
+        || pairStatsByName.get(canonicalTeamPlayerNameKey(player.name))
         || null;
-      return stats || {
+      return stats ? {
+        ...stats,
+        id: Number(player.id || stats.id || 0) || null,
+        name: player.name
+      } : {
         id: Number(player.id || 0) || null,
         name: player.name,
         teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
@@ -3830,7 +3858,7 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
     pairStats.forEach((item) => {
       const exists = pairPlayers.some((player) => (
         (Number(player.id || 0) && Number(player.id) === Number(item.id))
-        || sameNormalizedName(player.name, item.name)
+        || canonicalTeamPlayerNameKey(player.name) === canonicalTeamPlayerNameKey(item.name)
       ));
       if (!exists) pairPlayers.push(item);
     });
