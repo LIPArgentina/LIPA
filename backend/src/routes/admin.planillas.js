@@ -79,8 +79,7 @@ router.get('/planillas', async (req, res) => {
         p.datos,
         p.updated_at,
         TO_CHAR(
-          p.updated_at AT TIME ZONE current_setting('TIMEZONE')
-            AT TIME ZONE 'America/Argentina/Buenos_Aires',
+          p.updated_at AT TIME ZONE 'America/Argentina/Buenos_Aires',
           'YYYY-MM-DD HH24:MI'
         ) AS received_at_local
       FROM planillas p

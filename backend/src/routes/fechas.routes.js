@@ -408,8 +408,7 @@ module.exports = function createFechasRouter(deps) {
               id,
               datos = $2::jsonb AS contenido_confirmado,
               TO_CHAR(
-                updated_at AT TIME ZONE current_setting('TIMEZONE')
-                  AT TIME ZONE 'America/Argentina/Buenos_Aires',
+                updated_at AT TIME ZONE 'America/Argentina/Buenos_Aires',
                 'YYYY-MM-DD HH24:MI'
               ) AS recibida_en
             FROM planillas
@@ -480,8 +479,7 @@ const equipo = await resolveEquipoBySlug(requested);
           SELECT
             datos,
             TO_CHAR(
-              updated_at AT TIME ZONE current_setting('TIMEZONE')
-                AT TIME ZONE 'America/Argentina/Buenos_Aires',
+              updated_at AT TIME ZONE 'America/Argentina/Buenos_Aires',
               'YYYY-MM-DD HH24:MI'
             ) AS recibida_en
           FROM planillas
