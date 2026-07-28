@@ -996,8 +996,8 @@
     position: static;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 5px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
   }
 
   .actions > .btn {
@@ -1068,12 +1068,12 @@
   }
 
   .actions {
-    gap: 4px;
+    gap: 3px;
   }
 
   .actions > .btn,
   #btnAdminEquipos::after {
-    font-size: 8px;
+    font-size: 7.5px;
   }
 
   #btnAdminEquipos {
