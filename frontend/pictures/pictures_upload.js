@@ -20,7 +20,7 @@
     const h1 = document.querySelector('h1');
     if (h1) h1.textContent = 'Subir foto del desempate';
   }
-  const REQUIRED_PICTURES = isTiebreak ? 1 : 9;
+  const REQUIRED_PICTURES = isTiebreak ? 1 : 11;
 
   function getToken() {
     try {
@@ -151,7 +151,7 @@
       picturesInput.value = '';
       updatePreview();
       pickedFilesText.textContent = 'No se eligió ningún archivo';
-      setStatus(isTiebreak ? 'La foto del desempate se subió correctamente.' : 'Las 9 fotos se subieron correctamente.', 'success');
+      setStatus(isTiebreak ? 'La foto del desempate se subió correctamente.' : `Las ${REQUIRED_PICTURES} fotos se subieron correctamente.`, 'success');
     } catch (err) {
       setStatus(err.message || 'No se pudieron subir las fotos.', 'error');
     } finally {
