@@ -3489,7 +3489,7 @@ router.get('/team-ranking', requireAdminForPrivateCategory, async (req, res) => 
   }
 });
 
-async function findTeamsByCategory(category = '') {
+async function findTeamsByCategory(category = '', { includeInactive = false } = {}) {
   const division = String(category || '').trim().toLowerCase();
   if (!division) return [];
 
@@ -3500,10 +3500,10 @@ async function findTeamsByCategory(category = '') {
     SELECT id, slug_uid, slug_base, display_name, division
     FROM equipos
     WHERE LOWER(division) = $1
-      AND activo = true
+      AND ($2::boolean = true OR activo = true)
     ORDER BY display_name ASC, id ASC
     `,
-    [division]
+    [division, includeInactive]
   );
 
   return rows;
@@ -3566,7 +3566,9 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions: [], team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
     }
 
-    const teams = await findTeamsByCategory(category);
+    const teams = await findTeamsByCategory(category, {
+      includeInactive: Number(edition) !== CURRENT_EDITION
+    });
     const suggestions = teams
       .filter((team) => (
         includesNormalizedName(team.display_name, q) ||
