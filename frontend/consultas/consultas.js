@@ -565,6 +565,7 @@
 
   function renderTeamSearchResults(data) {
     const rawItems = Array.isArray(data?.players) ? data.players : [];
+    const rawPairItems = Array.isArray(data?.pairPlayers) ? data.pairPlayers : [];
     const team = data?.team || {};
     const items = rawItems;
     if (!$ranking) return;
@@ -575,7 +576,7 @@
       return;
     }
 
-    const rows = items.map((item, idx) => {
+    const buildRows = (sourceItems, { showRad = false } = {}) => sourceItems.map((item, idx) => {
       const diff = Number(item.diff || 0);
       const diffClass = diff >= 0 ? 'ok' : 'bad';
       return `
@@ -584,7 +585,7 @@
           <td class="player-name">${item.name || ''}</td>
           <td class="team-name">${item.teamName || team.name || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
-          <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
+          ${showRad ? `<td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>` : ''}
           <td class="num">${Number(item.effectiveness || 0).toFixed(1)}%</td>
           <td class="num ok">${Number(item.wins || 0)}</td>
           <td class="num bad">${Number(item.losses || 0)}</td>
@@ -594,14 +595,17 @@
         </tr>
       `;
     }).join('');
+    const rows = buildRows(items, { showRad: true });
+    const pairRows = buildRows(rawPairItems);
 
     $ranking.innerHTML = `
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Jugadores de ${team.name || 'equipo'} · ${data?.editionLabel || editionLabel(getTeamEdition())}</h2>
-          <p class="ranking-meta">${Number(data?.totalActivePlayers || 0)} jugadores activos sobre ${Number(data?.totalRegisteredPlayers || 0)} registrados.</p>
+          <p class="ranking-meta">${Number(data?.totalActivePlayers || 0)} jugadores con partidos sobre ${Number(data?.totalTeamPlayers || data?.totalRegisteredPlayers || 0)} integrantes del historial del equipo.</p>
         </div>
       </div>
+      <h3 class="team-stats-subtitle">Individuales</h3>
       <div class="ranking-table-wrap">
         <table class="ranking-table">
           <thead>
@@ -621,6 +625,33 @@
           </thead>
           <tbody>${rows}</tbody>
         </table>
+      </div>
+      <div class="team-pair-section">
+        <div class="ranking-head">
+          <div>
+            <h3 class="team-stats-subtitle">Parejas</h3>
+            <p class="ranking-meta">${Number(data?.totalActivePairPlayers || 0)} jugadores disputaron partidos en pareja.</p>
+          </div>
+        </div>
+        <div class="ranking-table-wrap">
+          <table class="ranking-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Jugador</th>
+                <th>Equipo</th>
+                <th class="num">PJ</th>
+                <th class="num">EFEC</th>
+                <th class="num">PG</th>
+                <th class="num">PP</th>
+                <th class="num">DIF</th>
+                <th class="num">TF</th>
+                <th class="num">TC</th>
+              </tr>
+            </thead>
+            <tbody>${pairRows}</tbody>
+          </table>
+        </div>
       </div>
     `;
   }

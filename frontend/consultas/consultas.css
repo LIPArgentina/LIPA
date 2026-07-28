@@ -98,6 +98,19 @@ header img{ height:34px; width:auto; display:block; }
 .ranking-table .ok{ color:var(--ok); font-weight:900; }
 .ranking-table .bad{ color:var(--err); font-weight:900; }
 .ranking-empty{ color:var(--muted); font-size:12px; padding:8px 0; }
+.team-stats-subtitle{
+  margin:8px 0 5px;
+  color:var(--gold);
+  font-size:13px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.team-pair-section{
+  margin-top:18px;
+  padding-top:10px;
+  border-top:1px solid var(--line);
+}
+.team-pair-section .ranking-head{ margin-bottom:5px; }
 
 @media (max-width:760px){
   .consultas-hero{ grid-template-columns:1fr; }

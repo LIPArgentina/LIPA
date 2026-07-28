@@ -3517,7 +3517,7 @@ async function findTeamsByCategory(category = '', { includeInactive = false } = 
   return rows;
 }
 
-async function getRegisteredPlayersForTeam(teamId) {
+async function getRegisteredPlayersForTeam(teamId, { includeInactive = false } = {}) {
   if (!teamId) return [];
 
   const { rows } = await pool.query(
@@ -3529,16 +3529,152 @@ async function getRegisteredPlayersForTeam(teamId) {
     FROM jugadores j
     LEFT JOIN jugador_equipos je ON je.jugador_id = j.id
     WHERE COALESCE(je.equipo_id, j.equipo_id) = $1
-      AND COALESCE(je.activo, true) = true
+      AND ($2::boolean = true OR COALESCE(je.activo, true) = true)
       AND TRIM(COALESCE(j.nombre, '')) <> ''
     ORDER BY j.id, COALESCE(je.orden, j.orden) ASC, j.nombre ASC
     `,
-    [teamId]
+    [teamId, includeInactive]
   );
 
   return rows
     .map((row) => ({ id: Number(row.id), name: String(row.name || '').trim() }))
     .filter((row) => row.name);
+}
+
+function buildPairPlayerStatsFromValidatedResults(results = [], teamInfo = {}) {
+  const statsMap = new Map();
+  const ensurePlayer = (player, teamSlug, teamName) => {
+    const id = Number(player?.id || 0) || null;
+    const name = String(player?.name || '').trim();
+    const key = id ? `id:${id}` : normalizeText(name);
+    if (!key || !name) return null;
+    if (!statsMap.has(key)) {
+      statsMap.set(key, {
+        id,
+        name,
+        teamSlug,
+        teamName,
+        played: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        triangulosFavor: 0,
+        triangulosContra: 0,
+        diff: 0,
+        effectiveness: 0
+      });
+    }
+    return statsMap.get(key);
+  };
+
+  results.forEach((item) => {
+    const isLocal = teamInfoMatchesSide(teamInfo, item.localSlug, item.localName);
+    const isVisitor = teamInfoMatchesSide(teamInfo, item.visitanteSlug, item.visitanteName);
+    if (!isLocal && !isVisitor) return;
+
+    const ownPlanilla = isLocal ? item.localPlanilla : item.visitantePlanilla;
+    const opponentPlanilla = isLocal ? item.visitantePlanilla : item.localPlanilla;
+    const ownScores = isLocal ? item.local?.scoreRows : item.visitante?.scoreRows;
+    const opponentScores = isLocal ? item.visitante?.scoreRows : item.local?.scoreRows;
+    const teamSlug = isLocal ? item.localSlug : item.visitanteSlug;
+    const teamName = isLocal ? item.localName : item.visitanteName;
+
+    for (let pairIndex = 0; pairIndex < 2; pairIndex++) {
+      const section = pairIndex === 0 ? 'pareja1' : 'pareja2';
+      const players = getPlanillaPlayerRefs(ownPlanilla, section);
+      const ownScore = getPairScore(ownScores, ownPlanilla, pairIndex);
+      const opponentScore = getPairScore(opponentScores, opponentPlanilla, pairIndex);
+      const result = resultFromScores(ownScore, opponentScore);
+
+      players.forEach((player) => {
+        const row = ensurePlayer(player, teamSlug, teamName);
+        if (!row) return;
+        row.played += 1;
+        row.triangulosFavor += Number(ownScore || 0);
+        row.triangulosContra += Number(opponentScore || 0);
+        if (result === 'ganado') row.wins += 1;
+        else if (result === 'perdido') row.losses += 1;
+        else row.draws += 1;
+      });
+    }
+  });
+
+  return Array.from(statsMap.values()).map((row) => ({
+    ...row,
+    diff: Number(row.triangulosFavor || 0) - Number(row.triangulosContra || 0),
+    effectiveness: Number(row.played || 0) > 0
+      ? (Number(row.wins || 0) / Number(row.played)) * 100
+      : 0
+  }));
+}
+
+async function getPairPlayerStatsForTeam(category = '', edition = CURRENT_EDITION, teamInfo = {}) {
+  const division = String(category || '').trim().toLowerCase();
+  const normalizedEdition = normalizeEdition(edition, {
+    allowTotal: false,
+    defaultEdition: CURRENT_EDITION
+  });
+  if (!division) return [];
+
+  let rows = [];
+  try {
+    await ensureJugadorResultadosEditionColumn();
+    const result = await pool.query(
+      `
+      SELECT
+        jugador_id AS id,
+        MAX(jugador_nombre) AS name,
+        equipo_slug,
+        MAX(equipo_nombre) AS team_name,
+        COUNT(*)::int AS played,
+        SUM(CASE WHEN resultado = 'ganado' THEN 1 ELSE 0 END)::int AS wins,
+        SUM(CASE WHEN resultado = 'perdido' THEN 1 ELSE 0 END)::int AS losses,
+        SUM(CASE WHEN resultado = 'empatado' THEN 1 ELSE 0 END)::int AS draws,
+        SUM(triangulos_favor)::int AS triangulos_favor,
+        SUM(triangulos_contra)::int AS triangulos_contra
+      FROM jugador_resultados
+      WHERE categoria = $1
+        AND edicion = $2
+        AND modalidad = 'pareja'
+        AND TRIM(COALESCE(jugador_nombre, '')) <> ''
+      GROUP BY jugador_id, equipo_slug
+      ORDER BY MAX(jugador_nombre) ASC
+      `,
+      [division, Number(normalizedEdition)]
+    );
+    rows = result.rows;
+  } catch (err) {
+    console.warn('Falling back to cruces_validations for pair player stats', err?.code || err?.message || err);
+    const results = await filterItemsByEdition(
+      await buildAllValidatedCrucesForPlayerQuery(division),
+      normalizedEdition,
+      division
+    );
+    return buildPairPlayerStatsFromValidatedResults(results, teamInfo);
+  }
+
+  return rows
+    .filter((row) => teamInfoMatchesSide(teamInfo, row.equipo_slug, row.team_name))
+    .map((row) => {
+      const played = Number(row.played || 0);
+      const wins = Number(row.wins || 0);
+      const triangulosFavor = Number(row.triangulos_favor || 0);
+      const triangulosContra = Number(row.triangulos_contra || 0);
+      return {
+        id: Number(row.id || 0) || null,
+        name: String(row.name || '').trim(),
+        teamSlug: row.equipo_slug,
+        teamName: row.team_name,
+        played,
+        wins,
+        losses: Number(row.losses || 0),
+        draws: Number(row.draws || 0),
+        triangulosFavor,
+        triangulosContra,
+        diff: triangulosFavor - triangulosContra,
+        effectiveness: played > 0 ? (wins / played) * 100 : 0
+      };
+    });
 }
 
 function teamInfoMatchesSide(teamInfo = {}, sideSlug = '', sideName = '') {
@@ -3552,6 +3688,10 @@ function teamInfoMatchesSide(teamInfo = {}, sideSlug = '', sideName = '') {
 }
 
 function sortPlayerStatsRows(a, b) {
+  const aPlayed = Number(a.played || 0);
+  const bPlayed = Number(b.played || 0);
+  if (aPlayed === 0 && bPlayed > 0) return 1;
+  if (bPlayed === 0 && aPlayed > 0) return -1;
   if (b.wins !== a.wins) return b.wins - a.wins;
   if (b.diff !== a.diff) return b.diff - a.diff;
   if (a.losses !== b.losses) return a.losses - b.losses;
@@ -3602,9 +3742,11 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
     }
 
-    const [registeredPlayers, rankingData] = await Promise.all([
-      getRegisteredPlayersForTeam(exactTeam.id),
-      buildRadRankingForCategory(category, edition)
+    const includeHistoricRoster = Number(edition) !== CURRENT_EDITION;
+    const [registeredPlayers, rankingData, pairStats] = await Promise.all([
+      getRegisteredPlayersForTeam(exactTeam.id, { includeInactive: includeHistoricRoster }),
+      buildRadRankingForCategory(category, edition),
+      getPairPlayerStatsForTeam(category, edition, exactTeam)
     ]);
 
     const { ranking: categoryRanking, radContext } = rankingData;
@@ -3621,13 +3763,16 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
     const ensureTeamPlayer = (playerInfo) => {
       const playerId = Number(playerInfo?.id || 0) || null;
       const playerName = String(playerInfo?.name || playerInfo || '').trim();
-      const key = playerId ? `id:${playerId}` : normalizeText(playerName);
+      const key = normalizeText(playerName);
       if (!key) return null;
+      const categoryNameKey = `${key}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
+      const idCategoryRow = playerId ? categoryPlayersByKey.get(`id:${playerId}`) : null;
+      const categoryRow = categoryPlayersByKey.get(categoryNameKey)
+        || (idCategoryRow && teamInfoMatchesSide(exactTeam, idCategoryRow.teamSlug, idCategoryRow.teamName)
+          ? idCategoryRow
+          : null)
+        || (Number(playerInfo?.played || 0) > 0 ? playerInfo : null);
       if (!playersMap.has(key)) {
-        const categoryKey = playerId
-          ? `id:${playerId}`
-          : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(exactTeam.slug_uid || exactTeam.slug_base)}`;
-        const categoryRow = categoryPlayersByKey.get(categoryKey) || null;
         playersMap.set(key, categoryRow ? { ...categoryRow } : {
           id: playerId,
           name: playerName,
@@ -3644,20 +3789,53 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
           rad: 0,
           radPenalty: 0
         });
+      } else if (categoryRow && Number(categoryRow.played || 0) > Number(playersMap.get(key).played || 0)) {
+        playersMap.set(key, { ...categoryRow });
       }
       return playersMap.get(key);
     };
 
-    if (Number(edition) === CURRENT_EDITION) {
-      registeredPlayers.forEach(ensureTeamPlayer);
-    } else {
-      categoryRanking
-        .filter((item) => teamInfoMatchesSide(exactTeam, item.teamSlug, item.teamName))
-        .forEach(ensureTeamPlayer);
-    }
+    registeredPlayers.forEach(ensureTeamPlayer);
+    categoryRanking
+      .filter((item) => teamInfoMatchesSide(exactTeam, item.teamSlug, item.teamName))
+      .forEach(ensureTeamPlayer);
 
     const players = Array.from(playersMap.values()).sort(sortPlayerRadRows);
     const totalActivePlayers = players.filter((item) => Number(item.played || 0) > 0).length;
+    const pairStatsById = new Map();
+    const pairStatsByName = new Map();
+    pairStats.forEach((item) => {
+      if (Number(item.id || 0)) pairStatsById.set(Number(item.id), item);
+      pairStatsByName.set(normalizeText(item.name), item);
+    });
+    const pairPlayers = players.map((player) => {
+      const stats = pairStatsById.get(Number(player.id || 0))
+        || pairStatsByName.get(normalizeText(player.name))
+        || null;
+      return stats || {
+        id: Number(player.id || 0) || null,
+        name: player.name,
+        teamSlug: exactTeam.slug_uid || exactTeam.slug_base,
+        teamName: exactTeam.display_name,
+        played: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        triangulosFavor: 0,
+        triangulosContra: 0,
+        diff: 0,
+        effectiveness: 0
+      };
+    });
+    pairStats.forEach((item) => {
+      const exists = pairPlayers.some((player) => (
+        (Number(player.id || 0) && Number(player.id) === Number(item.id))
+        || sameNormalizedName(player.name, item.name)
+      ));
+      if (!exists) pairPlayers.push(item);
+    });
+    pairPlayers.sort(sortPlayerStatsRows);
+    const totalActivePairPlayers = pairPlayers.filter((item) => Number(item.played || 0) > 0).length;
 
     return res.json({
       ok: true,
@@ -3673,9 +3851,12 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
         teamBase: exactTeam.slug_base
       },
       totalRegisteredPlayers: registeredPlayers.length,
+      totalTeamPlayers: players.length,
       totalActivePlayers,
+      totalActivePairPlayers,
       radContext,
-      players
+      players,
+      pairPlayers
     });
   } catch (err) {
     console.error('GET /team-query', err);
