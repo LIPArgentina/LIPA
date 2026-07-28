@@ -77,7 +77,12 @@ router.get('/planillas', async (req, res) => {
         e.display_name,
         e.division,
         p.datos,
-        p.updated_at
+        p.updated_at,
+        TO_CHAR(
+          p.updated_at AT TIME ZONE current_setting('TIMEZONE')
+            AT TIME ZONE 'America/Argentina/Buenos_Aires',
+          'YYYY-MM-DD HH24:MI'
+        ) AS received_at_local
       FROM planillas p
       JOIN equipos e ON e.id = p.equipo_id
       ORDER BY e.display_name ASC
@@ -91,7 +96,8 @@ router.get('/planillas', async (req, res) => {
       division: r.division,
       category: r.division,
       planilla: await enrichPlanillaWithPlayerIds(r.datos, r.equipo_id),
-      updatedAt: r.updated_at
+      updatedAt: r.updated_at,
+      receivedAtLocal: r.received_at_local
     })));
 
     res.json(out);

@@ -241,7 +241,28 @@
     align-self:flex-start;
     margin-top:9px;
     flex:0 0 auto;
+    cursor:pointer;
+    touch-action:manipulation;
   }
+  .title-indicator{ position:relative; }
+  .fresh-detail{
+    display:none;
+    position:absolute;
+    z-index:20;
+    top:34px;
+    left:0;
+    width:max-content;
+    max-width:min(280px, 80vw);
+    padding:8px 10px;
+    border:1px solid #8e6a12;
+    border-radius:8px;
+    background:#111;
+    color:#fff;
+    font-size:12px;
+    line-height:1.35;
+    box-shadow:0 4px 14px rgba(0,0,0,.55);
+  }
+  .title-indicator.is-detail-open .fresh-detail{ display:block; }
   .category-header-status .fresh-indicator{
     align-self:center;
     margin-top:0;
@@ -477,6 +498,6 @@
 </main>
 </div>
   <script src="../match-format.js"></script>
-  <script src="visor_planillas.js?v=20260726-1"></script>
+  <script src="visor_planillas.js?v=20260728-touch-time-1"></script>
 </body>
 </html>

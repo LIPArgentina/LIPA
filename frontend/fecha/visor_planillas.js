@@ -142,6 +142,10 @@ function authHeaders(extra = {}){
 
   function formatDateTime(value){
     try{
+      const localMatch = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+      if(localMatch){
+        return `${localMatch[3]}/${localMatch[2]}/${localMatch[1]}, ${localMatch[4]}:${localMatch[5]}`;
+      }
       const d = new Date(value);
       if (Number.isNaN(d.getTime())) return 'fecha inválida';
       return d.toLocaleString('es-AR', {
@@ -219,6 +223,39 @@ function authHeaders(extra = {}){
     } else {
       dot.title = 'Planilla sin fecha de actualización';
     }
+
+    dot.setAttribute('role', 'button');
+    dot.setAttribute('tabindex', '0');
+    dot.setAttribute('aria-label', dot.title);
+    dot.setAttribute('aria-expanded', 'false');
+
+    let detail = wrap.querySelector('.fresh-detail');
+    if(!detail){
+      detail = document.createElement('div');
+      detail.className = 'fresh-detail';
+      detail.setAttribute('role', 'status');
+      wrap.appendChild(detail);
+    }
+    detail.textContent = dot.title;
+
+    const toggleDetail = event => {
+      event.preventDefault();
+      const willOpen = !wrap.classList.contains('is-detail-open');
+      document.querySelectorAll('.title-indicator.is-detail-open').forEach(other => {
+        if(other !== wrap) other.classList.remove('is-detail-open');
+      });
+      wrap.classList.toggle('is-detail-open', willOpen);
+      dot.setAttribute('aria-expanded', String(willOpen));
+    };
+
+    dot.addEventListener('click', toggleDetail);
+    dot.addEventListener('keydown', event => {
+      if(event.key === 'Enter' || event.key === ' ') toggleDetail(event);
+      if(event.key === 'Escape'){
+        wrap.classList.remove('is-detail-open');
+        dot.setAttribute('aria-expanded', 'false');
+      }
+    });
 
   }catch(e){}
 }
@@ -439,7 +476,7 @@ function authHeaders(extra = {}){
     for(const item of visibleFiles){
       const team = item.teamName || item.team || 'equipo';
       const plan = item.planilla || item.plan || {};
-      const updatedAt = item.updatedAt || null;
+      const updatedAt = item.receivedAtLocal || item.updatedAt || null;
 
       const card = document.createElement('article');
       card.className = 'card';
