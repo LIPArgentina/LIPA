@@ -545,12 +545,15 @@
         </tr>
       `;
     }).join('');
+    const rankingPopulation = currentRankingEdition === 'total'
+      ? `${Number(data?.totalActivePlayers || 0)} jugadores con partidos registrados en la Superliga.`
+      : `${Number(data?.totalActivePlayers || 0)} jugadores registrados en esta edición.`;
 
     $ranking.innerHTML = `
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Ranking Top ${limit} · ${data?.editionLabel || editionLabel(currentRankingEdition)}</h2>
-          <p class="ranking-meta">Ranking realizado sobre una base de ${Number(data?.totalRegisteredPlayers || 0)} jugadores registrados y ${Number(data?.totalActivePlayers || 0)} jugadores activos.</p>
+          <p class="ranking-meta">Ranking realizado sobre una base de ${rankingPopulation}</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
