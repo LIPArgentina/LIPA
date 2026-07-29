@@ -339,6 +339,11 @@ body.modal-open{
   color:var(--ok);
 }
 
+.summary-eff strong,
+.summary-rad strong{
+  font-size:20px;
+}
+
 .summary-ranking{
   border-color:rgba(145,255,169,.72);
   background:rgba(145,255,169,.1);
@@ -369,6 +374,11 @@ body.modal-open{
 
   .summary-count strong{
     font-size:clamp(16px,5.2vw,22px);
+  }
+
+  .summary-eff strong,
+  .summary-rad strong{
+    font-size:clamp(14px,4.6vw,19px);
   }
 
   .summary-count span{
