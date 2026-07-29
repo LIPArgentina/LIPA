@@ -3019,8 +3019,7 @@ function buildPlayerRowsFromResults(results = []) {
     }));
 }
 
-function buildRadRankingFromResults(results = []) {
-  const baseRows = buildPlayerRowsFromResults(results);
+function buildRadRankingFromPlayerRows(baseRows = []) {
   const activeRows = baseRows.filter((item) => radNumber(item.played) > 0);
   const rawContext = buildRadContextFromRows(activeRows);
 
@@ -3037,6 +3036,48 @@ function buildRadRankingFromResults(results = []) {
       force: radRound1(rawContext.force)
     }
   };
+}
+
+function buildRadRankingFromResults(results = []) {
+  return buildRadRankingFromPlayerRows(buildPlayerRowsFromResults(results));
+}
+
+async function getPromotedPlayerKeys(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  const higherCategories = division === 'tercera'
+    ? ['segunda', 'primera']
+    : (division === 'segunda' ? ['primera'] : []);
+
+  if (!higherCategories.length) {
+    return { ids: new Set(), names: new Set() };
+  }
+
+  const { rows } = await pool.query(
+    `
+    SELECT DISTINCT j.id, j.nombre
+    FROM jugador_equipos je
+    INNER JOIN jugadores j ON j.id = je.jugador_id
+    WHERE je.activo = true
+      AND LOWER(je.categoria) = ANY($1::text[])
+    `,
+    [higherCategories]
+  );
+
+  return {
+    ids: new Set(rows.map((row) => Number(row.id || 0)).filter((id) => id > 0)),
+    names: new Set(rows.map((row) => normalizeText(row.nombre)).filter(Boolean))
+  };
+}
+
+function excludePromotedPlayers(rows = [], promoted = {}) {
+  const ids = promoted?.ids instanceof Set ? promoted.ids : new Set();
+  const names = promoted?.names instanceof Set ? promoted.names : new Set();
+
+  return rows.filter((row) => {
+    const id = Number(row?.id || 0);
+    if (id > 0) return !ids.has(id);
+    return !names.has(normalizeText(row?.name || ''));
+  });
 }
 
 async function buildPlayerRowsFromJugadorResultados(category = '', edition = CURRENT_EDITION) {
@@ -3138,22 +3179,7 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
 
 async function buildRadRankingFromJugadorResultados(category = '', edition = CURRENT_EDITION) {
   const baseRows = await buildPlayerRowsFromJugadorResultados(category, edition);
-  const activeRows = baseRows.filter((item) => radNumber(item.played) > 0);
-  const rawContext = buildRadContextFromRows(activeRows);
-
-  const ranking = baseRows
-    .map((item) => applyRadToPlayerRow(item, rawContext))
-    .sort(sortPlayerRadRows);
-
-  return {
-    ranking,
-    radContext: {
-      maxPlayed: radRound1(rawContext.maxPlayed),
-      avgPlayed: radRound1(rawContext.avgPlayed),
-      spread: radRound1(rawContext.spread),
-      force: radRound1(rawContext.force)
-    }
-  };
+  return buildRadRankingFromPlayerRows(baseRows);
 }
 
 async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITION) {
@@ -3350,10 +3376,18 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
     }
 
-    const [{ ranking: fullRanking, radContext }, totalRegisteredPlayers] = await Promise.all([
+    let [{ ranking: fullRanking, radContext }, totalRegisteredPlayers] = await Promise.all([
       buildRadRankingForCategory(category, edition),
       countRegisteredIndividualPlayersByCategory(category)
     ]);
+
+    let promotedPlayersExcluded = 0;
+    if (edition === 'total') {
+      const promoted = await getPromotedPlayerKeys(category);
+      const eligibleRows = excludePromotedPlayers(fullRanking, promoted);
+      promotedPlayersExcluded = fullRanking.length - eligibleRows.length;
+      ({ ranking: fullRanking, radContext } = buildRadRankingFromPlayerRows(eligibleRows));
+    }
 
     const totalActivePlayers = fullRanking.filter((item) => Number(item.played || 0) > 0).length;
     const ranking = fullRanking.slice(0, limit);
@@ -3367,6 +3401,7 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
       total: ranking.length,
       totalRegisteredPlayers,
       totalActivePlayers,
+      promotedPlayersExcluded,
       radContext,
       ranking
     });
