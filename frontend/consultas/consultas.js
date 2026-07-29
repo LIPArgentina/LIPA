@@ -669,7 +669,7 @@
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
-          <td class="team-name team-main">${team.teamName}</td>
+          <td class="team-name team-main">${teamSearchButtonMarkup(team.teamName, currentRankingEdition)}</td>
           <td class="num">${Number(team.played || 0)}</td>
           <td class="num ok">${Number(team.puntosFavor || 0)}</td>
           <td class="num bad">${Number(team.puntosContra || 0)}</td>
@@ -731,7 +731,7 @@
           <td class="rank-pos">#${idx + 1}</td>
           <td class="player-photo-cell">${playerPhotoButtonMarkup(item, team.name)}</td>
           <td class="player-name">${playerSearchButtonMarkup(item, team.name, getTeamEdition())}</td>
-          <td class="team-name">${item.teamName || team.name || ''}</td>
+          <td class="team-name">${teamSearchButtonMarkup(item.teamName || team.name, getTeamEdition())}</td>
           <td class="num">${Number(item.played || 0)}</td>
           ${showRad ? `<td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>` : ''}
           <td class="num">${Number(item.effectiveness || 0).toFixed(1)}%</td>
