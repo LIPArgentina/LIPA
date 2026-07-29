@@ -114,6 +114,21 @@ header img{ height:34px; width:auto; display:block; }
 }
 .player-search-button:hover{ color:var(--gold-soft); text-decoration:underline; }
 .player-search-button:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; border-radius:3px; }
+.team-search-button{
+  display:inline;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  font-weight:inherit;
+  text-align:left;
+  text-transform:inherit;
+  cursor:pointer;
+}
+.team-search-button:hover{ color:var(--gold-soft); text-decoration:underline; }
+.team-search-button:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; border-radius:3px; }
+.match-rival .player-search-button{ color:#fff; }
 .ranking-table th.player-photo-head,
 .ranking-table td.player-photo-cell{
   width:26px;
