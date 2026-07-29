@@ -1965,6 +1965,7 @@ function buildMatchStatus(validated = false) {
   const fechaISO = window.__CRUCE_FECHA_ISO || todayISO_AR;
   return {
     fechaISO,
+    category: deriveCategory(),
     validated: !!validated,
     localSlug,
     visitanteSlug,

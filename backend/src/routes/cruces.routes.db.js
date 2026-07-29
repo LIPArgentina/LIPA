@@ -1297,6 +1297,25 @@ async function resolveEquipoInfoBySlug(slug, categoryHint = '') {
   return rows[0] || null;
 }
 
+async function resolveEquipoInfosBySlug(slug) {
+  const slugNorm = normalizeSlug(slug);
+  if (!slugNorm) return [];
+
+  const { rows } = await pool.query(
+    `
+    SELECT slug_uid, slug_base, display_name, division
+    FROM equipos
+    WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1
+    ORDER BY
+      CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END,
+      id ASC
+    `,
+    [slugNorm]
+  );
+
+  return rows;
+}
+
 
 function buildTeamMatchCandidates(teamInfo = null, fallbackSlug = '') {
   const values = [
@@ -1318,17 +1337,37 @@ function fixtureTeamMatches(item = {}, candidates = []) {
   return !!equipo && candidates.includes(equipo);
 }
 
-async function inferCategoryFromMatch(localSlug, visitanteSlug) {
-  const [localInfo, visitanteInfo] = await Promise.all([
-    resolveEquipoInfoBySlug(localSlug),
-    resolveEquipoInfoBySlug(visitanteSlug)
+async function inferCategoryFromMatch(localSlug, visitanteSlug, categoryHint = '') {
+  const [localOptions, visitanteOptions] = await Promise.all([
+    resolveEquipoInfosBySlug(localSlug),
+    resolveEquipoInfosBySlug(visitanteSlug)
   ]);
+
+  const localDivisions = new Set(
+    localOptions.map(item => String(item?.division || '').trim().toLowerCase()).filter(Boolean)
+  );
+  const commonDivisions = [...new Set(
+    visitanteOptions
+      .map(item => String(item?.division || '').trim().toLowerCase())
+      .filter(division => division && localDivisions.has(division))
+  )];
+
+  const normalizedHint = String(categoryHint || '').trim().toLowerCase();
+  const category = normalizedHint && commonDivisions.includes(normalizedHint)
+    ? normalizedHint
+    : (commonDivisions.length === 1 ? commonDivisions[0] : null);
+  const localInfo = category
+    ? localOptions.find(item => String(item?.division || '').trim().toLowerCase() === category)
+    : (localOptions[0] || null);
+  const visitanteInfo = category
+    ? visitanteOptions.find(item => String(item?.division || '').trim().toLowerCase() === category)
+    : (visitanteOptions[0] || null);
 
   const localDivision = String(localInfo?.division || '').trim().toLowerCase();
   const visitanteDivision = String(visitanteInfo?.division || '').trim().toLowerCase();
-  const category = localDivision || visitanteDivision || null;
+  const inferredCategory = category || localDivision || visitanteDivision || null;
 
-  return { category, localInfo, visitanteInfo };
+  return { category: inferredCategory, localInfo, visitanteInfo };
 }
 
 async function syncValidatedMatchIntoFixture({
@@ -1342,7 +1381,12 @@ async function syncValidatedMatchIntoFixture({
     return { updated: false, reason: 'missing_data' };
   }
 
-  const { category, localInfo, visitanteInfo } = await inferCategoryFromMatch(localSlug, visitanteSlug);
+  const categoryHint = snapshot?.category || snapshot?.categoria || '';
+  const { category, localInfo, visitanteInfo } = await inferCategoryFromMatch(
+    localSlug,
+    visitanteSlug,
+    categoryHint
+  );
   if (!category) {
     return { updated: false, reason: 'category_not_found' };
   }
