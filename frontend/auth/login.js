@@ -150,10 +150,24 @@ function showCategoryGrid() {
 
 async function openTeamCategory(category) {
   currentCategory = category;
+  teamFormTitle.textContent = `Ingreso: ${capitalize(category)}`;
+  teamError.classList.add("hidden");
+  passwordInput.value = "";
+  togglePass.checked = false;
+  passwordInput.type = "password";
+  userSelect.innerHTML = '<option value="">Cargando equipos…</option>';
+  userSelect.disabled = true;
+
+  categoryGrid.classList.add("hidden");
+  salaForm.classList.add("hidden");
+  adminForm.classList.add("hidden");
+  teamForm.classList.remove("hidden");
+
   currentUsers = await loadUsers(category);
   currentUsers.sort((a, b) => (a.username || a.name).localeCompare((b.username || b.name), "es"));
 
   userSelect.innerHTML = "";
+  userSelect.disabled = false;
 
   for (const u of currentUsers) {
     const opt = document.createElement("option");
@@ -170,16 +184,10 @@ async function openTeamCategory(category) {
     if (exists) userSelect.value = lastTeamSlug;
   }
 
-  teamFormTitle.textContent = `Ingreso: ${capitalize(category)}`;
-  teamError.classList.add("hidden");
-  passwordInput.value = "";
-  togglePass.checked = false;
-  passwordInput.type = "password";
-
-  categoryGrid.classList.add("hidden");
-  salaForm.classList.add("hidden");
-  adminForm.classList.add("hidden");
-  teamForm.classList.remove("hidden");
+  if (!currentUsers.length) {
+    teamError.textContent = "No se pudieron cargar los equipos. Volvé y reintentá en unos segundos.";
+    teamError.classList.remove("hidden");
+  }
 }
 
 async function openSalas() {
