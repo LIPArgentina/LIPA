@@ -74,6 +74,17 @@
         title="Ver foto">📷</button>`;
   }
 
+  function playerSearchButtonMarkup(item, fallbackTeam = '', edition = currentRankingEdition) {
+    const name = String(item?.name || '');
+    const team = String(item?.teamName || fallbackTeam || '');
+    return `<button class="player-search-button" type="button"
+        data-player-search="1"
+        data-player-name="${escapeAttribute(name)}"
+        data-player-team="${escapeAttribute(team)}"
+        data-player-edition="${escapeAttribute(edition)}"
+        title="Consultar a ${escapeAttribute(name)}">${name}</button>`;
+  }
+
   function closePlayerPhoto() {
     if (!$playerPhotoModal) return;
     $playerPhotoModal.hidden = true;
@@ -427,7 +438,10 @@
     $summary.hidden = false;
     $summary.innerHTML = `
       <div class="summary-player">
-        <h2 class="summary-title">${player.name || 'Jugador'}</h2>
+        <div class="summary-player-title">
+          ${playerPhotoButtonMarkup(player)}
+          <h2 class="summary-title">${player.name || 'Jugador'}</h2>
+        </div>
         <p class="summary-meta">${player.teamName || ''} · Categoría ${(data.category || '').toUpperCase()} · ${data?.editionLabel || editionLabel(data?.edition || currentSearchEdition)}</p>
       </div>
       <div class="summary-stats">
@@ -532,7 +546,7 @@
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
           <td class="player-photo-cell">${playerPhotoButtonMarkup(item)}</td>
-          <td class="player-name">${item.name || ''}</td>
+          <td class="player-name">${playerSearchButtonMarkup(item, '', currentRankingEdition)}</td>
           <td class="team-name">${item.teamName || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
           <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
@@ -674,7 +688,7 @@
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
           <td class="player-photo-cell">${playerPhotoButtonMarkup(item, team.name)}</td>
-          <td class="player-name">${item.name || ''}</td>
+          <td class="player-name">${playerSearchButtonMarkup(item, team.name, getTeamEdition())}</td>
           <td class="team-name">${item.teamName || team.name || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
           ${showRad ? `<td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>` : ''}
@@ -866,6 +880,20 @@
     }
   }
 
+  async function searchPlayerFromRanking(button) {
+    const playerName = String(button?.dataset.playerName || '').trim();
+    const teamName = String(button?.dataset.playerTeam || '').trim();
+    const edition = String(button?.dataset.playerEdition || currentSearchEdition || '6').toLowerCase();
+    if (!playerName || !$player) return;
+
+    setSearchEdition(edition);
+    $player.value = teamName ? `${playerName} · ${teamName}` : playerName;
+    if ($team) $team.value = '';
+    renderTeamSuggestions([]);
+    await searchPlayer(null);
+    $summary?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   $player?.addEventListener('input', () => {
     if (String($player.value || '').trim()) {
       if ($team) $team.value = '';
@@ -923,9 +951,24 @@
     if (ev.target === $radModal) closeRadModal();
   });
   $ranking?.addEventListener('click', (ev) => {
-    const button = ev.target.closest('[data-player-photo]');
-    if (!button) return;
-    openPlayerPhoto(button).catch(() => {
+    const photoButton = ev.target.closest('[data-player-photo]');
+    if (photoButton) {
+      openPlayerPhoto(photoButton).catch(() => {
+        if ($playerPhotoStatus) $playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
+      });
+      return;
+    }
+    const searchButton = ev.target.closest('[data-player-search]');
+    if (!searchButton) return;
+    searchPlayerFromRanking(searchButton).catch((err) => {
+      console.error(err);
+      setStatus('No se pudo consultar el jugador.', 'error');
+    });
+  });
+  $summary?.addEventListener('click', (ev) => {
+    const photoButton = ev.target.closest('[data-player-photo]');
+    if (!photoButton) return;
+    openPlayerPhoto(photoButton).catch(() => {
       if ($playerPhotoStatus) $playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
     });
   });

@@ -46,6 +46,8 @@ header img{ height:34px; width:auto; display:block; }
 .status-box.info{ border-color:rgba(255,204,0,.45); }
 .summary-box{ padding:10px 12px; margin:12px 0; display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:10px; align-items:center; }
 .summary-title{ margin:0; font-size:clamp(16px,2vw,20px); color:var(--gold); text-transform:uppercase; font-weight:900; }
+.summary-player-title{ display:flex; align-items:center; gap:7px; }
+.summary-player-title .player-photo-button{ width:24px; height:24px; font-size:19px; }
 .summary-meta{ margin:3px 0 0; color:var(--muted); font-size:12px; }
 .summary-stats{ display:flex; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
 .summary-count{ min-width:78px; text-align:center; border-radius:10px; background:#0f0f11; padding:7px 8px; border:1px solid #b28900; }
@@ -94,6 +96,20 @@ header img{ height:34px; width:auto; display:block; }
 .ranking-table td.num,.ranking-table th.num{ text-align:right; }
 .ranking-table .rank-pos{ color:var(--gold-soft); font-weight:900; }
 .ranking-table .player-name{ color:#fff; font-weight:900; text-transform:uppercase; }
+.player-search-button{
+  display:inline;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  font-weight:inherit;
+  text-align:left;
+  text-transform:inherit;
+  cursor:pointer;
+}
+.player-search-button:hover{ color:var(--gold-soft); text-decoration:underline; }
+.player-search-button:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; border-radius:3px; }
 .ranking-table th.player-photo-head,
 .ranking-table td.player-photo-cell{
   width:26px;
