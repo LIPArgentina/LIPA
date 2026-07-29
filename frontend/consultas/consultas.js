@@ -524,8 +524,20 @@
         teamName: item.opponentName
       }, item.opponentName, currentSearchEdition)
       : 'Rival';
+    const companionPlayer = item.companionName
+      ? playerSearchButtonMarkup({
+        name: item.companionName,
+        teamName: item.teamName
+      }, item.teamName, currentSearchEdition)
+      : 'Sin compañero';
+    const opponentPairPlayers = Array.isArray(item.opponentPairPlayers)
+      ? item.opponentPairPlayers.filter(Boolean).map((name) => playerSearchButtonMarkup({
+        name,
+        teamName: item.opponentName
+      }, item.opponentName, currentSearchEdition))
+      : [];
     const rivalText = pair
-      ? `en pareja con ${item.companionName || 'Sin compañero'} vs ${(Array.isArray(item.opponentPairPlayers) ? item.opponentPairPlayers.filter(Boolean).join(' - ') : '') || 'Rivales'} · ${item.opponentName || ''}`
+      ? `en pareja con ${companionPlayer} vs ${opponentPairPlayers.join(' - ') || 'Rivales'} · ${item.opponentName || ''}`
       : `vs ${opponentPlayer} · ${item.opponentName || ''}`;
 
     card.innerHTML = `
