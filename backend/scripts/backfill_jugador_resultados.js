@@ -1,10 +1,6 @@
 const path = require('path');
 const fs = require('fs');
 
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-
-const pool = require('../db');
-
 const WRITE = process.argv.includes('--write');
 const EXPORT_UNRESOLVED = process.argv.includes('--export-unresolved');
 const CATEGORY_FILTER = readArg('--category');
@@ -463,6 +459,13 @@ function rowsFromSnapshot(ctx, match) {
   const visitantePlanilla = snapshot.visitantePlanilla || {};
   const localScores = Array.isArray(snapshot?.local?.scoreRows) ? snapshot.local.scoreRows : [];
   const visitanteScores = Array.isArray(snapshot?.visitante?.scoreRows) ? snapshot.visitante.scoreRows : [];
+  const individualCount = Math.max(
+    7,
+    Array.isArray(localPlanilla?.individuales) ? localPlanilla.individuales.length : 0,
+    Array.isArray(visitantePlanilla?.individuales) ? visitantePlanilla.individuales.length : 0,
+    Array.isArray(localPlanilla?.jugadorIds?.individuales) ? localPlanilla.jugadorIds.individuales.length : 0,
+    Array.isArray(visitantePlanilla?.jugadorIds?.individuales) ? visitantePlanilla.jugadorIds.individuales.length : 0
+  );
 
   const sides = [
     {
@@ -488,7 +491,7 @@ function rowsFromSnapshot(ctx, match) {
   ];
 
   for (const side of sides) {
-    for (let idx = 0; idx < 7; idx++) {
+    for (let idx = 0; idx < individualCount; idx++) {
       const player = planillaPlayerRef(side.planilla, 'individuales', idx);
       addRow(rows, ctx, player, {
         teamSlug: side.teamSlug,
@@ -504,7 +507,7 @@ function rowsFromSnapshot(ctx, match) {
 
     for (let pairIndex = 0; pairIndex < 2; pairIndex++) {
       const section = pairIndex === 0 ? 'pareja1' : 'pareja2';
-      const scoreIndex = pairIndex === 0 ? 7 : 8;
+      const scoreIndex = individualCount + pairIndex;
       for (let idx = 0; idx < 2; idx++) {
         const player = planillaPlayerRef(side.planilla, section, idx);
         addRow(rows, ctx, player, {
@@ -794,6 +797,8 @@ async function writeRows(client, rows) {
 }
 
 async function main() {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+  const pool = require('../db');
   const client = await pool.connect();
   try {
     const { rows, stats } = await buildRows(client);
@@ -817,7 +822,14 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err.message || err);
-  process.exit(1);
-});
+module.exports = {
+  buildRows,
+  writeRows
+};
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
+}
