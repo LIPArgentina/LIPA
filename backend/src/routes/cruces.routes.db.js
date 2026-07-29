@@ -3955,7 +3955,12 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
       return playersMap.get(key);
     };
 
-    registeredPlayers.forEach(ensureTeamPlayer);
+    // La ficha actual del equipo no representa necesariamente su plantel en
+    // ediciones anteriores. Para una edición histórica, la nómina se reconstruye
+    // únicamente con quienes tienen resultados de esa edición.
+    if (!includeHistoricRoster) {
+      registeredPlayers.forEach(ensureTeamPlayer);
+    }
     categoryRanking
       .filter((item) => teamInfoMatchesSide(exactTeam, item.teamSlug, item.teamName))
       .forEach(ensureTeamPlayer);
