@@ -91,9 +91,21 @@
     </div>
   </div>
 
+  <div id="playerPhotoModal" class="player-photo-modal" hidden>
+    <div class="player-photo-backdrop" data-close-player-photo="1"></div>
+    <div class="player-photo-dialog" role="dialog" aria-modal="true" aria-labelledby="playerPhotoName">
+      <button id="btnClosePlayerPhoto" class="player-photo-close" type="button" aria-label="Cerrar">×</button>
+      <h2 id="playerPhotoName">Jugador</h2>
+      <div class="player-photo-frame">
+        <img id="playerPhotoImage" src="../logo_liga.png" alt="Foto del jugador"/>
+      </div>
+      <div id="playerPhotoStatus" class="player-photo-status"></div>
+    </div>
+  </div>
+
 </div>
 
-<script src="../config.js"></script>
+<script src="../config.js?v=player-photo-1"></script>
 <script src="consultas.js?v=consult-mode-layout-2" defer></script>
 </body>
 </html>

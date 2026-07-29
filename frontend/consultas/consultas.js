@@ -20,6 +20,11 @@
   const $radInfo = document.getElementById('btnRadInfo');
   const $radModal = document.getElementById('radModal');
   const $radClose = document.getElementById('btnRadClose');
+  const $playerPhotoModal = document.getElementById('playerPhotoModal');
+  const $playerPhotoName = document.getElementById('playerPhotoName');
+  const $playerPhotoImage = document.getElementById('playerPhotoImage');
+  const $playerPhotoStatus = document.getElementById('playerPhotoStatus');
+  const $playerPhotoClose = document.getElementById('btnClosePlayerPhoto');
 
   let debounceTimer = null;
   let lastSuggestions = [];
@@ -34,9 +39,99 @@
   let lastRankingMode = 'players';
   let hasAdminAccess = false;
   let lastExecutedSearch = null;
+  const playerPhotoCache = new Map();
 
   function apiUrl(path) {
     return API_BASE + path;
+  }
+
+  function escapeAttribute(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function normalizePlayerName(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+  }
+
+  function playerPhotoButtonMarkup(item, fallbackTeam = '') {
+    const name = String(item?.name || '');
+    const team = String(item?.teamName || fallbackTeam || '');
+    return `<button class="player-photo-button" type="button"
+        data-player-photo="1"
+        data-player-id="${Number(item?.id || item?.playerId || 0) || ''}"
+        data-player-name="${escapeAttribute(name)}"
+        data-player-team="${escapeAttribute(team)}"
+        aria-label="Ver foto de ${escapeAttribute(name)}"
+        title="Ver foto">📷</button>`;
+  }
+
+  function playerSearchButtonMarkup(item, fallbackTeam = '', edition = currentRankingEdition) {
+    const name = String(item?.name || '');
+    const team = String(item?.teamName || fallbackTeam || '');
+    return `<button class="player-search-button" type="button"
+        data-player-search="1"
+        data-player-name="${escapeAttribute(name)}"
+        data-player-team="${escapeAttribute(team)}"
+        data-player-edition="${escapeAttribute(edition)}"
+        title="Consultar a ${escapeAttribute(name)}">${name}</button>`;
+  }
+
+  function closePlayerPhoto() {
+    if (!$playerPhotoModal) return;
+    $playerPhotoModal.hidden = true;
+    document.body.classList.remove('player-photo-open');
+  }
+
+  async function findPlayerPhoto(playerId, playerName, teamName) {
+    const key = `${Number(playerId || 0)}:${normalizePlayerName(playerName)}:${normalizePlayerName(teamName)}`;
+    if (!playerPhotoCache.has(key)) {
+      playerPhotoCache.set(key, (async () => {
+        const data = await fetchJson(apiUrl('/api/players-public/search?q=' + encodeURIComponent(playerName)));
+        const players = Array.isArray(data?.players) ? data.players : [];
+        const numericId = Number(playerId || 0);
+        return players.find((player) => numericId && Number(player?.id || 0) === numericId)
+          || players.find((player) =>
+            normalizePlayerName(player?.nombre || player?.name) === normalizePlayerName(playerName)
+            && (!teamName || normalizePlayerName(player?.equipo || player?.equipoNombre || player?.teamName) === normalizePlayerName(teamName))
+          )
+          || players.find((player) => normalizePlayerName(player?.nombre || player?.name) === normalizePlayerName(playerName))
+          || null;
+      })().catch((err) => {
+        playerPhotoCache.delete(key);
+        throw err;
+      }));
+    }
+    return playerPhotoCache.get(key);
+  }
+
+  async function openPlayerPhoto(button) {
+    if (!$playerPhotoModal || !$playerPhotoImage) return;
+    const playerName = String(button?.dataset.playerName || 'Jugador');
+    const teamName = String(button?.dataset.playerTeam || '');
+    const playerId = Number(button?.dataset.playerId || 0);
+    $playerPhotoName.textContent = playerName;
+    $playerPhotoImage.src = '../logo_liga.png';
+    $playerPhotoImage.alt = `Foto de ${playerName}`;
+    $playerPhotoStatus.textContent = 'Buscando foto…';
+    $playerPhotoModal.hidden = false;
+    document.body.classList.add('player-photo-open');
+
+    const player = await findPlayerPhoto(playerId, playerName, teamName);
+    if (!player) {
+      $playerPhotoStatus.textContent = 'No se encontró la ficha del jugador.';
+      return;
+    }
+    $playerPhotoImage.src = player?.fotoUrl ? apiUrl(player.fotoUrl) : '../logo_liga.png';
+    $playerPhotoStatus.textContent = player?.fotoUrl ? '' : 'Este jugador todavía no tiene una foto cargada.';
   }
 
   function readSession() {
@@ -88,7 +183,8 @@
     } else {
       $rankingEdition.value = '6';
     }
-    setSearchEdition($rankingEdition.value);
+    currentRankingEdition = $rankingEdition.value;
+    currentSearchEdition = currentRankingEdition;
   }
 
   function setConsultMode(mode, { preserveEdition = true } = {}) {
@@ -364,7 +460,10 @@
     $summary.hidden = false;
     $summary.innerHTML = `
       <div class="summary-player">
-        <h2 class="summary-title">${player.name || 'Jugador'}</h2>
+        <div class="summary-player-title">
+          ${playerPhotoButtonMarkup(player)}
+          <h2 class="summary-title">${player.name || 'Jugador'}</h2>
+        </div>
         <p class="summary-meta">${player.teamName || ''} · Categoría ${(data.category || '').toUpperCase()} · ${data?.editionLabel || editionLabel(data?.edition || currentSearchEdition)}</p>
       </div>
       <div class="summary-stats">
@@ -472,7 +571,8 @@
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
-          <td class="player-name">${item.name || ''}</td>
+          <td class="player-photo-cell">${playerPhotoButtonMarkup(item)}</td>
+          <td class="player-name">${playerSearchButtonMarkup(item, '', currentRankingEdition)}</td>
           <td class="team-name">${item.teamName || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
           <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
@@ -485,12 +585,17 @@
         </tr>
       `;
     }).join('');
+    const registeredPlayers = Number(data?.totalRegisteredPlayers || 0);
+    const participatingPlayers = Number(data?.totalActivePlayers || 0);
+    const rankingPopulation = currentRankingEdition === 'total'
+      ? `${registeredPlayers} jugadores registrados y un total de ${participatingPlayers} participando de la Superliga.`
+      : `${registeredPlayers} jugadores registrados y un total de ${participatingPlayers} participando de esta edición.`;
 
     $ranking.innerHTML = `
       <div class="ranking-head">
         <div>
           <h2 class="ranking-title">Ranking Top ${limit} · ${data?.editionLabel || editionLabel(currentRankingEdition)}</h2>
-          <p class="ranking-meta">Ranking realizado sobre una base de ${Number(data?.totalRegisteredPlayers || 0)} jugadores registrados y ${Number(data?.totalActivePlayers || 0)} jugadores activos.</p>
+          <p class="ranking-meta">Ranking realizado sobre una base de ${rankingPopulation}</p>
         </div>
       </div>
       <div class="ranking-table-wrap">
@@ -498,6 +603,7 @@
           <thead>
             <tr>
               <th>#</th>
+              <th class="player-photo-head" aria-label="Foto"></th>
               <th>Jugador</th>
               <th>Equipo</th>
               <th class="num">PJ</th>
@@ -607,7 +713,8 @@
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
-          <td class="player-name">${item.name || ''}</td>
+          <td class="player-photo-cell">${playerPhotoButtonMarkup(item, team.name)}</td>
+          <td class="player-name">${playerSearchButtonMarkup(item, team.name, getTeamEdition())}</td>
           <td class="team-name">${item.teamName || team.name || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
           ${showRad ? `<td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>` : ''}
@@ -636,6 +743,7 @@
           <thead>
             <tr>
               <th>#</th>
+              <th class="player-photo-head" aria-label="Foto"></th>
               <th>Jugador</th>
               <th>Equipo</th>
               <th class="num">PJ</th>
@@ -663,6 +771,7 @@
             <thead>
               <tr>
                 <th>#</th>
+                <th class="player-photo-head" aria-label="Foto"></th>
                 <th>Jugador</th>
                 <th>Equipo</th>
                 <th class="num">PJ</th>
@@ -793,6 +902,21 @@
     }
   }
 
+  async function searchPlayerFromRanking(button) {
+    const playerName = String(button?.dataset.playerName || '').trim();
+    const teamName = String(button?.dataset.playerTeam || '').trim();
+    const edition = String(button?.dataset.playerEdition || currentSearchEdition || '6').toLowerCase();
+    if (!playerName || !$player) return;
+
+    setConsultMode('individual');
+    setSearchEdition(edition);
+    $player.value = teamName ? `${playerName} · ${teamName}` : playerName;
+    if ($team) $team.value = '';
+    renderTeamSuggestions([]);
+    await searchPlayer(null);
+    $summary?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   $player?.addEventListener('input', () => {
     if (String($player.value || '').trim()) {
       if ($team) $team.value = '';
@@ -850,8 +974,36 @@
   $radModal?.addEventListener('click', (ev) => {
     if (ev.target === $radModal) closeRadModal();
   });
+  $ranking?.addEventListener('click', (ev) => {
+    const photoButton = ev.target.closest('[data-player-photo]');
+    if (photoButton) {
+      openPlayerPhoto(photoButton).catch(() => {
+        if ($playerPhotoStatus) $playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
+      });
+      return;
+    }
+    const searchButton = ev.target.closest('[data-player-search]');
+    if (!searchButton) return;
+    searchPlayerFromRanking(searchButton).catch((err) => {
+      console.error(err);
+      setStatus('No se pudo consultar el jugador.', 'error');
+    });
+  });
+  $summary?.addEventListener('click', (ev) => {
+    const photoButton = ev.target.closest('[data-player-photo]');
+    if (!photoButton) return;
+    openPlayerPhoto(photoButton).catch(() => {
+      if ($playerPhotoStatus) $playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
+    });
+  });
+  $playerPhotoClose?.addEventListener('click', closePlayerPhoto);
+  $playerPhotoModal?.addEventListener('click', (ev) => {
+    if (ev.target?.matches('[data-close-player-photo]')) closePlayerPhoto();
+  });
   document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') closeRadModal();
+    if (ev.key !== 'Escape') return;
+    closeRadModal();
+    closePlayerPhoto();
   });
   $form?.addEventListener('submit', (event) => {
     event.preventDefault();
