@@ -15,6 +15,7 @@ const CURRENT_EDITION = 6;
 const DEFAULT_HISTORIC_EDITION = 5;
 let ensureCrucesAdminStoragePromise = null;
 let ensureJugadorResultadosEditionPromise = null;
+let ensureJugadorCurrentCategoryPromise = null;
 
 function requireAdminForPrivateCategory(req, res, next) {
   const category = String(req.query.category || '').trim().toLowerCase();
@@ -3052,13 +3053,56 @@ async function getPromotedPlayerKeys(category = '') {
     return { ids: new Set(), names: new Set() };
   }
 
+  if (!ensureJugadorCurrentCategoryPromise) {
+    ensureJugadorCurrentCategoryPromise = (async () => {
+      await pool.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS categoria_actual TEXT`);
+      await pool.query(`
+        UPDATE jugadores j
+           SET categoria_actual = current_team.categoria,
+               updated_at = NOW()
+          FROM (
+            SELECT DISTINCT ON (je.jugador_id)
+              je.jugador_id,
+              LOWER(je.categoria) AS categoria
+            FROM jugador_equipos je
+            WHERE je.activo = true
+            ORDER BY
+              je.jugador_id,
+              CASE LOWER(je.categoria)
+                WHEN 'primera' THEN 3
+                WHEN 'segunda' THEN 2
+                WHEN 'tercera' THEN 1
+                ELSE 0
+              END DESC,
+              je.desde DESC NULLS LAST,
+              je.id DESC
+          ) current_team
+         WHERE j.id = current_team.jugador_id
+           AND NULLIF(TRIM(COALESCE(j.categoria_actual, '')), '') IS NULL
+      `);
+    })().catch((err) => {
+      ensureJugadorCurrentCategoryPromise = null;
+      throw err;
+    });
+  }
+  await ensureJugadorCurrentCategoryPromise;
+
   const { rows } = await pool.query(
     `
-    SELECT DISTINCT j.id, j.nombre
-    FROM jugador_equipos je
-    INNER JOIN jugadores j ON j.id = je.jugador_id
-    WHERE je.activo = true
-      AND LOWER(je.categoria) = ANY($1::text[])
+    SELECT DISTINCT promoted.id, promoted.nombre
+    FROM (
+      SELECT j.id, j.nombre
+      FROM jugadores j
+      WHERE LOWER(COALESCE(j.categoria_actual, '')) = ANY($1::text[])
+
+      UNION
+
+      SELECT j.id, j.nombre
+      FROM jugador_equipos je
+      INNER JOIN jugadores j ON j.id = je.jugador_id
+      WHERE je.activo = true
+        AND LOWER(je.categoria) = ANY($1::text[])
+    ) promoted
     `,
     [higherCategories]
   );
