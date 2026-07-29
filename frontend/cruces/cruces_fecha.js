@@ -368,7 +368,7 @@ function apiUrl(path){
       if (status) status.textContent = 'No se pudo identificar al jugador.';
       return;
     }
-    const params = new URLSearchParams({ category, player, auto: '1', edition: '6' });
+    const params = new URLSearchParams({ mode: 'individual', category, player, auto: '1', edition: '6' });
     const modal = document.getElementById('playerProfileModal');
     const frame = document.getElementById('playerProfileFrame');
     if (!modal || !frame) return;
