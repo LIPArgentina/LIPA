@@ -33,7 +33,7 @@
   let lastTeamSuggestions = [];
   let teamDebounceTimer = null;
   let currentRankingTab = 'players';
-  let currentSearchEdition = '6';
+  let currentSearchEdition = 'total';
   let currentRankingEdition = 'total';
   let lastRankingData = null;
   let lastRankingLimit = 10;
@@ -995,7 +995,7 @@
     if ($category) $category.value = category;
     if ($player) $player.value = player;
     if ($team) $team.value = '';
-    setSearchEdition(params.get('edition') || '6');
+    setSearchEdition(params.get('edition') || 'total');
     await searchPlayer(null);
   }
 
