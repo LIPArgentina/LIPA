@@ -16,7 +16,6 @@
   const $ranking = document.getElementById('rankingBox');
   const $rankingButtons = Array.from(document.querySelectorAll('[data-ranking-limit]'));
   const $rankingTabs = Array.from(document.querySelectorAll('[data-ranking-tab]'));
-  const $searchEditionButtons = Array.from(document.querySelectorAll('[data-search-edition]'));
   const $rankingEdition = document.getElementById('rankingEditionSelect');
   const $reload = document.getElementById('btnRecargar');
   const $radInfo = document.getElementById('btnRadInfo');
@@ -162,9 +161,10 @@
 
   function setSearchEdition(value) {
     currentSearchEdition = String(value || '6').toLowerCase();
-    $searchEditionButtons.forEach((btn) => {
-      btn.classList.toggle('active', String(btn.dataset.searchEdition || '').toLowerCase() === currentSearchEdition);
-    });
+    currentRankingEdition = currentSearchEdition;
+    if ($rankingEdition && Array.from($rankingEdition.options).some((option) => option.value === currentSearchEdition)) {
+      $rankingEdition.value = currentSearchEdition;
+    }
   }
 
   function getTeamEdition() {
@@ -182,7 +182,7 @@
     } else {
       $rankingEdition.value = currentRankingTab === 'teams' ? '6' : 'total';
     }
-    currentRankingEdition = $rankingEdition.value;
+    setSearchEdition($rankingEdition.value);
   }
 
   async function fetchJson(url) {
@@ -916,23 +916,21 @@
     scheduleSuggestions();
     scheduleTeamSuggestions();
   });
-  $searchEditionButtons.forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      setSearchEdition(btn.dataset.searchEdition || '6');
-      clearRanking();
-      const playerQ = String($player?.value || '').trim();
-      if (playerQ.length >= 2) {
-        await searchPlayer();
-        return;
-      }
-      clearResults();
-      scheduleSuggestions();
-      scheduleTeamSuggestions();
-    });
-  });
-  $rankingEdition?.addEventListener('change', () => {
-    currentRankingEdition = String($rankingEdition.value || 'total').toLowerCase();
-    if (lastRankingData) loadRanking(lastRankingLimit);
+  $rankingEdition?.addEventListener('change', async () => {
+    setSearchEdition($rankingEdition.value || 'total');
+    const playerQ = String($player?.value || '').trim();
+    const teamQ = String($team?.value || '').trim();
+    if (playerQ.length >= 2 || teamQ.length >= 2) {
+      await searchPlayer();
+      return;
+    }
+    if (lastRankingData) {
+      await loadRanking(lastRankingLimit);
+      return;
+    }
+    clearResults();
+    scheduleSuggestions();
+    scheduleTeamSuggestions();
   });
   $rankingButtons.forEach((btn) => {
     btn.addEventListener('click', () => loadRanking(Number(btn.getAttribute('data-ranking-limit') || btn.dataset.rankingLimit || 10)));
