@@ -3394,6 +3394,21 @@ async function getJugadorResultadoMatches(category = '', player = {}, edition = 
         equipo_nombre,
         rival_slug,
         rival_nombre,
+        (
+          SELECT opponent.jugador_nombre
+          FROM jugador_resultados opponent
+          WHERE opponent.id <> jugador_resultados.id
+            AND opponent.fecha_iso = jugador_resultados.fecha_iso
+            AND opponent.categoria = jugador_resultados.categoria
+            AND opponent.edicion = jugador_resultados.edicion
+            AND opponent.modalidad = 'individual'
+            AND opponent.modalidad = jugador_resultados.modalidad
+            AND opponent.slot = jugador_resultados.slot
+            AND opponent.equipo_slug = jugador_resultados.rival_slug
+            AND opponent.rival_slug = jugador_resultados.equipo_slug
+          ORDER BY opponent.id ASC
+          LIMIT 1
+        ) AS rival_jugador_nombre,
         modalidad,
         slot,
         pareja_index,
@@ -3421,6 +3436,7 @@ async function getJugadorResultadoMatches(category = '', player = {}, edition = 
     teamName: row.equipo_nombre,
     opponentSlug: row.rival_slug,
     opponentName: row.rival_nombre,
+    opponentPlayerName: String(row.rival_jugador_nombre || '').trim(),
     row: Number(row.slot || 0),
     pairNumber: Number(row.pareja_index || row.slot || 0),
     triangulosFavor: Number(row.triangulos_favor || 0),

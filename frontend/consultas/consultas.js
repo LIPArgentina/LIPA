@@ -85,6 +85,16 @@
         title="Consultar a ${escapeAttribute(name)}">${name}</button>`;
   }
 
+  function teamSearchButtonMarkup(teamName, edition = currentRankingEdition) {
+    const name = String(teamName || '').trim();
+    if (!name) return '';
+    return `<button class="team-search-button" type="button"
+        data-team-search="1"
+        data-team-name="${escapeAttribute(name)}"
+        data-team-edition="${escapeAttribute(edition)}"
+        title="Consultar a ${escapeAttribute(name)}">${name}</button>`;
+  }
+
   function closePlayerPhoto() {
     if (!$playerPhotoModal) return;
     $playerPhotoModal.hidden = true;
@@ -508,9 +518,15 @@
     const card = document.createElement('article');
     card.className = 'match-card ' + cls;
 
+    const opponentPlayer = item.opponentPlayerName
+      ? playerSearchButtonMarkup({
+        name: item.opponentPlayerName,
+        teamName: item.opponentName
+      }, item.opponentName, currentSearchEdition)
+      : 'Rival';
     const rivalText = pair
       ? `en pareja con ${item.companionName || 'Sin compañero'} vs ${(Array.isArray(item.opponentPairPlayers) ? item.opponentPairPlayers.filter(Boolean).join(' - ') : '') || 'Rivales'} · ${item.opponentName || ''}`
-      : `vs ${item.opponentPlayerName || 'Rival'} · ${item.opponentName || ''}`;
+      : `vs ${opponentPlayer} · ${item.opponentName || ''}`;
 
     card.innerHTML = `
       <div class="match-head">
@@ -573,7 +589,7 @@
           <td class="rank-pos">#${idx + 1}</td>
           <td class="player-photo-cell">${playerPhotoButtonMarkup(item)}</td>
           <td class="player-name">${playerSearchButtonMarkup(item, '', currentRankingEdition)}</td>
-          <td class="team-name">${item.teamName || ''}</td>
+          <td class="team-name">${teamSearchButtonMarkup(item.teamName, currentRankingEdition)}</td>
           <td class="num">${Number(item.played || 0)}</td>
           <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
           <td class="num">${Number(item.effectiveness || 0).toFixed(1)}%</td>
@@ -917,6 +933,20 @@
     $summary?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  async function searchTeamFromRanking(button) {
+    const teamName = String(button?.dataset.teamName || '').trim();
+    const requestedEdition = String(button?.dataset.teamEdition || currentSearchEdition || '6').toLowerCase();
+    if (!teamName || !$team) return;
+
+    setConsultMode('group');
+    setSearchEdition(requestedEdition === 'total' ? '6' : requestedEdition);
+    $team.value = teamName;
+    if ($player) $player.value = '';
+    renderSuggestions([]);
+    await searchTeam();
+    $ranking?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   $player?.addEventListener('input', () => {
     if (String($player.value || '').trim()) {
       if ($team) $team.value = '';
@@ -983,10 +1013,26 @@
       return;
     }
     const searchButton = ev.target.closest('[data-player-search]');
+    if (searchButton) {
+      searchPlayerFromRanking(searchButton).catch((err) => {
+        console.error(err);
+        setStatus('No se pudo consultar el jugador.', 'error');
+      });
+      return;
+    }
+    const teamButton = ev.target.closest('[data-team-search]');
+    if (!teamButton) return;
+    searchTeamFromRanking(teamButton).catch((err) => {
+      console.error(err);
+      setStatus('No se pudo consultar el equipo.', 'error');
+    });
+  });
+  $results?.addEventListener('click', (ev) => {
+    const searchButton = ev.target.closest('[data-player-search]');
     if (!searchButton) return;
     searchPlayerFromRanking(searchButton).catch((err) => {
       console.error(err);
-      setStatus('No se pudo consultar el jugador.', 'error');
+      setStatus('No se pudo consultar el jugador rival.', 'error');
     });
   });
   $summary?.addEventListener('click', (ev) => {
