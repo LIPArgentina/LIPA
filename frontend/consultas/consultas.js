@@ -467,6 +467,10 @@
         <p class="summary-meta">${player.teamName || ''} · Categoría ${(data.category || '').toUpperCase()} · ${data?.editionLabel || editionLabel(data?.edition || currentSearchEdition)}</p>
       </div>
       <div class="summary-stats">
+        <div class="summary-count summary-ranking">
+          <strong>${player.totalRankingPosition ? `#${player.totalRankingPosition}` : '—'}</strong>
+          <span>ranking</span>
+        </div>
         <div class="summary-count">
           <strong>${played}</strong>
           <span>partidos jugados</span>

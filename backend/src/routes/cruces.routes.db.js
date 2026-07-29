@@ -2811,7 +2811,13 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const { ranking: categoryRanking, radContext } = await buildRadRankingForCategory(category, edition);
+    const [
+      { ranking: categoryRanking, radContext },
+      { ranking: totalCategoryRanking }
+    ] = await Promise.all([
+      buildRadRankingForCategory(category, edition),
+      buildRadRankingForCategory(category, 'total')
+    ]);
     const playerRadRow = categoryRanking.find((item) =>
       Number(item.id || 0) && Number(item.id) === Number(exact.id)
     ) || categoryRanking.find((item) =>
@@ -2819,6 +2825,20 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
     ) || categoryRanking.find((item) =>
       sameNormalizedName(item.name, exact.name)
     ) || null;
+    const promoted = await getPromotedPlayerKeys(category);
+    const eligibleTotalRows = excludePromotedPlayers(totalCategoryRanking, promoted);
+    const { ranking: eligibleTotalRanking } = buildRadRankingFromPlayerRows(eligibleTotalRows);
+    const totalRankingIndex = eligibleTotalRanking.findIndex((item) =>
+      Number(item.id || 0) && Number(item.id) === Number(exact.id)
+    );
+    const totalRankingFallbackIndex = totalRankingIndex >= 0
+      ? totalRankingIndex
+      : eligibleTotalRanking.findIndex((item) =>
+          sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
+        );
+    const totalRankingPosition = totalRankingFallbackIndex >= 0
+      ? totalRankingFallbackIndex + 1
+      : null;
     let { matches, pairMatches } = await getJugadorResultadoMatches(category, {
       id: exact.id || playerRadRow?.id || null,
       name: exact.name || playerRadRow?.name || '',
@@ -2855,7 +2875,8 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
         name: exact.name || playerRadRow.name,
         teamSlug: exact.teamSlug || playerRadRow.teamSlug,
         teamName: exact.teamName || playerRadRow.teamName,
-        label: exact.label || playerRadRow.label
+        label: exact.label || playerRadRow.label,
+        totalRankingPosition
       } : {
         ...exact,
         played: 0,
@@ -2867,7 +2888,8 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
         diff: 0,
         effectiveness: 0,
         rad: 0,
-        radPenalty: 0
+        radPenalty: 0,
+        totalRankingPosition
       },
       rad: playerRadRow?.rad ?? null,
       radPenalty: playerRadRow?.radPenalty ?? null,
