@@ -3409,6 +3409,34 @@ async function getJugadorResultadoMatches(category = '', player = {}, edition = 
           ORDER BY opponent.id ASC
           LIMIT 1
         ) AS rival_jugador_nombre,
+        (
+          SELECT companion.jugador_nombre
+          FROM jugador_resultados companion
+          WHERE companion.id <> jugador_resultados.id
+            AND companion.fecha_iso = jugador_resultados.fecha_iso
+            AND companion.categoria = jugador_resultados.categoria
+            AND companion.edicion = jugador_resultados.edicion
+            AND companion.modalidad = 'pareja'
+            AND companion.modalidad = jugador_resultados.modalidad
+            AND COALESCE(companion.pareja_index, companion.slot) = COALESCE(jugador_resultados.pareja_index, jugador_resultados.slot)
+            AND companion.equipo_slug = jugador_resultados.equipo_slug
+            AND companion.rival_slug = jugador_resultados.rival_slug
+          ORDER BY companion.id ASC
+          LIMIT 1
+        ) AS companero_jugador_nombre,
+        ARRAY(
+          SELECT opponent.jugador_nombre
+          FROM jugador_resultados opponent
+          WHERE opponent.fecha_iso = jugador_resultados.fecha_iso
+            AND opponent.categoria = jugador_resultados.categoria
+            AND opponent.edicion = jugador_resultados.edicion
+            AND opponent.modalidad = 'pareja'
+            AND opponent.modalidad = jugador_resultados.modalidad
+            AND COALESCE(opponent.pareja_index, opponent.slot) = COALESCE(jugador_resultados.pareja_index, jugador_resultados.slot)
+            AND opponent.equipo_slug = jugador_resultados.rival_slug
+            AND opponent.rival_slug = jugador_resultados.equipo_slug
+          ORDER BY opponent.id ASC
+        ) AS rival_jugadores_nombres,
         modalidad,
         slot,
         pareja_index,
@@ -3437,6 +3465,10 @@ async function getJugadorResultadoMatches(category = '', player = {}, edition = 
     opponentSlug: row.rival_slug,
     opponentName: row.rival_nombre,
     opponentPlayerName: String(row.rival_jugador_nombre || '').trim(),
+    companionName: String(row.companero_jugador_nombre || '').trim(),
+    opponentPairPlayers: Array.isArray(row.rival_jugadores_nombres)
+      ? row.rival_jugadores_nombres.map((name) => String(name || '').trim()).filter(Boolean)
+      : [],
     row: Number(row.slot || 0),
     pairNumber: Number(row.pareja_index || row.slot || 0),
     triangulosFavor: Number(row.triangulos_favor || 0),
