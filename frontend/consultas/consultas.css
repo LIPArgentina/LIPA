@@ -308,7 +308,7 @@ body.modal-open{
 
 .summary-stats{
   display:grid;
-  grid-template-columns:repeat(7,minmax(0,1fr));
+  grid-template-columns:repeat(8,minmax(0,1fr));
   gap:7px;
   width:100%;
 }
@@ -333,6 +333,15 @@ body.modal-open{
 
 .summary-rad strong{
   color:var(--ok);
+}
+
+.summary-ranking{
+  border-color:rgba(145,255,169,.72);
+  background:rgba(145,255,169,.1);
+}
+
+.summary-ranking strong{
+  color:#9dffb0;
 }
 
 @media (max-width:760px){
@@ -370,7 +379,7 @@ body.modal-open{
   }
 
   .summary-rad{
-    grid-column:4;
+    grid-column:auto;
   }
 }
 
