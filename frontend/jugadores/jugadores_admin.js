@@ -148,7 +148,7 @@ async function fillForm(player){
   $('#playerName').readOnly = true;
   $('#playerDni').value = player?.dni || '';
   $('#playerBirth').value = player?.fechaNacimiento || player?.fecha_nacimiento || '';
-  $('#playerCategory').value = player?.categoria || 'tercera';
+  $('#playerCategory').value = player?.categoriaActual || player?.categoria || 'tercera';
   await refreshPlayerTeams(player?.teamSlug || player?.equipo || '');
   $('#playerPhoto').value = '';
   croppedPlayerPhoto = null;
@@ -173,7 +173,7 @@ function renderPlayers(players = [], { mode = currentResultsMode } = {}){
       <div>
         <h3>${escapeHtml(player.nombre || player.name || '')}</h3>
         <p>DNI ${escapeHtml(player.dni || '-')} · Nac. ${escapeHtml(player.fechaNacimiento || player.fecha_nacimiento || '-')}</p>
-        <p>${escapeHtml((player.categoria || '').toUpperCase())} · ${escapeHtml(player.equipo || player.teamName || 'Sin equipo activo')}</p>
+        <p>${escapeHtml((player.categoriaActual || player.categoria || '').toUpperCase())} · ${escapeHtml(player.equipo || player.teamName || 'Sin equipo activo')}</p>
       </div>
       <div class="player-actions">
         <button class="btn btn-edit-player" type="button">Editar</button>

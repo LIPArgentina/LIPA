@@ -67,6 +67,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         fecha_nacimiento DATE,
         foto_path TEXT,
         nombre_normalizado TEXT,
+        categoria_actual TEXT,
         equipo_id INTEGER,
         dorsal TEXT,
         orden INTEGER,
@@ -78,6 +79,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS fecha_nacimiento DATE`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS foto_path TEXT`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS nombre_normalizado TEXT`);
+    await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS categoria_actual TEXT`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS equipo_id INTEGER`);
     await client.query(`ALTER TABLE jugadores ALTER COLUMN equipo_id DROP NOT NULL`);
     await client.query(`ALTER TABLE jugadores ADD COLUMN IF NOT EXISTS dorsal TEXT`);
@@ -112,6 +114,30 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     await ensureUniquePlayerCategoryIndex(client);
 
     await migrateLegacyPlayers(client);
+    await client.query(`
+      UPDATE jugadores j
+         SET categoria_actual = current_team.categoria,
+             updated_at = NOW()
+        FROM (
+          SELECT DISTINCT ON (je.jugador_id)
+            je.jugador_id,
+            LOWER(je.categoria) AS categoria
+          FROM jugador_equipos je
+          WHERE je.activo = true
+          ORDER BY
+            je.jugador_id,
+            CASE LOWER(je.categoria)
+              WHEN 'primera' THEN 3
+              WHEN 'segunda' THEN 2
+              WHEN 'tercera' THEN 1
+              ELSE 0
+            END DESC,
+            je.desde DESC NULLS LAST,
+            je.id DESC
+        ) current_team
+       WHERE j.id = current_team.jugador_id
+         AND NULLIF(TRIM(COALESCE(j.categoria_actual, '')), '') IS NULL
+    `);
     schemaReady = true;
   }
 
@@ -248,6 +274,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       teamName: row.equipo || '',
       teamSlug: row.slug_uid || '',
       categoria: row.categoria || '',
+      categoriaActual: row.categoria_actual || row.categoria || '',
       associationId: row.association_id || null,
       activo: row.activo !== false,
     };
@@ -553,6 +580,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         j.dni,
         TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
         j.foto_path,
+        j.categoria_actual,
         je.id AS association_id,
         je.categoria,
         je.activo,
@@ -619,6 +647,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
           j.foto_path,
           j.nombre_normalizado,
+          j.categoria_actual,
           je.id AS association_id,
           je.categoria,
           je.activo,
@@ -667,6 +696,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
             TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
             j.foto_path,
             j.nombre_normalizado,
+            j.categoria_actual,
             je.id AS association_id,
             je.categoria,
             je.activo,
@@ -818,6 +848,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
           j.foto_path,
           j.nombre_normalizado,
+          j.categoria_actual,
           je.id AS association_id,
           je.categoria,
           je.activo,
@@ -866,6 +897,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
             TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
             j.foto_path,
             j.nombre_normalizado,
+            j.categoria_actual,
             je.id AS association_id,
             je.categoria,
             je.activo,
@@ -923,8 +955,9 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           TO_CHAR(j.fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
           j.foto_path,
           j.nombre_normalizado,
+          j.categoria_actual,
           NULL::int AS association_id,
-          NULL::text AS categoria,
+          j.categoria_actual AS categoria,
           false AS activo,
           NULL::date AS desde,
           NULL::date AS hasta,
@@ -1096,17 +1129,18 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
                 SET dni = COALESCE(NULLIF($1, ''), dni),
                     fecha_nacimiento = COALESCE($2::date, fecha_nacimiento),
                     foto_path = COALESCE($3, foto_path),
+                    categoria_actual = COALESCE(NULLIF($4, ''), categoria_actual),
                     updated_at = NOW()
-              WHERE id = $4`,
-            [dni, fechaNacimiento, fotoPath, finalPlayerId]
+              WHERE id = $5`,
+            [dni, fechaNacimiento, fotoPath, categoria, finalPlayerId]
           );
         } else {
           const inserted = await client.query(
             `INSERT INTO jugadores
-               (nombre, dni, fecha_nacimiento, foto_path, nombre_normalizado, created_at, updated_at)
-             VALUES ($1, NULLIF($2, ''), $3::date, $4, $5, NOW(), NOW())
+               (nombre, dni, fecha_nacimiento, foto_path, nombre_normalizado, categoria_actual, created_at, updated_at)
+             VALUES ($1, NULLIF($2, ''), $3::date, $4, $5, NULLIF($6, ''), NOW(), NOW())
              RETURNING id`,
-            [nombre, dni, fechaNacimiento, fotoPath, normalizeText(nombre)]
+            [nombre, dni, fechaNacimiento, fotoPath, normalizeText(nombre), categoria]
           );
           finalPlayerId = inserted.rows[0].id;
         }
