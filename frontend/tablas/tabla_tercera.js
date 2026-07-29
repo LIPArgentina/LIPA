@@ -286,6 +286,7 @@ function collectStandingsEntries(feeds){
 function calcRowsFromEntries(entries){
   const puntos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const triangulos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const triangulosContra = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const ju = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
 
   (entries || []).forEach(entry => {
@@ -318,6 +319,10 @@ function calcRowsFromEntries(entries){
         const bK = normalizeName(B.equipo);
         if (!aK || !bK) continue;
         if (aK.toUpperCase() === 'WO' || bK.toUpperCase() === 'WO') continue;
+
+        triangulosContra[g][aK] = (triangulosContra[g][aK] || 0) + B.puntosExtra;
+        triangulosContra[g][bK] = (triangulosContra[g][bK] || 0) + A.puntosExtra;
+
         if (A.puntos === 0 && B.puntos === 0 && A.puntosExtra === 0 && B.puntosExtra === 0) continue;
 
         ju[g][aK] = (ju[g][aK] || 0) + 1;
@@ -333,6 +338,7 @@ function calcRowsFromEntries(entries){
       .sort((a, b) =>
         (b.pts - a.pts) ||
         ((triangulos[g][normalizeName(b.equipo)] || 0) - (triangulos[g][normalizeName(a.equipo)] || 0)) ||
+        ((triangulosContra[g][normalizeName(a.equipo)] || 0) - (triangulosContra[g][normalizeName(b.equipo)] || 0)) ||
         String(a.equipo).localeCompare(String(b.equipo))
       )
       .slice(0, maxRows)

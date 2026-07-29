@@ -1693,27 +1693,6 @@ function llavesAutoIterateGroupMatches(entries, callback) {
   });
 }
 
-function llavesAutoComputeHeadToHead(group, tiedKeys, entries) {
-  const tied = new Set(tiedKeys);
-  const table = Object.create(null);
-
-  tiedKeys.forEach(key => {
-    table[key] = { pts: 0, tr: 0 };
-  });
-
-  llavesAutoIterateGroupMatches(entries, match => {
-    if (match.group !== group) return;
-    if (!tied.has(match.home.key) || !tied.has(match.away.key)) return;
-
-    table[match.home.key].pts += match.home.puntos;
-    table[match.home.key].tr += match.home.puntosExtra;
-    table[match.away.key].pts += match.away.puntos;
-    table[match.away.key].tr += match.away.puntosExtra;
-  });
-
-  return table;
-}
-
 function llavesAutoGetGroupsForCategory(category, edition) {
   return category === 'segunda' || (category === 'tercera' && Number(edition) >= 6)
     ? ['A', 'B']
@@ -1735,6 +1714,7 @@ function llavesAutoComputeStandings(category, ida, vuelta, edition) {
           equipo: team.team,
           pts: 0,
           tr: 0,
+          trContra: 0,
           ju: 0
         };
       }
@@ -1749,8 +1729,10 @@ function llavesAutoComputeStandings(category, ida, vuelta, edition) {
 
     stats[match.group][match.home.key].pts += match.home.puntos;
     stats[match.group][match.home.key].tr += match.home.puntosExtra;
+    stats[match.group][match.home.key].trContra += match.away.puntosExtra;
     stats[match.group][match.away.key].pts += match.away.puntos;
     stats[match.group][match.away.key].tr += match.away.puntosExtra;
+    stats[match.group][match.away.key].trContra += match.home.puntosExtra;
 
     if (played) {
       stats[match.group][match.home.key].ju += 1;
@@ -1761,43 +1743,12 @@ function llavesAutoComputeStandings(category, ida, vuelta, edition) {
   const result = {};
 
   groups.forEach(group => {
-    const rows = Object.values(stats[group]);
-    const buckets = new Map();
-
-    rows.forEach(row => {
-      const bucketKey = `${row.pts}|${row.tr}`;
-      if (!buckets.has(bucketKey)) buckets.set(bucketKey, []);
-      buckets.get(bucketKey).push(row);
-    });
-
-    const bucketKeys = Array.from(buckets.keys()).sort((a, b) => {
-      const [ap, at] = a.split('|').map(Number);
-      const [bp, bt] = b.split('|').map(Number);
-      return (bp - ap) || (bt - at);
-    });
-
-    const ordered = [];
-
-    bucketKeys.forEach(bucketKey => {
-      const bucket = buckets.get(bucketKey);
-      if (bucket.length <= 1) {
-        ordered.push(...bucket);
-        return;
-      }
-
-      const tiedKeys = bucket.map(row => row.key);
-      const h2h = llavesAutoComputeHeadToHead(group, tiedKeys, entries);
-
-      bucket.sort((a, b) => {
-        const hA = h2h[a.key] || { pts: 0, tr: 0 };
-        const hB = h2h[b.key] || { pts: 0, tr: 0 };
-        return (hB.pts - hA.pts) ||
-               (hB.tr - hA.tr) ||
-               String(a.equipo).localeCompare(String(b.equipo), 'es', { sensitivity: 'base' });
-      });
-
-      ordered.push(...bucket);
-    });
+    const ordered = Object.values(stats[group]).sort((a, b) =>
+      (b.pts - a.pts) ||
+      (b.tr - a.tr) ||
+      (a.trContra - b.trContra) ||
+      String(a.equipo).localeCompare(String(b.equipo), 'es', { sensitivity: 'base' })
+    );
 
     result[group] = ordered.map((row, idx) => ({
       ...row,

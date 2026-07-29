@@ -227,6 +227,7 @@ function calcRowsFromEntries(entries){
   const puntos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const ju = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const tr = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const trContra = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
   const teamsSeen = Object.fromEntries(GROUPS.map(g => [g, new Map()]));
 
   (entries || []).forEach(entry => {
@@ -259,6 +260,10 @@ function calcRowsFromEntries(entries){
         const bK = normalizeName(B.equipo);
         if (!aK || !bK) continue;
         if (aK === 'WO' || bK === 'WO') continue;
+
+        trContra[g][aK] = (trContra[g][aK] || 0) + B.puntosExtra;
+        trContra[g][bK] = (trContra[g][bK] || 0) + A.puntosExtra;
+
         if (A.puntos === 0 && B.puntos === 0 && A.puntosExtra === 0 && B.puntosExtra === 0) continue;
 
         ju[g][aK] = (ju[g][aK] || 0) + 1;
@@ -274,9 +279,15 @@ function calcRowsFromEntries(entries){
       equipo: puntos[g][key]?.equipo || display,
       pts: puntos[g][key]?.pts || 0,
       ju: ju[g][key] || '',
-      tr: tr[g][key] || 0
+      tr: tr[g][key] || 0,
+      trContra: trContra[g][key] || 0
     }))
-    .sort((a, b) => b.pts - a.pts || b.tr - a.tr || String(a.equipo).localeCompare(String(b.equipo)))
+    .sort((a, b) =>
+      b.pts - a.pts ||
+      b.tr - a.tr ||
+      a.trContra - b.trContra ||
+      String(a.equipo).localeCompare(String(b.equipo))
+    )
     .map((r, i) => ({
       pos: i + 1,
       equipo: r.equipo,
