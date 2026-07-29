@@ -7,7 +7,7 @@ const pool = require('../db');
 const EDITION = 6;
 const CATEGORY = 'segunda';
 const START_IDA = '2026-07-27';
-const START_VUELTA = '2026-08-31';
+const START_VUELTA = '2026-08-17';
 const APPLY = process.argv.includes('--apply');
 
 const FOUR_TEAM_GROUP = [
@@ -25,31 +25,18 @@ const FOUR_TEAM_GROUP = [
   ]
 ];
 
-const FIVE_TEAM_GROUP = [
+const FOUR_TEAM_GROUP_A = [
   [
     ['EL TREBOL', 'WEST'],
-    ['TAKOS PRO', 'WO'],
-    ['MALENA', 'TOMAS']
-  ],
-  [
-    ['EL TREBOL', 'WO'],
-    ['WEST', 'MALENA'],
     ['TOMAS', 'TAKOS PRO']
   ],
   [
-    ['MALENA', 'EL TREBOL'],
-    ['WO', 'TOMAS'],
-    ['TAKOS PRO', 'WEST']
-  ],
-  [
-    ['TOMAS', 'EL TREBOL'],
-    ['TAKOS PRO', 'MALENA'],
-    ['WO', 'WEST']
+    ['TAKOS PRO', 'WEST'],
+    ['TOMAS', 'EL TREBOL']
   ],
   [
     ['EL TREBOL', 'TAKOS PRO'],
-    ['WEST', 'TOMAS'],
-    ['MALENA', 'WO']
+    ['WEST', 'TOMAS']
   ]
 ];
 
@@ -78,18 +65,17 @@ function table(grupo, matches) {
 
 function buildFixture(startDate, reverse = false) {
   return {
-    fechas: Array.from({ length: 5 }, (_, index) => {
+    fechas: Array.from({ length: 3 }, (_, index) => {
       const reverseMatches = matches => reverse
         ? matches.map(([local, visitante]) => [visitante, local])
         : matches;
-      const tablas = [];
-
-      tablas.push(table('A', reverseMatches(FIVE_TEAM_GROUP[index])));
-      if (FOUR_TEAM_GROUP[index]) tablas.push(table('B', reverseMatches(FOUR_TEAM_GROUP[index])));
 
       return {
         date: addDays(startDate, index * 7),
-        tablas
+        tablas: [
+          table('A', reverseMatches(FOUR_TEAM_GROUP_A[index])),
+          table('B', reverseMatches(FOUR_TEAM_GROUP[index]))
+        ]
       };
     })
   };
@@ -100,30 +86,27 @@ function realPairKey(local, visitante) {
 }
 
 function validateFixture(data, kind) {
-  if (!Array.isArray(data?.fechas) || data.fechas.length !== 5) {
-    throw new Error(`${kind}: se esperaban 5 fechas`);
+  if (!Array.isArray(data?.fechas) || data.fechas.length !== 3) {
+    throw new Error(`${kind}: se esperaban 3 fechas`);
   }
 
-  const expectedMatches = { A: 10, B: 6 };
+  const expectedMatches = { A: 6, B: 6 };
   const seen = { A: new Set(), B: new Set() };
 
   data.fechas.forEach((fecha, index) => {
     const groupA = fecha.tablas.find(item => item.grupo === 'A');
     const groupB = fecha.tablas.find(item => item.grupo === 'B');
 
-    if (groupA?.equipos?.length !== 6) {
-      throw new Error(`${kind}: Grupo A debe tener 3 cruces en fecha ${index + 1}`);
+    if (groupA?.equipos?.length !== 4) {
+      throw new Error(`${kind}: Grupo A debe tener 2 partidos en fecha ${index + 1}`);
     }
-    if (index < 3 && groupB?.equipos?.length !== 4) {
+    if (groupB?.equipos?.length !== 4) {
       throw new Error(`${kind}: Grupo B debe tener 2 partidos en fecha ${index + 1}`);
     }
-    if (index >= 3 && groupB) {
-      throw new Error(`${kind}: Grupo B no debe jugar en fecha ${index + 1}`);
-    }
 
-    const woCount = groupA.equipos.filter(item => item.equipo === 'WO').length;
-    if (woCount !== 1) {
-      throw new Error(`${kind}: Grupo A debe tener exactamente un WO en fecha ${index + 1}`);
+    const allTeams = [...groupA.equipos, ...groupB.equipos].map(item => item.equipo);
+    if (allTeams.includes('WO') || allTeams.includes('MALENA')) {
+      throw new Error(`${kind}: no debe incluir WO ni MALENA en fecha ${index + 1}`);
     }
 
     fecha.tablas.forEach(({ grupo, equipos }) => {

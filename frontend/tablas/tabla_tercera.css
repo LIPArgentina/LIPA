@@ -11,9 +11,9 @@
     .pill-wrap { display:flex; justify-content:flex-start; gap:16px; margin-top:18px; flex-wrap:wrap; }
     .pill-btn { display:inline-block; padding:12px 22px; border:2px solid #b28900; border-radius:14px; background:#0f0f11; color:#ffd966; font-weight:900; letter-spacing:.06em; text-transform:uppercase; font-size:clamp(16px,2vw,20px); text-decoration:none; box-shadow:inset 0 0 0 3px #1b1600; user-select:none; cursor:pointer; opacity:.5; transition:opacity .15s ease-in-out; }
     .pill-btn.active { background:#1b1b1b; opacity:1; }
-    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; margin-top:22px; }
+    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:stretch; margin-top:22px; }
     @media (max-width:1100px){ .grid{ grid-template-columns:1fr; } }
-    .card{ background:#16171a; border:1px solid var(--line); border-radius:20px; padding:20px 12px 8px; box-shadow:0 10px 24px #0006; max-width:640px; justify-self:start; }
+    .card{ background:#16171a; border:1px solid var(--line); border-radius:20px; padding:20px 12px 8px; box-shadow:0 10px 24px #0006; max-width:640px; justify-self:start; height:100%; box-sizing:border-box; }
     .h1{ margin:0; font-size:clamp(22px,4.6vw,30px); font-weight:900; letter-spacing:.06em; color:var(--gold); }
     .h2{ margin:16px 0 10px; font-size:clamp(14px,2.6vw,14px); font-weight:800; opacity:.95; }
     .rule{ height:1px; background:var(--line); margin:10px 0 6px; }
@@ -25,6 +25,8 @@
     .fecha-header{ display:flex; align-items:center; gap:.5rem; }
     .fecha-header .h2{ flex:1 1 auto; }
     .fecha-text{ margin-left:auto; background:#000; color:#fff; border:1px solid #444; padding:.35rem .5rem; border-radius:.5rem; min-width:9rem; text-align:center; }
+    .adjustment-break-static{ min-height:190px; display:flex; align-items:center; justify-content:center; }
+    .adjustment-break-message{ width:100%; padding:22px 12px; color:var(--gold); font-size:clamp(18px,2.4vw,28px); font-weight:900; letter-spacing:.06em; text-align:center; text-transform:uppercase; }
 
 
 

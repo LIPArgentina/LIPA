@@ -134,16 +134,20 @@ function clearFixtureCards(){
   });
 }
 
-function ensureFechaBlock(section, fechaIndex, fechaText){
+function ensureFechaBlock(section, fechaIndex, fechaText, isAdjustmentBreak = false){
   const tpl = document.getElementById('tpl-fecha');
   const clone = document.importNode(tpl.content, true);
-  clone.querySelector('.h2').textContent = `${fechaIndex}ª FECHA`;
+  clone.querySelector('.h2').textContent = isAdjustmentBreak
+    ? 'FECHA LIBRE'
+    : `${fechaIndex}ª FECHA`;
 
   const formattedDate = formatDateDMY(fechaText);
   clone.querySelector('.fecha-text').textContent = formattedDate;
 
   const encuentrosBtn = clone.querySelector('.encuentros-btn');
-  if (encuentrosBtn) {
+  if (encuentrosBtn && isAdjustmentBreak) {
+    encuentrosBtn.remove();
+  } else if (encuentrosBtn) {
     const params = new URLSearchParams({
       category: 'tercera',
       kind: selectedKind,
@@ -206,19 +210,29 @@ function renderRowsStatic(rowsCont, equipos){
   }
 }
 
-function buildFixtureCard(group, fechaIndex, fechaText, equipos){
+function buildFixtureCard(group, fechaIndex, fechaText, equipos, isAdjustmentBreak = false){
   const section = document.createElement('section');
-  section.className = 'card';
+  section.className = `card${isAdjustmentBreak ? ' adjustment-break-card' : ''}`;
   section.setAttribute('data-group', group);
-  section.setAttribute('aria-label', `Fixture ${fechaIndex}ª fecha - Grupo ${group}`);
+  section.setAttribute(
+    'aria-label',
+    isAdjustmentBreak
+      ? `Fecha libre por reajuste - Grupo ${group}`
+      : `Fixture ${fechaIndex}ª fecha - Grupo ${group}`
+  );
 
   const h1 = document.createElement('h1');
   h1.className = 'h1';
   h1.textContent = `GRUPO ${group}`;
   section.appendChild(h1);
 
-  const rowsCont = ensureFechaBlock(section, fechaIndex, fechaText);
-  renderRowsStatic(rowsCont, equipos);
+  const rowsCont = ensureFechaBlock(section, fechaIndex, fechaText, isAdjustmentBreak);
+  if (isAdjustmentBreak) {
+    rowsCont.classList.add('adjustment-break-static');
+    rowsCont.innerHTML = '<div class="adjustment-break-message">FECHA LIBRE POR REAJUSTE</div>';
+  } else {
+    renderRowsStatic(rowsCont, equipos);
+  }
   return section;
 }
 
@@ -229,15 +243,24 @@ function renderSelectedFixture(){
 
   grid.innerHTML = '';
 
+  const playedRounds = Object.fromEntries(GROUPS.map(group => [group, 0]));
   fx.fechas.forEach((fechaObj, idx) => {
-    const fechaIndex = idx + 1;
     const fechaText = fechaObj?.date || fechaObj?.fecha || '';
 
     GROUPS.forEach(group => {
       const tabla = (fechaObj?.tablas || []).find(
         t => String(t?.grupo || '').toUpperCase() === group
       );
-      const card = buildFixtureCard(group, fechaIndex, fechaText, tabla?.equipos || []);
+      const isAdjustmentBreak = Boolean(tabla?.fechaLibrePorReajuste);
+      if (!isAdjustmentBreak) playedRounds[group] += 1;
+      const fechaIndex = isAdjustmentBreak ? idx + 1 : playedRounds[group];
+      const card = buildFixtureCard(
+        group,
+        fechaIndex,
+        fechaText,
+        tabla?.equipos || [],
+        isAdjustmentBreak
+      );
       grid.appendChild(card);
     });
   });
