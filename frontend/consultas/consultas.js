@@ -936,10 +936,17 @@
     scheduleTeamSuggestions();
   });
   $rankingEdition?.addEventListener('change', async () => {
-    currentRankingEdition = String($rankingEdition.value || 'total').toLowerCase();
-    currentSearchEdition = currentRankingEdition;
+    const shouldRepeatRanking = !!lastRankingData
+      && lastRankingMode === currentRankingTab
+      && $ranking?.hidden === false;
+    const rankingLimit = Number(lastRankingLimit || 10);
+    setSearchEdition($rankingEdition.value || 'total');
     clearRanking();
     clearResults();
+    if (shouldRepeatRanking) {
+      await loadRanking(rankingLimit);
+      return;
+    }
     const currentQuery = String((currentConsultMode === 'group' ? $team?.value : $player?.value) || '').trim();
     const shouldRepeatSearch = currentQuery.length >= 2
       && lastExecutedSearch?.mode === currentConsultMode
