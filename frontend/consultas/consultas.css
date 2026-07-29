@@ -425,7 +425,11 @@ body.player-photo-open{ overflow:hidden; }
 
 .summary-count{
   min-width:0;
+  min-height:46px;
   padding:7px 6px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
 }
 
 .summary-count strong{
