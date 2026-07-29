@@ -1277,22 +1277,32 @@ router.post('/tiebreak-validate', async (req, res) => {
 });
 
 
-async function resolveEquipoInfoBySlug(slug, categoryHint = '') {
+async function resolveEquipoInfoBySlug(slug, categoryHint = '', dateHint = '') {
   const slugNorm = normalizeSlug(slug);
   if (!slugNorm) return null;
+  const dateKey = normalizeDateOnly(dateHint);
+  const hasDateHint = /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 
   const { rows } = await pool.query(
     `
     SELECT slug_uid, slug_base, display_name, division
     FROM equipos
-    WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1
+    WHERE LOWER(slug_uid) = $1
+       OR (
+         LOWER(slug_base) = $1
+         AND ($3::date IS NULL OR created_at::date <= $3::date)
+       )
     ORDER BY
       CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END,
       CASE WHEN LOWER(division) = $2 THEN 0 ELSE 1 END,
       id ASC
     LIMIT 1
     `,
-    [slugNorm, String(categoryHint || '').trim().toLowerCase()]
+    [
+      slugNorm,
+      String(categoryHint || '').trim().toLowerCase(),
+      hasDateHint ? dateKey : null
+    ]
   );
 
   return rows[0] || null;
@@ -2443,10 +2453,10 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
   }
 
   const teamCache = new Map();
-  const resolveCached = async (slug) => {
-    const key = `${String(category || '').toLowerCase()}::${normalizeSlug(slug)}`;
+  const resolveCached = async (slug, dateHint = '') => {
+    const key = `${String(category || '').toLowerCase()}::${normalizeDateOnly(dateHint)}::${normalizeSlug(slug)}`;
     if (teamCache.has(key)) return teamCache.get(key);
-    const info = await resolveEquipoInfoBySlug(slug, category);
+    const info = await resolveEquipoInfoBySlug(slug, category, dateHint);
     teamCache.set(key, info);
     return info;
   };
@@ -2471,8 +2481,8 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
     if (diff.length) continue;
 
     const [localInfo, visitanteInfo] = await Promise.all([
-      resolveCached(localSlug),
-      resolveCached(visitanteSlug)
+      resolveCached(localSlug, matchDate),
+      resolveCached(visitanteSlug, matchDate)
     ]);
 
     if (category) {
