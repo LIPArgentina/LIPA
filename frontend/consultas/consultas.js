@@ -545,9 +545,11 @@
         </tr>
       `;
     }).join('');
+    const registeredPlayers = Number(data?.totalRegisteredPlayers || 0);
+    const participatingPlayers = Number(data?.totalActivePlayers || 0);
     const rankingPopulation = currentRankingEdition === 'total'
-      ? `${Number(data?.totalActivePlayers || 0)} jugadores con partidos registrados en la Superliga.`
-      : `${Number(data?.totalActivePlayers || 0)} jugadores registrados en esta edición.`;
+      ? `${registeredPlayers} jugadores registrados y un total de ${participatingPlayers} participando de la Superliga.`
+      : `${registeredPlayers} jugadores registrados y un total de ${participatingPlayers} participando de esta edición.`;
 
     $ranking.innerHTML = `
       <div class="ranking-head">
