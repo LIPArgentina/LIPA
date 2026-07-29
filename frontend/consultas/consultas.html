@@ -13,6 +13,7 @@
     <a href="../index.html" title="Inicio"><img alt="LPI" src="../logo_liga.png"/></a>
     <div class="header-center">
       <div class="title">CONSULTAS</div>
+      <button id="btnRadInfo" class="btn rad-info-btn" type="button"><span>Sistema</span><strong>RAD</strong><span>LIPA</span></button>
     </div>
     <nav class="actions">
       <a class="btn" href="../index.html">VOLVER</a>
@@ -20,36 +21,26 @@
   </header>
 
   <main class="consultas-page">
-    <section class="consultas-hero">
-      <div class="hero-copy hero-reload">
-        <div class="hero-buttons">
-          <button id="btnRecargar" class="btn btn-primary reload-btn" type="button">Recargar</button>
-          <button id="btnRadInfo" class="btn rad-info-btn" type="button"><span>Sistema</span><strong>RAD</strong><span>LIPA</span></button>
-        </div>
-      </div>
-      <div class="ranking-actions" aria-label="Ranking por categoría">
-        <div class="ranking-tabs" aria-label="Tipo de ranking">
-          <button class="btn tab-btn active" type="button" data-ranking-tab="players">Jugadores</button>
-          <button class="btn tab-btn" type="button" data-ranking-tab="teams">Equipos</button>
-        </div>
-        <label class="ranking-edition-label" for="rankingEditionSelect">Edición</label>
-        <select id="rankingEditionSelect" class="edition-select" aria-label="Edición del ranking">
-          <option value="total">Total</option>
-          <option value="6">6ta</option>
-          <option value="5">5ta</option>
-        </select>
-        <button class="btn ranking-btn" type="button" data-ranking-limit="10">Top 10</button>
-        <button class="btn ranking-btn" type="button" data-ranking-limit="20">Top 20</button>
-        <button class="btn ranking-btn" type="button" data-ranking-limit="50">Top 50</button>
-      </div>
+    <section class="consult-mode-tabs" aria-label="Tipo de consulta">
+      <button class="consult-mode-btn active" type="button" data-consult-mode="individual">Consulta individual</button>
+      <button class="consult-mode-btn" type="button" data-consult-mode="group">Consulta grupal</button>
     </section>
 
-    <section class="search-card" aria-label="Buscar jugador o equipo">
+    <section class="search-card" aria-label="Filtros de consulta">
       <form id="consultaForm" class="search-form" autocomplete="off">
         <div class="field">
           <label for="categorySelect">Categoría</label>
           <select id="categorySelect" required>
             <option value="tercera">Tercera</option>
+          </select>
+        </div>
+
+        <div class="field field-edition">
+          <label for="rankingEditionSelect">Edición</label>
+          <select id="rankingEditionSelect" class="edition-select" aria-label="Edición">
+            <option value="5">5ta</option>
+            <option value="6">6ta</option>
+            <option value="total">Total</option>
           </select>
         </div>
 
@@ -66,13 +57,9 @@
         </div>
 
         <button id="btnBuscar" class="btn btn-primary" type="submit">Buscar</button>
+        <button class="btn ranking-btn" type="button" data-ranking-limit="10">Top 10</button>
+        <button class="btn ranking-btn" type="button" data-ranking-limit="50">Top 50</button>
       </form>
-      <div class="edition-switch" aria-label="Edición de consulta">
-        <span>Edición</span>
-        <button class="edition-pill" type="button" data-search-edition="5">5ta</button>
-        <button class="edition-pill active" type="button" data-search-edition="6">6ta</button>
-        <button class="edition-pill edition-total" type="button" data-search-edition="total">Total</button>
-      </div>
     </section>
 
     <section id="rankingBox" class="ranking-box" hidden></section>
@@ -119,6 +106,6 @@
 </div>
 
 <script src="../config.js?v=player-photo-1"></script>
-<script src="consultas.js?v=default-total-edition-1" defer></script>
+<script src="consultas.js?v=consult-mode-layout-1" defer></script>
 </body>
 </html>
