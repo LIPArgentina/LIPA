@@ -139,7 +139,7 @@ function fillFicha(player){
   $('#playerName').value = player?.nombre || player?.name || '';
   $('#playerDni').value = player?.dni || '';
   $('#playerBirth').value = showDate(player?.fechaNacimiento || player?.fecha_nacimiento || '');
-  $('#playerCategory').value = (player?.categoria || '').toUpperCase();
+  $('#playerCategory').value = (player?.categoriaActual || player?.categoria || '').toUpperCase();
   $('#playerTeam').value = player?.equipo || player?.teamName || '';
   setStatus(`Viendo ficha de ${player?.nombre || player?.name || 'jugador'}.`);
 }
@@ -173,7 +173,7 @@ function renderPlayers(players = []){
       <div>
         <h3>${escapeHtml(player.nombre || player.name || '')}</h3>
         <p>DNI ${escapeHtml(player.dni || '-')} · Nac. ${escapeHtml(showDate(player.fechaNacimiento || player.fecha_nacimiento) || '-')}</p>
-        <p>${escapeHtml((player.categoria || '').toUpperCase())} · ${escapeHtml(player.equipo || player.teamName || 'Sin equipo activo')}</p>
+        <p>${escapeHtml((player.categoriaActual || player.categoria || '').toUpperCase())} · ${escapeHtml(player.equipo || player.teamName || 'Sin equipo activo')}</p>
       </div>
       <div class="player-actions">
         <button class="btn btn-history-player" type="button">Historial</button>
