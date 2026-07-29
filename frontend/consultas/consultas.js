@@ -15,9 +15,8 @@
   const $results = document.getElementById('resultsBox');
   const $ranking = document.getElementById('rankingBox');
   const $rankingButtons = Array.from(document.querySelectorAll('[data-ranking-limit]'));
-  const $rankingTabs = Array.from(document.querySelectorAll('[data-ranking-tab]'));
+  const $modeButtons = Array.from(document.querySelectorAll('[data-consult-mode]'));
   const $rankingEdition = document.getElementById('rankingEditionSelect');
-  const $reload = document.getElementById('btnRecargar');
   const $radInfo = document.getElementById('btnRadInfo');
   const $radModal = document.getElementById('radModal');
   const $radClose = document.getElementById('btnRadClose');
@@ -27,6 +26,7 @@
   let lastTeamSuggestions = [];
   let teamDebounceTimer = null;
   let currentRankingTab = 'players';
+  let currentConsultMode = 'individual';
   let currentSearchEdition = 'total';
   let currentRankingEdition = 'total';
   let lastRankingData = null;
@@ -78,16 +78,36 @@
 
   function updateRankingEditionOptions() {
     if (!$rankingEdition) return;
-    const previous = String($rankingEdition.value || currentRankingEdition || 'total').toLowerCase();
+    const previous = String(currentRankingEdition || $rankingEdition.value || '6').toLowerCase();
     $rankingEdition.innerHTML = currentRankingTab === 'teams'
-      ? '<option value="6">6ta</option><option value="5">5ta</option>'
-      : '<option value="total">Total</option><option value="6">6ta</option><option value="5">5ta</option>';
+      ? '<option value="5">5ta</option><option value="6">6ta</option>'
+      : '<option value="5">5ta</option><option value="6">6ta</option><option value="total">Total</option>';
     if (Array.from($rankingEdition.options).some((option) => option.value === previous)) {
       $rankingEdition.value = previous;
     } else {
-      $rankingEdition.value = currentRankingTab === 'teams' ? '6' : 'total';
+      $rankingEdition.value = '6';
     }
     setSearchEdition($rankingEdition.value);
+  }
+
+  function setConsultMode(mode, { preserveEdition = true } = {}) {
+    const nextMode = mode === 'group' ? 'group' : 'individual';
+    const previousEdition = preserveEdition ? currentSearchEdition : '6';
+    currentConsultMode = nextMode;
+    currentRankingTab = nextMode === 'group' ? 'teams' : 'players';
+    $modeButtons.forEach((button) => {
+      const active = button.dataset.consultMode === nextMode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    document.querySelector('.field-player')?.style.setProperty('display', nextMode === 'individual' ? 'flex' : 'none');
+    document.querySelector('.field-team')?.style.setProperty('display', nextMode === 'group' ? 'flex' : 'none');
+    updateRankingEditionOptions();
+    if (Array.from($rankingEdition?.options || []).some((option) => option.value === previousEdition)) {
+      setSearchEdition(previousEdition);
+    }
+    clearRanking();
+    clearResults();
   }
 
   async function fetchJson(url) {
@@ -730,12 +750,6 @@
   async function searchPlayer(ev, retryingSuggestion = false) {
     ev?.preventDefault();
 
-    const teamQ = String($team?.value || '').trim();
-    if (teamQ.length >= 2) {
-      await searchTeam();
-      return;
-    }
-
     clearResults();
     clearRanking();
     setStatus('Buscando jugador…', 'info');
@@ -794,32 +808,18 @@
     scheduleSuggestions();
     scheduleTeamSuggestions();
   });
-  $rankingEdition?.addEventListener('change', async () => {
+  $rankingEdition?.addEventListener('change', () => {
     setSearchEdition($rankingEdition.value || 'total');
-    const playerQ = String($player?.value || '').trim();
-    const teamQ = String($team?.value || '').trim();
-    if (playerQ.length >= 2 || teamQ.length >= 2) {
-      await searchPlayer();
-      return;
-    }
-    if (lastRankingData) {
-      await loadRanking(lastRankingLimit);
-      return;
-    }
+    clearRanking();
     clearResults();
-    scheduleSuggestions();
-    scheduleTeamSuggestions();
+    if (currentConsultMode === 'individual') scheduleSuggestions();
+    else scheduleTeamSuggestions();
   });
   $rankingButtons.forEach((btn) => {
     btn.addEventListener('click', () => loadRanking(Number(btn.getAttribute('data-ranking-limit') || btn.dataset.rankingLimit || 10)));
   });
-  $rankingTabs.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      currentRankingTab = btn.dataset.rankingTab || 'players';
-      $rankingTabs.forEach((item) => item.classList.toggle('active', item === btn));
-      updateRankingEditionOptions();
-      renderRankingSwitch();
-    });
+  $modeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => setConsultMode(btn.dataset.consultMode || 'individual'));
   });
   $radInfo?.addEventListener('click', openRadModal);
   $radClose?.addEventListener('click', closeRadModal);
@@ -829,10 +829,12 @@
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') closeRadModal();
   });
-  $reload?.addEventListener('click', () => window.location.reload());
-  $form?.addEventListener('submit', searchPlayer);
-  setSearchEdition(currentSearchEdition);
-  updateRankingEditionOptions();
+  $form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (currentConsultMode === 'group') searchTeam();
+    else searchPlayer();
+  });
+  setConsultMode('individual', { preserveEdition: false });
 
   async function applyLinkedPlayerSearch() {
     const params = new URLSearchParams(location.search);
@@ -841,6 +843,7 @@
     const player = String(params.get('player') || '').trim();
     if (!['segunda', 'tercera'].includes(category) || (category === 'segunda' && !hasAdminAccess) || player.length < 2) return;
     if ($category) $category.value = category;
+    setConsultMode('individual');
     if ($player) $player.value = player;
     if ($team) $team.value = '';
     setSearchEdition(params.get('edition') || 'total');
