@@ -22,6 +22,11 @@
   const $radInfo = document.getElementById('btnRadInfo');
   const $radModal = document.getElementById('radModal');
   const $radClose = document.getElementById('btnRadClose');
+  const $playerPhotoModal = document.getElementById('playerPhotoModal');
+  const $playerPhotoName = document.getElementById('playerPhotoName');
+  const $playerPhotoImage = document.getElementById('playerPhotoImage');
+  const $playerPhotoStatus = document.getElementById('playerPhotoStatus');
+  const $playerPhotoClose = document.getElementById('btnClosePlayerPhoto');
 
   let debounceTimer = null;
   let lastSuggestions = [];
@@ -34,9 +39,91 @@
   let lastRankingLimit = 10;
   let lastRankingMode = 'players';
   let hasAdminAccess = false;
+  const playerPhotoCache = new Map();
 
   function apiUrl(path) {
     return API_BASE + path;
+  }
+
+  function escapeAttribute(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function normalizePlayerName(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+  }
+
+  function playerNameMarkup(item, fallbackTeam = '') {
+    const name = String(item?.name || '');
+    const team = String(item?.teamName || fallbackTeam || '');
+    return `<span class="player-name-content">
+      <span>${name}</span>
+      <button class="player-photo-button" type="button"
+        data-player-photo="1"
+        data-player-id="${Number(item?.id || item?.playerId || 0) || ''}"
+        data-player-name="${escapeAttribute(name)}"
+        data-player-team="${escapeAttribute(team)}"
+        aria-label="Ver foto de ${escapeAttribute(name)}"
+        title="Ver foto">📷</button>
+    </span>`;
+  }
+
+  function closePlayerPhoto() {
+    if (!$playerPhotoModal) return;
+    $playerPhotoModal.hidden = true;
+    document.body.classList.remove('player-photo-open');
+  }
+
+  async function findPlayerPhoto(playerId, playerName, teamName) {
+    const key = `${Number(playerId || 0)}:${normalizePlayerName(playerName)}:${normalizePlayerName(teamName)}`;
+    if (!playerPhotoCache.has(key)) {
+      playerPhotoCache.set(key, (async () => {
+        const data = await fetchJson(apiUrl('/api/players-public/search?q=' + encodeURIComponent(playerName)));
+        const players = Array.isArray(data?.players) ? data.players : [];
+        const numericId = Number(playerId || 0);
+        return players.find((player) => numericId && Number(player?.id || 0) === numericId)
+          || players.find((player) =>
+            normalizePlayerName(player?.nombre || player?.name) === normalizePlayerName(playerName)
+            && (!teamName || normalizePlayerName(player?.equipo || player?.equipoNombre || player?.teamName) === normalizePlayerName(teamName))
+          )
+          || players.find((player) => normalizePlayerName(player?.nombre || player?.name) === normalizePlayerName(playerName))
+          || null;
+      })().catch((err) => {
+        playerPhotoCache.delete(key);
+        throw err;
+      }));
+    }
+    return playerPhotoCache.get(key);
+  }
+
+  async function openPlayerPhoto(button) {
+    if (!$playerPhotoModal || !$playerPhotoImage) return;
+    const playerName = String(button?.dataset.playerName || 'Jugador');
+    const teamName = String(button?.dataset.playerTeam || '');
+    const playerId = Number(button?.dataset.playerId || 0);
+    $playerPhotoName.textContent = playerName;
+    $playerPhotoImage.src = '../logo_liga.png';
+    $playerPhotoImage.alt = `Foto de ${playerName}`;
+    $playerPhotoStatus.textContent = 'Buscando foto…';
+    $playerPhotoModal.hidden = false;
+    document.body.classList.add('player-photo-open');
+
+    const player = await findPlayerPhoto(playerId, playerName, teamName);
+    if (!player) {
+      $playerPhotoStatus.textContent = 'No se encontró la ficha del jugador.';
+      return;
+    }
+    $playerPhotoImage.src = player?.fotoUrl ? apiUrl(player.fotoUrl) : '../logo_liga.png';
+    $playerPhotoStatus.textContent = player?.fotoUrl ? '' : 'Este jugador todavía no tiene una foto cargada.';
   }
 
   function readSession() {
@@ -447,7 +534,7 @@
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
-          <td class="player-name">${item.name || ''}</td>
+          <td class="player-name">${playerNameMarkup(item)}</td>
           <td class="team-name">${item.teamName || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
           <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
@@ -582,7 +669,7 @@
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
-          <td class="player-name">${item.name || ''}</td>
+          <td class="player-name">${playerNameMarkup(item, team.name)}</td>
           <td class="team-name">${item.teamName || team.name || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
           ${showRad ? `<td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>` : ''}
@@ -828,8 +915,21 @@
   $radModal?.addEventListener('click', (ev) => {
     if (ev.target === $radModal) closeRadModal();
   });
+  $ranking?.addEventListener('click', (ev) => {
+    const button = ev.target.closest('[data-player-photo]');
+    if (!button) return;
+    openPlayerPhoto(button).catch(() => {
+      if ($playerPhotoStatus) $playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
+    });
+  });
+  $playerPhotoClose?.addEventListener('click', closePlayerPhoto);
+  $playerPhotoModal?.addEventListener('click', (ev) => {
+    if (ev.target?.matches('[data-close-player-photo]')) closePlayerPhoto();
+  });
   document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') closeRadModal();
+    if (ev.key !== 'Escape') return;
+    closeRadModal();
+    closePlayerPhoto();
   });
   $reload?.addEventListener('click', () => window.location.reload());
   $form?.addEventListener('submit', searchPlayer);
