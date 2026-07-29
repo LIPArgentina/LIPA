@@ -33,6 +33,7 @@
   let lastRankingLimit = 10;
   let lastRankingMode = 'players';
   let hasAdminAccess = false;
+  let lastExecutedSearch = null;
 
   function apiUrl(path) {
     return API_BASE + path;
@@ -689,6 +690,7 @@
       setStatus('Seleccioná una categoría y escribí al menos 2 letras del equipo.', 'error');
       return;
     }
+    lastExecutedSearch = { mode: 'group', query: q };
 
     try {
       const data = await fetchJson(apiUrl('/api/cruces/team-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q) + '&edition=' + encodeURIComponent(getTeamEdition())));
@@ -761,6 +763,7 @@
       setStatus('Seleccioná una categoría y escribí al menos 2 letras de un jugador o equipo.', 'error');
       return;
     }
+    lastExecutedSearch = { mode: 'individual', query: q };
 
     try {
       const data = await fetchJson(apiUrl('/api/cruces/player-query?category=' + encodeURIComponent(category) + '&q=' + encodeURIComponent(q) + '&edition=' + encodeURIComponent(currentSearchEdition)));
@@ -808,10 +811,19 @@
     scheduleSuggestions();
     scheduleTeamSuggestions();
   });
-  $rankingEdition?.addEventListener('change', () => {
+  $rankingEdition?.addEventListener('change', async () => {
     setSearchEdition($rankingEdition.value || 'total');
     clearRanking();
     clearResults();
+    const currentQuery = String((currentConsultMode === 'group' ? $team?.value : $player?.value) || '').trim();
+    const shouldRepeatSearch = currentQuery.length >= 2
+      && lastExecutedSearch?.mode === currentConsultMode
+      && lastExecutedSearch?.query === currentQuery;
+    if (shouldRepeatSearch) {
+      if (currentConsultMode === 'group') await searchTeam();
+      else await searchPlayer();
+      return;
+    }
     if (currentConsultMode === 'individual') scheduleSuggestions();
     else scheduleTeamSuggestions();
   });
