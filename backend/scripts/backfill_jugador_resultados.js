@@ -8,7 +8,7 @@ const pool = require('../db');
 const WRITE = process.argv.includes('--write');
 const EXPORT_UNRESOLVED = process.argv.includes('--export-unresolved');
 const CATEGORY_FILTER = readArg('--category');
-const EDITION = Number(readArg('--edition') || 5) || 5;
+const EDITION_OVERRIDE = Number(readArg('--edition')) || null;
 const OVERRIDES = loadOverrides();
 
 function readArg(name) {
@@ -546,9 +546,42 @@ function inferCategory(localSlug = '', visitanteSlug = '', localInfo = null, vis
   ).trim().toLowerCase();
 }
 
+async function loadEditionStartDates(client) {
+  const { rows } = await client.query(`
+    SELECT category, edicion, data
+    FROM fixtures
+    WHERE edicion > 5
+    ORDER BY edicion ASC
+  `);
+  const starts = new Map();
+  for (const row of rows) {
+    const category = String(row.category || '').trim().toLowerCase();
+    const edition = Number(row.edicion || 0);
+    const dates = Array.isArray(row?.data?.fechas)
+      ? row.data.fechas.map((fecha) => String(fecha?.date || '').slice(0, 10)).filter(Boolean).sort()
+      : [];
+    if (!category || !edition || !dates.length) continue;
+    const current = starts.get(category);
+    if (!current || edition > current.edition || (edition === current.edition && dates[0] < current.date)) {
+      starts.set(category, { edition, date: dates[0] });
+    }
+  }
+  return starts;
+}
+
+function inferRowEdition(row, editionStarts) {
+  if (EDITION_OVERRIDE) return EDITION_OVERRIDE;
+  const category = String(row?.categoria || '').trim().toLowerCase();
+  const date = String(row?.fecha_iso || '').slice(0, 10);
+  const current = editionStarts.get(category);
+  if (current && date && date >= current.date) return current.edition;
+  return 5;
+}
+
 async function buildRows(client) {
   const teams = await loadTeams(client);
   const playerIndex = await loadPlayers(client);
+  const editionStarts = await loadEditionStartDates(client);
   const overrideIndexes = makeOverrideIndexes(OVERRIDES);
   const { rows: validationRows } = await client.query(`
     SELECT fecha_key, team, status_json, validated, updated_at
@@ -576,6 +609,7 @@ async function buildRows(client) {
     unresolvedPlayers: 0,
     fallbackResolvedPlayers: 0,
     byCategory: {},
+    byEdition: {},
     unresolvedByCategory: {},
     unresolvedByModality: {},
     uncategorizedMatches: [],
@@ -652,7 +686,11 @@ async function buildRows(client) {
         visitanteSlug
       });
     }
-    out.push(...prepared);
+    for (const row of prepared) {
+      row.edicion = inferRowEdition(row, editionStarts);
+      stats.byEdition[row.edicion] = (stats.byEdition[row.edicion] || 0) + 1;
+      out.push(row);
+    }
   }
 
   stats.rowsPrepared = out.length;
@@ -692,7 +730,7 @@ async function writeRows(client, rows) {
         params.push(
           row.fecha_key,
           row.fecha_iso,
-          EDITION,
+          row.edicion,
           row.categoria,
           row.jugador_id,
           row.jugador_key,
@@ -769,7 +807,7 @@ async function main() {
       ok: true,
       mode: WRITE ? 'write' : 'dry-run',
       category: CATEGORY_FILTER || null,
-      edition: EDITION,
+      edition: EDITION_OVERRIDE || 'inferred',
       unresolvedExport,
       ...stats
     }, null, 2));
