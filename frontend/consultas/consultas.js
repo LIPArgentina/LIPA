@@ -62,19 +62,16 @@
       .toUpperCase();
   }
 
-  function playerNameMarkup(item, fallbackTeam = '') {
+  function playerPhotoButtonMarkup(item, fallbackTeam = '') {
     const name = String(item?.name || '');
     const team = String(item?.teamName || fallbackTeam || '');
-    return `<span class="player-name-content">
-      <span>${name}</span>
-      <button class="player-photo-button" type="button"
+    return `<button class="player-photo-button" type="button"
         data-player-photo="1"
         data-player-id="${Number(item?.id || item?.playerId || 0) || ''}"
         data-player-name="${escapeAttribute(name)}"
         data-player-team="${escapeAttribute(team)}"
         aria-label="Ver foto de ${escapeAttribute(name)}"
-        title="Ver foto">📷</button>
-    </span>`;
+        title="Ver foto">📷</button>`;
   }
 
   function closePlayerPhoto() {
@@ -534,7 +531,8 @@
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
-          <td class="player-name">${playerNameMarkup(item)}</td>
+          <td class="player-photo-cell">${playerPhotoButtonMarkup(item)}</td>
+          <td class="player-name">${item.name || ''}</td>
           <td class="team-name">${item.teamName || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
           <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
@@ -560,6 +558,7 @@
           <thead>
             <tr>
               <th>#</th>
+              <th class="player-photo-head" aria-label="Foto"></th>
               <th>Jugador</th>
               <th>Equipo</th>
               <th class="num">PJ</th>
@@ -669,7 +668,8 @@
       return `
         <tr>
           <td class="rank-pos">#${idx + 1}</td>
-          <td class="player-name">${playerNameMarkup(item, team.name)}</td>
+          <td class="player-photo-cell">${playerPhotoButtonMarkup(item, team.name)}</td>
+          <td class="player-name">${item.name || ''}</td>
           <td class="team-name">${item.teamName || team.name || ''}</td>
           <td class="num">${Number(item.played || 0)}</td>
           ${showRad ? `<td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>` : ''}
@@ -698,6 +698,7 @@
           <thead>
             <tr>
               <th>#</th>
+              <th class="player-photo-head" aria-label="Foto"></th>
               <th>Jugador</th>
               <th>Equipo</th>
               <th class="num">PJ</th>
@@ -725,6 +726,7 @@
             <thead>
               <tr>
                 <th>#</th>
+                <th class="player-photo-head" aria-label="Foto"></th>
                 <th>Jugador</th>
                 <th>Equipo</th>
                 <th class="num">PJ</th>

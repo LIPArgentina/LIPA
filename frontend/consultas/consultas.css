@@ -94,7 +94,14 @@ header img{ height:34px; width:auto; display:block; }
 .ranking-table td.num,.ranking-table th.num{ text-align:right; }
 .ranking-table .rank-pos{ color:var(--gold-soft); font-weight:900; }
 .ranking-table .player-name{ color:#fff; font-weight:900; text-transform:uppercase; }
-.player-name-content{ display:inline-flex; align-items:center; gap:5px; }
+.ranking-table th.player-photo-head,
+.ranking-table td.player-photo-cell{
+  width:26px;
+  min-width:26px;
+  padding-left:2px;
+  padding-right:2px;
+  text-align:center;
+}
 .player-photo-button{
   display:inline-grid;
   place-items:center;
