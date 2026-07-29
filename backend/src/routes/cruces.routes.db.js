@@ -3094,6 +3094,13 @@ async function getPromotedPlayerKeys(category = '') {
       SELECT j.id, j.nombre
       FROM jugadores j
       WHERE LOWER(COALESCE(j.categoria_actual, '')) = ANY($1::text[])
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jugador_equipos current_division
+          WHERE current_division.jugador_id = j.id
+            AND current_division.activo = true
+            AND LOWER(current_division.categoria) = $2
+        )
 
       UNION
 
@@ -3102,9 +3109,16 @@ async function getPromotedPlayerKeys(category = '') {
       INNER JOIN jugadores j ON j.id = je.jugador_id
       WHERE je.activo = true
         AND LOWER(je.categoria) = ANY($1::text[])
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jugador_equipos current_division
+          WHERE current_division.jugador_id = j.id
+            AND current_division.activo = true
+            AND LOWER(current_division.categoria) = $2
+        )
     ) promoted
     `,
-    [higherCategories]
+    [higherCategories, division]
   );
 
   return {
