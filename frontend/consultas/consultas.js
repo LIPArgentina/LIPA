@@ -474,7 +474,7 @@
           ${playerPhotoButtonMarkup(player)}
           <h2 class="summary-title">${player.name || 'Jugador'}</h2>
         </div>
-        <p class="summary-meta">${player.teamName || ''} · Categoría ${(data.category || '').toUpperCase()} · ${data?.editionLabel || editionLabel(data?.edition || currentSearchEdition)}</p>
+        <p class="summary-meta">${teamSearchButtonMarkup(player.teamName, data?.edition || currentSearchEdition)} · Categoría ${(data.category || '').toUpperCase()} · ${data?.editionLabel || editionLabel(data?.edition || currentSearchEdition)}</p>
       </div>
       <div class="summary-stats">
         <div class="summary-count summary-ranking">
@@ -536,14 +536,15 @@
         teamName: item.opponentName
       }, item.opponentName, currentSearchEdition))
       : [];
+    const opponentTeam = teamSearchButtonMarkup(item.opponentName, currentSearchEdition);
     const rivalText = pair
-      ? `en pareja con ${companionPlayer} vs ${opponentPairPlayers.join(' - ') || 'Rivales'} · ${item.opponentName || ''}`
-      : `vs ${opponentPlayer} · ${item.opponentName || ''}`;
+      ? `en pareja con ${companionPlayer} vs ${opponentPairPlayers.join(' - ') || 'Rivales'} · ${opponentTeam}`
+      : `vs ${opponentPlayer} · ${opponentTeam}`;
 
     card.innerHTML = `
       <div class="match-head">
         <div>
-          <h3 class="match-title">${item.teamName || ''}</h3>
+          <h3 class="match-title">${teamSearchButtonMarkup(item.teamName, currentSearchEdition)}</h3>
           <p class="match-rival">${rivalText}</p>
           <span class="result-pill ${cls}">${item.result || ''}</span>
         </div>
@@ -1041,17 +1042,33 @@
   });
   $results?.addEventListener('click', (ev) => {
     const searchButton = ev.target.closest('[data-player-search]');
-    if (!searchButton) return;
-    searchPlayerFromRanking(searchButton).catch((err) => {
+    if (searchButton) {
+      searchPlayerFromRanking(searchButton).catch((err) => {
+        console.error(err);
+        setStatus('No se pudo consultar el jugador rival.', 'error');
+      });
+      return;
+    }
+    const teamButton = ev.target.closest('[data-team-search]');
+    if (!teamButton) return;
+    searchTeamFromRanking(teamButton).catch((err) => {
       console.error(err);
-      setStatus('No se pudo consultar el jugador rival.', 'error');
+      setStatus('No se pudo consultar el equipo.', 'error');
     });
   });
   $summary?.addEventListener('click', (ev) => {
     const photoButton = ev.target.closest('[data-player-photo]');
-    if (!photoButton) return;
-    openPlayerPhoto(photoButton).catch(() => {
-      if ($playerPhotoStatus) $playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
+    if (photoButton) {
+      openPlayerPhoto(photoButton).catch(() => {
+        if ($playerPhotoStatus) $playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
+      });
+      return;
+    }
+    const teamButton = ev.target.closest('[data-team-search]');
+    if (!teamButton) return;
+    searchTeamFromRanking(teamButton).catch((err) => {
+      console.error(err);
+      setStatus('No se pudo consultar el equipo.', 'error');
     });
   });
   $playerPhotoClose?.addEventListener('click', closePlayerPhoto);
