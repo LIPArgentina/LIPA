@@ -83,6 +83,30 @@ async function ensureJugadorResultadosEditionColumn() {
       await pool.query(`UPDATE jugador_resultados SET edicion = 5 WHERE edicion IS NULL`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_edicion ON jugador_resultados (edicion)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_jugador_resultados_categoria_edicion ON jugador_resultados (categoria, edicion)`);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_jugador_resultados_match_slot
+        ON jugador_resultados (
+          categoria,
+          edicion,
+          fecha_iso,
+          modalidad,
+          slot,
+          equipo_slug,
+          rival_slug
+        )
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_jugador_resultados_match_pair
+        ON jugador_resultados (
+          categoria,
+          edicion,
+          fecha_iso,
+          modalidad,
+          (COALESCE(pareja_index, slot)),
+          equipo_slug,
+          rival_slug
+        )
+      `);
     })().catch((err) => {
       ensureJugadorResultadosEditionPromise = null;
       throw err;
