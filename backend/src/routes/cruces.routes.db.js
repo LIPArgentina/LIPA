@@ -16,6 +16,8 @@ const DEFAULT_HISTORIC_EDITION = 5;
 let ensureCrucesAdminStoragePromise = null;
 let ensureJugadorResultadosEditionPromise = null;
 let ensureJugadorCurrentCategoryPromise = null;
+const RAD_RANKING_CACHE_TTL_MS = 15_000;
+const radRankingCache = new Map();
 
 function requireAdminForPrivateCategory(req, res, next) {
   const category = String(req.query.category || '').trim().toLowerCase();
@@ -3297,17 +3299,46 @@ async function buildRadRankingFromJugadorResultados(category = '', edition = CUR
 }
 
 async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITION) {
-  try {
-    const rankingData = await buildRadRankingFromJugadorResultados(category, edition);
-    if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {
-      return rankingData;
-    }
-  } catch (err) {
-    console.warn('Falling back to cruces_validations for player ranking', err?.code || err?.message || err);
+  const division = String(category || '').trim().toLowerCase();
+  const normalizedEdition = normalizeEdition(edition, { allowTotal: true, defaultEdition: CURRENT_EDITION });
+  const cacheKey = `${division}:${normalizedEdition}`;
+  const now = Date.now();
+  const cached = radRankingCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.value;
   }
 
-  const results = await filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition, category);
-  return buildRadRankingFromResults(results);
+  const value = (async () => {
+    try {
+      const rankingData = await buildRadRankingFromJugadorResultados(division, normalizedEdition);
+      if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {
+        return rankingData;
+      }
+    } catch (err) {
+      console.warn('Falling back to cruces_validations for player ranking', err?.code || err?.message || err);
+    }
+
+    const results = await filterItemsByEdition(
+      await buildAllValidatedCrucesForPlayerQuery(division),
+      normalizedEdition,
+      division
+    );
+    return buildRadRankingFromResults(results);
+  })();
+
+  radRankingCache.set(cacheKey, {
+    expiresAt: now + RAD_RANKING_CACHE_TTL_MS,
+    value
+  });
+
+  try {
+    return await value;
+  } catch (err) {
+    if (radRankingCache.get(cacheKey)?.value === value) {
+      radRankingCache.delete(cacheKey);
+    }
+    throw err;
+  }
 }
 
 async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', edition = CURRENT_EDITION) {
