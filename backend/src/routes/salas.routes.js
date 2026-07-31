@@ -130,6 +130,8 @@ module.exports = function createSalasRouter(deps = {}) {
       sala: row.sala_nombre,
       slot: row.slot,
       categoria: row.categoria || '',
+      modalidad: row.categoria || '',
+      estilo: row.estilo || '',
       fechaHora: row.fecha_hora,
       valor: row.valor,
       moneda: row.moneda || 'ARS',
@@ -217,6 +219,7 @@ module.exports = function createSalasRouter(deps = {}) {
         sala_id INTEGER NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
         slot INTEGER NOT NULL CHECK (slot >= 1 AND slot <= 6),
         categoria TEXT DEFAULT '',
+        estilo TEXT DEFAULT '',
         fecha_hora TIMESTAMPTZ NOT NULL,
         valor INTEGER,
         moneda TEXT NOT NULL DEFAULT 'ARS',
@@ -239,7 +242,8 @@ module.exports = function createSalasRouter(deps = {}) {
     await pool.query(`
       ALTER TABLE sala_torneos
       ADD COLUMN IF NOT EXISTS categorias JSONB NOT NULL DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS valor_mesa INTEGER
+      ADD COLUMN IF NOT EXISTS valor_mesa INTEGER,
+      ADD COLUMN IF NOT EXISTS estilo TEXT DEFAULT ''
     `);
 
     await pool.query(`
@@ -325,7 +329,7 @@ module.exports = function createSalasRouter(deps = {}) {
     return rows;
   }
 
-  async function saveTorneoForSala({ salaId, slot, categoria, fechaHora, valor, moneda, categorias = [], valorMesa = null, file }) {
+  async function saveTorneoForSala({ salaId, slot, categoria, estilo = '', fechaHora, valor, moneda, categorias = [], valorMesa = null, file }) {
     const client = await pool.connect();
 
     try {
@@ -353,13 +357,14 @@ module.exports = function createSalasRouter(deps = {}) {
 
       await client.query(
         `INSERT INTO sala_torneos (
-           sala_id, slot, categoria, fecha_hora, valor, moneda, categorias, valor_mesa,
+           sala_id, slot, categoria, estilo, fecha_hora, valor, moneda, categorias, valor_mesa,
            media_type, media_path, original_name, created_at, updated_at
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, NOW(), NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, NOW(), NOW())
          ON CONFLICT (sala_id, slot)
          DO UPDATE SET
            categoria = EXCLUDED.categoria,
+           estilo = EXCLUDED.estilo,
            fecha_hora = EXCLUDED.fecha_hora,
            valor = EXCLUDED.valor,
            moneda = EXCLUDED.moneda,
@@ -369,7 +374,7 @@ module.exports = function createSalasRouter(deps = {}) {
            media_path = EXCLUDED.media_path,
            original_name = EXCLUDED.original_name,
            updated_at = NOW()`,
-        [salaId, slot, categoria, fechaHora, valor, moneda, JSON.stringify(categorias), valorMesa, file.mimetype, file.path, file.originalname || '']
+        [salaId, slot, categoria, estilo, fechaHora, valor, moneda, JSON.stringify(categorias), valorMesa, file.mimetype, file.path, file.originalname || '']
       );
 
       await reorderSalaTorneos(salaId, client);
@@ -401,6 +406,7 @@ module.exports = function createSalasRouter(deps = {}) {
       `SELECT
          sala_id,
          categoria,
+         estilo,
          fecha_hora,
          valor,
          moneda,
@@ -433,6 +439,7 @@ module.exports = function createSalasRouter(deps = {}) {
            sala_id,
            slot,
            categoria,
+           estilo,
            fecha_hora,
            valor,
            moneda,
@@ -444,11 +451,12 @@ module.exports = function createSalasRouter(deps = {}) {
            created_at,
            updated_at
          )
-         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,NOW())`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,NOW())`,
         [
           row.sala_id,
           slot,
           row.categoria,
+          row.estilo,
           row.fecha_hora,
           row.valor,
           row.moneda,
@@ -744,6 +752,7 @@ module.exports = function createSalasRouter(deps = {}) {
       }
 
       const categoria = String(req.body?.categoria || '').trim();
+      const estilo = String(req.body?.estilo || '').trim();
       const moneda = normalizeCurrency(req.body?.moneda);
       const categorias = normalizeCategorias(req.body?.categorias, moneda);
       const fecha = String(req.body?.fecha || '').trim();
@@ -760,6 +769,7 @@ module.exports = function createSalasRouter(deps = {}) {
         salaId,
         slot,
         categoria,
+        estilo,
         fechaHora,
         valor,
         moneda,
@@ -833,6 +843,7 @@ module.exports = function createSalasRouter(deps = {}) {
       const salaId = Number(req.params.salaId);
       const slot = Number(req.params.slot);
       const categoria = String(req.body?.categoria || '').trim();
+      const estilo = String(req.body?.estilo || '').trim();
       const moneda = normalizeCurrency(req.body?.moneda);
       const categorias = normalizeCategorias(req.body?.categorias, moneda);
       const fecha = String(req.body?.fecha || '').trim();
@@ -844,6 +855,7 @@ module.exports = function createSalasRouter(deps = {}) {
         salaId,
         slot,
         categoria,
+        estilo,
         fechaHora,
         valor,
         moneda,

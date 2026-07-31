@@ -11,6 +11,7 @@
   const imageInput = $('#imageInput');
   const mediaBox = $('#mediaBox');
   const categoriaInput = $('#categoriaInput');
+  const estiloInput = $('#estiloInput');
   const fechaInput = $('#fechaInput');
   const valorMesaInput = $('#valorMesaInput');
   const divisionDetails = $('#divisionDetails');
@@ -247,12 +248,13 @@
     }
 
     const categoria = categoriaInput.value.trim();
+    const estilo = estiloInput.value.trim();
     const fecha = fechaInput.value;
     const categorias = collectCategorias();
     const valorMesa = normalizeDisplayValue(valorMesaInput.value);
     const moneda = monedaSelect.value || 'ARS';
 
-    if (!categoria || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || !valorMesa) {
+    if (!categoria || !estilo || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || !valorMesa) {
       setStatus('Completá modalidad, categorías LIPA, fecha, hora, valores y valor mesa.', 'error');
       return;
     }
@@ -265,6 +267,7 @@
     const formData = new FormData();
     formData.append('imagen', state.file);
     formData.append('categoria', categoria);
+    formData.append('estilo', estilo);
     formData.append('fecha', fecha);
     formData.append('categorias', JSON.stringify(categorias));
     formData.append('valor', categorias[0].valor);
@@ -293,6 +296,7 @@
       setStatus('Torneo cargado correctamente.', 'ok');
 
       categoriaInput.value = '';
+      estiloInput.value = '';
       fechaInput.value = '';
       valorMesaInput.value = '';
       monedaSelect.value = 'ARS';

@@ -82,9 +82,10 @@
   function buildWhatsappMessage(torneo){
     const fecha = formatDateTime(torneo?.fechaHora);
     const categoria = String(torneo?.categoria || '').trim();
+    const estilo = String(torneo?.estilo || '').trim();
     const divisiones = Array.isArray(torneo?.categorias) ? torneo.categorias.map(item => item.categoria).filter(Boolean).join(', ') : '';
 
-    return `Hola, vengo de la APP de LIPA y quiero inscribirme al torneo del ${fecha}. Categoría: ${categoria || '—'}${divisiones ? ` (${divisiones})` : ''}.`;
+    return `Hola, vengo de la APP de LIPA y quiero inscribirme al torneo del ${fecha}. Modalidad: ${categoria || '—'}${estilo ? `. Estilo: ${estilo}` : ''}${divisiones ? `. Categorías: ${divisiones}` : ''}.`;
   }
 
   function addWhatsappMessage(url, message){
@@ -209,7 +210,8 @@
         </div>
         <div class="torneo-card__body">
           <div class="torneo-row torneo-row--sala"><span>Sala</span><strong>${escapeHtml(torneo.sala || 'Sala')}</strong></div>
-          <div class="torneo-row"><span>Categoría</span><strong>${escapeHtml(torneo.categoria || '—')}</strong></div>
+          <div class="torneo-row"><span>Modalidad</span><strong>${escapeHtml(torneo.modalidad || torneo.categoria || '—')}</strong></div>
+          ${torneo.estilo ? `<div class="torneo-row"><span>Estilo</span><strong>${escapeHtml(torneo.estilo)}</strong></div>` : ''}
           ${renderCategoryDetails(torneo)}
           ${(buildWhatsappUrl(torneo) || buildWhatsappUrl(torneo, torneo.contacto2)) ? `<div class="contactos-row">${buildWhatsappUrl(torneo) ? `<a class="btn-contacto" href="${escapeHtml(buildWhatsappUrl(torneo))}" target="_blank" rel="noopener noreferrer">${torneo.contacto2 ? 'CONTACTO 1' : 'CONTACTO'}</a>` : ''}${buildWhatsappUrl(torneo, torneo.contacto2) ? `<a class="btn-contacto" href="${escapeHtml(buildWhatsappUrl(torneo, torneo.contacto2))}" target="_blank" rel="noopener noreferrer">CONTACTO 2</a>` : ''}</div>` : ''}
           ${torneo.ubicacion ? `
