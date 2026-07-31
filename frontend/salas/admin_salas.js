@@ -146,9 +146,8 @@
           <input class="torneo-slot__file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Cargar imagen slot ${slot}">
         </div>
         <div class="torneo-slot__fields">
-          <label>Categoría
-            <input class="js-categoria" type="text" value="${escapeAttr(torneo?.categoria || '')}" placeholder="Ej: Parejas, Individual">
-          </label>
+          <label>Modalidad<select class="js-categoria"><option value="">Seleccionar modalidad</option>${['Bola 8','Bola 9','Bola 9 cantada','Bola 10'].map(v => `<option value="${v}" ${torneo?.categoria === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+          <label>Estilo<select class="js-estilo"><option value="">Seleccionar estilo</option>${['Individual','Parejas','Indiv. y parej.'].map(v => `<option value="${v}" ${torneo?.estilo === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
           <fieldset class="divisiones-fieldset"><legend>Categorías LIPA</legend><div class="divisiones-checks">${['1ra','2da','3ra'].map(d => `<label><input type="checkbox" class="js-division" value="${d}" ${savedCategorias.some(c => c.categoria === d) ? 'checked' : ''}> ${d}</label>`).join('')}</div></fieldset>
           <div class="division-details">${divisionRowsHtml(savedCategorias)}</div>
           <label>Fecha<input class="js-fecha date-visible" type="date" value="${formatDateForInput(torneo?.fechaHora || '')}"></label>
@@ -221,12 +220,13 @@
       }
 
       const categoria = card.querySelector('.js-categoria')?.value.trim() || '';
+      const estilo = card.querySelector('.js-estilo')?.value.trim() || '';
       const fecha = card.querySelector('.js-fecha')?.value || '';
       const categorias = selectedCategorias(card);
       const valorMesa = normalizeDisplayValue(card.querySelector('.js-valor-mesa')?.value);
       const moneda = card.querySelector('.js-moneda')?.value || 'ARS';
 
-      if (!categoria || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || !valorMesa) {
+      if (!categoria || !estilo || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || !valorMesa) {
         setStatus('Completá modalidad, categorías LIPA, fecha, horas, valores y valor mesa.', 'error');
         return;
       }
@@ -234,6 +234,7 @@
       const formData = new FormData();
       formData.append('imagen', file);
       formData.append('categoria', categoria);
+      formData.append('estilo', estilo);
       formData.append('fecha', fecha);
       formData.append('categorias', JSON.stringify(categorias));
       formData.append('valor', categorias[0].valor);
