@@ -128,7 +128,8 @@ module.exports = function createEquiposRouter() {
         const slugUid = `${slugBase}_${division}`;
 
         return {
-          slug_uid: slugUid,
+          id: Number.isInteger(Number(t.id)) && Number(t.id) > 0 ? Number(t.id) : null,
+          slug_uid: String(t.slug || t.slug_uid || slugUid).trim() || slugUid,
           slug_base: slugBase,
           division,
           display_name: username,
@@ -142,13 +143,47 @@ module.exports = function createEquiposRouter() {
         };
       }).filter(Boolean);
 
-      const keepSlugs = processed.map(t => t.slug_uid);
+      const keepIds = [];
       const defaultHash = await bcrypt.hash(DEFAULT_TEAM_PASSWORD, 10);
 
       await client.query('BEGIN');
 
       for (const t of processed) {
-        await client.query(
+        if (t.id) {
+          const updated = await client.query(
+            `UPDATE equipos
+                SET display_name = $1,
+                    username = $2,
+                    role = $3,
+                    captain = $4,
+                    subcaptain = $5,
+                    phone = $6,
+                    email = $7,
+                    activo = $8
+              WHERE id = $9
+                AND division = $10
+              RETURNING id`,
+            [
+              t.display_name,
+              t.username,
+              t.role,
+              t.captain,
+              t.subcaptain,
+              t.phone,
+              t.email,
+              t.activo,
+              t.id,
+              division,
+            ]
+          );
+          if (updated.rowCount !== 1) {
+            throw new Error(`No se encontró el equipo ID ${t.id} en ${division}`);
+          }
+          keepIds.push(updated.rows[0].id);
+          continue;
+        }
+
+        const inserted = await client.query(
           `INSERT INTO equipos
              (slug_uid, slug_base, division, display_name, username, role, captain, subcaptain, phone, email,
               activo, password_hash, must_change_password, password_updated_at)
@@ -164,7 +199,8 @@ module.exports = function createEquiposRouter() {
              subcaptain = EXCLUDED.subcaptain,
              phone = EXCLUDED.phone,
              email = EXCLUDED.email,
-             activo = EXCLUDED.activo`,
+             activo = EXCLUDED.activo
+           RETURNING id`,
           [
             t.slug_uid,
             t.slug_base,
@@ -180,15 +216,16 @@ module.exports = function createEquiposRouter() {
             defaultHash,
           ]
         );
+        keepIds.push(inserted.rows[0].id);
       }
 
-      if (keepSlugs.length > 0) {
+      if (keepIds.length > 0) {
         await client.query(
           `UPDATE equipos
               SET activo = false
             WHERE division = $1
-              AND NOT (slug_uid = ANY($2::text[]))`,
-          [division, keepSlugs]
+              AND NOT (id = ANY($2::int[]))`,
+          [division, keepIds]
         );
       } else {
         await client.query(`UPDATE equipos SET activo = false WHERE division = $1`, [division]);
