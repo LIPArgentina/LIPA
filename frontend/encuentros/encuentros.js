@@ -19,6 +19,10 @@
   const playerPhotoImage = document.getElementById('playerPhotoImage');
   const playerPhotoStatus = document.getElementById('playerPhotoStatus');
   const btnClosePlayerPhoto = document.getElementById('btnClosePlayerPhoto');
+  const playerProfileButton = document.getElementById('playerProfileButton');
+  const playerProfileModal = document.getElementById('playerProfileModal');
+  const playerProfileFrame = document.getElementById('playerProfileFrame');
+  const btnClosePlayerProfile = document.getElementById('btnClosePlayerProfile');
 
   let currentPhotos = [];
   let currentPhotoIndex = 0;
@@ -155,6 +159,10 @@
     playerPhotoImage.src = '../logo_liga.png';
     playerPhotoImage.alt = `Foto de ${playerNameValue || 'jugador'}`;
     playerPhotoStatus.textContent = 'Buscando foto…';
+    if (playerProfileButton) {
+      playerProfileButton.dataset.player = String(playerNameValue || '');
+      playerProfileButton.dataset.category = currentCategory;
+    }
     playerPhotoModal.hidden = false;
     document.body.classList.add('player-photo-open');
 
@@ -167,23 +175,48 @@
     playerPhotoStatus.textContent = player?.fotoUrl ? '' : 'Este jugador todavía no tiene una foto cargada.';
   }
 
+  function openPlayerProfile(){
+    const player = String(playerProfileButton?.dataset.player || '').trim();
+    const category = String(playerProfileButton?.dataset.category || currentCategory).trim().toLowerCase();
+    if (category !== 'tercera') {
+      playerPhotoStatus.textContent = 'Ficha no disponible para esta categoría.';
+      return;
+    }
+    if (!player || !playerProfileModal || !playerProfileFrame) {
+      playerPhotoStatus.textContent = 'No se pudo identificar al jugador.';
+      return;
+    }
+    const params = new URLSearchParams({
+      mode: 'individual',
+      category,
+      player,
+      auto: '1',
+      edition: String(currentEdition || 6)
+    });
+    playerProfileFrame.src = `../consultas/consultas.html?${params.toString()}`;
+    playerProfileModal.hidden = false;
+  }
+
+  function closePlayerProfile(){
+    if (!playerProfileModal || !playerProfileFrame) return;
+    playerProfileModal.hidden = true;
+    playerProfileFrame.src = 'about:blank';
+  }
+
   function wirePlayerPhotoSlots(container, teamRef){
     container.querySelectorAll('.slot').forEach(slot => {
       const playerNameValue = String(slot.dataset.full || slot.textContent || '').trim();
       if (!playerNameValue) return;
-      slot.classList.add('player-photo-trigger');
-      slot.tabIndex = 0;
-      slot.setAttribute('role', 'button');
-      slot.setAttribute('aria-label', `Ver foto de ${playerNameValue}`);
+      const photoButton = document.createElement('button');
+      photoButton.type = 'button';
+      photoButton.className = 'player-photo-button';
+      photoButton.textContent = '📷';
+      photoButton.setAttribute('aria-label', `Ver foto de ${playerNameValue}`);
       const open = () => openPlayerPhoto(playerNameValue, teamRef).catch(() => {
         if (playerPhotoStatus) playerPhotoStatus.textContent = 'No se pudo cargar la foto.';
       });
-      slot.addEventListener('click', open);
-      slot.addEventListener('keydown', ev => {
-        if (ev.key !== 'Enter' && ev.key !== ' ') return;
-        ev.preventDefault();
-        open();
-      });
+      photoButton.addEventListener('click', open);
+      slot.appendChild(photoButton);
     });
   }
 
@@ -571,6 +604,11 @@
 
     btnClosePhotos?.addEventListener('click', closePhotosModal);
     btnClosePlayerPhoto?.addEventListener('click', closePlayerPhoto);
+    playerProfileButton?.addEventListener('click', openPlayerProfile);
+    btnClosePlayerProfile?.addEventListener('click', closePlayerProfile);
+    playerProfileModal?.addEventListener('click', ev => {
+      if (ev.target?.matches('[data-close-player-profile]')) closePlayerProfile();
+    });
     playerPhotoModal?.addEventListener('click', ev => {
       if (ev.target?.matches('[data-close-player-photo]')) closePlayerPhoto();
     });
@@ -580,6 +618,7 @@
     document.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape' && photosModal && !photosModal.hidden) closePhotosModal();
       if (ev.key === 'Escape' && playerPhotoModal && !playerPhotoModal.hidden) closePlayerPhoto();
+      if (ev.key === 'Escape' && playerProfileModal && !playerProfileModal.hidden) closePlayerProfile();
     });
 
     const data = await fetchJson(
