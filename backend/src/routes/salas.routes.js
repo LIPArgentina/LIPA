@@ -81,8 +81,28 @@ module.exports = function createSalasRouter(deps = {}) {
   }
 
   function normalizeValor(value) {
-    const clean = String(value ?? '').replace(/[^0-9]/g, '');
-    return clean ? Number(clean) : null;
+    const clean = String(value ?? '').trim().replace(/\./g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+    if (!clean) return null;
+    const parsed = Number(clean);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return Math.round(parsed > 0 && parsed < 1000 ? parsed * 1000 : parsed);
+  }
+
+  function normalizeCategorias(value, monedaFallback = 'ARS') {
+    let raw = value;
+    if (typeof raw === 'string') {
+      try { raw = JSON.parse(raw); } catch (_) { raw = []; }
+    }
+    if (!Array.isArray(raw)) return [];
+    const allowed = new Set(['1ra', '2da', '3ra']);
+    return raw
+      .map((item) => ({
+        categoria: String(item?.categoria || '').trim().toLowerCase(),
+        hora: String(item?.hora || '').trim(),
+        valor: normalizeValor(item?.valor),
+        moneda: normalizeCurrency(item?.moneda || monedaFallback)
+      }))
+      .filter((item) => allowed.has(item.categoria) && /^\d{2}:\d{2}$/.test(item.hora) && item.valor !== null);
   }
 
   function normalizeDateTime(value) {
@@ -113,10 +133,13 @@ module.exports = function createSalasRouter(deps = {}) {
       fechaHora: row.fecha_hora,
       valor: row.valor,
       moneda: row.moneda || 'ARS',
+      categorias: Array.isArray(row.categorias) ? row.categorias : [],
+      valorMesa: row.valor_mesa,
       mediaType: row.media_type,
       mediaUrl: row.id ? `/api/sala-torneos/media/${encodeURIComponent(row.id)}` : '',
       ubicacion: row.sala_ubicacion || row.ubicacion || '',
       contacto: row.sala_contacto || row.contacto || '',
+      contacto2: row.sala_contacto_2 || row.contacto_2 || '',
       updatedAt: row.updated_at,
       createdAt: row.created_at
     };
@@ -197,6 +220,8 @@ module.exports = function createSalasRouter(deps = {}) {
         fecha_hora TIMESTAMPTZ NOT NULL,
         valor INTEGER,
         moneda TEXT NOT NULL DEFAULT 'ARS',
+        categorias JSONB NOT NULL DEFAULT '[]'::jsonb,
+        valor_mesa INTEGER,
         media_type TEXT NOT NULL,
         media_path TEXT NOT NULL,
         original_name TEXT DEFAULT '',
@@ -204,6 +229,17 @@ module.exports = function createSalasRouter(deps = {}) {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(sala_id, slot)
       )
+    `);
+
+    await pool.query(`
+      ALTER TABLE salas
+      ADD COLUMN IF NOT EXISTS contacto_2 TEXT DEFAULT ''
+    `);
+
+    await pool.query(`
+      ALTER TABLE sala_torneos
+      ADD COLUMN IF NOT EXISTS categorias JSONB NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS valor_mesa INTEGER
     `);
 
     await pool.query(`
@@ -278,7 +314,8 @@ module.exports = function createSalasRouter(deps = {}) {
          s.nombre AS sala_nombre,
          s.slug AS sala_slug,
          s.ubicacion AS sala_ubicacion,
-         s.contacto AS sala_contacto
+         s.contacto AS sala_contacto,
+         s.contacto_2 AS sala_contacto_2
        FROM sala_torneos t
        JOIN salas s ON s.id = t.sala_id
        WHERE t.sala_id = $1
@@ -288,7 +325,7 @@ module.exports = function createSalasRouter(deps = {}) {
     return rows;
   }
 
-  async function saveTorneoForSala({ salaId, slot, categoria, fechaHora, valor, moneda, file }) {
+  async function saveTorneoForSala({ salaId, slot, categoria, fechaHora, valor, moneda, categorias = [], valorMesa = null, file }) {
     const client = await pool.connect();
 
     try {
@@ -316,21 +353,23 @@ module.exports = function createSalasRouter(deps = {}) {
 
       await client.query(
         `INSERT INTO sala_torneos (
-           sala_id, slot, categoria, fecha_hora, valor, moneda,
+           sala_id, slot, categoria, fecha_hora, valor, moneda, categorias, valor_mesa,
            media_type, media_path, original_name, created_at, updated_at
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, NOW(), NOW())
          ON CONFLICT (sala_id, slot)
          DO UPDATE SET
            categoria = EXCLUDED.categoria,
            fecha_hora = EXCLUDED.fecha_hora,
            valor = EXCLUDED.valor,
            moneda = EXCLUDED.moneda,
+           categorias = EXCLUDED.categorias,
+           valor_mesa = EXCLUDED.valor_mesa,
            media_type = EXCLUDED.media_type,
            media_path = EXCLUDED.media_path,
            original_name = EXCLUDED.original_name,
            updated_at = NOW()`,
-        [salaId, slot, categoria, fechaHora, valor, moneda, file.mimetype, file.path, file.originalname || '']
+        [salaId, slot, categoria, fechaHora, valor, moneda, JSON.stringify(categorias), valorMesa, file.mimetype, file.path, file.originalname || '']
       );
 
       await reorderSalaTorneos(salaId, client);
@@ -365,6 +404,8 @@ module.exports = function createSalasRouter(deps = {}) {
          fecha_hora,
          valor,
          moneda,
+         categorias,
+         valor_mesa,
          media_type,
          media_path,
          original_name,
@@ -395,13 +436,15 @@ module.exports = function createSalasRouter(deps = {}) {
            fecha_hora,
            valor,
            moneda,
+           categorias,
+           valor_mesa,
            media_type,
            media_path,
            original_name,
            created_at,
            updated_at
          )
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,NOW())`,
         [
           row.sala_id,
           slot,
@@ -409,6 +452,8 @@ module.exports = function createSalasRouter(deps = {}) {
           row.fecha_hora,
           row.valor,
           row.moneda,
+          JSON.stringify(row.categorias || []),
+          row.valor_mesa,
           row.media_type,
           row.media_path,
           row.original_name,
@@ -469,6 +514,7 @@ module.exports = function createSalasRouter(deps = {}) {
           direccion,
           ubicacion,
           contacto,
+          contacto_2,
           orden,
           COALESCE(slug, '') AS slug,
           COALESCE(must_change_password, false) AS must_change_password
@@ -497,11 +543,12 @@ module.exports = function createSalasRouter(deps = {}) {
           const direccion = String(sala?.direccion || '').trim();
           const ubicacion = String(sala?.ubicacion || '').trim();
           const contacto = String(sala?.contacto || '').trim();
+          const contacto2 = String(sala?.contacto2 || sala?.contacto_2 || '').trim();
           const slug = buildSlug(sala?.slug || nombre);
           const id = Number(sala?.id || 0) || null;
 
           if (!nombre || !slug) return null;
-          return { id, nombre, direccion, ubicacion, contacto, slug, orden: idx + 1 };
+          return { id, nombre, direccion, ubicacion, contacto, contacto2, slug, orden: idx + 1 };
         })
         .filter(Boolean);
 
@@ -513,22 +560,23 @@ module.exports = function createSalasRouter(deps = {}) {
       for (const sala of processed) {
         await client.query(
           `INSERT INTO salas (
-             nombre, direccion, ubicacion, contacto, slug, orden,
+             nombre, direccion, ubicacion, contacto, contacto_2, slug, orden,
              password_hash, must_change_password, password_updated_at, updated_at
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, false, NOW(), NOW())
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, NOW(), NOW())
            ON CONFLICT (slug) WHERE slug IS NOT NULL AND slug <> ''
            DO UPDATE SET
              nombre = EXCLUDED.nombre,
              direccion = EXCLUDED.direccion,
              ubicacion = EXCLUDED.ubicacion,
              contacto = EXCLUDED.contacto,
+             contacto_2 = EXCLUDED.contacto_2,
              orden = EXCLUDED.orden,
              password_hash = COALESCE(salas.password_hash, EXCLUDED.password_hash),
              must_change_password = COALESCE(salas.must_change_password, false),
              password_updated_at = COALESCE(salas.password_updated_at, EXCLUDED.password_updated_at),
              updated_at = NOW()`,
-          [sala.nombre, sala.direccion, sala.ubicacion, sala.contacto, sala.slug, sala.orden, defaultHash]
+          [sala.nombre, sala.direccion, sala.ubicacion, sala.contacto, sala.contacto2, sala.slug, sala.orden, defaultHash]
         );
       }
 
@@ -696,9 +744,12 @@ module.exports = function createSalasRouter(deps = {}) {
       }
 
       const categoria = String(req.body?.categoria || '').trim();
-      const fechaHora = normalizeDateTime(req.body?.fechaHora || req.body?.fecha_hora);
-      const valor = normalizeValor(req.body?.valor);
       const moneda = normalizeCurrency(req.body?.moneda);
+      const categorias = normalizeCategorias(req.body?.categorias, moneda);
+      const fecha = String(req.body?.fecha || '').trim();
+      const fechaHora = normalizeDateTime(req.body?.fechaHora || req.body?.fecha_hora || (fecha && categorias[0] ? `${fecha}T${categorias[0].hora}` : ''));
+      const valor = categorias[0]?.valor ?? normalizeValor(req.body?.valor);
+      const valorMesa = normalizeValor(req.body?.valorMesa ?? req.body?.valor_mesa);
 
       if (!categoria) return res.status(400).json({ ok: false, error: 'Falta categoría' });
       if (!fechaHora) return res.status(400).json({ ok: false, error: 'Falta fecha y hora del torneo' });
@@ -712,6 +763,8 @@ module.exports = function createSalasRouter(deps = {}) {
         fechaHora,
         valor,
         moneda,
+        categorias,
+        valorMesa,
         file: req.file
       });
 
@@ -780,9 +833,12 @@ module.exports = function createSalasRouter(deps = {}) {
       const salaId = Number(req.params.salaId);
       const slot = Number(req.params.slot);
       const categoria = String(req.body?.categoria || '').trim();
-      const fechaHora = normalizeDateTime(req.body?.fechaHora || req.body?.fecha_hora);
-      const valor = normalizeValor(req.body?.valor);
       const moneda = normalizeCurrency(req.body?.moneda);
+      const categorias = normalizeCategorias(req.body?.categorias, moneda);
+      const fecha = String(req.body?.fecha || '').trim();
+      const fechaHora = normalizeDateTime(req.body?.fechaHora || req.body?.fecha_hora || (fecha && categorias[0] ? `${fecha}T${categorias[0].hora}` : ''));
+      const valor = categorias[0]?.valor ?? normalizeValor(req.body?.valor);
+      const valorMesa = normalizeValor(req.body?.valorMesa ?? req.body?.valor_mesa);
 
       const torneos = await saveTorneoForSala({
         salaId,
@@ -791,6 +847,8 @@ module.exports = function createSalasRouter(deps = {}) {
         fechaHora,
         valor,
         moneda,
+        categorias,
+        valorMesa,
         file: req.file
       });
 
@@ -811,7 +869,8 @@ module.exports = function createSalasRouter(deps = {}) {
            s.nombre AS sala_nombre,
            s.slug AS sala_slug,
            s.ubicacion AS sala_ubicacion,
-           s.contacto AS sala_contacto
+           s.contacto AS sala_contacto,
+           s.contacto_2 AS sala_contacto_2
          FROM sala_torneos t
          JOIN salas s ON s.id = t.sala_id
          WHERE t.fecha_hora >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') AT TIME ZONE 'America/Argentina/Buenos_Aires'
