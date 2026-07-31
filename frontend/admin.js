@@ -270,33 +270,26 @@ function renderRows(users){
   const tbody = $('#tbodyTeams');
   tbody.innerHTML = '';
   const teams = (users||[]).filter(u => u && u.role === 'team');
-  const by = {
-    sala: new Map(teams.map(u => [u.username, u.sala || u.email || ''])),
-    ubicacion: new Map(teams.map(u => [u.username, u.ubicacion || u.location || u.phone || ''])),
-    captain: new Map(teams.map(u => [u.username, u.captain || u.capitan || ''])),
-    subcaptain: new Map(teams.map(u => [u.username, u.subcaptain || u.subcapitan || ''])),
-    id:   new Map(teams.map(u => [u.username, u.id || null])),
-    activo: new Map(teams.map(u => [u.username, u.activo !== false])),
-  };
-  const names = teams.map(u => u.username);
 
-  for(let i=0;i<Math.max(20, names.length);i++){
-    const name  = names[i] || '';
-    const teamId = by.id.get(name) || '';
+  for(let i=0;i<Math.max(20, teams.length);i++){
+    const team = teams[i] || {};
+    const name = team.username || '';
+    const teamId = team.id || '';
     const canReset = Boolean(teamId);
-    const isActive = name ? by.activo.get(name) !== false : true;
+    const isActive = name ? team.activo !== false : true;
     const tr = document.createElement('tr');
     if (teamId) tr.dataset.teamId = String(teamId);
+    if (team.slug) tr.dataset.teamSlug = String(team.slug);
     tr.dataset.active = isActive ? '1' : '0';
     tr.classList.toggle('team-inactive', !isActive);
 
     tr.innerHTML = `
       <td class="col-idx">${i+1}</td>
       <td><input class="input team" type="text" value="${escapeHtml(name)}" aria-label="Nombre del equipo fila ${i+1}"></td>
-      <td><input class="input captain" type="text" value="${escapeHtml(by.captain.get(name)||'')}" placeholder="Capitán" aria-label="Capitán fila ${i+1}"></td>
-      <td><input class="input subcaptain" type="text" value="${escapeHtml(by.subcaptain.get(name)||'')}" placeholder="Subcapitán" aria-label="Subcapitán fila ${i+1}"></td>
-      <td><input class="input sala" type="text" value="${escapeHtml(by.sala.get(name)||'')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
-      <td><input class="input location" type="url" value="${escapeHtml(normalizeLocation(by.ubicacion.get(name)||''))}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
+      <td><input class="input captain" type="text" value="${escapeHtml(team.captain || team.capitan || '')}" placeholder="Capitán" aria-label="Capitán fila ${i+1}"></td>
+      <td><input class="input subcaptain" type="text" value="${escapeHtml(team.subcaptain || team.subcapitan || '')}" placeholder="Subcapitán" aria-label="Subcapitán fila ${i+1}"></td>
+      <td><input class="input sala" type="text" value="${escapeHtml(team.sala || team.email || '')}" placeholder="Nombre de sala" aria-label="Sala fila ${i+1}"></td>
+      <td><input class="input location" type="url" value="${escapeHtml(normalizeLocation(team.ubicacion || team.location || team.phone || ''))}" placeholder="Link de Google Maps" aria-label="Ubicación Google Maps fila ${i+1}"></td>
       <td class="team-actions-cell">
         <button class="btn-reset-pass btn-team-planilla" type="button" title="Ingresar como capitán y abrir planilla" aria-label="Ingresar como capitán y abrir planilla de ${escapeHtml(name || ('fila ' + (i+1)))}" ${name && isActive ? '' : 'disabled'}>📋</button>
         <button class="btn-reset-pass btn-team-cruces" type="button" title="Ingresar como capitán y abrir cruces" aria-label="Ingresar como capitán y abrir cruces de ${escapeHtml(name || ('fila ' + (i+1)))}" ${name && isActive ? '' : 'disabled'}>⚔️</button>
@@ -389,7 +382,17 @@ function collectRows(){
     const ubicacion = tr.querySelector('.location')?.value.trim()  || '';
     const activo = tr.dataset.active !== '0';
     if(!name) return;
-    rows.push({ username:name, role:'team', captain, subcaptain, email:sala, phone:ubicacion, activo });
+    rows.push({
+      id: tr.dataset.teamId || null,
+      slug: tr.dataset.teamSlug || '',
+      username:name,
+      role:'team',
+      captain,
+      subcaptain,
+      email:sala,
+      phone:ubicacion,
+      activo
+    });
   });
   return rows;
 }
