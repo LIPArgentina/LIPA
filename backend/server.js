@@ -43,6 +43,114 @@ app.use("/pictures", express.static(PICTURES_DIR, {
   }
 })();
 
+// Corrección puntual y reversible del encuentro del 27/07/2026:
+// Los Patos de la Liga vs Alba. Se elimina después de ejecutarse en producción.
+(async () => {
+  const client = await pool.connect();
+  const fixKey = "2026-07-27-lospatos-alba-suplente-gaston-duperre";
+  const fechaKey = "2026-07-27::lospatosdelaliga::albapool";
+  try {
+    await client.query("BEGIN");
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS codex_data_fix_backups (
+        fix_key TEXT NOT NULL,
+        team TEXT NOT NULL,
+        fecha_key TEXT NOT NULL,
+        validacion_json JSONB,
+        status_json JSONB,
+        validated BOOLEAN,
+        locked_until TIMESTAMPTZ,
+        original_updated_at TIMESTAMPTZ,
+        backed_up_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (fix_key, team, fecha_key)
+      )
+    `);
+
+    const playerResult = await client.query(
+      `SELECT id, nombre
+       FROM jugadores
+       WHERE id = $1
+         AND LOWER(nombre) = LOWER($2)
+       LIMIT 1`,
+      [2625, "Gastón Duperre"]
+    );
+    if (playerResult.rowCount !== 1) {
+      throw new Error("No se encontró la ficha exacta de Gastón Duperre (ID 2625)");
+    }
+
+    const validationResult = await client.query(
+      `SELECT team, fecha_key, validacion_json, status_json, validated, locked_until, updated_at
+       FROM cruces_validations
+       WHERE fecha_key = $1
+         AND team IN ($2, $3)
+       ORDER BY team
+       FOR UPDATE`,
+      [fechaKey, "lospatosdelaliga", "albapool"]
+    );
+    if (validationResult.rowCount !== 2) {
+      throw new Error(`Se esperaban 2 validaciones y se encontraron ${validationResult.rowCount}`);
+    }
+
+    for (const row of validationResult.rows) {
+      const status = row.status_json && typeof row.status_json === "object"
+        ? structuredClone(row.status_json)
+        : null;
+      const suplentes = status?.localPlanilla?.suplentes;
+      if (!Array.isArray(suplentes) || !suplentes.length) {
+        throw new Error(`La validación de ${row.team} no contiene suplentes locales`);
+      }
+
+      const currentName = String(suplentes[0] || "").trim();
+      if (!["Jorge Oscar Gonzalez", "Gastón Duperre"].includes(currentName)) {
+        throw new Error(`Suplente inesperado en ${row.team}: ${currentName}`);
+      }
+
+      await client.query(
+        `INSERT INTO codex_data_fix_backups (
+           fix_key, team, fecha_key, validacion_json, status_json,
+           validated, locked_until, original_updated_at
+         )
+         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8)
+         ON CONFLICT (fix_key, team, fecha_key) DO NOTHING`,
+        [
+          fixKey,
+          row.team,
+          row.fecha_key,
+          JSON.stringify(row.validacion_json || {}),
+          JSON.stringify(row.status_json || {}),
+          row.validated,
+          row.locked_until,
+          row.updated_at
+        ]
+      );
+
+      suplentes[0] = "Gastón Duperre";
+      status.localPlanilla.jugadorIds = status.localPlanilla.jugadorIds || {};
+      status.localPlanilla.jugadorIds.suplentes = Array.isArray(status.localPlanilla.jugadorIds.suplentes)
+        ? status.localPlanilla.jugadorIds.suplentes
+        : [];
+      status.localPlanilla.jugadorIds.suplentes[0] = 2625;
+
+      await client.query(
+        `UPDATE cruces_validations
+         SET status_json = $1::jsonb,
+             updated_at = NOW()
+         WHERE team = $2
+           AND fecha_key = $3`,
+        [JSON.stringify(status), row.team, row.fecha_key]
+      );
+    }
+
+    await client.query("COMMIT");
+    console.log(`Corrección aplicada: ${fixKey}`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("No se pudo aplicar la corrección puntual del suplente:", err);
+  } finally {
+    client.release();
+  }
+})();
+
 app.get("/test-db", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
