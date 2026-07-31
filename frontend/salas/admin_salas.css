@@ -34,7 +34,7 @@ header img{height:34px;width:auto;display:block;}
 .status-box.error{border-color:rgba(255,103,103,.6);color:#ffb3b3;}
 .status-box.ok{border-color:rgba(76,217,100,.6);color:#bfffc9;}
 .torneos-admin-grid{display:grid;grid-template-columns:repeat(3, 300px);gap:18px;justify-content:center;align-items:start;}
-.torneo-slot{width:300px;min-height:360px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 5px 12px #0006;padding:10px;display:flex;flex-direction:column;gap:8px;}
+.torneo-slot{width:300px;min-height:610px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 5px 12px #0006;padding:10px;display:flex;flex-direction:column;gap:8px;}
 .torneo-slot__media{height:180px;border:1px dashed #b28900;border-radius:12px;background:#050505;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;}
 .torneo-slot__media img{width:100%;height:100%;object-fit:cover;display:block;}
 .torneo-slot__empty{color:var(--gold);font-weight:900;text-transform:uppercase;letter-spacing:.04em;font-size:13px;padding:16px;}
@@ -44,6 +44,7 @@ header img{height:34px;width:auto;display:block;}
 .torneo-slot input,.torneo-slot select{width:100%;background:#090b10;color:#fff;border:1px solid #333;border-radius:8px;padding:7px 8px;font:inherit;font-size:12px;font-weight:700;outline:none;}
 .torneo-slot input:focus,.torneo-slot select:focus{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,204,0,.14);}
 .valor-row{display:grid;grid-template-columns:1fr 82px;gap:6px;}
+.divisiones-fieldset{margin:0;padding:0;border:0;display:grid;gap:5px;}.divisiones-fieldset legend{color:var(--gold);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}.divisiones-checks{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.divisiones-checks label{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;background:#090b10;border:1px solid #333;border-radius:8px;padding:7px;cursor:pointer}.divisiones-checks input{width:17px;height:17px;accent-color:var(--gold)}.division-details{display:grid;gap:5px;min-height:142px;align-content:start}.division-detail{display:grid;grid-template-columns:38px 1fr 1.3fr;gap:5px;align-items:end;padding:6px;border:1px solid #ffffff1c;border-radius:9px;background:#0b0c0f}.division-detail>strong{align-self:center;text-align:center;color:var(--gold);font-size:12px;text-transform:uppercase}.date-visible{color-scheme:dark}.date-visible::-webkit-calendar-picker-indicator{filter:invert(82%) sepia(98%) saturate(1500%) hue-rotate(355deg) brightness(105%);opacity:1;cursor:pointer;width:21px;height:21px}
 .torneo-slot__actions{display:flex;gap:7px;justify-content:space-between;margin-top:auto;}
 .torneo-slot__actions .btn{flex:1;padding:7px 8px;font-size:11px;}
 dialog.modal{padding:0;border:none;background:transparent;}

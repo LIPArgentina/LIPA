@@ -82,8 +82,9 @@
   function buildWhatsappMessage(torneo){
     const fecha = formatDateTime(torneo?.fechaHora);
     const categoria = String(torneo?.categoria || '').trim();
+    const divisiones = Array.isArray(torneo?.categorias) ? torneo.categorias.map(item => item.categoria).filter(Boolean).join(', ') : '';
 
-    return `Hola, quiero inscribirme al torneo del ${fecha}. Categoría: ${categoria || '—'}.`;
+    return `Hola, vengo de la APP de LIPA y quiero inscribirme al torneo del ${fecha}. Categoría: ${categoria || '—'}${divisiones ? ` (${divisiones})` : ''}.`;
   }
 
   function addWhatsappMessage(url, message){
@@ -99,11 +100,18 @@
     }
   }
 
-  function buildWhatsappUrl(torneo){
-    const baseUrl = normalizeWhatsappUrl(torneo?.contacto);
+  function buildWhatsappUrl(torneo, contactValue = torneo?.contacto){
+    const baseUrl = normalizeWhatsappUrl(contactValue);
     if (!baseUrl) return '';
 
     return addWhatsappMessage(baseUrl, buildWhatsappMessage(torneo));
+  }
+
+  function renderCategoryDetails(torneo){
+    const items = Array.isArray(torneo?.categorias) ? torneo.categorias : [];
+    if (!items.length) return `<div class="torneo-row"><span>Fecha y hora</span><strong>${formatDateTime(torneo.fechaHora)}</strong></div><div class="torneo-row"><span>Valor</span><strong>${formatValor(torneo.valor, torneo.moneda)}</strong></div>`;
+    const date = new Date(torneo.fechaHora).toLocaleDateString('es-AR', { dateStyle:'medium' });
+    return `<div class="torneo-row"><span>Fecha</span><strong>${date}</strong></div><div class="categoria-publica-list">${items.map(item => `<div class="categoria-publica"><strong>${escapeHtml(item.categoria)}</strong><span>${escapeHtml(item.hora)} hs</span><span>${formatValor(item.valor, item.moneda || torneo.moneda)}</span></div>`).join('')}</div>${torneo.valorMesa != null ? `<div class="torneo-row"><span>Valor mesa</span><strong>${formatValor(torneo.valorMesa, torneo.moneda)}</strong></div>` : ''}`;
   }
 
   function openImageLightbox(src, alt){
@@ -202,18 +210,8 @@
         <div class="torneo-card__body">
           <div class="torneo-row torneo-row--sala"><span>Sala</span><strong>${escapeHtml(torneo.sala || 'Sala')}</strong></div>
           <div class="torneo-row"><span>Categoría</span><strong>${escapeHtml(torneo.categoria || '—')}</strong></div>
-          <div class="torneo-row"><span>Fecha y hora</span><strong>${formatDateTime(torneo.fechaHora)}</strong></div>
-          <div class="torneo-row"><span>Valor</span><strong>${formatValor(torneo.valor, torneo.moneda)}</strong></div>
-          ${buildWhatsappUrl(torneo) ? `
-            <a 
-              class="btn-contacto" 
-              href="${escapeHtml(buildWhatsappUrl(torneo))}" 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              CONTACTO
-            </a>
-          ` : ''}
+          ${renderCategoryDetails(torneo)}
+          ${(buildWhatsappUrl(torneo) || buildWhatsappUrl(torneo, torneo.contacto2)) ? `<div class="contactos-row">${buildWhatsappUrl(torneo) ? `<a class="btn-contacto" href="${escapeHtml(buildWhatsappUrl(torneo))}" target="_blank" rel="noopener noreferrer">${torneo.contacto2 ? 'CONTACTO 1' : 'CONTACTO'}</a>` : ''}${buildWhatsappUrl(torneo, torneo.contacto2) ? `<a class="btn-contacto" href="${escapeHtml(buildWhatsappUrl(torneo, torneo.contacto2))}" target="_blank" rel="noopener noreferrer">CONTACTO 2</a>` : ''}</div>` : ''}
           ${torneo.ubicacion ? `
             <a 
               class="btn-ver-ubicacion" 
@@ -242,7 +240,8 @@
           ? data.torneos.map(t => ({
               ...t,
               ubicacion: t.ubicacion || t.salaUbicacion || '',
-              contacto: t.contacto || t.salaContacto || ''
+              contacto: t.contacto || t.salaContacto || '',
+              contacto2: t.contacto2 || t.salaContacto2 || ''
             }))
           : []
       );

@@ -55,17 +55,26 @@
           <label>Categoría
             <input id="categoriaInput" type="text" placeholder="Ej: Parejas, Individual">
           </label>
-          <label>Fecha y hora
-            <input id="fechaInput" type="datetime-local">
-          </label>
-          <label>Valor
-            <div class="valor-row">
-              <input id="valorInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Solo números">
-              <select id="monedaSelect">
-                <option value="ARS">Pesos</option>
-                <option value="USD">Dólares</option>
-              </select>
+          <fieldset class="divisiones-fieldset">
+            <legend>Categorías LIPA</legend>
+            <div class="divisiones-checks">
+              <label><input type="checkbox" class="js-division" value="1ra"> 1ra</label>
+              <label><input type="checkbox" class="js-division" value="2da"> 2da</label>
+              <label><input type="checkbox" class="js-division" value="3ra"> 3ra</label>
             </div>
+          </fieldset>
+          <div id="divisionDetails" class="division-details"></div>
+          <label>Fecha
+            <input id="fechaInput" class="date-visible" type="date">
+          </label>
+          <label>Valor mesa
+            <input id="valorMesaInput" type="number" min="0" step="any" inputmode="decimal" placeholder="Ej: 10 = 10.000">
+          </label>
+          <label>Moneda
+            <select id="monedaSelect">
+              <option value="ARS">Pesos</option>
+              <option value="USD">Dólares</option>
+            </select>
           </label>
         </div>
 

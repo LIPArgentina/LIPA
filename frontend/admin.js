@@ -683,6 +683,7 @@ function normalizeSala(item){
     direccion: String(item?.direccion || item?.address || '').trim(),
     ubicacion: String(item?.ubicacion || item?.location || item?.maps || '').trim(),
     contacto: String(item?.contacto || item?.whatsapp || item?.phone_contact || '').trim(),
+    contacto2: String(item?.contacto2 || item?.contacto_2 || '').trim(),
   };
 }
 
@@ -693,7 +694,7 @@ function renderSalasRows(salas){
   const rows = Array.isArray(salas) ? salas.map(normalizeSala).slice(0, SALAS_SLOTS) : [];
 
   for (let i = 0; i < SALAS_SLOTS; i++){
-    const sala = rows[i] || { id: null, nombre: '', direccion: '', ubicacion: '', contacto: '' };
+    const sala = rows[i] || { id: null, nombre: '', direccion: '', ubicacion: '', contacto: '', contacto2: '' };
     const canReset = Boolean(sala.id);
     const tr = document.createElement('tr');
     if (sala.id) tr.dataset.salaId = String(sala.id);
@@ -704,6 +705,7 @@ function renderSalasRows(salas){
       <td><input class="input sala-address" type="text" value="${sala.direccion.replace(/"/g,'&quot;')}" placeholder="Dirección" aria-label="Dirección fila ${i + 1}"></td>
       <td><input class="input sala-location" type="url" value="${normalizeLocation(sala.ubicacion).replace(/"/g,'&quot;')}" placeholder="Link de Google Maps" aria-label="Ubicación fila ${i + 1}"></td>
       <td><input class="input sala-contact" type="text" value="${(sala.contacto || '').replace(/"/g,'&quot;')}" placeholder="WhatsApp o link de grupo" aria-label="Contacto WhatsApp fila ${i + 1}"></td>
+      <td><input class="input sala-contact-2" type="text" value="${(sala.contacto2 || '').replace(/"/g,'&quot;')}" placeholder="Segundo WhatsApp o link" aria-label="Segundo contacto WhatsApp fila ${i + 1}"></td>
       <td class="team-actions-cell">
         <button class="btn-reset-pass btn-reset-sala-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${sala.nombre || ('fila ' + (i + 1))}" ${canReset ? '' : 'disabled'}>🔑</button>
         <button class="btn-del-sala" type="button">Eliminar</button>
@@ -716,6 +718,7 @@ function renderSalasRows(salas){
       tr.querySelector('.sala-address').value = '';
       tr.querySelector('.sala-location').value = '';
       tr.querySelector('.sala-contact').value = '';
+      tr.querySelector('.sala-contact-2').value = '';
       delete tr.dataset.salaId;
       const resetBtn = tr.querySelector('.btn-reset-sala-pass');
       if (resetBtn) resetBtn.disabled = true;
@@ -772,9 +775,10 @@ function collectSalasRows(){
     const direccion = tr.querySelector('.sala-address')?.value.trim() || '';
     const ubicacion = tr.querySelector('.sala-location')?.value.trim() || '';
     const contacto = tr.querySelector('.sala-contact')?.value.trim() || '';
-    if (!nombre && !direccion && !ubicacion && !contacto) return;
+    const contacto2 = tr.querySelector('.sala-contact-2')?.value.trim() || '';
+    if (!nombre && !direccion && !ubicacion && !contacto && !contacto2) return;
     const id = tr.dataset.salaId || null;
-    rows.push({ id, nombre, direccion, ubicacion, contacto });
+    rows.push({ id, nombre, direccion, ubicacion, contacto, contacto2 });
   });
   return rows;
 }
@@ -866,7 +870,8 @@ function exportSalasTable(){
     nombre: item.nombre || '',
     direccion: item.direccion || '',
     ubicacion: item.ubicacion || '',
-    contacto: item.contacto || ''
+    contacto: item.contacto || '',
+    contacto2: item.contacto2 || ''
   }));
 
   downloadJson(makeExportFilename('salas'), {
@@ -916,7 +921,8 @@ function importSalasTable(items){
     nombre: item?.nombre || item?.name || item?.sala || item?.room || '',
     direccion: item?.direccion || item?.address || '',
     ubicacion: item?.ubicacion || item?.location || item?.maps || '',
-    contacto: item?.contacto || item?.whatsapp || item?.phone_contact || ''
+    contacto: item?.contacto || item?.whatsapp || item?.phone_contact || '',
+    contacto2: item?.contacto2 || item?.contacto_2 || ''
   }));
   renderSalasRows(salas);
   toast('Tabla importada. Revisá y guardá para actualizar la DB.');

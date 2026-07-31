@@ -118,6 +118,7 @@ header img{height:34px;width:auto;display:block;}
   letter-spacing:.05em;font-size:13px;transition:all .15s ease;border:1px solid #159947;
 }
 .btn-contacto:hover{filter:brightness(1.06);transform:translateY(-1px);}
+.contactos-row{display:flex;gap:8px;width:100%;}.contactos-row .btn-contacto{flex:1;min-width:0}.categoria-publica-list{display:grid;gap:6px}.categoria-publica{display:grid;grid-template-columns:52px 1fr 1fr;gap:7px;align-items:center;background:#0f0f11;border:1px solid #ffffff12;border-radius:10px;padding:9px 10px}.categoria-publica strong{color:var(--gold);text-transform:uppercase}.categoria-publica span{font-weight:800;text-align:right;color:#fff}
 
 @media (min-width: 769px){
   body{ zoom:.8; }

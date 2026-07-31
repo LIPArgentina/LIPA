@@ -111,6 +111,19 @@
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
+  function formatDateForInput(value){ return formatForInput(value).slice(0, 10); }
+  function normalizeDisplayValue(value){
+    const n = Number(String(value || '').replace(',', '.'));
+    if (!Number.isFinite(n) || n < 0) return '';
+    return String(Math.round(n > 0 && n < 1000 ? n * 1000 : n));
+  }
+  function divisionRowsHtml(categorias = []){
+    return categorias.map((item) => `<div class="division-detail" data-division="${escapeAttr(item.categoria)}"><strong>${escapeAttr(item.categoria)}</strong><label>Hora<input class="js-division-hora" type="time" value="${escapeAttr(item.hora || '')}"></label><label>Valor<input class="js-division-valor" type="number" min="0" step="any" inputmode="decimal" value="${item.valor ?? ''}" placeholder="10 = 10.000"></label></div>`).join('');
+  }
+  function selectedCategorias(card){
+    return [...card.querySelectorAll('.division-detail')].map(row => ({ categoria:row.dataset.division, hora:row.querySelector('.js-division-hora')?.value || '', valor:normalizeDisplayValue(row.querySelector('.js-division-valor')?.value), moneda:card.querySelector('.js-moneda')?.value || 'ARS' }));
+  }
+
   function renderSlots(){
     if (!grid) return;
     grid.innerHTML = '';
@@ -121,6 +134,8 @@
       const torneo = bySlot.get(slot) || null;
       const file = state.selectedFiles.get(slot) || null;
       const previewUrl = file ? URL.createObjectURL(file) : (torneo?.mediaUrl ? apiUrl(torneo.mediaUrl) : '');
+      const legacyTime = formatForInput(torneo?.fechaHora || '').slice(11,16);
+      const savedCategorias = Array.isArray(torneo?.categorias) && torneo.categorias.length ? torneo.categorias : (torneo ? [{ categoria:'1ra', hora:legacyTime, valor:torneo.valor, moneda:torneo.moneda || 'ARS' }] : []);
 
       const card = document.createElement('article');
       card.className = 'torneo-slot';
@@ -134,18 +149,11 @@
           <label>Categoría
             <input class="js-categoria" type="text" value="${escapeAttr(torneo?.categoria || '')}" placeholder="Ej: Parejas, Individual">
           </label>
-          <label>Fecha y hora
-            <input class="js-fecha" type="datetime-local" value="${formatForInput(torneo?.fechaHora || '')}">
-          </label>
-          <label>Valor
-            <div class="valor-row">
-              <input class="js-valor" type="number" min="0" step="1" inputmode="numeric" value="${torneo?.valor ?? ''}" placeholder="Solo números">
-              <select class="js-moneda">
-                <option value="ARS" ${(torneo?.moneda || 'ARS') === 'ARS' ? 'selected' : ''}>Pesos</option>
-                <option value="USD" ${(torneo?.moneda || 'ARS') === 'USD' ? 'selected' : ''}>Dólares</option>
-              </select>
-            </div>
-          </label>
+          <fieldset class="divisiones-fieldset"><legend>Categorías LIPA</legend><div class="divisiones-checks">${['1ra','2da','3ra'].map(d => `<label><input type="checkbox" class="js-division" value="${d}" ${savedCategorias.some(c => c.categoria === d) ? 'checked' : ''}> ${d}</label>`).join('')}</div></fieldset>
+          <div class="division-details">${divisionRowsHtml(savedCategorias)}</div>
+          <label>Fecha<input class="js-fecha date-visible" type="date" value="${formatDateForInput(torneo?.fechaHora || '')}"></label>
+          <label>Valor mesa<input class="js-valor-mesa" type="number" min="0" step="any" inputmode="decimal" value="${torneo?.valorMesa ?? ''}" placeholder="10 = 10.000"></label>
+          <label>Moneda<select class="js-moneda"><option value="ARS" ${(torneo?.moneda || 'ARS') === 'ARS' ? 'selected' : ''}>Pesos</option><option value="USD" ${(torneo?.moneda || 'ARS') === 'USD' ? 'selected' : ''}>Dólares</option></select></label>
         </div>
         <div class="torneo-slot__actions">
           <button class="btn btn-primary js-save" type="button">Guardar</button>
@@ -156,6 +164,11 @@
       const fileInput = card.querySelector('.torneo-slot__file');
       const saveBtn = card.querySelector('.js-save');
       const deleteBtn = card.querySelector('.js-delete');
+      card.querySelectorAll('.js-division').forEach((checkbox) => checkbox.addEventListener('change', () => {
+        const current = new Map(selectedCategorias(card).map(item => [item.categoria, item]));
+        const next = [...card.querySelectorAll('.js-division:checked')].map(el => current.get(el.value) || { categoria:el.value, hora:'', valor:'' });
+        card.querySelector('.division-details').innerHTML = divisionRowsHtml(next);
+      }));
 
       fileInput.addEventListener('change', () => {
         const chosen = fileInput.files?.[0] || null;
@@ -208,20 +221,23 @@
       }
 
       const categoria = card.querySelector('.js-categoria')?.value.trim() || '';
-      const fechaHora = card.querySelector('.js-fecha')?.value || '';
-      const valor = card.querySelector('.js-valor')?.value || '';
+      const fecha = card.querySelector('.js-fecha')?.value || '';
+      const categorias = selectedCategorias(card);
+      const valorMesa = normalizeDisplayValue(card.querySelector('.js-valor-mesa')?.value);
       const moneda = card.querySelector('.js-moneda')?.value || 'ARS';
 
-      if (!categoria || !fechaHora || !valor) {
-        setStatus('Completá categoría, fecha/hora y valor.', 'error');
+      if (!categoria || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || !valorMesa) {
+        setStatus('Completá modalidad, categorías LIPA, fecha, horas, valores y valor mesa.', 'error');
         return;
       }
 
       const formData = new FormData();
       formData.append('imagen', file);
       formData.append('categoria', categoria);
-      formData.append('fechaHora', fechaHora);
-      formData.append('valor', valor);
+      formData.append('fecha', fecha);
+      formData.append('categorias', JSON.stringify(categorias));
+      formData.append('valor', categorias[0].valor);
+      formData.append('valorMesa', valorMesa);
       formData.append('moneda', moneda);
 
       setStatus('Guardando torneo…', 'info');
@@ -269,6 +285,11 @@
     wirePasswordToggles();
     renderSlots();
     loadTorneos();
+    grid?.addEventListener('focusout', (ev) => {
+      if (!ev.target.matches('.js-division-valor, .js-valor-mesa')) return;
+      const normalized = normalizeDisplayValue(ev.target.value);
+      if (normalized) ev.target.value = normalized;
+    });
     $('#btnChangePassword')?.addEventListener('click', openPassModal);
     $('#btnCancelPass')?.addEventListener('click', () => $('#passModal')?.close());
     $('#passForm')?.addEventListener('submit', submitPassword);
