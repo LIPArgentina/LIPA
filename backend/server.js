@@ -43,6 +43,123 @@ app.use("/pictures", express.static(PICTURES_DIR, {
   }
 })();
 
+// Corrección puntual y reversible en staging: conservar el Oldies original
+// (ID 319, con plantel) y retirar el duplicado vacío (ID 1126).
+(async () => {
+  const client = await pool.connect();
+  const fixKey = "2026-07-31-oldies-staging-canonical-319";
+  const canonicalId = 319;
+  const duplicateId = 1126;
+
+  try {
+    await client.query("BEGIN");
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS codex_team_fix_backups (
+        fix_key TEXT PRIMARY KEY,
+        teams_json JSONB NOT NULL,
+        reference_counts_json JSONB NOT NULL,
+        backed_up_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    const teamsResult = await client.query(
+      `SELECT *
+         FROM equipos
+        WHERE id IN ($1, $2)
+        ORDER BY id
+        FOR UPDATE`,
+      [canonicalId, duplicateId]
+    );
+
+    const canonical = teamsResult.rows.find((row) => Number(row.id) === canonicalId);
+    const duplicate = teamsResult.rows.find((row) => Number(row.id) === duplicateId);
+
+    if (canonical && !duplicate && canonical.activo === true) {
+      await client.query("ROLLBACK");
+      console.log(`Corrección ya aplicada: ${fixKey}`);
+      return;
+    }
+
+    if (!canonical || !duplicate) {
+      throw new Error("No se encontraron exactamente los dos registros esperados de Oldies");
+    }
+
+    for (const team of [canonical, duplicate]) {
+      if (String(team.division || "").toLowerCase() !== "tercera" ||
+          String(team.username || "").trim().toUpperCase() !== "OLDIES") {
+        throw new Error(`El equipo ID ${team.id} no coincide con Oldies de tercera`);
+      }
+    }
+
+    const referencesResult = await client.query(`
+      SELECT tc.table_schema, tc.table_name, kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON kcu.constraint_name = tc.constraint_name
+         AND kcu.constraint_schema = tc.constraint_schema
+        JOIN information_schema.constraint_column_usage ccu
+          ON ccu.constraint_name = tc.constraint_name
+         AND ccu.constraint_schema = tc.constraint_schema
+       WHERE tc.constraint_type = 'FOREIGN KEY'
+         AND ccu.table_name = 'equipos'
+         AND ccu.column_name = 'id'
+         AND tc.table_schema = 'public'
+    `);
+
+    const quoteIdentifier = (value) => `"${String(value).replace(/"/g, '""')}"`;
+    const referenceCounts = {};
+    for (const reference of referencesResult.rows) {
+      const tableName = `${quoteIdentifier(reference.table_schema)}.${quoteIdentifier(reference.table_name)}`;
+      const columnName = quoteIdentifier(reference.column_name);
+      const counts = await client.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE ${columnName} = $1)::int AS canonical_count,
+           COUNT(*) FILTER (WHERE ${columnName} = $2)::int AS duplicate_count
+         FROM ${tableName}`,
+        [canonicalId, duplicateId]
+      );
+      referenceCounts[`${reference.table_schema}.${reference.table_name}.${reference.column_name}`] = counts.rows[0];
+    }
+
+    const duplicateReferences = Object.entries(referenceCounts)
+      .filter(([, counts]) => Number(counts.duplicate_count) > 0);
+    if (duplicateReferences.length) {
+      throw new Error(`El duplicado ID ${duplicateId} tiene referencias: ${JSON.stringify(duplicateReferences)}`);
+    }
+
+    const canonicalPlayers = Object.entries(referenceCounts)
+      .find(([key]) => key.endsWith("jugador_equipos.equipo_id"))?.[1]?.canonical_count || 0;
+    if (Number(canonicalPlayers) < 1) {
+      throw new Error(`El Oldies original ID ${canonicalId} no tiene asociaciones de jugadores`);
+    }
+
+    await client.query(
+      `INSERT INTO codex_team_fix_backups (fix_key, teams_json, reference_counts_json)
+       VALUES ($1, $2::jsonb, $3::jsonb)
+       ON CONFLICT (fix_key) DO NOTHING`,
+      [fixKey, JSON.stringify(teamsResult.rows), JSON.stringify(referenceCounts)]
+    );
+
+    await client.query(
+      `UPDATE equipos
+          SET activo = true,
+              display_name = 'OLDIES',
+              username = 'OLDIES'
+        WHERE id = $1`,
+      [canonicalId]
+    );
+    await client.query(`DELETE FROM equipos WHERE id = $1`, [duplicateId]);
+
+    await client.query("COMMIT");
+    console.log(`Corrección aplicada: ${fixKey}; jugadores asociados: ${canonicalPlayers}`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("No se pudo unificar Oldies en staging:", err);
+  } finally {
+    client.release();
+  }
+})();
+
 app.get("/test-db", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
