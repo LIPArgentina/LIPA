@@ -163,6 +163,7 @@
 
 .encounter-left .row .slot,
 .encounter-right .row .slot{
+  position:relative;
   width:calc(var(--slot-base-w) * var(--slot-scale, 1));
   min-width:0;
   flex:1 1 auto;
@@ -224,15 +225,29 @@
   visibility:hidden;
 }
 
-.encuentros-page .slot.player-photo-trigger{
+.encounter-left .row .slot{ padding-left:34px; }
+.encounter-right .row .slot{ padding-right:34px; }
+
+.player-photo-button{
+  position:absolute;
+  top:50%;
+  width:25px;
+  height:25px;
+  padding:0;
+  transform:translateY(-50%);
+  border:0;
+  border-radius:7px;
+  background:transparent;
   cursor:pointer;
+  font-size:14px;
+  line-height:1;
 }
 
-.encuentros-page .slot.player-photo-trigger:hover{
-  box-shadow:0 0 0 2px #d6a446 inset;
-}
+.encounter-left .player-photo-button{ left:5px; }
+.encounter-right .player-photo-button{ right:5px; }
 
-.encuentros-page .slot.player-photo-trigger:focus-visible{
+.player-photo-button:hover{ background:#d6a44633; }
+.player-photo-button:focus-visible{
   outline:2px solid #ffe65a;
   outline-offset:2px;
 }
@@ -340,6 +355,57 @@ body.player-photo-open{ overflow:hidden; }
   color:#c9d0db;
   font-size:13px;
   font-weight:700;
+}
+
+.player-profile-btn{
+  width:100%;
+  min-height:38px;
+  margin-top:12px;
+  padding:7px 12px;
+  border:1px solid #9b7417;
+  border-radius:10px;
+  background:#ffd43b;
+  color:#111;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.player-profile-modal[hidden]{ display:none !important; }
+.player-profile-modal{
+  position:fixed;
+  inset:0;
+  z-index:1100;
+  display:grid;
+  place-items:center;
+  padding:14px;
+}
+.player-profile-backdrop{ position:absolute; inset:0; background:#000e; }
+.player-profile-dialog{
+  position:relative;
+  z-index:1;
+  width:min(920px, calc(100vw - 28px));
+  height:min(820px, calc(100vh - 28px));
+  overflow:hidden;
+  border:1px solid #9b7417;
+  border-radius:16px;
+  background:#08090b;
+  box-shadow:0 24px 70px #000b;
+}
+.player-profile-dialog iframe{ width:100%; height:100%; border:0; background:#08090b; }
+.player-profile-close{
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:2;
+  width:34px;
+  height:34px;
+  border:1px solid #ffd43b;
+  border-radius:50%;
+  background:#08090b;
+  color:#ffd43b;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
 }
 
 .photos-modal[hidden]{ display:none !important; }
