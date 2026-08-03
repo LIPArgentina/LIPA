@@ -24,6 +24,11 @@
   const matchSelect = document.getElementById('matchSelect');
   const fixtureDate = document.getElementById('fixtureDate');
   const releaseStatus = document.getElementById('releaseStatus');
+  const TEAM_ALIASES = {
+    OLDIES: ['OLDIES', 'OLDIES 3RA', 'OLDIES3RA'],
+    THEWEST: ['THE WEST', 'WEST'],
+    ALBA: ['ALBA', 'ALBA POOL']
+  };
 
   function apiUrl(path) {
     return API_BASE + path;
@@ -56,7 +61,12 @@
   function aliases(value) {
     const exact = normalize(value);
     const base = exact.replace(/(TERCERA|SEGUNDA|PRIMERA|3RA|3ERA|2DA|2NDA|1RA)$/g, '');
-    return [...new Set([exact, base].filter(Boolean))];
+    const result = new Set([exact, base].filter(Boolean));
+    for (const [canonical, names] of Object.entries(TEAM_ALIASES)) {
+      const keys = [canonical, ...names].map(normalize).filter(Boolean);
+      if (keys.includes(exact) || keys.includes(base)) keys.forEach(key => result.add(key));
+    }
+    return [...result];
   }
 
   function localDateKey() {
