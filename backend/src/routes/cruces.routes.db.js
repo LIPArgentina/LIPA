@@ -3140,12 +3140,15 @@ function ensureRankingRow(map, playerName, teamSlug, teamName) {
   return ensureRankingRowForPlayer(map, { name: playerName, id: null }, teamSlug, teamName);
 }
 
-function ensureRankingRowForPlayer(map, player, teamSlug, teamName) {
+function ensureRankingRowForPlayer(map, player, teamSlug, teamName, options = {}) {
   const playerId = Number(player?.id || 0) || null;
   const playerName = String(player?.name || '').trim();
-  const key = playerId
-    ? `id:${playerId}`
-    : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`;
+  const mergeHistoricalIdentities = !!options.mergeHistoricalIdentities;
+  const key = mergeHistoricalIdentities && playerName
+    ? `historic:${canonicalTeamPlayerNameKey(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`
+    : (playerId
+        ? `id:${playerId}`
+        : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`);
   if (!map.has(key)) {
     map.set(key, {
       id: playerId,
@@ -3161,6 +3164,8 @@ function ensureRankingRowForPlayer(map, player, teamSlug, teamName) {
       diff: 0,
       effectiveness: 0
     });
+  } else if (playerId && !map.get(key).id) {
+    map.get(key).id = playerId;
   }
   return map.get(key);
 }
@@ -3236,7 +3241,7 @@ function sortPlayerRadRows(a, b) {
   return String(a.name || '').localeCompare(String(b.name || ''), 'es');
 }
 
-function buildPlayerRowsFromResults(results = []) {
+function buildPlayerRowsFromResults(results = [], options = {}) {
   const rankingMap = new Map();
 
   for (const item of results) {
@@ -3253,7 +3258,7 @@ function buildPlayerRowsFromResults(results = []) {
       const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
 
       if (localPlayer.name) {
-        const row = ensureRankingRowForPlayer(rankingMap, localPlayer, item.localSlug, item.localName);
+        const row = ensureRankingRowForPlayer(rankingMap, localPlayer, item.localSlug, item.localName, options);
         row.played += 1;
         row.triangulosFavor += localScore;
         row.triangulosContra += visitanteScore;
@@ -3263,7 +3268,7 @@ function buildPlayerRowsFromResults(results = []) {
       }
 
       if (visitantePlayer.name) {
-        const row = ensureRankingRowForPlayer(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
+        const row = ensureRankingRowForPlayer(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName, options);
         row.played += 1;
         row.triangulosFavor += visitanteScore;
         row.triangulosContra += localScore;
@@ -3301,8 +3306,8 @@ function buildRadRankingFromPlayerRows(baseRows = []) {
   };
 }
 
-function buildRadRankingFromResults(results = []) {
-  return buildRadRankingFromPlayerRows(buildPlayerRowsFromResults(results));
+function buildRadRankingFromResults(results = [], options = {}) {
+  return buildRadRankingFromPlayerRows(buildPlayerRowsFromResults(results, options));
 }
 
 async function getPromotedPlayerKeys(category = '') {
@@ -3519,7 +3524,9 @@ async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITI
         normalizedEdition,
         division
       );
-      const rankingData = buildRadRankingFromResults(results);
+      const rankingData = buildRadRankingFromResults(results, {
+        mergeHistoricalIdentities: normalizedEdition === 'total'
+      });
       if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {
         return rankingData;
       }
