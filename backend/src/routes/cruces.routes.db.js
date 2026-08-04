@@ -474,10 +474,29 @@ function normalizeSlug(value = '') {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeTeamIdentity(value = '') {
+  const compact = normalizeSlug(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .replace(/(primera|segunda|tercera|1ra|2da|3ra|3era)$/g, '');
+
+  const aliases = {
+    west: 'thewest',
+    thewest: 'thewest',
+    albapool: 'alba',
+    alba: 'alba',
+    oldies3ra: 'oldies',
+    oldies: 'oldies'
+  };
+
+  return aliases[compact] || compact;
+}
+
 function slugMatchesTeam(teamSlug, matchSlug) {
   const a = normalizeSlug(teamSlug);
   const b = normalizeSlug(matchSlug);
-  return a === b || a.startsWith(`${b}_`);
+  return a === b || a.startsWith(`${b}_`) || normalizeTeamIdentity(a) === normalizeTeamIdentity(b);
 }
 
 
