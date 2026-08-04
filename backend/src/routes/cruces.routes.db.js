@@ -18,6 +18,13 @@ let ensureJugadorResultadosEditionPromise = null;
 let ensureJugadorCurrentCategoryPromise = null;
 const RAD_RANKING_CACHE_TTL_MS = 15_000;
 const radRankingCache = new Map();
+const VALIDATED_CRUCES_CACHE_TTL_MS = 15_000;
+const validatedCrucesCache = new Map();
+
+function invalidateValidatedStatsCache() {
+  validatedCrucesCache.clear();
+  radRankingCache.clear();
+}
 
 function requireAdminForPrivateCategory(req, res, next) {
   const category = String(req.query.category || '').trim().toLowerCase();
@@ -633,6 +640,9 @@ function inferCategoryFromTeamMarker(team = '') {
 }
 
 function normalizeDateOnly(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
   return String(value || '').slice(0, 10);
 }
 
@@ -1124,6 +1134,8 @@ router.post('/validate', async (req, res) => {
       snapshot: validatedSnapshot
     });
 
+    invalidateValidatedStatsCache();
+
     return res.json({
       ok: true,
       tipo: 'validado',
@@ -1412,6 +1424,7 @@ router.post('/tiebreak-validate', async (req, res) => {
     );
     const latest = (new Date(mine.updated_at).getTime() >= new Date(rival.updated_at).getTime()) ? mine.status_json : rival.status_json;
     const llavesSync = await syncTiebreakIntoLlaves({ fechaISO, localSlug, visitanteSlug, snapshot: latest });
+    invalidateValidatedStatsCache();
     return res.json({ ok: true, tipo: 'validado', mensaje: 'Desempate validado', locked: true, validated: true, lockedUntil: lockUntil, llavesSync });
   } catch (err) {
     console.error('POST /tiebreak-validate', err);
@@ -2577,14 +2590,23 @@ function getPairScore(scoreRows = [], planilla = {}, pairIndex = 0) {
   return Number(fromPlanilla ?? 0) || 0;
 }
 
-async function buildAllValidatedCrucesForPlayerQuery(category = '') {
-  const { rows } = await pool.query(
-    `
-    SELECT fecha_key, team, status_json, validated, updated_at
-    FROM cruces_validations
-    ORDER BY updated_at DESC
-    `
-  );
+async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
+  const [{ rows }, { rows: teamRows }] = await Promise.all([
+    pool.query(
+      `
+      SELECT fecha_key, team, status_json, validated, updated_at
+      FROM cruces_validations
+      ORDER BY updated_at DESC
+      `
+    ),
+    pool.query(
+      `
+      SELECT id, slug_uid, slug_base, display_name, division, created_at
+      FROM equipos
+      ORDER BY id ASC
+      `
+    )
+  ]);
 
   const grouped = new Map();
   for (const row of rows) {
@@ -2594,10 +2616,27 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
   }
 
   const teamCache = new Map();
-  const resolveCached = async (slug, dateHint = '') => {
+  const resolveCached = (slug, dateHint = '') => {
     const key = `${String(category || '').toLowerCase()}::${normalizeDateOnly(dateHint)}::${normalizeSlug(slug)}`;
     if (teamCache.has(key)) return teamCache.get(key);
-    const info = await resolveEquipoInfoBySlug(slug, category, dateHint);
+    const slugNorm = normalizeSlug(slug);
+    const dateKey = normalizeDateOnly(dateHint);
+    const categoryNorm = String(category || '').trim().toLowerCase();
+    const matches = teamRows.filter((row) => {
+      if (dateKey && row.created_at && normalizeDateOnly(row.created_at) > dateKey) return false;
+      return [row.slug_uid, row.slug_base, row.display_name]
+        .some((value) => normalizeTeamIdentity(value) === normalizeTeamIdentity(slugNorm));
+    });
+    matches.sort((a, b) => {
+      const aUidExact = normalizeSlug(a.slug_uid) === slugNorm ? 0 : 1;
+      const bUidExact = normalizeSlug(b.slug_uid) === slugNorm ? 0 : 1;
+      const aBaseExact = normalizeSlug(a.slug_base) === slugNorm ? 0 : 1;
+      const bBaseExact = normalizeSlug(b.slug_base) === slugNorm ? 0 : 1;
+      const aCategory = categoryNorm && normalizeSlug(a.division) === categoryNorm ? 0 : 1;
+      const bCategory = categoryNorm && normalizeSlug(b.division) === categoryNorm ? 0 : 1;
+      return (aCategory - bCategory) || (aUidExact - bUidExact) || (aBaseExact - bBaseExact) || (Number(a.id) - Number(b.id));
+    });
+    const info = matches[0] || null;
     teamCache.set(key, info);
     return info;
   };
@@ -2621,10 +2660,8 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
     const diff = compareFullStatus(localEntry.status_json || {}, visitanteEntry.status_json || {});
     if (diff.length) continue;
 
-    const [localInfo, visitanteInfo] = await Promise.all([
-      resolveCached(localSlug, matchDate),
-      resolveCached(visitanteSlug, matchDate)
-    ]);
+    const localInfo = resolveCached(localSlug, matchDate);
+    const visitanteInfo = resolveCached(visitanteSlug, matchDate);
 
     if (category) {
       const localDivision = String(localInfo?.division || '').trim().toLowerCase();
@@ -2668,6 +2705,28 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
   }
 
   return results;
+}
+
+async function buildAllValidatedCrucesForPlayerQuery(category = '') {
+  const key = String(category || '').trim().toLowerCase() || '__all__';
+  const now = Date.now();
+  const cached = validatedCrucesCache.get(key);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const value = buildAllValidatedCrucesForPlayerQueryUncached(category);
+  validatedCrucesCache.set(key, {
+    expiresAt: now + VALIDATED_CRUCES_CACHE_TTL_MS,
+    value
+  });
+
+  try {
+    return await value;
+  } catch (err) {
+    if (validatedCrucesCache.get(key)?.value === value) {
+      validatedCrucesCache.delete(key);
+    }
+    throw err;
+  }
 }
 
 async function findRegisteredPlayerSuggestionsByCategory(category = '', q = '') {
@@ -2940,8 +2999,10 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const registeredSuggestions = await findRegisteredPlayerSuggestionsByCategory(category, q);
-    const resultadoSuggestions = await findJugadorResultadoSuggestionsByCategory(category, q, edition);
+    const [registeredSuggestions, resultadoSuggestions] = await Promise.all([
+      findRegisteredPlayerSuggestionsByCategory(category, q),
+      findJugadorResultadoSuggestionsByCategory(category, q, edition)
+    ]);
     const suggestions = mergePlayerSuggestions(registeredSuggestions, resultadoSuggestions);
     if (suggestOnly) {
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
@@ -2980,11 +3041,6 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
     const totalRankingPosition = totalRankingFallbackIndex >= 0
       ? totalRankingFallbackIndex + 1
       : null;
-    const storedDetail = await getJugadorResultadoMatches(category, {
-      id: exact.id || playerRadRow?.id || null,
-      name: exact.name || playerRadRow?.name || '',
-      names: [exact.name, playerRadRow?.name].filter(Boolean)
-    }, edition);
     const validatedResults = await filterItemsByEdition(
       await buildAllValidatedCrucesForPlayerQuery(category),
       edition,
@@ -2994,9 +3050,14 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       id: exact.id || playerRadRow?.id || null,
       name: exact.name || playerRadRow?.name || ''
     });
-    const { matches, pairMatches } = (liveDetail.matches.length || liveDetail.pairMatches.length)
-      ? liveDetail
-      : storedDetail;
+    const storedDetail = (liveDetail.matches.length || liveDetail.pairMatches.length)
+      ? null
+      : await getJugadorResultadoMatches(category, {
+          id: exact.id || playerRadRow?.id || null,
+          name: exact.name || playerRadRow?.name || '',
+          names: [exact.name, playerRadRow?.name].filter(Boolean)
+        }, edition);
+    const { matches, pairMatches } = storedDetail || liveDetail;
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
