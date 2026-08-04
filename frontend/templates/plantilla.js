@@ -551,9 +551,12 @@ function showAlert(msg) {
 
 function showSendError(msg) {
   const dialog = document.getElementById('sendErrorDialog');
+  const title = document.getElementById('sendErrorTitle');
   const message = document.getElementById('sendErrorMessage');
   const accept = document.getElementById('sendErrorAccept');
   const text = msg || 'Hubo un error al enviar la planilla. Intentá nuevamente.';
+
+  if (title) title.textContent = 'Error al enviar';
 
   if (!dialog || !message || !accept || typeof dialog.showModal !== 'function') {
     if (typeof showAlert === 'function') showAlert(text);
@@ -566,6 +569,35 @@ function showSendError(msg) {
   };
 
   if (!dialog.open) dialog.showModal();
+}
+
+function confirmEmptyPlanillaSend(){
+  const warning = 'Usted está enviando una planilla vacía, si no la regulariza al momento de publicarse los cruces se le generará una de forma aleatoria y no podrá cambiarla';
+  const dialog = document.getElementById('sendErrorDialog');
+  const title = document.getElementById('sendErrorTitle');
+  const message = document.getElementById('sendErrorMessage');
+  const accept = document.getElementById('sendErrorAccept');
+
+  if (!dialog || !message || !accept || typeof dialog.showModal !== 'function') {
+    window.alert(warning);
+    return Promise.resolve(true);
+  }
+
+  if (title) title.textContent = 'Planilla vacía';
+  message.textContent = warning;
+
+  return new Promise((resolve) => {
+    const onCancel = function(){
+      resolve(false);
+    };
+    accept.onclick = function(){
+      dialog.removeEventListener('cancel', onCancel);
+      dialog.close();
+      resolve(true);
+    };
+    dialog.addEventListener('cancel', onCancel, { once:true });
+    if (!dialog.open) dialog.showModal();
+  });
 }
 
 function showToastOK(msg){
@@ -1134,7 +1166,6 @@ function collectPlanillaPayload(){
 
   function planillaHasAnyPlayer(payloadObj){
     const groups = [
-      payloadObj && payloadObj.capitan,
       payloadObj && payloadObj.individuales,
       payloadObj && payloadObj.pareja1,
       payloadObj && payloadObj.pareja2,
@@ -1152,11 +1183,13 @@ function collectPlanillaPayload(){
     if (typeof updateRepeatedHighlight === 'function') updateRepeatedHighlight();
   }
 
-  window.showPlanillaReceipt = function(receivedAtLocal){
+  window.showPlanillaReceipt = function(receivedAtLocal, generatedAutomatically){
     const receipt = document.getElementById('planillaReceipt');
     const match = String(receivedAtLocal || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
     if (!receipt || !match) return false;
-    receipt.textContent = `Su planilla llegó al servidor a las ${match[4]}:${match[5]}hs del ${match[3]}/${match[2]}.`;
+    receipt.textContent = generatedAutomatically
+      ? `Planilla generada de forma automática por el servidor a las ${match[4]}:${match[5]}hs del ${match[3]}/${match[2]}.`
+      : `Su planilla llegó al servidor a las ${match[4]}:${match[5]}hs del ${match[3]}/${match[2]}.`;
     receipt.classList.add('is-visible');
     return true;
   };
@@ -1170,8 +1203,8 @@ async function savePlanilla(){
     const payloadObj = collectPlanillaPayload();
 
     if (!planillaHasAnyPlayer(payloadObj)) {
-      if (typeof showSendError === 'function') showSendError('No se puede enviar una planilla totalmente vacía.');
-      return { ok:false, empty:true };
+      const accepted = await confirmEmptyPlanillaSend();
+      if (!accepted) return { ok:false, empty:true, cancelled:true };
     }
 
     try {
@@ -1822,7 +1855,7 @@ document.addEventListener('DOMContentLoaded', function(){
         if (p) {
           applyPlanilla(p);
           if (j.verified === true && typeof window.showPlanillaReceipt === 'function') {
-            window.showPlanillaReceipt(j.receivedAtLocal);
+            window.showPlanillaReceipt(j.receivedAtLocal, p.generatedAutomatically === true);
           }
           return;
         }
