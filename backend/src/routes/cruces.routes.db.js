@@ -1327,30 +1327,31 @@ async function resolveEquipoInfoBySlug(slug, categoryHint = '', dateHint = '') {
   if (!slugNorm) return null;
   const dateKey = normalizeDateOnly(dateHint);
   const hasDateHint = /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
+  const categoryNorm = String(categoryHint || '').trim().toLowerCase();
 
   const { rows } = await pool.query(
     `
-    SELECT slug_uid, slug_base, display_name, division
+    SELECT id, slug_uid, slug_base, display_name, division
     FROM equipos
-    WHERE LOWER(slug_uid) = $1
-       OR (
-         LOWER(slug_base) = $1
-         AND ($3::date IS NULL OR created_at::date <= $3::date)
-       )
-    ORDER BY
-      CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END,
-      CASE WHEN LOWER(division) = $2 THEN 0 ELSE 1 END,
-      id ASC
-    LIMIT 1
+    WHERE ($1::date IS NULL OR created_at::date <= $1::date)
     `,
-    [
-      slugNorm,
-      String(categoryHint || '').trim().toLowerCase(),
-      hasDateHint ? dateKey : null
-    ]
+    [hasDateHint ? dateKey : null]
   );
 
-  return rows[0] || null;
+  const matches = rows.filter((row) => [row.slug_uid, row.slug_base, row.display_name]
+    .some((value) => normalizeTeamIdentity(value) === normalizeTeamIdentity(slugNorm)));
+
+  matches.sort((a, b) => {
+    const aUidExact = normalizeSlug(a.slug_uid) === slugNorm ? 0 : 1;
+    const bUidExact = normalizeSlug(b.slug_uid) === slugNorm ? 0 : 1;
+    const aBaseExact = normalizeSlug(a.slug_base) === slugNorm ? 0 : 1;
+    const bBaseExact = normalizeSlug(b.slug_base) === slugNorm ? 0 : 1;
+    const aCategory = categoryNorm && normalizeSlug(a.division) === categoryNorm ? 0 : 1;
+    const bCategory = categoryNorm && normalizeSlug(b.division) === categoryNorm ? 0 : 1;
+    return (aCategory - bCategory) || (aUidExact - bUidExact) || (aBaseExact - bBaseExact) || (Number(a.id) - Number(b.id));
+  });
+
+  return matches[0] || null;
 }
 
 async function resolveEquipoInfosBySlug(slug) {
@@ -1359,17 +1360,14 @@ async function resolveEquipoInfosBySlug(slug) {
 
   const { rows } = await pool.query(
     `
-    SELECT slug_uid, slug_base, display_name, division
+    SELECT id, slug_uid, slug_base, display_name, division
     FROM equipos
-    WHERE LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1
-    ORDER BY
-      CASE WHEN LOWER(slug_uid) = $1 THEN 0 ELSE 1 END,
-      id ASC
-    `,
-    [slugNorm]
+    ORDER BY id ASC
+    `
   );
 
-  return rows;
+  return rows.filter((row) => [row.slug_uid, row.slug_base, row.display_name]
+    .some((value) => normalizeTeamIdentity(value) === normalizeTeamIdentity(slugNorm)));
 }
 
 
