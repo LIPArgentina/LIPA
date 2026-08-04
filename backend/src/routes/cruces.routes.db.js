@@ -2591,7 +2591,7 @@ function getPairScore(scoreRows = [], planilla = {}, pairIndex = 0) {
 }
 
 async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
-  const [{ rows }, { rows: teamRows }] = await Promise.all([
+  const [{ rows }, { rows: teamRows }, { rows: fixtureRows }] = await Promise.all([
     pool.query(
       `
       SELECT fecha_key, team, status_json, validated, updated_at
@@ -2605,8 +2605,30 @@ async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
       FROM equipos
       ORDER BY id ASC
       `
-    )
+    ),
+    category
+      ? pool.query(`SELECT data FROM fixtures WHERE category = $1`, [String(category).trim().toLowerCase()])
+      : Promise.resolve({ rows: [] })
   ]);
+
+  const fixtureMatchKeys = new Set();
+  for (const fixtureRow of fixtureRows) {
+    const fechas = Array.isArray(fixtureRow?.data?.fechas) ? fixtureRow.data.fechas : [];
+    for (const fecha of fechas) {
+      const dateKey = normalizeDateOnly(fecha?.date);
+      const tablas = Array.isArray(fecha?.tablas) ? fecha.tablas : [];
+      for (const tabla of tablas) {
+        const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+        for (let index = 0; index + 1 < equipos.length; index += 2) {
+          const pair = [
+            normalizeTeamIdentity(equipos[index]?.equipo),
+            normalizeTeamIdentity(equipos[index + 1]?.equipo)
+          ].filter(Boolean).sort();
+          if (dateKey && pair.length === 2) fixtureMatchKeys.add(`${dateKey}::${pair.join('::')}`);
+        }
+      }
+    }
+  }
 
   const grouped = new Map();
   for (const row of rows) {
@@ -2650,6 +2672,10 @@ async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
     const visitanteSlug = normalizeSlug(parts[2] || '');
 
     if (!localSlug || !visitanteSlug) continue;
+    if (category && fixtureMatchKeys.size) {
+      const pair = [normalizeTeamIdentity(localSlug), normalizeTeamIdentity(visitanteSlug)].sort();
+      if (!fixtureMatchKeys.has(`${matchDate}::${pair.join('::')}`)) continue;
+    }
 
     const localEntry = entries.find((row) => normalizeSlug(row.team) === localSlug) || null;
     const visitanteEntry = entries.find((row) => normalizeSlug(row.team) === visitanteSlug) || null;
