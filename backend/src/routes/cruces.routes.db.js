@@ -2591,7 +2591,7 @@ function getPairScore(scoreRows = [], planilla = {}, pairIndex = 0) {
 }
 
 async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
-  const [{ rows }, { rows: teamRows }, { rows: fixtureRows }] = await Promise.all([
+  const [{ rows }, { rows: teamRows }, { rows: fixtureRows }, { rows: historicMatchRows }] = await Promise.all([
     pool.query(
       `
       SELECT fecha_key, team, status_json, validated, updated_at
@@ -2608,10 +2608,16 @@ async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
     ),
     category
       ? pool.query(`SELECT data FROM fixtures WHERE category = $1`, [String(category).trim().toLowerCase()])
+      : Promise.resolve({ rows: [] }),
+    category
+      ? pool.query(
+          `SELECT DISTINCT fecha_key FROM jugador_resultados WHERE categoria = $1`,
+          [String(category).trim().toLowerCase()]
+        )
       : Promise.resolve({ rows: [] })
   ]);
 
-  const fixtureMatchKeys = new Set();
+  const categoryMatchKeys = new Set();
   for (const fixtureRow of fixtureRows) {
     const fechas = Array.isArray(fixtureRow?.data?.fechas) ? fixtureRow.data.fechas : [];
     for (const fecha of fechas) {
@@ -2624,10 +2630,18 @@ async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
             normalizeTeamIdentity(equipos[index]?.equipo),
             normalizeTeamIdentity(equipos[index + 1]?.equipo)
           ].filter(Boolean).sort();
-          if (dateKey && pair.length === 2) fixtureMatchKeys.add(`${dateKey}::${pair.join('::')}`);
+          if (dateKey && pair.length === 2) categoryMatchKeys.add(`${dateKey}::${pair.join('::')}`);
         }
       }
     }
+  }
+  for (const historicRow of historicMatchRows) {
+    const parts = String(historicRow?.fecha_key || '').split('::');
+    const dateKey = normalizeDateOnly(parts[0]);
+    const pair = [normalizeTeamIdentity(parts[1]), normalizeTeamIdentity(parts[2])]
+      .filter(Boolean)
+      .sort();
+    if (dateKey && pair.length === 2) categoryMatchKeys.add(`${dateKey}::${pair.join('::')}`);
   }
 
   const grouped = new Map();
@@ -2672,9 +2686,9 @@ async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
     const visitanteSlug = normalizeSlug(parts[2] || '');
 
     if (!localSlug || !visitanteSlug) continue;
-    if (category && fixtureMatchKeys.size) {
+    if (category && categoryMatchKeys.size) {
       const pair = [normalizeTeamIdentity(localSlug), normalizeTeamIdentity(visitanteSlug)].sort();
-      if (!fixtureMatchKeys.has(`${matchDate}::${pair.join('::')}`)) continue;
+      if (!categoryMatchKeys.has(`${matchDate}::${pair.join('::')}`)) continue;
     }
 
     const localEntry = entries.find((row) => normalizeSlug(row.team) === localSlug) || null;
