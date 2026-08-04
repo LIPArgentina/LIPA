@@ -2980,21 +2980,23 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
     const totalRankingPosition = totalRankingFallbackIndex >= 0
       ? totalRankingFallbackIndex + 1
       : null;
-    let { matches, pairMatches } = await getJugadorResultadoMatches(category, {
+    const storedDetail = await getJugadorResultadoMatches(category, {
       id: exact.id || playerRadRow?.id || null,
       name: exact.name || playerRadRow?.name || '',
       names: [exact.name, playerRadRow?.name].filter(Boolean)
     }, edition);
-
-    if (!matches.length && !pairMatches.length) {
-      const validatedResults = await filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition, category);
-      const fallbackDetail = buildPlayerMatchesFromValidatedResults(validatedResults, {
-        id: exact.id || playerRadRow?.id || null,
-        name: exact.name || playerRadRow?.name || ''
-      });
-      matches = fallbackDetail.matches;
-      pairMatches = fallbackDetail.pairMatches;
-    }
+    const validatedResults = await filterItemsByEdition(
+      await buildAllValidatedCrucesForPlayerQuery(category),
+      edition,
+      category
+    );
+    const liveDetail = buildPlayerMatchesFromValidatedResults(validatedResults, {
+      id: exact.id || playerRadRow?.id || null,
+      name: exact.name || playerRadRow?.name || ''
+    });
+    const { matches, pairMatches } = (liveDetail.matches.length || liveDetail.pairMatches.length)
+      ? liveDetail
+      : storedDetail;
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
@@ -3425,20 +3427,20 @@ async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITI
 
   const value = (async () => {
     try {
-      const rankingData = await buildRadRankingFromJugadorResultados(division, normalizedEdition);
+      const results = await filterItemsByEdition(
+        await buildAllValidatedCrucesForPlayerQuery(division),
+        normalizedEdition,
+        division
+      );
+      const rankingData = buildRadRankingFromResults(results);
       if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {
         return rankingData;
       }
     } catch (err) {
-      console.warn('Falling back to cruces_validations for player ranking', err?.code || err?.message || err);
+      console.warn('Falling back to jugador_resultados for player ranking', err?.code || err?.message || err);
     }
 
-    const results = await filterItemsByEdition(
-      await buildAllValidatedCrucesForPlayerQuery(division),
-      normalizedEdition,
-      division
-    );
-    return buildRadRankingFromResults(results);
+    return buildRadRankingFromJugadorResultados(division, normalizedEdition);
   })();
 
   radRankingCache.set(cacheKey, {
@@ -3499,14 +3501,15 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', 
     .sort((a, b) => a.label.localeCompare(b.label, 'es'))
     .slice(0, 12);
 
-  if (storedSuggestions.length) return storedSuggestions;
-
   const validatedResults = await filterItemsByEdition(
     await buildAllValidatedCrucesForPlayerQuery(division),
     normalizedEdition,
     division
   );
-  return buildValidatedPlayerSuggestions(validatedResults, q);
+  return mergePlayerSuggestions(
+    storedSuggestions,
+    buildValidatedPlayerSuggestions(validatedResults, q)
+  );
 }
 
 async function getJugadorResultadoMatches(category = '', player = {}, edition = CURRENT_EDITION) {
@@ -3954,6 +3957,18 @@ async function getPairPlayerStatsForTeam(category = '', edition = CURRENT_EDITIO
   });
   if (!division) return [];
 
+  try {
+    const results = await filterItemsByEdition(
+      await buildAllValidatedCrucesForPlayerQuery(division),
+      normalizedEdition,
+      division
+    );
+    const liveRows = buildPairPlayerStatsFromValidatedResults(results, teamInfo);
+    if (liveRows.length) return liveRows;
+  } catch (err) {
+    console.warn('Falling back to jugador_resultados for pair player stats', err?.code || err?.message || err);
+  }
+
   let rows = [];
   try {
     await ensureJugadorResultadosEditionColumn();
@@ -3982,13 +3997,8 @@ async function getPairPlayerStatsForTeam(category = '', edition = CURRENT_EDITIO
     );
     rows = result.rows;
   } catch (err) {
-    console.warn('Falling back to cruces_validations for pair player stats', err?.code || err?.message || err);
-    const results = await filterItemsByEdition(
-      await buildAllValidatedCrucesForPlayerQuery(division),
-      normalizedEdition,
-      division
-    );
-    return buildPairPlayerStatsFromValidatedResults(results, teamInfo);
+    console.warn('Unable to read jugador_resultados for pair player stats', err?.code || err?.message || err);
+    return [];
   }
 
   return rows
