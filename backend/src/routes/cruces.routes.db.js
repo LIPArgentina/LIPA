@@ -365,6 +365,101 @@ async function fetchAutomationFixtureInfo(team) {
   };
 }
 
+function planillaHasAssignedPlayers(planilla = {}) {
+  const individuales = Array.isArray(planilla?.individuales) ? planilla.individuales : [];
+  const suplentes = Array.isArray(planilla?.suplentes) ? planilla.suplentes : [];
+  return [...individuales, ...suplentes].some((name) => String(name || '').trim());
+}
+
+async function generateEmptyPlanillasForCategory(category) {
+  const division = String(category || '').trim().toLowerCase();
+  if (!['segunda', 'tercera'].includes(division)) return [];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: emptyPlanillas } = await client.query(
+      `
+        SELECT p.id, p.equipo_id, p.datos, e.slug_uid, e.slug_base
+        FROM planillas p
+        JOIN equipos e ON e.id = p.equipo_id
+        WHERE LOWER(e.division) = $1
+          AND COALESCE(e.activo, true) = true
+          AND p.estado = 'guardada'
+          AND p.id = (
+            SELECT latest.id
+            FROM planillas latest
+            WHERE latest.equipo_id = p.equipo_id
+              AND latest.estado = 'guardada'
+            ORDER BY latest.updated_at DESC, latest.id DESC
+            LIMIT 1
+          )
+        ORDER BY p.id ASC
+        FOR UPDATE OF p
+      `,
+      [division]
+    );
+
+    const generated = [];
+    for (const row of emptyPlanillas) {
+      if (planillaHasAssignedPlayers(row.datos || {}) || row.datos?.generatedAutomatically === true) continue;
+
+      const { rows: players } = await client.query(
+        `
+          SELECT j.id, TRIM(j.nombre) AS nombre
+          FROM jugador_equipos je
+          JOIN jugadores j ON j.id = je.jugador_id
+          WHERE je.equipo_id = $1
+            AND je.activo = true
+            AND LOWER(je.categoria) = $2
+            AND TRIM(COALESCE(j.nombre, '')) <> ''
+          ORDER BY je.orden ASC NULLS LAST, j.orden ASC NULLS LAST, je.id ASC, j.id ASC
+          LIMIT 13
+        `,
+        [row.equipo_id, division]
+      );
+
+      const titulares = players.slice(0, 11);
+      const suplentes = players.slice(11, 13);
+      const generatedAt = new Date().toISOString();
+      const current = row.datos && typeof row.datos === 'object' ? row.datos : {};
+      const planilla = {
+        ...current,
+        team: current.team || row.slug_uid || row.slug_base || '',
+        category: division,
+        categoria: division,
+        individuales: titulares.map((player) => player.nombre),
+        pareja1: [],
+        pareja2: [],
+        suplentes: suplentes.map((player) => player.nombre),
+        generatedAutomatically: true,
+        generatedAt,
+        jugadorIds: {
+          ...(current.jugadorIds || {}),
+          individuales: titulares.map((player) => Number(player.id)),
+          pareja1: [],
+          pareja2: [],
+          suplentes: suplentes.map((player) => Number(player.id))
+        }
+      };
+
+      await client.query(
+        `UPDATE planillas SET datos = $2::jsonb, updated_at = NOW() WHERE id = $1`,
+        [row.id, JSON.stringify(planilla)]
+      );
+      generated.push({ planillaId: row.id, equipoId: row.equipo_id, players: players.length });
+    }
+
+    await client.query('COMMIT');
+    return generated;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 async function buildCrucesAdminStatus(team) {
   const config = await getOrCreateCrucesAdminConfig(team);
   const automation = await fetchAutomationFixtureInfo(team);
@@ -372,6 +467,9 @@ async function buildCrucesAdminStatus(team) {
   const automationEnabled = !!config.automation_enabled;
   const scheduledEnabled = automationEnabled && !!automation.scheduledEnabled;
   const enabled = manualEnabled || scheduledEnabled;
+  if (enabled && automation.category) {
+    await generateEmptyPlanillasForCategory(automation.category);
+  }
   const remainingMs = enabled
     ? Math.max(Number(automation.remainingMs || 0), 0)
     : 0;
