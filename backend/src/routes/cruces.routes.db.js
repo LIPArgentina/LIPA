@@ -424,6 +424,63 @@ async function repairDuckHunterPlanillaFromAutomaticOverwrite() {
   return rows.length > 0;
 }
 
+async function repairDuckHunterTemporaryMatchStatus() {
+  const capitan = ['Guillermo Ortega', 'Julian Alcaraz'];
+  const individuales = [
+    'Guillermo Ortega',
+    'Eduardo Gomez',
+    'Emiliano Rincon',
+    'Lucas Gomez',
+    'Federico Alcaraz',
+    'Gustavo Iraiman',
+    'Maximiliano Beñacar',
+    'Raggio Norberto Daniel',
+    'Diego Moron',
+    'Julian Alcaraz',
+    'Dylan Gomez'
+  ];
+  const suplentes = ['Gustavo Alcaraz', 'Esteban Rincon'];
+  const jugadorIds = {
+    capitan: [1384, 1388],
+    individuales: [1384, 1392, 1389, 1400, 1386, 1394, 1391, 2758, 1395, 1388, 1393],
+    suplentes: [1387, 1390],
+    pareja1: [],
+    pareja2: []
+  };
+
+  const { rows } = await pool.query(
+    `
+      UPDATE cruces_match_status
+      SET status_json = jsonb_set(
+            jsonb_set(
+              jsonb_set(
+                jsonb_set(
+                  status_json,
+                  '{localPlanilla,capitan}', $1::jsonb, true
+                ),
+                '{localPlanilla,individuales}', $2::jsonb, true
+              ),
+              '{localPlanilla,suplentes}', $3::jsonb, true
+            ),
+            '{localPlanilla,jugadorIds}', $4::jsonb, true
+          ),
+          updated_at = NOW()
+      WHERE fecha_iso = DATE '2026-08-04'
+        AND status_json->'localPlanilla'->'individuales' @>
+            '["Guillermo Ortega", "Federico Alcaraz", "Gustavo Alcaraz"]'::jsonb
+        AND status_json->'visitantePlanilla'->'individuales' @> '["Julio Molina"]'::jsonb
+      RETURNING local_slug, visitante_slug, equipo_slug
+    `,
+    [
+      JSON.stringify(capitan),
+      JSON.stringify(individuales),
+      JSON.stringify(suplentes),
+      JSON.stringify(jugadorIds)
+    ]
+  );
+  return rows;
+}
+
 async function generateEmptyPlanillasForCategory(category) {
   const division = String(category || '').trim().toLowerCase();
   if (!['segunda', 'tercera'].includes(division)) return [];
@@ -517,6 +574,7 @@ async function generateEmptyPlanillasForCategory(category) {
 
 async function buildCrucesAdminStatus(team) {
   await repairDuckHunterPlanillaFromAutomaticOverwrite();
+  await repairDuckHunterTemporaryMatchStatus();
   const config = await getOrCreateCrucesAdminConfig(team);
   const automation = await fetchAutomationFixtureInfo(team);
   const manualEnabled = !!config.manual_enabled;
