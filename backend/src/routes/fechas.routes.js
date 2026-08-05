@@ -343,6 +343,13 @@ module.exports = function createFechasRouter(deps) {
 
       let finalPlan = normalizePlanillaPayload(plan, authSlug);
       finalPlan.team = authSlug;
+      const submittedPlayers = [
+        ...(Array.isArray(finalPlan.individuales) ? finalPlan.individuales : []),
+        ...(Array.isArray(finalPlan.suplentes) ? finalPlan.suplentes : [])
+      ];
+      finalPlan.pendingAutomaticGeneration = !submittedPlayers.some((name) => String(name || '').trim());
+      finalPlan.generatedAutomatically = false;
+      delete finalPlan.generatedAt;
 
       const equipo = await resolveEquipoBySlug(authSlug);
       if (!equipo) {
