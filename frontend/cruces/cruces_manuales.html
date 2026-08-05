@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Carga manual de cruces</title>
+  <title>Administración manual de cruces</title>
   <link rel="stylesheet" href="./cruces_manuales.css" />
 </head>
 <body>
@@ -11,22 +11,23 @@
     <a href="../index.html" title="Inicio" class="logo-link">
       <img src="../logo_liga.png" alt="LPI" />
     </a>
-
-    <div class="header-center">
-      <h1>CARGA MANUAL DE CRUCES</h1>
-    </div>
-
+    <div class="header-center"><h1>ADMINISTRACIÓN DE CRUCES</h1></div>
     <div class="header-actions">
       <a id="btnVolverAdmin" class="btn" href="../admin.html" aria-label="Volver a administración">VOLVER</a>
     </div>
   </header>
 
   <main class="page">
-    <section class="topbar">
+    <section class="topbar" aria-labelledby="searchTitle">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">CRUCES DEL FIXTURE</p>
+          <h2 id="searchTitle">CARGAR O CORREGIR RESULTADOS</h2>
+        </div>
+        <span id="modeBadge" class="mode-badge new">NUEVO</span>
+      </div>
+
       <div class="controls">
-        <label>Fecha
-          <input id="fechaISO" type="date" />
-        </label>
         <label>Categoría
           <select id="categoria">
             <option value="segunda">Segunda</option>
@@ -34,24 +35,40 @@
             <option value="primera">Primera</option>
           </select>
         </label>
-        <label>Equipo local
-          <select id="localTeam"></select>
+        <label>Edición
+          <select id="edicion">
+            <option value="6" selected>6TA EDICIÓN</option>
+            <option value="5">5TA EDICIÓN</option>
+          </select>
         </label>
-        <label>Equipo visitante
-          <select id="visitanteTeam"></select>
+        <label>Fecha del fixture
+          <select id="fechaISO"></select>
+        </label>
+        <label>Partido
+          <select id="fixtureMatch"></select>
         </label>
       </div>
 
       <div class="actions">
-        <button id="btnGuardar" type="button">GUARDAR EN DB</button>
+        <button id="btnCargar" class="secondary" type="button">CARGAR CRUCE</button>
+        <button id="btnGuardar" type="button" disabled>GUARDAR CRUCE</button>
       </div>
 
       <div id="status" class="hint">
-        Los equipos se cargan por división y cada campo se completa manualmente eligiendo jugadores desde la lista del equipo.
+        Elegí categoría, edición, fecha y partido. Las fechas disponibles salen únicamente del fixture.
       </div>
     </section>
 
-    <section class="layout">
+    <section id="editorSummary" class="editor-summary" hidden>
+      <div><span class="summary-label">LOCAL</span><strong id="localTeamName"></strong></div>
+      <span class="versus">VS</span>
+      <div><span class="summary-label">VISITANTE</span><strong id="visitanteTeamName"></strong></div>
+    </section>
+
+    <input id="localTeam" type="hidden" />
+    <input id="visitanteTeam" type="hidden" />
+
+    <section class="layout" aria-live="polite">
       <div id="localRoot"></div>
       <div id="visitanteRoot"></div>
     </section>
