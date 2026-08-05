@@ -409,6 +409,7 @@ async function generateEmptyPlanillasForCategory(category) {
 
     const generated = [];
     for (const row of emptyPlanillas) {
+      if (row.datos?.pendingAutomaticGeneration !== true) continue;
       if (planillaHasAssignedPlayers(row.datos || {}) || row.datos?.generatedAutomatically === true) continue;
 
       const { rows: players } = await client.query(
@@ -439,6 +440,7 @@ async function generateEmptyPlanillasForCategory(category) {
         pareja1: [],
         pareja2: [],
         suplentes: suplentes.map((player) => player.nombre),
+        pendingAutomaticGeneration: false,
         generatedAutomatically: true,
         generatedAt,
         jugadorIds: {
