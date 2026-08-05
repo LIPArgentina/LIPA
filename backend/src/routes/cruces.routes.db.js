@@ -378,6 +378,52 @@ function planillaHasAssignedPlayers(planilla = {}) {
   return [...individuales, ...suplentes].some((name) => String(name || '').trim());
 }
 
+async function repairDuckHunterPlanillaFromAutomaticOverwrite() {
+  const restoredPlanilla = {
+    capitan: ['Guillermo Ortega', 'Julian Alcaraz'],
+    individuales: [
+      'Guillermo Ortega',
+      'Eduardo Gomez',
+      'Emiliano Rincon',
+      'Lucas Gomez',
+      'Federico Alcaraz',
+      'Gustavo Iraiman',
+      'Maximiliano Beñacar',
+      'Raggio Norberto Daniel',
+      'Diego Moron',
+      'Julian Alcaraz',
+      'Dylan Gomez'
+    ],
+    suplentes: ['Gustavo Alcaraz', 'Esteban Rincon'],
+    pareja1: [],
+    pareja2: [],
+    pendingAutomaticGeneration: false,
+    generatedAutomatically: false,
+    jugadorIds: {
+      capitan: [1384, 1388],
+      individuales: [1384, 1392, 1389, 1400, 1386, 1394, 1391, 2758, 1395, 1388, 1393],
+      suplentes: [1387, 1390],
+      pareja1: [],
+      pareja2: []
+    }
+  };
+
+  const { rows } = await pool.query(
+    `
+      UPDATE planillas p
+      SET datos = (p.datos || $1::jsonb) - 'generatedAt', updated_at = NOW()
+      FROM equipos e
+      WHERE p.equipo_id = e.id
+        AND e.slug_uid = 'duckhunter_tercera'
+        AND p.estado = 'guardada'
+        AND p.datos->>'generatedAt' = '2026-08-05T00:41:09.317Z'
+      RETURNING p.id
+    `,
+    [JSON.stringify(restoredPlanilla)]
+  );
+  return rows.length > 0;
+}
+
 async function generateEmptyPlanillasForCategory(category) {
   const division = String(category || '').trim().toLowerCase();
   if (!['segunda', 'tercera'].includes(division)) return [];
@@ -470,6 +516,7 @@ async function generateEmptyPlanillasForCategory(category) {
 }
 
 async function buildCrucesAdminStatus(team) {
+  await repairDuckHunterPlanillaFromAutomaticOverwrite();
   const config = await getOrCreateCrucesAdminConfig(team);
   const automation = await fetchAutomationFixtureInfo(team);
   const manualEnabled = !!config.manual_enabled;
