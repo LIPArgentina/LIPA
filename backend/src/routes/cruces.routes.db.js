@@ -26,6 +26,13 @@ function invalidateValidatedStatsCache() {
   radRankingCache.clear();
 }
 
+function invalidateManualCrucesCaches() {
+  radRankingCache.clear();
+  if (typeof validatedCrucesCache !== 'undefined' && validatedCrucesCache?.clear) {
+    validatedCrucesCache.clear();
+  }
+}
+
 function requireAdminForPrivateCategory(req, res, next) {
   const category = String(req.query.category || '').trim().toLowerCase();
   if (category !== 'segunda') return next();
@@ -2777,7 +2784,7 @@ router.post('/manual-save', requireAdmin, async (req, res) => {
     const warnings = syncResults
       .filter((result) => result.status === 'rejected')
       .map((result) => String(result.reason?.message || result.reason || 'Error de sincronización'));
-    invalidateValidatedStatsCache();
+    invalidateManualCrucesCaches();
 
     return res.json({
       ok: true,
