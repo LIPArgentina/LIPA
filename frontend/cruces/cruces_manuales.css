@@ -65,6 +65,39 @@ body{
 .topbar{
   padding:10px;
 }
+.panel-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+.panel-heading h2{
+  margin:1px 0 0;
+  color:var(--accent);
+  font-size:16px;
+}
+.eyebrow{
+  margin:0;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.12em;
+}
+.mode-badge{
+  flex:0 0 auto;
+  border:1px solid var(--accent-border);
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:9px;
+  font-weight:900;
+}
+.mode-badge.new{color:var(--accent)}
+.mode-badge.loaded{
+  color:#08170c;
+  border-color:var(--ok);
+  background:var(--ok);
+}
 .controls{
   display:grid;
   grid-template-columns:repeat(4, minmax(0, 1fr));
@@ -107,11 +140,35 @@ input,select{
   opacity:.6;
   cursor:not-allowed;
 }
+.actions button.secondary{
+  background:#111216;
+  color:var(--accent);
+}
 .hint{
   color:var(--muted);
   font-size:11px;
   margin-top:8px;
 }
+.hint.ok{color:var(--ok)}
+.hint.loaded{color:#7ee7ff}
+.hint.error{color:var(--danger)}
+.editor-summary{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  gap:12px;
+  margin-top:10px;
+  padding:9px 12px;
+  background:#141519;
+  border:1px solid var(--line);
+  border-radius:12px;
+  text-align:center;
+}
+.editor-summary[hidden]{display:none}
+.editor-summary div{display:grid;gap:2px}
+.editor-summary strong{color:var(--accent);font-size:12px}
+.summary-label{color:var(--muted);font-size:8px;font-weight:900;letter-spacing:.1em}
+.versus{color:var(--muted);font-size:10px;font-weight:900}
 .layout{
   display:grid;
   grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
@@ -250,6 +307,11 @@ input,select{
 }
 .ok{color:var(--ok);font-weight:700}
 .error{color:var(--danger);font-weight:700}
+.player-select.bench-selected{
+  outline:2px solid var(--ok);
+  outline-offset:1px;
+  background:#c8ffb8;
+}
 
 @media (max-width: 900px){
   .controls{
@@ -282,6 +344,8 @@ input,select{
   .btn{padding:6px 10px;font-size:12px}
   .page{padding:10px 8px 16px}
   .topbar{padding:12px}
+  .panel-heading h2{font-size:14px}
+  .eyebrow{font-size:8px}
   .controls{gap:8px}
   label{font-size:11px}
   input,select{font-size:12px;padding:8px 10px}
@@ -303,6 +367,15 @@ input,select{
   .label{font-size:10px}
   .totalbox{width:24px;height:24px;font-size:11px}
   .winsbox{width:28px;height:28px;font-size:14px}
+}
+
+@media (max-width:480px){
+  .controls{grid-template-columns:1fr}
+  .panel-heading{align-items:flex-start}
+  .actions{display:grid;grid-template-columns:1fr 1fr}
+  .actions button{width:100%}
+  .editor-summary{gap:6px;padding:8px 6px}
+  .editor-summary strong{font-size:10px}
 }
 
 @media (min-width: 769px){

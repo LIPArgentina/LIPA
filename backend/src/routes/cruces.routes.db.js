@@ -2470,6 +2470,172 @@ router.get('/results', async (req, res) => {
   }
 });
 
+function fixtureHasScheduledMatch(rows = [], { fechaISO, localSlug, visitanteSlug } = {}) {
+  const dateKey = normalizeDateOnly(fechaISO);
+  const localKey = normalizeTeamIdentity(localSlug);
+  const visitanteKey = normalizeTeamIdentity(visitanteSlug);
+  if (!dateKey || !localKey || !visitanteKey) return false;
+
+  return rows.some((row) => {
+    const fechas = Array.isArray(row?.data?.fechas) ? row.data.fechas : [];
+    return fechas.some((fecha) => {
+      if (normalizeDateOnly(fecha?.date) !== dateKey) return false;
+      const tablas = Array.isArray(fecha?.tablas) ? fecha.tablas : [];
+      return tablas.some((tabla) => {
+        const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+        for (let index = 0; index < equipos.length - 1; index += 2) {
+          const local = equipos[index];
+          const visitante = equipos[index + 1];
+          if (String(local?.categoria || '').toLowerCase() !== 'local') continue;
+          if (String(visitante?.categoria || '').toLowerCase() !== 'visitante') continue;
+          if (normalizeTeamIdentity(local?.equipo) !== localKey) continue;
+          if (normalizeTeamIdentity(visitante?.equipo) !== visitanteKey) continue;
+          return true;
+        }
+        return false;
+      });
+    });
+  });
+}
+
+router.post('/manual-save', requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+  let transactionOpen = false;
+
+  try {
+    const category = String(req.body?.category || '').trim().toLowerCase();
+    const edition = normalizeEdition(req.body?.edition, { defaultEdition: CURRENT_EDITION });
+    const status = req.body?.status || {};
+    const fechaISO = normalizeDateOnly(status?.fechaISO || '');
+    const localSlug = normalizeSlug(status?.localSlug || '');
+    const visitanteSlug = normalizeSlug(status?.visitanteSlug || '');
+
+    if (!['primera', 'segunda', 'tercera'].includes(category)) {
+      return res.status(400).json({ ok: false, error: 'Categoría inválida.' });
+    }
+    if (!fechaISO || !localSlug || !visitanteSlug || localSlug === visitanteSlug) {
+      return res.status(400).json({ ok: false, error: 'El cruce seleccionado no es válido.' });
+    }
+
+    const statusError = validateCurrentMatchStatus(status);
+    if (statusError) {
+      return res.status(400).json({ ok: false, error: statusError });
+    }
+
+    const fixtureResult = await client.query(
+      `SELECT kind, data
+       FROM fixtures
+       WHERE category = $1 AND edicion = $2 AND kind IN ('ida', 'vuelta')`,
+      [category, edition]
+    );
+    if (!fixtureHasScheduledMatch(fixtureResult.rows, { fechaISO, localSlug, visitanteSlug })) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Ese partido no existe en el fixture de la categoría, edición y fecha seleccionadas.'
+      });
+    }
+
+    const normalizedStatus = {
+      ...status,
+      category,
+      categoria: category,
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      validated: true
+    };
+    const validacion = {
+      fechaISO,
+      localSlug,
+      visitanteSlug,
+      local: {
+        scoreRows: normalizedStatus?.local?.scoreRows || [],
+        triangulos: Number(normalizedStatus?.local?.triangulosTotales || 0),
+        puntosTotales: Number(normalizedStatus?.local?.puntosTotales || 0)
+      },
+      visitante: {
+        scoreRows: normalizedStatus?.visitante?.scoreRows || [],
+        triangulos: Number(normalizedStatus?.visitante?.triangulosTotales || 0),
+        puntosTotales: Number(normalizedStatus?.visitante?.puntosTotales || 0)
+      },
+      localPlanilla: normalizedStatus.localPlanilla,
+      visitantePlanilla: normalizedStatus.visitantePlanilla
+    };
+    const fechaKey = buildFechaKey(fechaISO, localSlug, visitanteSlug);
+    const lockUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const statusJson = JSON.stringify(normalizedStatus);
+    const validationJson = JSON.stringify(validacion);
+
+    await client.query('BEGIN');
+    transactionOpen = true;
+
+    for (const team of [localSlug, visitanteSlug]) {
+      await client.query(
+        `INSERT INTO cruces_match_status (
+           local_slug, visitante_slug, fecha_iso, equipo_slug, status_json, updated_at
+         ) VALUES ($1, $2, $3::date, $4, $5::jsonb, NOW())
+         ON CONFLICT (local_slug, visitante_slug, fecha_iso, equipo_slug)
+         DO UPDATE SET status_json = EXCLUDED.status_json, updated_at = NOW()`,
+        [localSlug, visitanteSlug, fechaISO, team, statusJson]
+      );
+
+      await client.query(
+        `INSERT INTO cruces_validations (
+           team, fecha_key, validacion_json, status_json, validated, locked_until, updated_at
+         ) VALUES ($1, $2, $3::jsonb, $4::jsonb, true, $5::timestamptz, NOW())
+         ON CONFLICT (team, fecha_key)
+         DO UPDATE SET
+           validacion_json = EXCLUDED.validacion_json,
+           status_json = EXCLUDED.status_json,
+           validated = true,
+           locked_until = EXCLUDED.locked_until,
+           updated_at = NOW()`,
+        [team, fechaKey, validationJson, statusJson, lockUntil]
+      );
+    }
+
+    await client.query('COMMIT');
+    transactionOpen = false;
+
+    const syncResults = await Promise.allSettled([
+      syncValidatedMatchIntoFixture({ fechaISO, localSlug, visitanteSlug, snapshot: normalizedStatus }),
+      syncValidatedMatchIntoLlaves({ fechaISO, localSlug, visitanteSlug, snapshot: normalizedStatus })
+    ]);
+    const fixtureSync = syncResults[0].status === 'fulfilled'
+      ? syncResults[0].value
+      : { updated: false, reason: 'sync_error' };
+    const llavesSync = syncResults[1].status === 'fulfilled'
+      ? syncResults[1].value
+      : { updated: false, reason: 'sync_error' };
+    const warnings = syncResults
+      .filter((result) => result.status === 'rejected')
+      .map((result) => String(result.reason?.message || result.reason || 'Error de sincronización'));
+    invalidateValidatedStatsCache();
+
+    return res.json({
+      ok: true,
+      saved: true,
+      updated: true,
+      fechaISO,
+      category,
+      edition,
+      localSlug,
+      visitanteSlug,
+      fixtureSync,
+      llavesSync,
+      warnings
+    });
+  } catch (err) {
+    if (transactionOpen) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+    }
+    console.error('POST /manual-save', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo guardar el cruce manual.' });
+  } finally {
+    client.release();
+  }
+});
+
 function includesNormalizedName(name, query) {
   const a = normalizeText(name || '');
   const q = normalizeText(query || '');
