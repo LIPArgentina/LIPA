@@ -936,6 +936,55 @@ function validateCurrentMatchStatus(status = {}) {
   return '';
 }
 
+function validateManualMatchStatus(status = {}, edition = CURRENT_EDITION) {
+  if (Number(edition) !== 5) return validateCurrentMatchStatus(status);
+
+  const individualCount = 7;
+  const pairCount = 2;
+  const expectedScoreRows = individualCount + pairCount;
+  const localScores = Array.isArray(status?.local?.scoreRows) ? status.local.scoreRows.map(Number) : [];
+  const visitanteScores = Array.isArray(status?.visitante?.scoreRows) ? status.visitante.scoreRows.map(Number) : [];
+  const localPlanilla = status?.localPlanilla || {};
+  const visitantePlanilla = status?.visitantePlanilla || {};
+  const requiredSections = [
+    ['individuales', individualCount],
+    ['pareja1', 2],
+    ['pareja2', 2]
+  ];
+
+  if (localScores.length !== expectedScoreRows || visitanteScores.length !== expectedScoreRows) {
+    return 'La planilla de 5TA edición debe tener 7 individuales y 2 partidos de parejas.';
+  }
+  for (const [section, expectedPlayers] of requiredSections) {
+    const localPlayers = Array.isArray(localPlanilla?.[section]) ? localPlanilla[section] : [];
+    const visitantePlayers = Array.isArray(visitantePlanilla?.[section]) ? visitantePlanilla[section] : [];
+    if (localPlayers.length < expectedPlayers || visitantePlayers.length < expectedPlayers ||
+        localPlayers.slice(0, expectedPlayers).some(player => !String(player || '').trim()) ||
+        visitantePlayers.slice(0, expectedPlayers).some(player => !String(player || '').trim())) {
+      return `Faltan jugadores en ${section === 'individuales' ? 'los individuales' : section.replace('pareja', 'la pareja ')}.`;
+    }
+  }
+  for (let index = 0; index < expectedScoreRows; index++) {
+    if (!Number.isFinite(localScores[index]) || !Number.isFinite(visitanteScores[index]) ||
+        localScores[index] < 0 || visitanteScores[index] < 0) {
+      return `El resultado del partido ${index + 1} no es válido.`;
+    }
+    if (localScores[index] === visitanteScores[index]) {
+      return `El partido ${index + 1} debe tener un ganador.`;
+    }
+  }
+  const localPoints = localScores.filter((score, index) => score > visitanteScores[index]).length;
+  const visitantePoints = visitanteScores.filter((score, index) => score > localScores[index]).length;
+  if (localPoints + visitantePoints !== expectedScoreRows) {
+    return `La suma de puntos debe ser ${expectedScoreRows}.`;
+  }
+  if (Number(status?.local?.puntosTotales ?? -1) !== localPoints ||
+      Number(status?.visitante?.puntosTotales ?? -1) !== visitantePoints) {
+    return 'Los puntos totales no coinciden con los resultados cargados.';
+  }
+  return '';
+}
+
 function compareFullStatus(mine = {}, rival = {}) {
   const diffs = [];
 
@@ -2635,7 +2684,7 @@ router.post('/manual-save', requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'El cruce seleccionado no es válido.' });
     }
 
-    const statusError = validateCurrentMatchStatus(status);
+    const statusError = validateManualMatchStatus(status, edition);
     if (statusError) {
       return res.status(400).json({ ok: false, error: statusError });
     }

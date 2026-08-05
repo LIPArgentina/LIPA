@@ -5,11 +5,6 @@
   const FORMAT = window.LIPA_getMatchFormat?.() || {
     individualCount: 11, pairCount: 2, pairSize: 2, captainCount: 2, substituteCount: 2
   };
-  const INDIVIDUAL_COUNT = Number(FORMAT.individualCount || 11);
-  const PAIR_COUNT = Number(FORMAT.pairCount || 0);
-  const PAIR_SIZE = Number(FORMAT.pairSize || 2);
-  const CAPTAIN_COUNT = Number(FORMAT.captainCount || 2);
-  const SUBSTITUTE_COUNT = Number(FORMAT.substituteCount || 2);
 
   const state = {
     teams: [],
@@ -20,15 +15,37 @@
     editorReady: false
   };
 
-  const sections = [
-    { key: 'capitan', title: 'CAPITÁN', count: CAPTAIN_COUNT, score: false },
-    { key: 'individuales', title: 'INDIVIDUALES', count: INDIVIDUAL_COUNT, score: true },
-    ...(PAIR_COUNT >= 1 ? [{ key: 'pareja1', title: 'PAREJA 1', count: PAIR_SIZE, score: 'single' }] : []),
-    ...(PAIR_COUNT >= 2 ? [{ key: 'pareja2', title: 'PAREJA 2', count: PAIR_SIZE, score: 'single' }] : []),
-    { key: 'suplentes', title: 'SUPLENTES', count: SUBSTITUTE_COUNT, score: false }
-  ];
-
   const $ = (selector) => document.querySelector(selector);
+
+  function editorFormat() {
+    if (Number($('#edicion')?.value || 6) === 5) {
+      return {
+        individualCount: 7,
+        pairCount: 2,
+        pairSize: 2,
+        captainCount: 2,
+        substituteCount: 2
+      };
+    }
+    return {
+      individualCount: Number(FORMAT.individualCount || 11),
+      pairCount: Number(FORMAT.pairCount || 0),
+      pairSize: Number(FORMAT.pairSize || 2),
+      captainCount: Number(FORMAT.captainCount || 2),
+      substituteCount: Number(FORMAT.substituteCount || 2)
+    };
+  }
+
+  function editorSections() {
+    const format = editorFormat();
+    return [
+      { key: 'capitan', title: 'CAPITÁN', count: format.captainCount, score: false },
+      { key: 'individuales', title: 'INDIVIDUALES', count: format.individualCount, score: true },
+      ...(format.pairCount >= 1 ? [{ key: 'pareja1', title: 'PAREJA 1', count: format.pairSize, score: 'single' }] : []),
+      ...(format.pairCount >= 2 ? [{ key: 'pareja2', title: 'PAREJA 2', count: format.pairSize, score: 'single' }] : []),
+      { key: 'suplentes', title: 'SUPLENTES', count: format.substituteCount, score: false }
+    ];
+  }
 
   function apiUrl(path) {
     return `${API_BASE}${path}`;
@@ -247,7 +264,7 @@
     }
 
     const sectionsNode = card.querySelector('.sections');
-    sections.forEach((section) => {
+    editorSections().forEach((section) => {
       const sectionNode = document.createElement('div');
       sectionNode.className = 'section';
       sectionNode.dataset.section = section.key;
@@ -398,20 +415,22 @@
   }
 
   function collectPlanilla(rootId) {
+    const format = editorFormat();
     const output = { capitan: [], individuales: [], pareja1: [], pareja2: [], suplentes: [] };
     document.querySelectorAll(`#${rootId} .section`).forEach((section) => {
       output[section.dataset.section] = [...section.querySelectorAll('.player-select')].map((select) => select.value || '');
     });
     const scores = scoreRows(rootId);
-    output.individualesPts = scores.slice(0, INDIVIDUAL_COUNT);
-    output.pareja1Pts = PAIR_COUNT >= 1 ? [scores[INDIVIDUAL_COUNT] || 0] : [];
-    output.pareja2Pts = PAIR_COUNT >= 2 ? [scores[INDIVIDUAL_COUNT + 1] || 0] : [];
+    output.individualesPts = scores.slice(0, format.individualCount);
+    output.pareja1Pts = format.pairCount >= 1 ? [scores[format.individualCount] || 0] : [];
+    output.pareja2Pts = format.pairCount >= 2 ? [scores[format.individualCount + 1] || 0] : [];
     return output;
   }
 
   function collectStatus() {
     const match = selectedMatch();
     const persistedMatch = state.loadedResult || match;
+    const format = editorFormat();
     const localScores = scoreRows('localRoot');
     const visitanteScores = scoreRows('visitanteRoot');
     return {
@@ -423,12 +442,12 @@
       visitanteSlug: persistedMatch.visitanteSlug,
       validated: true,
       local: {
-        jugadores: localScores.slice(0, INDIVIDUAL_COUNT), scoreRows: localScores,
+        jugadores: localScores.slice(0, format.individualCount), scoreRows: localScores,
         puntosTotales: Number($('#localRoot .winsValue').textContent || 0),
         triangulosTotales: Number($('#localRoot .totalValue').textContent || 0)
       },
       visitante: {
-        jugadores: visitanteScores.slice(0, INDIVIDUAL_COUNT), scoreRows: visitanteScores,
+        jugadores: visitanteScores.slice(0, format.individualCount), scoreRows: visitanteScores,
         puntosTotales: Number($('#visitanteRoot .winsValue').textContent || 0),
         triangulosTotales: Number($('#visitanteRoot .totalValue').textContent || 0)
       },
