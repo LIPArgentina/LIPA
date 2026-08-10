@@ -18,6 +18,13 @@ let ensureJugadorResultadosEditionPromise = null;
 let ensureJugadorCurrentCategoryPromise = null;
 const RAD_RANKING_CACHE_TTL_MS = 15_000;
 const radRankingCache = new Map();
+const VALIDATED_CRUCES_CACHE_TTL_MS = 15_000;
+const validatedCrucesCache = new Map();
+
+function invalidateValidatedStatsCache() {
+  validatedCrucesCache.clear();
+  radRankingCache.clear();
+}
 
 function invalidateManualCrucesCaches() {
   radRankingCache.clear();
@@ -378,6 +385,109 @@ function planillaHasAssignedPlayers(planilla = {}) {
   return [...individuales, ...suplentes].some((name) => String(name || '').trim());
 }
 
+async function repairDuckHunterPlanillaFromAutomaticOverwrite() {
+  const restoredPlanilla = {
+    capitan: ['Guillermo Ortega', 'Julian Alcaraz'],
+    individuales: [
+      'Guillermo Ortega',
+      'Eduardo Gomez',
+      'Emiliano Rincon',
+      'Lucas Gomez',
+      'Federico Alcaraz',
+      'Gustavo Iraiman',
+      'Maximiliano Beñacar',
+      'Raggio Norberto Daniel',
+      'Diego Moron',
+      'Julian Alcaraz',
+      'Dylan Gomez'
+    ],
+    suplentes: ['Gustavo Alcaraz', 'Esteban Rincon'],
+    pareja1: [],
+    pareja2: [],
+    pendingAutomaticGeneration: false,
+    generatedAutomatically: false,
+    jugadorIds: {
+      capitan: [1384, 1388],
+      individuales: [1384, 1392, 1389, 1400, 1386, 1394, 1391, 2758, 1395, 1388, 1393],
+      suplentes: [1387, 1390],
+      pareja1: [],
+      pareja2: []
+    }
+  };
+
+  const { rows } = await pool.query(
+    `
+      UPDATE planillas p
+      SET datos = (p.datos || $1::jsonb) - 'generatedAt', updated_at = NOW()
+      FROM equipos e
+      WHERE p.equipo_id = e.id
+        AND e.slug_uid = 'duckhunter_tercera'
+        AND p.estado = 'guardada'
+        AND p.datos->>'generatedAt' = '2026-08-05T00:41:09.317Z'
+      RETURNING p.id
+    `,
+    [JSON.stringify(restoredPlanilla)]
+  );
+  return rows.length > 0;
+}
+
+async function repairDuckHunterTemporaryMatchStatus() {
+  const capitan = ['Guillermo Ortega', 'Julian Alcaraz'];
+  const individuales = [
+    'Guillermo Ortega',
+    'Eduardo Gomez',
+    'Emiliano Rincon',
+    'Lucas Gomez',
+    'Federico Alcaraz',
+    'Gustavo Iraiman',
+    'Maximiliano Beñacar',
+    'Raggio Norberto Daniel',
+    'Diego Moron',
+    'Julian Alcaraz',
+    'Dylan Gomez'
+  ];
+  const suplentes = ['Gustavo Alcaraz', 'Esteban Rincon'];
+  const jugadorIds = {
+    capitan: [1384, 1388],
+    individuales: [1384, 1392, 1389, 1400, 1386, 1394, 1391, 2758, 1395, 1388, 1393],
+    suplentes: [1387, 1390],
+    pareja1: [],
+    pareja2: []
+  };
+
+  const { rows } = await pool.query(
+    `
+      UPDATE cruces_match_status
+      SET status_json = jsonb_set(
+            jsonb_set(
+              jsonb_set(
+                jsonb_set(
+                  status_json,
+                  '{localPlanilla,capitan}', $1::jsonb, true
+                ),
+                '{localPlanilla,individuales}', $2::jsonb, true
+              ),
+              '{localPlanilla,suplentes}', $3::jsonb, true
+            ),
+            '{localPlanilla,jugadorIds}', $4::jsonb, true
+          ),
+          updated_at = NOW()
+      WHERE fecha_iso = DATE '2026-08-04'
+        AND status_json->'localPlanilla'->'individuales' @>
+            '["Guillermo Ortega", "Federico Alcaraz", "Gustavo Alcaraz"]'::jsonb
+        AND status_json->'visitantePlanilla'->'individuales' @> '["Julio Molina"]'::jsonb
+      RETURNING local_slug, visitante_slug, equipo_slug
+    `,
+    [
+      JSON.stringify(capitan),
+      JSON.stringify(individuales),
+      JSON.stringify(suplentes),
+      JSON.stringify(jugadorIds)
+    ]
+  );
+  return rows;
+}
+
 async function generateEmptyPlanillasForCategory(category) {
   const division = String(category || '').trim().toLowerCase();
   if (!['segunda', 'tercera'].includes(division)) return [];
@@ -470,6 +580,8 @@ async function generateEmptyPlanillasForCategory(category) {
 }
 
 async function buildCrucesAdminStatus(team) {
+  await repairDuckHunterPlanillaFromAutomaticOverwrite();
+  await repairDuckHunterTemporaryMatchStatus();
   const config = await getOrCreateCrucesAdminConfig(team);
   const automation = await fetchAutomationFixtureInfo(team);
   const manualEnabled = !!config.manual_enabled;
@@ -642,6 +754,9 @@ function inferCategoryFromTeamMarker(team = '') {
 }
 
 function normalizeDateOnly(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
   return String(value || '').slice(0, 10);
 }
 
@@ -1182,6 +1297,8 @@ router.post('/validate', async (req, res) => {
       snapshot: validatedSnapshot
     });
 
+    invalidateValidatedStatsCache();
+
     return res.json({
       ok: true,
       tipo: 'validado',
@@ -1470,6 +1587,7 @@ router.post('/tiebreak-validate', async (req, res) => {
     );
     const latest = (new Date(mine.updated_at).getTime() >= new Date(rival.updated_at).getTime()) ? mine.status_json : rival.status_json;
     const llavesSync = await syncTiebreakIntoLlaves({ fechaISO, localSlug, visitanteSlug, snapshot: latest });
+    invalidateValidatedStatsCache();
     return res.json({ ok: true, tipo: 'validado', mensaje: 'Desempate validado', locked: true, validated: true, lockedUntil: lockUntil, llavesSync });
   } catch (err) {
     console.error('POST /tiebreak-validate', err);
@@ -2801,14 +2919,59 @@ function getPairScore(scoreRows = [], planilla = {}, pairIndex = 0) {
   return Number(fromPlanilla ?? 0) || 0;
 }
 
-async function buildAllValidatedCrucesForPlayerQuery(category = '') {
-  const { rows } = await pool.query(
-    `
-    SELECT fecha_key, team, status_json, validated, updated_at
-    FROM cruces_validations
-    ORDER BY updated_at DESC
-    `
-  );
+async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
+  const [{ rows }, { rows: teamRows }, { rows: fixtureRows }, { rows: historicMatchRows }] = await Promise.all([
+    pool.query(
+      `
+      SELECT fecha_key, team, status_json, validated, updated_at
+      FROM cruces_validations
+      ORDER BY updated_at DESC
+      `
+    ),
+    pool.query(
+      `
+      SELECT id, slug_uid, slug_base, display_name, division, created_at
+      FROM equipos
+      ORDER BY id ASC
+      `
+    ),
+    category
+      ? pool.query(`SELECT data FROM fixtures WHERE category = $1`, [String(category).trim().toLowerCase()])
+      : Promise.resolve({ rows: [] }),
+    category
+      ? pool.query(
+          `SELECT DISTINCT fecha_key FROM jugador_resultados WHERE categoria = $1`,
+          [String(category).trim().toLowerCase()]
+        )
+      : Promise.resolve({ rows: [] })
+  ]);
+
+  const categoryMatchKeys = new Set();
+  for (const fixtureRow of fixtureRows) {
+    const fechas = Array.isArray(fixtureRow?.data?.fechas) ? fixtureRow.data.fechas : [];
+    for (const fecha of fechas) {
+      const dateKey = normalizeDateOnly(fecha?.date);
+      const tablas = Array.isArray(fecha?.tablas) ? fecha.tablas : [];
+      for (const tabla of tablas) {
+        const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+        for (let index = 0; index + 1 < equipos.length; index += 2) {
+          const pair = [
+            normalizeTeamIdentity(equipos[index]?.equipo),
+            normalizeTeamIdentity(equipos[index + 1]?.equipo)
+          ].filter(Boolean).sort();
+          if (dateKey && pair.length === 2) categoryMatchKeys.add(`${dateKey}::${pair.join('::')}`);
+        }
+      }
+    }
+  }
+  for (const historicRow of historicMatchRows) {
+    const parts = String(historicRow?.fecha_key || '').split('::');
+    const dateKey = normalizeDateOnly(parts[0]);
+    const pair = [normalizeTeamIdentity(parts[1]), normalizeTeamIdentity(parts[2])]
+      .filter(Boolean)
+      .sort();
+    if (dateKey && pair.length === 2) categoryMatchKeys.add(`${dateKey}::${pair.join('::')}`);
+  }
 
   const grouped = new Map();
   for (const row of rows) {
@@ -2818,10 +2981,27 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
   }
 
   const teamCache = new Map();
-  const resolveCached = async (slug, dateHint = '') => {
+  const resolveCached = (slug, dateHint = '') => {
     const key = `${String(category || '').toLowerCase()}::${normalizeDateOnly(dateHint)}::${normalizeSlug(slug)}`;
     if (teamCache.has(key)) return teamCache.get(key);
-    const info = await resolveEquipoInfoBySlug(slug, category, dateHint);
+    const slugNorm = normalizeSlug(slug);
+    const dateKey = normalizeDateOnly(dateHint);
+    const categoryNorm = String(category || '').trim().toLowerCase();
+    const matches = teamRows.filter((row) => {
+      if (dateKey && row.created_at && normalizeDateOnly(row.created_at) > dateKey) return false;
+      return [row.slug_uid, row.slug_base, row.display_name]
+        .some((value) => normalizeTeamIdentity(value) === normalizeTeamIdentity(slugNorm));
+    });
+    matches.sort((a, b) => {
+      const aUidExact = normalizeSlug(a.slug_uid) === slugNorm ? 0 : 1;
+      const bUidExact = normalizeSlug(b.slug_uid) === slugNorm ? 0 : 1;
+      const aBaseExact = normalizeSlug(a.slug_base) === slugNorm ? 0 : 1;
+      const bBaseExact = normalizeSlug(b.slug_base) === slugNorm ? 0 : 1;
+      const aCategory = categoryNorm && normalizeSlug(a.division) === categoryNorm ? 0 : 1;
+      const bCategory = categoryNorm && normalizeSlug(b.division) === categoryNorm ? 0 : 1;
+      return (aCategory - bCategory) || (aUidExact - bUidExact) || (aBaseExact - bBaseExact) || (Number(a.id) - Number(b.id));
+    });
+    const info = matches[0] || null;
     teamCache.set(key, info);
     return info;
   };
@@ -2835,6 +3015,10 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
     const visitanteSlug = normalizeSlug(parts[2] || '');
 
     if (!localSlug || !visitanteSlug) continue;
+    if (category && categoryMatchKeys.size) {
+      const pair = [normalizeTeamIdentity(localSlug), normalizeTeamIdentity(visitanteSlug)].sort();
+      if (!categoryMatchKeys.has(`${matchDate}::${pair.join('::')}`)) continue;
+    }
 
     const localEntry = entries.find((row) => normalizeSlug(row.team) === localSlug) || null;
     const visitanteEntry = entries.find((row) => normalizeSlug(row.team) === visitanteSlug) || null;
@@ -2845,10 +3029,8 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
     const diff = compareFullStatus(localEntry.status_json || {}, visitanteEntry.status_json || {});
     if (diff.length) continue;
 
-    const [localInfo, visitanteInfo] = await Promise.all([
-      resolveCached(localSlug, matchDate),
-      resolveCached(visitanteSlug, matchDate)
-    ]);
+    const localInfo = resolveCached(localSlug, matchDate);
+    const visitanteInfo = resolveCached(visitanteSlug, matchDate);
 
     if (category) {
       const localDivision = String(localInfo?.division || '').trim().toLowerCase();
@@ -2892,6 +3074,28 @@ async function buildAllValidatedCrucesForPlayerQuery(category = '') {
   }
 
   return results;
+}
+
+async function buildAllValidatedCrucesForPlayerQuery(category = '') {
+  const key = String(category || '').trim().toLowerCase() || '__all__';
+  const now = Date.now();
+  const cached = validatedCrucesCache.get(key);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const value = buildAllValidatedCrucesForPlayerQueryUncached(category);
+  validatedCrucesCache.set(key, {
+    expiresAt: now + VALIDATED_CRUCES_CACHE_TTL_MS,
+    value
+  });
+
+  try {
+    return await value;
+  } catch (err) {
+    if (validatedCrucesCache.get(key)?.value === value) {
+      validatedCrucesCache.delete(key);
+    }
+    throw err;
+  }
 }
 
 async function findRegisteredPlayerSuggestionsByCategory(category = '', q = '') {
@@ -3164,8 +3368,10 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions: [], player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
 
-    const registeredSuggestions = await findRegisteredPlayerSuggestionsByCategory(category, q);
-    const resultadoSuggestions = await findJugadorResultadoSuggestionsByCategory(category, q, edition);
+    const [registeredSuggestions, resultadoSuggestions] = await Promise.all([
+      findRegisteredPlayerSuggestionsByCategory(category, q),
+      findJugadorResultadoSuggestionsByCategory(category, q, edition)
+    ]);
     const suggestions = mergePlayerSuggestions(registeredSuggestions, resultadoSuggestions);
     if (suggestOnly) {
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
@@ -3204,21 +3410,23 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
     const totalRankingPosition = totalRankingFallbackIndex >= 0
       ? totalRankingFallbackIndex + 1
       : null;
-    let { matches, pairMatches } = await getJugadorResultadoMatches(category, {
+    const validatedResults = await filterItemsByEdition(
+      await buildAllValidatedCrucesForPlayerQuery(category),
+      edition,
+      category
+    );
+    const liveDetail = buildPlayerMatchesFromValidatedResults(validatedResults, {
       id: exact.id || playerRadRow?.id || null,
-      name: exact.name || playerRadRow?.name || '',
-      names: [exact.name, playerRadRow?.name].filter(Boolean)
-    }, edition);
-
-    if (!matches.length && !pairMatches.length) {
-      const validatedResults = await filterItemsByEdition(await buildAllValidatedCrucesForPlayerQuery(category), edition, category);
-      const fallbackDetail = buildPlayerMatchesFromValidatedResults(validatedResults, {
-        id: exact.id || playerRadRow?.id || null,
-        name: exact.name || playerRadRow?.name || ''
-      });
-      matches = fallbackDetail.matches;
-      pairMatches = fallbackDetail.pairMatches;
-    }
+      name: exact.name || playerRadRow?.name || ''
+    });
+    const storedDetail = (liveDetail.matches.length || liveDetail.pairMatches.length)
+      ? null
+      : await getJugadorResultadoMatches(category, {
+          id: exact.id || playerRadRow?.id || null,
+          name: exact.name || playerRadRow?.name || '',
+          names: [exact.name, playerRadRow?.name].filter(Boolean)
+        }, edition);
+    const { matches, pairMatches } = storedDetail || liveDetail;
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
@@ -3275,12 +3483,15 @@ function ensureRankingRow(map, playerName, teamSlug, teamName) {
   return ensureRankingRowForPlayer(map, { name: playerName, id: null }, teamSlug, teamName);
 }
 
-function ensureRankingRowForPlayer(map, player, teamSlug, teamName) {
+function ensureRankingRowForPlayer(map, player, teamSlug, teamName, options = {}) {
   const playerId = Number(player?.id || 0) || null;
   const playerName = String(player?.name || '').trim();
-  const key = playerId
-    ? `id:${playerId}`
-    : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`;
+  const mergeHistoricalIdentities = !!options.mergeHistoricalIdentities;
+  const key = mergeHistoricalIdentities && playerName
+    ? `historic:${canonicalTeamPlayerNameKey(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`
+    : (playerId
+        ? `id:${playerId}`
+        : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`);
   if (!map.has(key)) {
     map.set(key, {
       id: playerId,
@@ -3296,6 +3507,8 @@ function ensureRankingRowForPlayer(map, player, teamSlug, teamName) {
       diff: 0,
       effectiveness: 0
     });
+  } else if (playerId && !map.get(key).id) {
+    map.get(key).id = playerId;
   }
   return map.get(key);
 }
@@ -3371,7 +3584,7 @@ function sortPlayerRadRows(a, b) {
   return String(a.name || '').localeCompare(String(b.name || ''), 'es');
 }
 
-function buildPlayerRowsFromResults(results = []) {
+function buildPlayerRowsFromResults(results = [], options = {}) {
   const rankingMap = new Map();
 
   for (const item of results) {
@@ -3388,7 +3601,7 @@ function buildPlayerRowsFromResults(results = []) {
       const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
 
       if (localPlayer.name) {
-        const row = ensureRankingRowForPlayer(rankingMap, localPlayer, item.localSlug, item.localName);
+        const row = ensureRankingRowForPlayer(rankingMap, localPlayer, item.localSlug, item.localName, options);
         row.played += 1;
         row.triangulosFavor += localScore;
         row.triangulosContra += visitanteScore;
@@ -3398,7 +3611,7 @@ function buildPlayerRowsFromResults(results = []) {
       }
 
       if (visitantePlayer.name) {
-        const row = ensureRankingRowForPlayer(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName);
+        const row = ensureRankingRowForPlayer(rankingMap, visitantePlayer, item.visitanteSlug, item.visitanteName, options);
         row.played += 1;
         row.triangulosFavor += visitanteScore;
         row.triangulosContra += localScore;
@@ -3436,8 +3649,8 @@ function buildRadRankingFromPlayerRows(baseRows = []) {
   };
 }
 
-function buildRadRankingFromResults(results = []) {
-  return buildRadRankingFromPlayerRows(buildPlayerRowsFromResults(results));
+function buildRadRankingFromResults(results = [], options = {}) {
+  return buildRadRankingFromPlayerRows(buildPlayerRowsFromResults(results, options));
 }
 
 async function getPromotedPlayerKeys(category = '') {
@@ -3649,20 +3862,22 @@ async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITI
 
   const value = (async () => {
     try {
-      const rankingData = await buildRadRankingFromJugadorResultados(division, normalizedEdition);
+      const results = await filterItemsByEdition(
+        await buildAllValidatedCrucesForPlayerQuery(division),
+        normalizedEdition,
+        division
+      );
+      const rankingData = buildRadRankingFromResults(results, {
+        mergeHistoricalIdentities: normalizedEdition === 'total'
+      });
       if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {
         return rankingData;
       }
     } catch (err) {
-      console.warn('Falling back to cruces_validations for player ranking', err?.code || err?.message || err);
+      console.warn('Falling back to jugador_resultados for player ranking', err?.code || err?.message || err);
     }
 
-    const results = await filterItemsByEdition(
-      await buildAllValidatedCrucesForPlayerQuery(division),
-      normalizedEdition,
-      division
-    );
-    return buildRadRankingFromResults(results);
+    return buildRadRankingFromJugadorResultados(division, normalizedEdition);
   })();
 
   radRankingCache.set(cacheKey, {
@@ -3723,14 +3938,15 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', 
     .sort((a, b) => a.label.localeCompare(b.label, 'es'))
     .slice(0, 12);
 
-  if (storedSuggestions.length) return storedSuggestions;
-
   const validatedResults = await filterItemsByEdition(
     await buildAllValidatedCrucesForPlayerQuery(division),
     normalizedEdition,
     division
   );
-  return buildValidatedPlayerSuggestions(validatedResults, q);
+  return mergePlayerSuggestions(
+    storedSuggestions,
+    buildValidatedPlayerSuggestions(validatedResults, q)
+  );
 }
 
 async function getJugadorResultadoMatches(category = '', player = {}, edition = CURRENT_EDITION) {
@@ -4178,6 +4394,18 @@ async function getPairPlayerStatsForTeam(category = '', edition = CURRENT_EDITIO
   });
   if (!division) return [];
 
+  try {
+    const results = await filterItemsByEdition(
+      await buildAllValidatedCrucesForPlayerQuery(division),
+      normalizedEdition,
+      division
+    );
+    const liveRows = buildPairPlayerStatsFromValidatedResults(results, teamInfo);
+    if (liveRows.length) return liveRows;
+  } catch (err) {
+    console.warn('Falling back to jugador_resultados for pair player stats', err?.code || err?.message || err);
+  }
+
   let rows = [];
   try {
     await ensureJugadorResultadosEditionColumn();
@@ -4206,13 +4434,8 @@ async function getPairPlayerStatsForTeam(category = '', edition = CURRENT_EDITIO
     );
     rows = result.rows;
   } catch (err) {
-    console.warn('Falling back to cruces_validations for pair player stats', err?.code || err?.message || err);
-    const results = await filterItemsByEdition(
-      await buildAllValidatedCrucesForPlayerQuery(division),
-      normalizedEdition,
-      division
-    );
-    return buildPairPlayerStatsFromValidatedResults(results, teamInfo);
+    console.warn('Unable to read jugador_resultados for pair player stats', err?.code || err?.message || err);
+    return [];
   }
 
   return rows
