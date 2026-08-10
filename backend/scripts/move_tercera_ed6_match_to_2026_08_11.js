@@ -1,7 +1,7 @@
 const pool = require('../db');
 
 const APPLY = process.argv.includes('--apply');
-const EXPECTED_DATABASE = 'lipa_db_staging';
+const EXPECTED_DATABASE = process.env.EXPECTED_DATABASE || 'lipa_db_staging';
 const CATEGORY = 'tercera';
 const EDITION = 6;
 const KIND = 'ida';
