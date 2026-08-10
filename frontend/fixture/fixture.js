@@ -440,7 +440,9 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
   rowsCont.innerHTML = '';
   const list = Array.isArray(equipos) ? equipos.slice() : [];
   const matchesFromData = Math.floor(list.length / 2);
-  const total = matchesPerGroup || matchesFromData;
+  // Si una fecha ya tiene cruces cargados, respetar exactamente esa cantidad.
+  // El máximo configurado se usa solo para fechas todavía vacías/editables.
+  const total = matchesFromData || matchesPerGroup || 0;
 
   for (let k = 0; k < total; k++){
     const iL = 2 * k;
