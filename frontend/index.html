@@ -260,19 +260,19 @@
   <footer class="site-footer">
     <div class="site-footer__inner">
       <a class="site-footer__link" href="./politica-privacidad.html">Política de Privacidad</a>
-      <button class="site-footer__link site-footer__credit" id="openDeveloperContact" type="button">
+      <button class="site-footer__link site-footer__credit" type="button" popovertarget="developerContact">
         Diseño y desarrollo Javier Martino
       </button>
       <span class="site-footer__stats" id="statsBar">Online: — | Hoy: — | Semana: —</span>
     </div>
   </footer>
 
-  <dialog class="developer-contact" id="developerContact" aria-labelledby="developerContactTitle">
-    <button class="developer-contact__close" id="closeDeveloperContact" type="button" aria-label="Cerrar">×</button>
+  <div class="developer-contact" id="developerContact" popover aria-labelledby="developerContactTitle">
+    <button class="developer-contact__close" type="button" popovertarget="developerContact" popovertargetaction="hide" aria-label="Cerrar">×</button>
     <strong id="developerContactTitle">Diseño y desarrollo</strong>
     <span>Javier Martino</span>
     <a href="mailto:javier.martino@hotmail.com">javier.martino@hotmail.com</a>
-  </dialog>
+  </div>
 
   <style>
     .site-footer{
