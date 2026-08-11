@@ -150,6 +150,33 @@ module.exports = function createPicturesRouter(deps) {
     return teamInfo.displayName || slug;
   }
 
+  async function getPictureSlugAliases(teamSlug, teamName = '', category = '') {
+    const normalizedSlug = normalizeSlug(teamSlug);
+    const normalizedName = String(teamName || '').trim().toLowerCase();
+    const normalizedCategory = normalizeCategory(category);
+    const aliases = new Set([normalizedSlug].filter(Boolean));
+    if (!normalizedSlug && !normalizedName) return [...aliases];
+
+    const { rows } = await pool.query(
+      `SELECT display_name, slug_uid, slug_base, division
+         FROM equipos
+        WHERE ($1 <> '' AND (LOWER(slug_uid) = $1 OR LOWER(slug_base) = $1))
+           OR ($2 <> '' AND LOWER(TRIM(display_name)) = $2)`,
+      [normalizedSlug, normalizedName]
+    );
+
+    rows
+      .filter((row) => !normalizedCategory || normalizeCategory(row.division) === normalizedCategory)
+      .forEach((row) => {
+        const slugUid = normalizeSlug(row.slug_uid);
+        const slugBase = normalizeSlug(row.slug_base);
+        if (slugUid) aliases.add(slugUid);
+        if (slugBase) aliases.add(slugBase);
+      });
+
+    return [...aliases];
+  }
+
   async function getTeamOptions() {
     await pool.query(`ALTER TABLE equipos ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true`);
     const { rows } = await pool.query(`SELECT display_name, slug_uid, slug_base, division FROM equipos WHERE activo = true AND COALESCE(display_name, '') <> '' AND (COALESCE(slug_uid, '') <> '' OR COALESCE(slug_base, '') <> '') ORDER BY display_name ASC, id ASC`);
@@ -201,7 +228,7 @@ module.exports = function createPicturesRouter(deps) {
     return /(^|_)desempate$/i.test(normalizeSlug(folderSlug));
   }
 
-  async function listTeamPictures(fechaISO, teamSlug, { tipo = '' } = {}) {
+  async function listTeamPictures(fechaISO, teamSlug, { tipo = '', aliases = [] } = {}) {
     if (!fechaISO || !teamSlug) return [];
 
     const fechaDir = path.join(picturesRoot, fechaISO);
@@ -212,7 +239,9 @@ module.exports = function createPicturesRouter(deps) {
       return [];
     }
 
-    const normalized = normalizeSlug(teamSlug);
+    const normalizedAliases = new Set(
+      [teamSlug, ...aliases].map(normalizeSlug).filter(Boolean)
+    );
     const wantsTiebreak = String(tipo || '').trim().toLowerCase() === 'desempate';
 
     const candidates = dirEntries
@@ -220,7 +249,9 @@ module.exports = function createPicturesRouter(deps) {
       .map((entry) => entry.name)
       .filter((name) => {
         const slug = normalizeSlug(name);
-        const belongsToTeam = slug === normalized || slug.startsWith(normalized + '_');
+        const belongsToTeam = [...normalizedAliases].some((alias) => (
+          slug === alias || slug.startsWith(alias + '_')
+        ));
         if (!belongsToTeam) return false;
 
         const isTiebreakFolder = isTiebreakPicturesFolder(slug);
@@ -429,12 +460,19 @@ module.exports = function createPicturesRouter(deps) {
       const fechaISO = String(req.query?.fechaISO || '').slice(0, 10);
       const localSlug = normalizeSlug(req.query?.localSlug || '');
       const visitanteSlug = normalizeSlug(req.query?.visitanteSlug || '');
+      const localName = String(req.query?.localName || '').trim();
+      const visitanteName = String(req.query?.visitanteName || '').trim();
+      const category = normalizeCategory(req.query?.category || '');
       const tipo = String(req.query?.tipo || '').trim().toLowerCase() === 'desempate' ? 'desempate' : 'cruce';
 
       if (!fechaISO || !localSlug || !visitanteSlug) return res.status(400).json({ ok: false, error: 'Faltan datos del encuentro' });
 
-      const localItems = await listTeamPictures(fechaISO, localSlug, { tipo });
-      const visitanteItems = await listTeamPictures(fechaISO, visitanteSlug, { tipo });
+      const [localAliases, visitanteAliases] = await Promise.all([
+        getPictureSlugAliases(localSlug, localName, category),
+        getPictureSlugAliases(visitanteSlug, visitanteName, category)
+      ]);
+      const localItems = await listTeamPictures(fechaISO, localSlug, { tipo, aliases: localAliases });
+      const visitanteItems = await listTeamPictures(fechaISO, visitanteSlug, { tipo, aliases: visitanteAliases });
       const chosen = localItems.length ? { teamSlug: localSlug, items: localItems } : { teamSlug: visitanteSlug, items: visitanteItems };
       return res.json({ ok: true, fechaISO, tipo, teamSlug: chosen.teamSlug, items: chosen.items });
     } catch (err) {
