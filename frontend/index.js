@@ -860,6 +860,18 @@ function setupBannerPopupLinks() {
   });
 }
 
+function setupDeveloperContact() {
+  const dialog = document.getElementById("developerContact");
+  const openButton = document.getElementById("openDeveloperContact");
+  const closeButton = document.getElementById("closeDeveloperContact");
+
+  openButton?.addEventListener("click", () => dialog?.showModal());
+  closeButton?.addEventListener("click", () => dialog?.close());
+  dialog?.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   ensureManageTeamButton();
   ensureConsultasButton();
@@ -876,4 +888,5 @@ document.addEventListener("DOMContentLoaded", () => {
   setupFlyerImageZoom();
   setupBannerPopupLinks();
   setupSocialFollowModal();
+  setupDeveloperContact();
 });

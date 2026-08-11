@@ -361,23 +361,9 @@
     }
   </style>
 
-  <script>
-    (() => {
-      const dialog = document.getElementById('developerContact');
-      const openButton = document.getElementById('openDeveloperContact');
-      const closeButton = document.getElementById('closeDeveloperContact');
-
-      openButton?.addEventListener('click', () => dialog?.showModal());
-      closeButton?.addEventListener('click', () => dialog?.close());
-      dialog?.addEventListener('click', (event) => {
-        if (event.target === dialog) dialog.close();
-      });
-    })();
-  </script>
-
   <script src="./config.js"></script>
   <script type="module" src="./templates/banner.js" defer></script>
   <script type="module" src="./app.js" defer></script>
-  <script type="module" src="./index.js?v=20260727-1" defer></script>
+  <script type="module" src="./index.js?v=20260811-1" defer></script>
 </body>
 </html>
