@@ -260,19 +260,18 @@
   <footer class="site-footer">
     <div class="site-footer__inner">
       <a class="site-footer__link" href="./politica-privacidad.html">Política de Privacidad</a>
-      <button class="site-footer__link site-footer__credit" type="button" popovertarget="developerContact">
-        Diseño y desarrollo Javier Martino
-      </button>
+      <details class="site-footer__contact">
+        <summary class="site-footer__link site-footer__credit">Diseño y desarrollo Javier Martino</summary>
+        <div class="developer-contact" aria-label="Contacto del desarrollador">
+          <strong>Diseño y desarrollo</strong>
+          <span>Javier Martino</span>
+          <a href="mailto:javier.martino@hotmail.com">javier.martino@hotmail.com</a>
+          <small>Volvé a tocar el texto para cerrar</small>
+        </div>
+      </details>
       <span class="site-footer__stats" id="statsBar">Online: — | Hoy: — | Semana: —</span>
     </div>
   </footer>
-
-  <div class="developer-contact" id="developerContact" popover aria-labelledby="developerContactTitle">
-    <button class="developer-contact__close" type="button" popovertarget="developerContact" popovertargetaction="hide" aria-label="Cerrar">×</button>
-    <strong id="developerContactTitle">Diseño y desarrollo</strong>
-    <span>Javier Martino</span>
-    <a href="mailto:javier.martino@hotmail.com">javier.martino@hotmail.com</a>
-  </div>
 
   <style>
     .site-footer{
@@ -307,11 +306,11 @@
       opacity: .9;
     }
     .site-footer__credit{
-      padding: 0;
-      border: 0;
-      background: transparent;
-      font: inherit;
       cursor: pointer;
+      list-style: none;
+    }
+    .site-footer__credit::-webkit-details-marker{
+      display: none;
     }
     .site-footer__stats{
       color: var(--muted);
@@ -319,7 +318,11 @@
       white-space: nowrap;
     }
     .developer-contact{
-      position: relative;
+      position: fixed;
+      z-index: 10000;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       width: min(320px, calc(100% - 32px));
       padding: 24px 28px;
       border: 1px solid #d5a900;
@@ -328,9 +331,6 @@
       color: #fff;
       box-shadow: 0 18px 55px rgba(0, 0, 0, .65);
       text-align: center;
-    }
-    .developer-contact::backdrop{
-      background: rgba(0, 0, 0, .68);
     }
     .developer-contact strong,
     .developer-contact span,
@@ -349,15 +349,11 @@
       color: #ffd966;
       overflow-wrap: anywhere;
     }
-    .developer-contact__close{
-      position: absolute;
-      top: 7px;
-      right: 10px;
-      border: 0;
-      background: transparent;
-      color: #fff;
-      font-size: 1.5rem;
-      cursor: pointer;
+    .developer-contact small{
+      display: block;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: .75rem;
     }
   </style>
 
