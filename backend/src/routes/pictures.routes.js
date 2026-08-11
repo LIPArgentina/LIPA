@@ -12,6 +12,24 @@ module.exports = function createPicturesRouter(deps) {
   const picturesRoot = deps.PICTURES_DIR;
   const REQUIRED_PICTURES = 11;
   const HEIC_EXT_RE = /\.(heic|heif)$/i;
+  const PICTURE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i;
+
+  function uploadErrorId() {
+    return crypto.randomBytes(5).toString('hex');
+  }
+
+  function logUploadError(req, error, errorId, stage = 'upload') {
+    console.error('[pictures-upload-error]', JSON.stringify({
+      errorId,
+      stage,
+      fechaISO: String(req.body?.fechaISO || '').slice(0, 10),
+      teamSlug: resolveRequestedTeamSlug(req) || pickUserSlug(req.user),
+      receivedFiles: Array.isArray(req.files) ? req.files.length : 0,
+      receivedBytes: (Array.isArray(req.files) ? req.files : []).reduce((sum, file) => sum + Number(file?.size || 0), 0),
+      message: String(error?.message || error || 'Error desconocido'),
+      code: String(error?.code || '')
+    }));
+  }
 
   function isHeicLike(file = {}) {
     const original = String(file.originalname || file.filename || '');
@@ -399,9 +417,63 @@ module.exports = function createPicturesRouter(deps) {
 
   function runUpload(req, res, next) {
     upload.array('pictures', REQUIRED_PICTURES)(req, res, (err) => {
-      if (err) return res.status(400).json({ ok: false, error: err.message || 'No se pudo subir el archivo' });
+      if (err) {
+        const errorId = uploadErrorId();
+        logUploadError(req, err, errorId, 'recepcion');
+        const friendlyError = err?.code === 'LIMIT_FILE_SIZE'
+          ? 'Una de las fotos supera el máximo permitido de 10 MB.'
+          : err?.code === 'LIMIT_FILE_COUNT' || err?.code === 'LIMIT_UNEXPECTED_FILE'
+            ? `Solo se pueden enviar hasta ${REQUIRED_PICTURES} fotos por carga.`
+            : (err.message || 'No se pudieron recibir las fotos.');
+        return res.status(400).json({ ok: false, error: friendlyError, errorId });
+      }
       next();
     });
+  }
+
+  async function fileHash(filePath) {
+    const content = await fs.promises.readFile(filePath);
+    return crypto.createHash('sha256').update(content).digest('hex');
+  }
+
+  async function keepUniquePicturesWithinLimit(files, limit) {
+    if (!files.length) return { files: [], duplicatesSkipped: 0, excessSkipped: 0, totalPictures: 0 };
+    const directory = path.dirname(files[0].path);
+    const currentNames = new Set(files.map((file) => path.basename(file.path)));
+    const directoryEntries = await fs.promises.readdir(directory, { withFileTypes: true });
+    const existingPaths = directoryEntries
+      .filter((entry) => entry.isFile() && PICTURE_EXT_RE.test(entry.name) && !currentNames.has(entry.name))
+      .map((entry) => path.join(directory, entry.name));
+    const knownHashes = new Set();
+    for (const existingPath of existingPaths) {
+      try { knownHashes.add(await fileHash(existingPath)); } catch (_) {}
+    }
+
+    const accepted = [];
+    let duplicatesSkipped = 0;
+    let excessSkipped = 0;
+    for (const file of files) {
+      const hash = await fileHash(file.path);
+      if (knownHashes.has(hash)) {
+        duplicatesSkipped += 1;
+        try { await fs.promises.unlink(file.path); } catch (_) {}
+        continue;
+      }
+      if (existingPaths.length + accepted.length >= limit) {
+        excessSkipped += 1;
+        try { await fs.promises.unlink(file.path); } catch (_) {}
+        continue;
+      }
+      knownHashes.add(hash);
+      accepted.push(file);
+    }
+
+    return {
+      files: accepted,
+      duplicatesSkipped,
+      excessSkipped,
+      totalPictures: Math.min(limit, existingPaths.length + accepted.length)
+    };
   }
 
   async function handleUpload(req, res, { adminMode = false } = {}) {
@@ -418,10 +490,9 @@ module.exports = function createPicturesRouter(deps) {
       if (!teamSlug) return res.status(400).json({ ok: false, error: manualAdminUpload ? 'Falta el teamSlug para la carga manual' : 'No se pudo identificar el equipo' });
       if (!manualAdminUpload && (!localSlug || !visitanteSlug)) return res.status(400).json({ ok: false, error: 'Faltan datos del cruce' });
       if (!files.length) return res.status(400).json({ ok: false, error: 'No se recibieron imágenes' });
-      if (files.length !== requiredPictures) {
+      if (isTiebreakPicturesFolder(tipo) && files.length !== 1) {
         for (const file of files) { try { await fs.promises.unlink(file.path); } catch (_) {} }
-        if (files.length < requiredPictures) return res.status(400).json({ ok: false, error: `Faltan ${requiredPictures - files.length} foto${requiredPictures - files.length === 1 ? '' : 's'} para completar las ${requiredPictures} requerida${requiredPictures === 1 ? '' : 's'}` });
-        return res.status(400).json({ ok: false, error: `Solo se permiten ${requiredPictures} foto${requiredPictures === 1 ? '' : 's'} por carga` });
+        return res.status(400).json({ ok: false, error: 'El desempate admite una sola foto por carga.' });
       }
       if (!manualAdminUpload) {
         const allowed = await isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug: teamSlug, tipo });
@@ -432,9 +503,20 @@ module.exports = function createPicturesRouter(deps) {
       }
       const normalizedFiles = [];
       for (const file of files) normalizedFiles.push(await convertHeicToJpeg(file));
-      const result = normalizedFiles.map(file => ({ teamSlug, tipo, fechaISO, filename: file.filename, originalName: file.originalname, size: file.size, uploadedAt: new Date().toISOString() }));
-      return res.json({ ok: true, files: result });
+      const stored = await keepUniquePicturesWithinLimit(normalizedFiles, requiredPictures);
+      const result = stored.files.map(file => ({ teamSlug, tipo, fechaISO, filename: file.filename, originalName: file.originalname, size: file.size, uploadedAt: new Date().toISOString() }));
+      return res.json({
+        ok: true,
+        files: result,
+        uploadedCount: result.length,
+        duplicatesSkipped: stored.duplicatesSkipped,
+        excessSkipped: stored.excessSkipped,
+        totalPictures: stored.totalPictures,
+        requiredPictures
+      });
     } catch (err) {
+      const errorId = uploadErrorId();
+      logUploadError(req, err, errorId, 'procesamiento');
       const files = Array.isArray(req.files) ? req.files : [];
       for (const file of files) {
         try { await fs.promises.unlink(file.path); } catch (_) {}
@@ -443,7 +525,7 @@ module.exports = function createPicturesRouter(deps) {
           if (jpgCandidate !== file.path) await fs.promises.unlink(jpgCandidate);
         } catch (_) {}
       }
-      return res.status(500).json({ ok: false, error: err?.message || 'No se pudieron guardar las fotos' });
+      return res.status(500).json({ ok: false, error: 'No se pudieron procesar o guardar las fotos.', errorId });
     }
   }
 

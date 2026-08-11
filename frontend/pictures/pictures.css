@@ -27,6 +27,27 @@ body.modal-open { overflow: hidden; }
 .status.error { color: #ff8d8d; }
 .status.success { color: #76d476; }
 .status.info { color: #8eb7ff; }
+.upload-progress {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #10151c;
+}
+.upload-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.upload-progress progress {
+  display: block;
+  width: 100%;
+  height: 18px;
+  accent-color: var(--accent);
+}
 .list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

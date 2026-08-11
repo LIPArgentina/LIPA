@@ -23,14 +23,21 @@
         <span id="pickedFilesText" class="muted">No se eligió ningún archivo</span>
       </div>
       <div id="previewContainer" class="preview-grid"></div>
+      <div id="uploadProgressWrap" class="upload-progress" hidden>
+        <div class="upload-progress-head">
+          <span id="uploadProgressText">Preparando fotos…</span>
+          <strong id="uploadProgressPercent">0%</strong>
+        </div>
+        <progress id="uploadProgress" max="100" value="0">0%</progress>
+      </div>
       <div class="actions">
         <button class="btn" id="btnUpload" type="button">SUBIR FOTOS</button>
       </div>
-      <p class="hint">Elegí exactamente 11 fotos, de hasta 10 MB cada una.</p>
+      <p class="hint">Podés subir entre 1 y 11 fotos y completar las faltantes más tarde. La aplicación intentará reducir automáticamente el peso antes de enviarlas.</p>
     </section>
   </main>
 
   <script src="../config.js"></script>
-  <script src="./pictures_upload.js?v=20260728-1"></script>
+  <script src="./pictures_upload.js?v=20260811-1"></script>
 </body>
 </html>
