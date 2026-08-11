@@ -260,16 +260,16 @@
   <footer class="site-footer">
     <div class="site-footer__inner">
       <a class="site-footer__link" href="./politica-privacidad.html">Política de Privacidad</a>
+      <span class="site-footer__stats" id="statsBar">Online: — | Hoy: — | Semana: —</span>
       <details class="site-footer__contact">
         <summary class="site-footer__link site-footer__credit">Diseño y desarrollo Javier Martino</summary>
         <div class="developer-contact" aria-label="Contacto del desarrollador">
           <strong>Diseño y desarrollo</strong>
           <span>Javier Martino</span>
           <a href="mailto:javier.martino@hotmail.com">javier.martino@hotmail.com</a>
-          <small>Volvé a tocar el texto para cerrar</small>
+          <button class="developer-contact__close" id="closeDeveloperContact" type="button">Cerrar</button>
         </div>
       </details>
-      <span class="site-footer__stats" id="statsBar">Online: — | Hoy: — | Semana: —</span>
     </div>
   </footer>
 
@@ -308,6 +308,11 @@
     .site-footer__credit{
       cursor: pointer;
       list-style: none;
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 500;
+      text-decoration: none;
+      opacity: .72;
     }
     .site-footer__credit::-webkit-details-marker{
       display: none;
@@ -323,8 +328,8 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: min(320px, calc(100% - 32px));
-      padding: 24px 28px;
+      width: min(280px, calc(100% - 32px));
+      padding: 20px 24px;
       border: 1px solid #d5a900;
       border-radius: 14px;
       background: #15181e;
@@ -349,11 +354,17 @@
       color: #ffd966;
       overflow-wrap: anywhere;
     }
-    .developer-contact small{
-      display: block;
+    .developer-contact__close{
+      display: inline-block;
       margin-top: 14px;
-      color: var(--muted);
-      font-size: .75rem;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #ffd966;
+      font: inherit;
+      font-size: .82rem;
+      text-decoration: underline;
+      cursor: pointer;
     }
   </style>
 
@@ -361,5 +372,6 @@
   <script type="module" src="./templates/banner.js" defer></script>
   <script type="module" src="./app.js" defer></script>
   <script type="module" src="./index.js?v=20260811-1" defer></script>
+  <script src="./developer-contact.js?v=20260811-1" defer></script>
 </body>
 </html>
