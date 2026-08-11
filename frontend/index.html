@@ -260,9 +260,19 @@
   <footer class="site-footer">
     <div class="site-footer__inner">
       <a class="site-footer__link" href="./politica-privacidad.html">Política de Privacidad</a>
+      <button class="site-footer__link site-footer__credit" id="openDeveloperContact" type="button">
+        Diseño y desarrollo Javier Martino
+      </button>
       <span class="site-footer__stats" id="statsBar">Online: — | Hoy: — | Semana: —</span>
     </div>
   </footer>
+
+  <dialog class="developer-contact" id="developerContact" aria-labelledby="developerContactTitle">
+    <button class="developer-contact__close" id="closeDeveloperContact" type="button" aria-label="Cerrar">×</button>
+    <strong id="developerContactTitle">Diseño y desarrollo</strong>
+    <span>Javier Martino</span>
+    <a href="mailto:javier.martino@hotmail.com">javier.martino@hotmail.com</a>
+  </dialog>
 
   <style>
     .site-footer{
@@ -296,12 +306,74 @@
     .site-footer__link:hover{
       opacity: .9;
     }
+    .site-footer__credit{
+      padding: 0;
+      border: 0;
+      background: transparent;
+      font: inherit;
+      cursor: pointer;
+    }
     .site-footer__stats{
       color: var(--muted);
       font-size: 0.92rem;
       white-space: nowrap;
     }
+    .developer-contact{
+      position: relative;
+      width: min(320px, calc(100% - 32px));
+      padding: 24px 28px;
+      border: 1px solid #d5a900;
+      border-radius: 14px;
+      background: #15181e;
+      color: #fff;
+      box-shadow: 0 18px 55px rgba(0, 0, 0, .65);
+      text-align: center;
+    }
+    .developer-contact::backdrop{
+      background: rgba(0, 0, 0, .68);
+    }
+    .developer-contact strong,
+    .developer-contact span,
+    .developer-contact a{
+      display: block;
+    }
+    .developer-contact strong{
+      margin-bottom: 8px;
+      color: #ffd54a;
+      font-size: 1.05rem;
+    }
+    .developer-contact span{
+      margin-bottom: 12px;
+    }
+    .developer-contact a{
+      color: #ffd966;
+      overflow-wrap: anywhere;
+    }
+    .developer-contact__close{
+      position: absolute;
+      top: 7px;
+      right: 10px;
+      border: 0;
+      background: transparent;
+      color: #fff;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
   </style>
+
+  <script>
+    (() => {
+      const dialog = document.getElementById('developerContact');
+      const openButton = document.getElementById('openDeveloperContact');
+      const closeButton = document.getElementById('closeDeveloperContact');
+
+      openButton?.addEventListener('click', () => dialog?.showModal());
+      closeButton?.addEventListener('click', () => dialog?.close());
+      dialog?.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+    })();
+  </script>
 
   <script src="./config.js"></script>
   <script type="module" src="./templates/banner.js" defer></script>
