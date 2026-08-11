@@ -325,7 +325,10 @@
     const params = new URLSearchParams({
       fechaISO: item.fechaISO || '',
       localSlug: item.localSlug || '',
-      visitanteSlug: item.visitanteSlug || ''
+      visitanteSlug: item.visitanteSlug || '',
+      localName: item.localName || '',
+      visitanteName: item.visitanteName || '',
+      category: currentCategory || ''
     });
     if (isTiebreak) params.set('tipo', 'desempate');
 
