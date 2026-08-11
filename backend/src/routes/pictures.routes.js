@@ -74,10 +74,25 @@ module.exports = function createPicturesRouter(deps) {
     return a === b || a.startsWith(`${b}_`);
   }
 
-  function resolveTeamKey(equipoSlug, localSlug, visitanteSlug) {
+  function normalizeTeamIdentity(value = '') {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\b(segunda|tercera|primera|2da|3ra|1ra)\b/g, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  async function resolveTeamKey(equipoSlug, localSlug, visitanteSlug) {
     const equipoNorm = normalizeSlug(equipoSlug);
     if (slugMatchesTeam(equipoNorm, localSlug)) return normalizeSlug(localSlug);
     if (slugMatchesTeam(equipoNorm, visitanteSlug)) return normalizeSlug(visitanteSlug);
+
+    const teamInfo = await getTeamInfoBySlug(equipoNorm);
+    const teamIdentity = normalizeTeamIdentity(teamInfo.displayName);
+    if (teamIdentity && teamIdentity === normalizeTeamIdentity(localSlug)) return normalizeSlug(localSlug);
+    if (teamIdentity && teamIdentity === normalizeTeamIdentity(visitanteSlug)) return normalizeSlug(visitanteSlug);
     return null;
   }
 
@@ -210,7 +225,7 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   async function isValidatedMatch({ fechaISO, localSlug, visitanteSlug, equipoSlug, tipo = '' }) {
-    const teamKey = resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
+    const teamKey = await resolveTeamKey(equipoSlug, localSlug, visitanteSlug);
     if (!teamKey) return false;
     const rivalKey = teamKey === normalizeSlug(localSlug) ? normalizeSlug(visitanteSlug) : normalizeSlug(localSlug);
     const fechaKey = buildFechaKey(fechaISO, localSlug, visitanteSlug) + (String(tipo || '').toLowerCase() === 'desempate' ? '::desempate' : '');
