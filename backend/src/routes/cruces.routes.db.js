@@ -144,13 +144,43 @@ async function ensureJugadorResultadosIdentityLinks() {
           WHERE TRIM(COALESCE(nombre, '')) <> ''
           GROUP BY LOWER(TRIM(nombre))
           HAVING COUNT(DISTINCT id) = 1
+        ),
+        team_players AS (
+          SELECT
+            jr.id AS resultado_id,
+            MIN(j.id)::int AS jugador_id
+          FROM jugador_resultados jr
+          INNER JOIN jugadores j
+            ON LOWER(TRIM(j.nombre)) = LOWER(TRIM(jr.jugador_nombre))
+          INNER JOIN jugador_equipos je
+            ON je.jugador_id = j.id
+           AND LOWER(je.categoria) = LOWER(jr.categoria)
+          INNER JOIN equipos e ON e.id = je.equipo_id
+          WHERE jr.jugador_id IS NULL
+            AND LOWER(jr.equipo_slug) IN (
+              LOWER(COALESCE(e.slug_uid, '')),
+              LOWER(COALESCE(e.slug_base, '')),
+              LOWER(COALESCE(e.username, ''))
+            )
+          GROUP BY jr.id
+          HAVING COUNT(DISTINCT j.id) = 1
+        ),
+        resolved_ids AS (
+          SELECT
+            jr.id AS resultado_id,
+            COALESCE(team_players.jugador_id, unique_players.jugador_id) AS jugador_id
+          FROM jugador_resultados jr
+          LEFT JOIN team_players ON team_players.resultado_id = jr.id
+          LEFT JOIN unique_players
+            ON LOWER(TRIM(jr.jugador_nombre)) = unique_players.normalized_name
+          WHERE jr.jugador_id IS NULL
+            AND COALESCE(team_players.jugador_id, unique_players.jugador_id) IS NOT NULL
         )
         UPDATE jugador_resultados jr
-           SET jugador_id = unique_players.jugador_id,
+           SET jugador_id = resolved_ids.jugador_id,
                updated_at = NOW()
-          FROM unique_players
-         WHERE jr.jugador_id IS NULL
-           AND LOWER(TRIM(jr.jugador_nombre)) = unique_players.normalized_name
+          FROM resolved_ids
+         WHERE jr.id = resolved_ids.resultado_id
       `);
     })().catch((err) => {
       ensureJugadorResultadosIdentityPromise = null;
@@ -3798,14 +3828,37 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
       GROUP BY LOWER(TRIM(nombre))
       HAVING COUNT(DISTINCT id) = 1
     ),
+    team_players AS (
+      SELECT
+        jr.id AS resultado_id,
+        MIN(j.id)::int AS jugador_id
+      FROM jugador_resultados jr
+      INNER JOIN jugadores j
+        ON LOWER(TRIM(j.nombre)) = LOWER(TRIM(jr.jugador_nombre))
+      INNER JOIN jugador_equipos je
+        ON je.jugador_id = j.id
+       AND LOWER(je.categoria) = LOWER(jr.categoria)
+      INNER JOIN equipos e ON e.id = je.equipo_id
+      WHERE jr.jugador_id IS NULL
+        AND LOWER(jr.equipo_slug) IN (
+          LOWER(COALESCE(e.slug_uid, '')),
+          LOWER(COALESCE(e.slug_base, '')),
+          LOWER(COALESCE(e.username, ''))
+        )
+      GROUP BY jr.id
+      HAVING COUNT(DISTINCT j.id) = 1
+    ),
     resolved AS (
       SELECT
         jr.*,
-        COALESCE(jr.jugador_id, unique_players.jugador_id) AS resolved_jugador_id
+        COALESCE(jr.jugador_id, team_players.jugador_id, unique_players.jugador_id) AS resolved_jugador_id
       FROM jugador_resultados jr
       LEFT JOIN unique_players
         ON jr.jugador_id IS NULL
        AND LOWER(TRIM(jr.jugador_nombre)) = unique_players.normalized_name
+      LEFT JOIN team_players
+        ON jr.jugador_id IS NULL
+       AND team_players.resultado_id = jr.id
       WHERE jr.categoria = $1
         AND jr.modalidad = 'individual'
         AND TRIM(COALESCE(jr.jugador_nombre, '')) <> ''
