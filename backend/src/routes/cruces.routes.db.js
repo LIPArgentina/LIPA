@@ -3546,11 +3546,27 @@ function ensureRankingRowForPlayer(map, player, teamSlug, teamName, options = {}
   const playerId = Number(player?.id || 0) || null;
   const playerName = String(player?.name || '').trim();
   const mergeHistoricalIdentities = !!options.mergeHistoricalIdentities;
+  const canonicalName = canonicalTeamPlayerNameKey(playerName);
+  const canonicalTeam = canonicalPlayerTeamSlug(teamSlug);
   const key = mergeHistoricalIdentities && playerName
-    ? `historic:${canonicalTeamPlayerNameKey(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`
+    ? `historic:${canonicalName}::${canonicalTeam}`
     : (playerId
         ? `id:${playerId}`
-        : `${normalizeText(playerName)}::${canonicalPlayerTeamSlug(teamSlug)}`);
+        : `${normalizeText(playerName)}::${canonicalTeam}`);
+
+  if (!map.has(key) && playerName) {
+    const compatibleRows = Array.from(map.values()).filter((row) => (
+      canonicalTeamPlayerNameKey(row.name) === canonicalName &&
+      canonicalPlayerTeamSlug(row.teamSlug) === canonicalTeam &&
+      (!playerId || !row.id || Number(row.id) === playerId)
+    ));
+    if (compatibleRows.length === 1) {
+      const existing = compatibleRows[0];
+      if (playerId && !existing.id) existing.id = playerId;
+      return existing;
+    }
+  }
+
   if (!map.has(key)) {
     map.set(key, {
       id: playerId,
