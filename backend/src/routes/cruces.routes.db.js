@@ -157,10 +157,10 @@ async function ensureJugadorResultadosIdentityLinks() {
            AND LOWER(je.categoria) = LOWER(jr.categoria)
           INNER JOIN equipos e ON e.id = je.equipo_id
           WHERE jr.jugador_id IS NULL
-            AND LOWER(jr.equipo_slug) IN (
-              LOWER(COALESCE(e.slug_uid, '')),
-              LOWER(COALESCE(e.slug_base, '')),
-              LOWER(COALESCE(e.username, ''))
+            AND REGEXP_REPLACE(LOWER(jr.equipo_slug), '_(primera|segunda|tercera)$', '') IN (
+              REGEXP_REPLACE(LOWER(COALESCE(e.slug_uid, '')), '_(primera|segunda|tercera)$', ''),
+              REGEXP_REPLACE(LOWER(COALESCE(e.slug_base, '')), '_(primera|segunda|tercera)$', ''),
+              REGEXP_REPLACE(LOWER(COALESCE(e.username, '')), '_(primera|segunda|tercera)$', '')
             )
           GROUP BY jr.id
           HAVING COUNT(DISTINCT j.id) = 1
@@ -3840,10 +3840,10 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
        AND LOWER(je.categoria) = LOWER(jr.categoria)
       INNER JOIN equipos e ON e.id = je.equipo_id
       WHERE jr.jugador_id IS NULL
-        AND LOWER(jr.equipo_slug) IN (
-          LOWER(COALESCE(e.slug_uid, '')),
-          LOWER(COALESCE(e.slug_base, '')),
-          LOWER(COALESCE(e.username, ''))
+        AND REGEXP_REPLACE(LOWER(jr.equipo_slug), '_(primera|segunda|tercera)$', '') IN (
+          REGEXP_REPLACE(LOWER(COALESCE(e.slug_uid, '')), '_(primera|segunda|tercera)$', ''),
+          REGEXP_REPLACE(LOWER(COALESCE(e.slug_base, '')), '_(primera|segunda|tercera)$', ''),
+          REGEXP_REPLACE(LOWER(COALESCE(e.username, '')), '_(primera|segunda|tercera)$', '')
         )
       GROUP BY jr.id
       HAVING COUNT(DISTINCT j.id) = 1
