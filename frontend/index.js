@@ -656,9 +656,6 @@ function openFlyerAldoModal() {
   const dlg = document.getElementById("flyerAldoModal");
   if (!dlg) return;
 
-  const socialDlg = document.getElementById("socialFollowModal");
-  if (socialDlg?.open) socialDlg.close();
-
   requestAnimationFrame(() => {
     if (typeof dlg.showModal === "function" && !dlg.open) {
       dlg.showModal();
@@ -674,9 +671,6 @@ function setupDialogOpener(dialogId, openButtonId) {
   const closeBtn = dlg.querySelector(".flyer-popup__close");
   const closeModal = () => dlg.close?.();
   const openModal = () => {
-    const socialDlg = document.getElementById("socialFollowModal");
-    if (socialDlg?.open) socialDlg.close();
-
     requestAnimationFrame(() => {
       if (typeof dlg.showModal === "function" && !dlg.open) {
         dlg.showModal();
@@ -710,29 +704,6 @@ function setupFlyerImageZoom() {
     dlg.addEventListener("close", () => {
       dlg.classList.remove("is-zoomed");
     });
-  });
-}
-
-function setupSocialFollowModal() {
-  const dlg = document.getElementById("socialFollowModal");
-  if (!dlg) return;
-  if (new URLSearchParams(location.search).has("popup")) return;
-
-  const closeBtn = dlg.querySelector(".social-follow-modal__close");
-  const closeModal = () => dlg.close?.();
-
-  closeBtn?.addEventListener("click", closeModal);
-
-  dlg.addEventListener("click", (event) => {
-    if (event.target === dlg) closeModal();
-  });
-
-  dlg.addEventListener("cancel", () => closeModal());
-
-  requestAnimationFrame(() => {
-    if (typeof dlg.showModal === "function" && !dlg.open) {
-      dlg.showModal();
-    }
   });
 }
 
@@ -875,5 +846,4 @@ document.addEventListener("DOMContentLoaded", () => {
   setupAscensosLipaModal();
   setupFlyerImageZoom();
   setupBannerPopupLinks();
-  setupSocialFollowModal();
 });
