@@ -389,6 +389,11 @@ function resolvePlayerId(player, category, teamSlug, teamName, playerIndex, over
     if (found?.id) return { id: Number(found.id), source: 'fallback' };
   }
 
+  const uniqueByName = playerIndex.byName.get(name);
+  if (uniqueByName?.id) {
+    return { id: Number(uniqueByName.id), source: 'unique-name' };
+  }
+
   if (overrideIndexes.flexibleNames.has(name)) {
     const teamKeys = [
       `${normalizeSlug(teamSlug)}::${name}`,
