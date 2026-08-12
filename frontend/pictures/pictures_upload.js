@@ -27,7 +27,39 @@
   const REQUIRED_PICTURES = isTiebreak ? 1 : 11;
   const MAX_IMAGE_SIDE = 2200;
   const JPEG_QUALITY = 0.84;
+  const UPLOAD_LOCK_TTL = 6 * 60 * 1000;
+  const uploadLockKey = `lipa.picture-upload:${fechaISO}:${localSlug}:${visitanteSlug}:${team}:${tipo || 'regular'}`;
   let uploadAllowed = false;
+  let uploadInProgress = false;
+
+  function readUploadLock() {
+    try {
+      const startedAt = Number(localStorage.getItem(uploadLockKey) || 0);
+      if (!startedAt || Date.now() - startedAt > UPLOAD_LOCK_TTL) {
+        localStorage.removeItem(uploadLockKey);
+        return false;
+      }
+      return true;
+    } catch {
+      return uploadInProgress;
+    }
+  }
+
+  function setUploadLock(active) {
+    uploadInProgress = active;
+    try {
+      if (active) localStorage.setItem(uploadLockKey, String(Date.now()));
+      else localStorage.removeItem(uploadLockKey);
+    } catch {}
+  }
+
+  function showUploadInProgress() {
+    btnUpload.disabled = true;
+    btnChoosePhotos.disabled = true;
+    picturesInput.disabled = true;
+    setStatus('Ya hay una carga en proceso. Por favor, esperá a que finalice antes de volver a intentarlo.', 'info');
+    setProgress(95, 'Fotos recibidas. El servidor las está guardando; no cierres ni vuelvas a intentar.');
+  }
 
   function getToken() {
     try {
@@ -128,8 +160,11 @@
       Object.entries(headers).forEach(([name, value]) => xhr.setRequestHeader(name, value));
       xhr.upload.onprogress = (event) => {
         if (!event.lengthComputable) return;
-        const percent = 15 + Math.round((event.loaded / event.total) * 84);
-        setProgress(percent, `Subiendo fotos… ${Math.min(100, percent)}%`);
+        const percent = 15 + Math.round((event.loaded / event.total) * 75);
+        setProgress(percent, `Enviando fotos… ${Math.min(90, percent)}%`);
+      };
+      xhr.upload.onload = () => {
+        setProgress(95, 'Fotos recibidas. El servidor las está guardando; no cierres ni vuelvas a intentar.');
       };
       xhr.onload = () => {
         let data = {};
@@ -185,9 +220,14 @@
     const data = await res.json().catch(() => ({}));
     const ok = res.ok && data?.ok && (data?.tipo === 'validado' || data?.locked);
     uploadAllowed = ok;
-    btnUpload.disabled = !ok;
-    picturesInput.disabled = !ok;
-    btnChoosePhotos.disabled = !ok;
+    const locked = readUploadLock();
+    btnUpload.disabled = !ok || locked;
+    picturesInput.disabled = !ok || locked;
+    btnChoosePhotos.disabled = !ok || locked;
+    if (locked) {
+      showUploadInProgress();
+      return;
+    }
     setStatus(ok ? (isTiebreak ? 'Desempate validado. Ya podés subir la foto.' : 'Cruce validado. Ya podés subir fotos.') : 'Todavía no está habilitada la subida de fotos.', ok ? 'success' : 'error');
   }
 
@@ -217,6 +257,11 @@
   });
 
   btnUpload?.addEventListener('click', async () => {
+    if (uploadInProgress || readUploadLock()) {
+      showUploadInProgress();
+      return;
+    }
+
     const files = Array.from(picturesInput.files || []);
     if (!files.length) {
       setStatus(`Tenés que elegir ${REQUIRED_PICTURES} foto${REQUIRED_PICTURES === 1 ? '' : 's'}.`, 'error');
@@ -241,6 +286,7 @@
     btnUpload.disabled = true;
     btnChoosePhotos.disabled = true;
     picturesInput.disabled = true;
+    setUploadLock(true);
     setStatus('Preparando las fotos para subir…', 'info');
     setProgress(0, 'Preparando fotos…');
 
@@ -257,14 +303,28 @@
       const duplicateText = Number(data?.duplicatesSkipped || 0) > 0
         ? ` ${data.duplicatesSkipped} foto${data.duplicatesSkipped === 1 ? '' : 's'} repetida${data.duplicatesSkipped === 1 ? '' : 's'} no se duplicaron.`
         : '';
+      const allAlreadySaved = uploaded === 0 && Number(data?.duplicatesSkipped || 0) > 0;
       setStatus(isTiebreak
         ? 'La foto del desempate se subió correctamente.'
-        : `${uploaded} foto${uploaded === 1 ? '' : 's'} subida${uploaded === 1 ? '' : 's'} correctamente. Hay ${total} de 11 fotos guardadas.${duplicateText}`,
+        : allAlreadySaved
+          ? `Las ${total} fotos ya estaban guardadas. No fue necesario volver a subirlas.`
+          : `${uploaded} foto${uploaded === 1 ? '' : 's'} subida${uploaded === 1 ? '' : 's'} correctamente. Hay ${total} de 11 fotos guardadas.${duplicateText}`,
       'success');
     } catch (err) {
       setStatus(err.message || 'No se pudieron subir las fotos.', 'error');
       setProgress(0, 'La carga no pudo completarse');
     } finally {
+      setUploadLock(false);
+      btnUpload.disabled = !uploadAllowed;
+      btnChoosePhotos.disabled = !uploadAllowed;
+      picturesInput.disabled = !uploadAllowed;
+    }
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== uploadLockKey) return;
+    if (readUploadLock()) showUploadInProgress();
+    else if (!uploadInProgress) {
       btnUpload.disabled = !uploadAllowed;
       btnChoosePhotos.disabled = !uploadAllowed;
       picturesInput.disabled = !uploadAllowed;
