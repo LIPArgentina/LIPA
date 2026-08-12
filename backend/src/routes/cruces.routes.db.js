@@ -15,6 +15,7 @@ const CURRENT_EDITION = 6;
 const DEFAULT_HISTORIC_EDITION = 5;
 let ensureCrucesAdminStoragePromise = null;
 let ensureJugadorResultadosEditionPromise = null;
+let ensureJugadorResultadosIdentityPromise = null;
 let ensureJugadorCurrentCategoryPromise = null;
 const RAD_RANKING_CACHE_TTL_MS = 15_000;
 const radRankingCache = new Map();
@@ -129,6 +130,34 @@ async function ensureJugadorResultadosEditionColumn() {
     });
   }
   return ensureJugadorResultadosEditionPromise;
+}
+
+async function ensureJugadorResultadosIdentityLinks() {
+  if (!ensureJugadorResultadosIdentityPromise) {
+    ensureJugadorResultadosIdentityPromise = (async () => {
+      await pool.query(`
+        WITH unique_players AS (
+          SELECT
+            LOWER(TRIM(nombre)) AS normalized_name,
+            MIN(id)::int AS jugador_id
+          FROM jugadores
+          WHERE TRIM(COALESCE(nombre, '')) <> ''
+          GROUP BY LOWER(TRIM(nombre))
+          HAVING COUNT(DISTINCT id) = 1
+        )
+        UPDATE jugador_resultados jr
+           SET jugador_id = unique_players.jugador_id,
+               updated_at = NOW()
+          FROM unique_players
+         WHERE jr.jugador_id IS NULL
+           AND LOWER(TRIM(jr.jugador_nombre)) = unique_players.normalized_name
+      `);
+    })().catch((err) => {
+      ensureJugadorResultadosIdentityPromise = null;
+      throw err;
+    });
+  }
+  return ensureJugadorResultadosIdentityPromise;
 }
 
 function normalizeCrucesAdminKey(team) {
@@ -3752,6 +3781,7 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
   const division = String(category || '').trim().toLowerCase();
   if (!division) return [];
   await ensureJugadorResultadosEditionColumn();
+  await ensureJugadorResultadosIdentityLinks();
 
   const normalizedEdition = normalizeEdition(edition, { allowTotal: true, defaultEdition: CURRENT_EDITION });
   const editionFilter = normalizedEdition === 'total' ? '' : 'AND edicion = $2';
@@ -3759,10 +3789,32 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
 
   const { rows } = await pool.query(
     `
-    WITH agg AS (
+    WITH unique_players AS (
       SELECT
-        COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))) AS player_key,
-        MAX(jugador_id) AS jugador_id,
+        LOWER(TRIM(nombre)) AS normalized_name,
+        MIN(id)::int AS jugador_id
+      FROM jugadores
+      WHERE TRIM(COALESCE(nombre, '')) <> ''
+      GROUP BY LOWER(TRIM(nombre))
+      HAVING COUNT(DISTINCT id) = 1
+    ),
+    resolved AS (
+      SELECT
+        jr.*,
+        COALESCE(jr.jugador_id, unique_players.jugador_id) AS resolved_jugador_id
+      FROM jugador_resultados jr
+      LEFT JOIN unique_players
+        ON jr.jugador_id IS NULL
+       AND LOWER(TRIM(jr.jugador_nombre)) = unique_players.normalized_name
+      WHERE jr.categoria = $1
+        AND jr.modalidad = 'individual'
+        AND TRIM(COALESCE(jr.jugador_nombre, '')) <> ''
+        ${editionFilter.replaceAll('edicion', 'jr.edicion')}
+    ),
+    agg AS (
+      SELECT
+        COALESCE(resolved_jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))) AS player_key,
+        MAX(resolved_jugador_id) AS jugador_id,
         categoria,
         MAX(jugador_nombre) AS name,
         COUNT(*)::int AS played,
@@ -3771,26 +3823,18 @@ async function buildPlayerRowsFromJugadorResultados(category = '', edition = CUR
         SUM(CASE WHEN resultado = 'empatado' THEN 1 ELSE 0 END)::int AS draws,
         SUM(triangulos_favor)::int AS triangulos_favor,
         SUM(triangulos_contra)::int AS triangulos_contra
-      FROM jugador_resultados
-      WHERE categoria = $1
-        AND modalidad = 'individual'
-        AND TRIM(COALESCE(jugador_nombre, '')) <> ''
-        ${editionFilter}
-      GROUP BY COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria
+      FROM resolved
+      GROUP BY COALESCE(resolved_jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria
     ),
     latest AS (
-      SELECT DISTINCT ON (COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria)
-        COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))) AS player_key,
-        jugador_id,
+      SELECT DISTINCT ON (COALESCE(resolved_jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria)
+        COALESCE(resolved_jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))) AS player_key,
+        resolved_jugador_id AS jugador_id,
         categoria,
         equipo_slug,
         equipo_nombre
-      FROM jugador_resultados
-      WHERE categoria = $1
-        AND modalidad = 'individual'
-        AND TRIM(COALESCE(jugador_nombre, '')) <> ''
-        ${editionFilter}
-      ORDER BY COALESCE(jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria, fecha_iso DESC, id DESC
+      FROM resolved
+      ORDER BY COALESCE(resolved_jugador_id::text, 'name:' || LOWER(TRIM(jugador_nombre))), categoria, fecha_iso DESC, id DESC
     ),
     active_team AS (
       SELECT DISTINCT ON (je.jugador_id, je.categoria)
