@@ -18,6 +18,9 @@ module.exports = function createSalasRouter(deps = {}) {
   const router = express.Router();
   const picturesRoot = deps.PICTURES_DIR || path.resolve(__dirname, '../../data/pictures');
   const torneosRoot = path.join(picturesRoot, 'torneos');
+  const EXPIRED_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
+  let expiredCleanupPromise = null;
+  let lastExpiredCleanupAt = 0;
 
   function buildSlug(value = '') {
     return String(value || '')
@@ -312,6 +315,7 @@ module.exports = function createSalasRouter(deps = {}) {
 
   async function getTorneosBySala(salaId) {
     await ensureTable();
+    await cleanupExpiredTorneos();
     const { rows } = await pool.query(
       `SELECT
          t.*,
@@ -469,6 +473,60 @@ module.exports = function createSalasRouter(deps = {}) {
         ]
       );
       slot += 1;
+    }
+  }
+
+  async function cleanupExpiredTorneos({ force = false } = {}) {
+    const now = Date.now();
+    if (!force && now - lastExpiredCleanupAt < EXPIRED_CLEANUP_INTERVAL_MS) return 0;
+    if (expiredCleanupPromise) return expiredCleanupPromise;
+
+    expiredCleanupPromise = (async () => {
+      const client = await pool.connect();
+      let expiredRows = [];
+      try {
+        await ensureTable();
+        await client.query('BEGIN');
+        const deleted = await client.query(
+          `DELETE FROM sala_torneos
+            WHERE fecha_hora < DATE_TRUNC('day', NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')
+                              AT TIME ZONE 'America/Argentina/Buenos_Aires'
+          RETURNING sala_id, media_path`,
+        );
+        expiredRows = deleted.rows;
+
+        const affectedSalaIds = [...new Set(expiredRows.map((row) => Number(row.sala_id)).filter(Number.isFinite))];
+        for (const salaId of affectedSalaIds) {
+          await reorderSalaTorneos(salaId, client);
+        }
+
+        await client.query('COMMIT');
+        lastExpiredCleanupAt = Date.now();
+
+        await Promise.allSettled(
+          expiredRows
+            .map((row) => row.media_path)
+            .filter(Boolean)
+            .map((mediaPath) => removeFileIfExists(mediaPath))
+        );
+
+        if (expiredRows.length) {
+          console.info(`[sala-torneos-cleanup] ${expiredRows.length} torneo(s) vencido(s) eliminado(s)`);
+        }
+        return expiredRows.length;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('[sala-torneos-cleanup]', err);
+        throw err;
+      } finally {
+        client.release();
+      }
+    })();
+
+    try {
+      return await expiredCleanupPromise;
+    } finally {
+      expiredCleanupPromise = null;
     }
   }
 
@@ -916,6 +974,7 @@ module.exports = function createSalasRouter(deps = {}) {
   router.get('/torneos', async (_req, res) => {
     try {
       await ensureTable();
+      await cleanupExpiredTorneos();
       const { rows } = await pool.query(
         `SELECT
            t.*,
@@ -973,6 +1032,15 @@ module.exports = function createSalasRouter(deps = {}) {
       return res.status(500).end();
     }
   });
+
+  setTimeout(() => {
+    cleanupExpiredTorneos({ force: true }).catch(() => {});
+  }, 5000).unref?.();
+
+  const expiredCleanupTimer = setInterval(() => {
+    cleanupExpiredTorneos({ force: true }).catch(() => {});
+  }, 60 * 60 * 1000);
+  expiredCleanupTimer.unref?.();
 
   return router;
 };
