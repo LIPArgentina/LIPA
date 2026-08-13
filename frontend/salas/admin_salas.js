@@ -226,8 +226,17 @@
       const valorMesa = normalizeDisplayValue(card.querySelector('.js-valor-mesa')?.value);
       const moneda = card.querySelector('.js-moneda')?.value || 'ARS';
 
-      if (!categoria || !estilo || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || valorMesa === '') {
-        setStatus('Completá modalidad, categorías LIPA, fecha, horas, valores y valor mesa.', 'error');
+      const faltantes = [];
+      if (!categoria) faltantes.push('modalidad');
+      if (!estilo) faltantes.push('estilo');
+      if (!categorias.length) faltantes.push('categoría LIPA');
+      if (categorias.some(item => !item.hora)) faltantes.push('hora');
+      if (categorias.some(item => item.valor === '')) faltantes.push('valor');
+      if (!fecha) faltantes.push('fecha');
+      if (valorMesa === '') faltantes.push('valor mesa');
+
+      if (faltantes.length) {
+        setStatus(`Revisá estos datos: ${[...new Set(faltantes)].join(', ')}.`, 'error');
         return;
       }
 
