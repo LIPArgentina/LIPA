@@ -15,6 +15,7 @@ module.exports = function createPicturesRouter(deps) {
   const REQUIRED_PICTURES = 11;
   const HEIC_EXT_RE = /\.(heic|heif)$/i;
   const PICTURE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i;
+  const variantJobs = new Map();
 
   function uploadErrorId() {
     return crypto.randomBytes(5).toString('hex');
@@ -275,23 +276,18 @@ module.exports = function createPicturesRouter(deps) {
       return variantPath;
     } catch (_) {}
 
-    await ensureDir(path.dirname(variantPath));
-    const temporaryPath = `${variantPath}.${process.pid}.${Date.now()}.tmp`;
-    try {
-      await sharp(fullPath, { failOn: 'none', animated: false })
-        .rotate()
-        .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
-        .webp({ quality, effort: 4 })
-        .toFile(temporaryPath);
-      await fs.promises.rename(temporaryPath, variantPath).catch(async () => {
-        await fs.promises.copyFile(temporaryPath, variantPath);
-        await fs.promises.unlink(temporaryPath).catch(() => {});
-      });
-      return variantPath;
-    } catch (err) {
-      await fs.promises.unlink(temporaryPath).catch(() => {});
-      throw err;
+    if (!variantJobs.has(variantPath)) {
+      variantJobs.set(variantPath, (async () => {
+        await ensureDir(path.dirname(variantPath));
+        await sharp(fullPath, { failOn: 'none', animated: false })
+          .rotate()
+          .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality, effort: 4 })
+          .toFile(variantPath);
+        return variantPath;
+      })().finally(() => variantJobs.delete(variantPath)));
     }
+    return variantJobs.get(variantPath);
   }
 
   function isTiebreakPicturesFolder(folderSlug) {
