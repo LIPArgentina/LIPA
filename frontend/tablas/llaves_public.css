@@ -34,6 +34,23 @@
   overflow-y:hidden;
   padding-bottom:8px;
 }
+#llavesPublicMount .bracket-scroll-hint{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin:8px 0 0;
+  color:var(--ll-muted);
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.04em;
+  text-align:center;
+}
+#llavesPublicMount .bracket-scroll-hint .hint-arrow{
+  color:var(--ll-gold);
+  font-size:20px;
+  line-height:1;
+}
 #llavesPublicMount .bracket{
   display:grid;
   gap:10px;
@@ -137,6 +154,11 @@
 @media (max-width: 900px){
   #llavesPublicMount .llaves-public-box{
     padding:10px 8px 12px;
+  }
+
+  #llavesPublicMount .bracket-scroll-hint{
+    font-size:11px;
+    gap:8px;
   }
 
   #llavesPublicMount .bracket{

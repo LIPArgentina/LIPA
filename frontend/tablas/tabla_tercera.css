@@ -667,6 +667,30 @@ header .logo-link{ display:inline-block; line-height:0; }
   letter-spacing:.02em;
 }
 
+@media (max-width:1100px){
+  #posiciones .tables.four-group-layout{
+    grid-template-columns:repeat(2,minmax(260px,1fr)) !important;
+    width:min(760px,100%) !important;
+    max-width:min(760px,100%) !important;
+    margin-left:auto !important;
+    margin-right:auto !important;
+  }
+}
+
+@media (max-width:640px){
+  #posiciones .tables.four-group-layout{
+    grid-template-columns:1fr !important;
+    width:min(360px,100%) !important;
+    max-width:min(360px,100%) !important;
+  }
+
+  #posiciones .tables.four-group-layout .cols,
+  #posiciones .tables.four-group-layout .row{
+    grid-template-columns:30px minmax(0,1fr) 28px 38px 30px;
+    gap:5px;
+  }
+}
+
 #posiciones .tables.two-group-layout{
   grid-template-columns:repeat(2,minmax(280px,1fr)) !important;
   width:min(900px,100%) !important;
