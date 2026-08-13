@@ -634,7 +634,8 @@ module.exports = function createPicturesRouter(deps) {
       setPictureCacheHeaders(res);
       res.type('image/webp');
       return res.sendFile(variantPath);
-    } catch {
+    } catch (err) {
+      console.error('[picture-variant-error]', String(err?.message || err));
       if (fullPath) {
         try {
           await fs.promises.access(fullPath, fs.constants.R_OK);
@@ -696,7 +697,8 @@ module.exports = function createPicturesRouter(deps) {
       setPictureCacheHeaders(res);
       res.type('image/webp');
       return res.sendFile(variantPath);
-    } catch {
+    } catch (err) {
+      console.error('[picture-thumbnail-error]', String(err?.message || err));
       if (fullPath) {
         try {
           await fs.promises.access(fullPath, fs.constants.R_OK);
