@@ -2,12 +2,15 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const sharp = require('sharp');
 const pool = require('../../db');
 const { requireAdmin } = require('../middleware/auth');
 
 module.exports = function createPlayersAdminRouter(deps = {}) {
   const router = express.Router();
   const playersRoot = path.join(deps.PICTURES_DIR || path.resolve(__dirname, '../../data/pictures'), 'players');
+  const playerVariantsRoot = path.join(playersRoot, '.variants');
+  const playerVariantJobs = new Map();
   let schemaReady = false;
 
   function normalizeText(value) {
@@ -21,6 +24,39 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
   function normalizeDni(value) {
     return String(value || '').replace(/\D/g, '').trim();
+  }
+
+  async function getPlayerDisplayVariant(sourcePath, safeFilename) {
+    const sourceStat = await fs.promises.stat(sourcePath);
+    const parsed = path.parse(safeFilename);
+    const version = Math.trunc(sourceStat.mtimeMs).toString(36);
+    const variantName = `${safeName(parsed.name)}-${version}-display.webp`;
+    const variantPath = path.join(playerVariantsRoot, variantName);
+
+    try {
+      await fs.promises.access(variantPath, fs.constants.R_OK);
+      return variantPath;
+    } catch (_) {}
+
+    if (!playerVariantJobs.has(variantPath)) {
+      playerVariantJobs.set(variantPath, (async () => {
+        await fs.promises.mkdir(playerVariantsRoot, { recursive: true });
+        const temporaryPath = `${variantPath}.${process.pid}.${Date.now()}.tmp`;
+        try {
+          await sharp(sourcePath, { failOn: 'none' })
+            .rotate()
+            .resize({ width: 900, height: 900, fit: 'inside', withoutEnlargement: true })
+            .webp({ quality: 80, effort: 4 })
+            .toFile(temporaryPath);
+          await fs.promises.rename(temporaryPath, variantPath);
+        } finally {
+          try { await fs.promises.unlink(temporaryPath); } catch (_) {}
+        }
+        return variantPath;
+      })().finally(() => playerVariantJobs.delete(variantPath)));
+    }
+
+    return playerVariantJobs.get(variantPath);
   }
 
   function normalizeCategory(value) {
@@ -1252,7 +1288,18 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       await fs.promises.access(fullPath, fs.constants.R_OK);
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('Access-Control-Allow-Origin', '*');
-      return res.sendFile(fullPath);
+      res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+
+      if (String(req.query.original || '') === '1') return res.sendFile(fullPath);
+
+      try {
+        const variantPath = await getPlayerDisplayVariant(fullPath, safe);
+        res.type('image/webp');
+        return res.sendFile(variantPath);
+      } catch (variantError) {
+        console.warn('players-admin/photo variant fallback', safe, variantError.message);
+        return res.sendFile(fullPath);
+      }
     } catch {
       return res.status(404).end();
     }
