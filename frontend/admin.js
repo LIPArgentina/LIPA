@@ -687,6 +687,48 @@ function normalizeSala(item){
   };
 }
 
+async function impersonateSala(salaId, salaName){
+  if (!Number.isFinite(salaId) || salaId <= 0) {
+    alert('Esa sala todavía no tiene ID en la base. Guardala primero y volvé a probar.');
+    return;
+  }
+
+  const ok = confirm(`Vas a ingresar como la sala "${salaName}".\n\nLos cambios que hagas se guardarán como si los hiciera esa sala. ¿Continuar?`);
+  if (!ok) return;
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/admin/impersonate-sala`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      credentials: 'include',
+      body: JSON.stringify({ salaId })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok || !data.session) {
+      throw new Error(data.error || data.msg || `HTTP ${resp.status}`);
+    }
+
+    const previousSession = localStorage.getItem('lpi.session');
+    if (previousSession) localStorage.setItem('lpi.admin.session.backup', previousSession);
+
+    const session = data.session;
+    localStorage.setItem('lpi.session', JSON.stringify(session));
+    sessionStorage.setItem('lpi.session', JSON.stringify(session));
+    localStorage.setItem('lpi.lastCategory', 'salas');
+
+    const params = new URLSearchParams({
+      sala: session.slug,
+      salaId: String(session.salaId),
+      token: session.token
+    });
+    window.open(`salas/admin_salas.html?${params.toString()}`, '_blank');
+    toast(`Sesión temporal generada: ${salaName}`);
+  } catch (err) {
+    console.error('impersonate-sala', err);
+    alert(err?.message || 'No se pudo ingresar como esa sala');
+  }
+}
+
 function renderSalasRows(salas){
   const tbody = $('#tbodySalas');
   if (!tbody) return;
@@ -707,6 +749,7 @@ function renderSalasRows(salas){
       <td><input class="input sala-contact" type="text" value="${(sala.contacto || '').replace(/"/g,'&quot;')}" placeholder="WhatsApp o link de grupo" aria-label="Contacto WhatsApp fila ${i + 1}"></td>
       <td><input class="input sala-contact-2" type="text" value="${(sala.contacto2 || '').replace(/"/g,'&quot;')}" placeholder="Segundo WhatsApp o link" aria-label="Segundo contacto WhatsApp fila ${i + 1}"></td>
       <td class="team-actions-cell">
+        <button class="btn-reset-pass btn-enter-sala" type="button" title="Ingresar temporalmente como sala" aria-label="Ingresar como sala ${sala.nombre || ('fila ' + (i + 1))}" ${canReset ? '' : 'disabled'}>🚪</button>
         <button class="btn-reset-pass btn-reset-sala-pass" type="button" title="Blanquear contraseña" aria-label="Blanquear contraseña de ${sala.nombre || ('fila ' + (i + 1))}" ${canReset ? '' : 'disabled'}>🔑</button>
         <button class="btn-del-sala" type="button">Eliminar</button>
       </td>`;
@@ -722,6 +765,14 @@ function renderSalasRows(salas){
       delete tr.dataset.salaId;
       const resetBtn = tr.querySelector('.btn-reset-sala-pass');
       if (resetBtn) resetBtn.disabled = true;
+      const enterBtn = tr.querySelector('.btn-enter-sala');
+      if (enterBtn) enterBtn.disabled = true;
+    });
+
+    tr.querySelector('.btn-enter-sala')?.addEventListener('click', () => {
+      const salaName = tr.querySelector('.sala-name')?.value?.trim() || `fila ${i + 1}`;
+      const salaId = Number(tr.dataset.salaId);
+      impersonateSala(salaId, salaName);
     });
 
     const resetBtn = tr.querySelector('.btn-reset-sala-pass');

@@ -689,6 +689,47 @@ module.exports = function createSalasRouter(deps = {}) {
     }
   });
 
+  router.post('/admin/impersonate-sala', requireAdmin, async (req, res) => {
+    try {
+      const salaId = Number(req.body?.salaId);
+      if (!Number.isFinite(salaId) || salaId <= 0) {
+        return res.status(400).json({ ok: false, error: 'Se requiere el ID de la sala' });
+      }
+
+      const sala = await findSala({ id: salaId });
+      if (!sala) return res.status(404).json({ ok: false, error: 'Sala no encontrada' });
+
+      const token = jwt.sign(
+        {
+          role: 'sala',
+          salaId: sala.id,
+          slug: sala.slug,
+          displayName: sala.nombre,
+          impersonatedBy: 'admin'
+        },
+        getJwtSecret(),
+        { expiresIn: '45m' }
+      );
+
+      return res.json({
+        ok: true,
+        session: {
+          role: 'sala',
+          salaId: sala.id,
+          slug: sala.slug,
+          displayName: sala.nombre,
+          category: 'salas',
+          token,
+          isTestSession: true,
+          ts: Date.now()
+        }
+      });
+    } catch (err) {
+      console.error('POST /api/admin/impersonate-sala', err);
+      return res.status(500).json({ ok: false, error: 'No se pudo generar la sesión temporal de la sala.' });
+    }
+  });
+
 
   router.post('/admin/reset-sala-password/:id', requireAdmin, async (req, res) => {
     try {
