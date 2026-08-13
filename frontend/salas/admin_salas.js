@@ -226,7 +226,7 @@
       const valorMesa = normalizeDisplayValue(card.querySelector('.js-valor-mesa')?.value);
       const moneda = card.querySelector('.js-moneda')?.value || 'ARS';
 
-      if (!categoria || !estilo || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || !valorMesa) {
+      if (!categoria || !estilo || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || valorMesa === '') {
         setStatus('Completá modalidad, categorías LIPA, fecha, horas, valores y valor mesa.', 'error');
         return;
       }
