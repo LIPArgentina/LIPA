@@ -4,12 +4,14 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const heicConvert = require('heic-convert');
+const sharp = require('sharp');
 const pool = require('../../db');
 const { requireTeam, requireAdmin } = require('../middleware/auth');
 
 module.exports = function createPicturesRouter(deps) {
   const router = express.Router();
   const picturesRoot = deps.PICTURES_DIR;
+  const variantsRoot = path.resolve(picturesRoot, '..', 'picture-variants');
   const REQUIRED_PICTURES = 11;
   const HEIC_EXT_RE = /\.(heic|heif)$/i;
   const PICTURE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i;
@@ -249,12 +251,47 @@ module.exports = function createPicturesRouter(deps) {
     return `${safeName(teamSlug)}_${String(fechaISO || '').slice(0, 10)}.zip`;
   }
 
-  function buildAdminThumbUrl(filePath) {
-    return `/api/pictures/admin/thumb?file=${encodeURIComponent(filePath)}`;
+  function buildAdminThumbUrl(filePath, version = '') {
+    return `/api/pictures/admin/thumb?file=${encodeURIComponent(filePath)}${version ? `&v=${encodeURIComponent(version)}` : ''}`;
   }
 
-  function buildPublicImageUrl(filePath) {
-    return `/api/pictures/public/file?file=${encodeURIComponent(filePath)}`;
+  function buildPublicImageUrl(filePath, version = '') {
+    return `/api/pictures/public/view?file=${encodeURIComponent(filePath)}${version ? `&v=${encodeURIComponent(version)}` : ''}`;
+  }
+
+  function setPictureCacheHeaders(res) {
+    res.set('Cache-Control', 'public, max-age=2592000, immutable');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+
+  async function getOptimizedVariant(fullPath, relativePath, { width, quality }) {
+    const stat = await fs.promises.stat(fullPath);
+    const identity = `${relativePath}|${stat.size}|${stat.mtimeMs}|${width}|${quality}`;
+    const cacheName = `${crypto.createHash('sha256').update(identity).digest('hex')}.webp`;
+    const variantPath = path.join(variantsRoot, `${width}px`, cacheName);
+    try {
+      await fs.promises.access(variantPath, fs.constants.R_OK);
+      return variantPath;
+    } catch (_) {}
+
+    await ensureDir(path.dirname(variantPath));
+    const temporaryPath = `${variantPath}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await sharp(fullPath, { failOn: 'none', animated: false })
+        .rotate()
+        .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality, effort: 4 })
+        .toFile(temporaryPath);
+      await fs.promises.rename(temporaryPath, variantPath).catch(async () => {
+        await fs.promises.copyFile(temporaryPath, variantPath);
+        await fs.promises.unlink(temporaryPath).catch(() => {});
+      });
+      return variantPath;
+    } catch (err) {
+      await fs.promises.unlink(temporaryPath).catch(() => {});
+      throw err;
+    }
   }
 
   function isTiebreakPicturesFolder(folderSlug) {
@@ -308,7 +345,8 @@ module.exports = function createPicturesRouter(deps) {
           filename: file.name,
           size: stat.size,
           modifiedAt: stat.mtime.toISOString(),
-          imageUrl: buildPublicImageUrl(relFile),
+          imageUrl: buildPublicImageUrl(relFile, Math.round(stat.mtimeMs)),
+          originalUrl: `/api/pictures/public/file?file=${encodeURIComponent(relFile)}&v=${encodeURIComponent(Math.round(stat.mtimeMs))}`,
           sourceTeamSlug: folderName,
           tipo: wantsTiebreak ? 'desempate' : 'cruce'
         });
@@ -582,8 +620,32 @@ module.exports = function createPicturesRouter(deps) {
       const fullPath = resolveSafeFullPath(req.query?.file || '');
       if (!fullPath) return res.status(400).json({ ok: false, error: 'Ruta inválida' });
       await fs.promises.access(fullPath, fs.constants.R_OK);
+      setPictureCacheHeaders(res);
       return res.sendFile(fullPath);
     } catch {
+      return res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
+    }
+  });
+
+  router.get('/public/view', async (req, res) => {
+    let fullPath = null;
+    try {
+      const relativePath = String(req.query?.file || '');
+      fullPath = resolveSafeFullPath(relativePath);
+      if (!fullPath) return res.status(400).json({ ok: false, error: 'Ruta inválida' });
+      await fs.promises.access(fullPath, fs.constants.R_OK);
+      const variantPath = await getOptimizedVariant(fullPath, relativePath, { width: 1400, quality: 80 });
+      setPictureCacheHeaders(res);
+      res.type('image/webp');
+      return res.sendFile(variantPath);
+    } catch {
+      if (fullPath) {
+        try {
+          await fs.promises.access(fullPath, fs.constants.R_OK);
+          setPictureCacheHeaders(res);
+          return res.sendFile(fullPath);
+        } catch (_) {}
+      }
       return res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
     }
   });
@@ -613,7 +675,7 @@ module.exports = function createPicturesRouter(deps) {
             const fullPath = path.join(teamPath, file.name);
             const stat = await fs.promises.stat(fullPath);
             const relFile = `${fechaISO}/${teamSlug}/${file.name}`;
-            items.push({ filename: file.name, size: stat.size, modifiedAt: stat.mtime.toISOString(), thumbUrl: buildAdminThumbUrl(relFile) });
+            items.push({ filename: file.name, size: stat.size, modifiedAt: stat.mtime.toISOString(), thumbUrl: buildAdminThumbUrl(relFile, Math.round(stat.mtimeMs)) });
           }
           items.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
           if (!items.length) continue;
@@ -628,12 +690,24 @@ module.exports = function createPicturesRouter(deps) {
   });
 
   router.get('/admin/thumb', requireAdmin, async (req, res) => {
+    let fullPath = null;
     try {
-      const fullPath = resolveSafeFullPath(req.query?.file || '');
+      const relativePath = String(req.query?.file || '');
+      fullPath = resolveSafeFullPath(relativePath);
       if (!fullPath) return res.status(400).json({ ok: false, error: 'Ruta inválida' });
       await fs.promises.access(fullPath, fs.constants.R_OK);
-      return res.sendFile(fullPath);
+      const variantPath = await getOptimizedVariant(fullPath, relativePath, { width: 480, quality: 72 });
+      setPictureCacheHeaders(res);
+      res.type('image/webp');
+      return res.sendFile(variantPath);
     } catch {
+      if (fullPath) {
+        try {
+          await fs.promises.access(fullPath, fs.constants.R_OK);
+          setPictureCacheHeaders(res);
+          return res.sendFile(fullPath);
+        } catch (_) {}
+      }
       return res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
     }
   });

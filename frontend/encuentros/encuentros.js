@@ -247,7 +247,7 @@
 
   async function fetchPhotoBlobUrl(item){
     const url = apiUrl(item.imageUrl || item.url || '');
-    const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+    const response = await fetch(url, { cache: 'default', credentials: 'same-origin' });
     if (!response.ok) {
       throw new Error('No se pudo cargar la foto.');
     }
