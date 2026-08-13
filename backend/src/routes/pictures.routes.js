@@ -11,7 +11,7 @@ const { requireTeam, requireAdmin } = require('../middleware/auth');
 module.exports = function createPicturesRouter(deps) {
   const router = express.Router();
   const picturesRoot = deps.PICTURES_DIR;
-  const variantsRoot = path.resolve(picturesRoot, '..', 'picture-variants');
+  const variantsRoot = path.join(picturesRoot, '.variants');
   const REQUIRED_PICTURES = 11;
   const HEIC_EXT_RE = /\.(heic|heif)$/i;
   const PICTURE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i;
@@ -654,6 +654,7 @@ module.exports = function createPicturesRouter(deps) {
       const groups = [];
       for (const fechaDir of fechas) {
         if (!fechaDir.isDirectory()) continue;
+        if (fechaDir.name.startsWith('.')) continue;
         const fechaISO = fechaDir.name;
         const fechaPath = path.join(picturesRoot, fechaISO);
         const teams = await fs.promises.readdir(fechaPath, { withFileTypes: true });
