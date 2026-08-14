@@ -3529,6 +3529,9 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
 
     matches.sort(sortByDateAndRow);
     pairMatches.sort(sortByDateAndRow);
+    const playerDisplayTeamName = matches.find((match) =>
+      samePlayerTeamSlug(match?.teamSlug, playerRadRow?.teamSlug || exact.teamSlug)
+    )?.teamName || playerRadRow?.teamName || exact.teamName;
 
     return res.json({
       ok: true,
@@ -3542,8 +3545,8 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
         id: exact.id || playerRadRow.id,
         name: exact.name || playerRadRow.name,
         teamSlug: playerRadRow.teamSlug || exact.teamSlug,
-        teamName: playerRadRow.teamName || exact.teamName,
-        label: `${exact.name || playerRadRow.name} Â· ${playerRadRow.teamName || exact.teamName}`,
+        teamName: playerDisplayTeamName,
+        label: `${exact.name || playerRadRow.name} Â· ${playerDisplayTeamName}`,
         totalRankingPosition
       } : {
         ...exact,
