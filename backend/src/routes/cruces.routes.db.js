@@ -3264,11 +3264,11 @@ function mergePlayerSuggestions(primary = [], fallback = [], { hideTeam = false 
       id: Number(rawItem?.id || 0) || null,
       name
     };
-    const normalizedName = normalizeText(name);
+    const normalizedName = canonicalTeamPlayerNameKey(name);
     const existingIndex = merged.findIndex((existing) => {
       const existingId = Number(existing?.id || 0) || null;
       if (item.id && existingId) return item.id === existingId;
-      if (normalizeText(existing?.name) !== normalizedName) return false;
+      if (canonicalTeamPlayerNameKey(existing?.name) !== normalizedName) return false;
       return playerSuggestionTeamsMatch(existing, item);
     });
 
@@ -4687,6 +4687,7 @@ function sortPlayerStatsRows(a, b) {
 const HISTORIC_PLAYER_NAME_ALIASES = new Map([
   ['NAUEL AROVI', 'NAHUEL AROVI'],
   ['EDUARDO LOPEZ', 'JUAN EDUARDO LOPEZ'],
+  ['VARGAS, CLAUDIO', 'CLAUDIO VARGAS'],
   ['BENITEZ, CRISTIAN JOAQUIN', 'CRISTIAN JOAQUIN BENITEZ'],
   ['BENITEZ CRISTIAN JOAQUIN', 'CRISTIAN JOAQUIN BENITEZ'],
   ['CRISTIAN BENITEZ', 'CRISTIAN JOAQUIN BENITEZ']

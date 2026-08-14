@@ -73,3 +73,14 @@ test('no adivina una identidad cuando la referencia historica no tiene equipo', 
 
   assert.equal(result.length, 2);
 });
+
+test('unifica Vargas, Claudio con la ficha oficial de Claudio Vargas', () => {
+  const result = mergePlayerSuggestions(
+    [{ id: 1180, name: 'Claudio Vargas', teamSlug: 'takos', teamName: "TAKO'S" }],
+    [{ id: null, name: 'Vargas, Claudio', teamSlug: 'takos_tercera', teamName: "TAKO'S" }]
+  );
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 1180);
+  assert.equal(result[0].label, "Claudio Vargas · TAKO'S");
+});
