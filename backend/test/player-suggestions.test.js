@@ -2,7 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  mergePlayerSuggestions
+  mergePlayerSuggestions,
+  samePlayerIdentity,
+  sortPlayerMatchByDateAndRow
 } = require('../src/routes/cruces.routes.db').__test;
 
 test('conserva personas distintas aunque compartan apellido', () => {
@@ -94,4 +96,30 @@ test('conserva una sola ficha aunque el alias historico tenga otro equipo', () =
   assert.equal(result.length, 1);
   assert.equal(result[0].id, 1180);
   assert.equal(result[0].label, "Claudio Vargas · TAKO'S");
+});
+
+test('reconoce Vargas, Claudio dentro del detalle total de Claudio Vargas', () => {
+  assert.equal(
+    samePlayerIdentity(
+      { id: null, name: 'Vargas, Claudio' },
+      { id: 1180, name: 'Claudio Vargas' }
+    ),
+    true
+  );
+});
+
+test('ordena los partidos desde el mas reciente hacia el mas antiguo', () => {
+  const matches = [
+    { fechaISO: '2026-03-17', row: 1 },
+    { fechaISO: '2026-08-04', row: 1 },
+    { fechaISO: '2026-07-28', row: 1 }
+  ];
+
+  matches.sort(sortPlayerMatchByDateAndRow);
+
+  assert.deepEqual(matches.map((item) => item.fechaISO), [
+    '2026-08-04',
+    '2026-07-28',
+    '2026-03-17'
+  ]);
 });

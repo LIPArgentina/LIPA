@@ -3357,7 +3357,12 @@ function samePlayerIdentity(player, exact) {
   const playerId = Number(player?.id || 0) || null;
   const exactId = Number(exact?.id || 0) || null;
   if (playerId && exactId) return playerId === exactId;
-  return sameNormalizedName(player?.name, exact?.name);
+  return sameCanonicalPlayerName(player?.name, exact?.name);
+}
+
+function sortPlayerMatchByDateAndRow(a = {}, b = {}) {
+  return String(b.fechaISO || '').localeCompare(String(a.fechaISO || ''))
+    || Number(a.row || a.pairNumber || 0) - Number(b.row || b.pairNumber || 0);
 }
 
 function resultFromScores(ownScore, opponentScore) {
@@ -3591,12 +3596,8 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       normalizePlayerMatchTeamNames(rawDetail.pairMatches, category)
     ]);
 
-    const sortByDateAndRow = (a, b) =>
-      String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
-      Number(a.row || a.pairNumber || 0) - Number(b.row || b.pairNumber || 0);
-
-    matches.sort(sortByDateAndRow);
-    pairMatches.sort(sortByDateAndRow);
+    matches.sort(sortPlayerMatchByDateAndRow);
+    pairMatches.sort(sortPlayerMatchByDateAndRow);
     const playerDisplayTeamName = matches.find((match) =>
       samePlayerTeamSlug(match?.teamSlug, playerRadRow?.teamSlug || exact.teamSlug)
     )?.teamName || playerRadRow?.teamName || exact.teamName;
@@ -4925,5 +4926,7 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
 module.exports = router;
 module.exports.__test = {
   mergePlayerSuggestions,
-  playerSuggestionTeamsMatch
+  playerSuggestionTeamsMatch,
+  samePlayerIdentity,
+  sortPlayerMatchByDateAndRow
 };
