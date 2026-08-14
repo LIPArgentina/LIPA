@@ -25,6 +25,10 @@
   const $playerPhotoImage = document.getElementById('playerPhotoImage');
   const $playerPhotoStatus = document.getElementById('playerPhotoStatus');
   const $playerPhotoClose = document.getElementById('btnClosePlayerPhoto');
+  const useTouchSuggestions = (navigator.maxTouchPoints || 0) > 0
+    && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  const $playerTouchSuggestions = createTouchSuggestions($player, 'player-touch-suggestions');
+  const $teamTouchSuggestions = createTouchSuggestions($team, 'team-touch-suggestions');
 
   let debounceTimer = null;
   let lastSuggestions = [];
@@ -40,6 +44,52 @@
   let hasAdminAccess = false;
   let lastExecutedSearch = null;
   const playerPhotoCache = new Map();
+
+  function createTouchSuggestions(input, className) {
+    if (!useTouchSuggestions || !input) return null;
+    input.removeAttribute('list');
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-expanded', 'false');
+    const menu = document.createElement('div');
+    menu.className = `touch-suggestions ${className}`;
+    menu.setAttribute('role', 'listbox');
+    menu.hidden = true;
+    input.insertAdjacentElement('afterend', menu);
+    return menu;
+  }
+
+  function closeTouchSuggestions(input, menu) {
+    if (!menu) return;
+    menu.hidden = true;
+    input?.setAttribute('aria-expanded', 'false');
+  }
+
+  function renderTouchSuggestions(input, menu, items, valueForItem, labelForItem) {
+    if (!menu || !input) return;
+    menu.replaceChildren();
+    items.forEach((item) => {
+      const value = String(valueForItem(item) || '').trim();
+      if (!value) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'touch-suggestion-option';
+      button.setAttribute('role', 'option');
+      button.textContent = String(labelForItem(item) || value);
+      button.addEventListener('pointerdown', (event) => event.preventDefault());
+      button.addEventListener('click', () => {
+        input.value = value;
+        input.focus({ preventScroll: true });
+        closeTouchSuggestions(input, menu);
+      });
+      menu.appendChild(button);
+    });
+    const shouldOpen = menu.childElementCount > 0
+      && document.activeElement === input
+      && String(input.value || '').trim().length >= 2;
+    menu.hidden = !shouldOpen;
+    input.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  }
 
   function apiUrl(path) {
     return API_BASE + path;
@@ -373,6 +423,13 @@
       option.label = item.label || item.name || '';
       $datalist.appendChild(option);
     });
+    renderTouchSuggestions(
+      $player,
+      $playerTouchSuggestions,
+      items,
+      (item) => item.label || item.name || '',
+      (item) => item.label || item.name || ''
+    );
   }
 
   function renderTeamSuggestions(items = []) {
@@ -385,6 +442,13 @@
       option.label = item.label || item.name || '';
       $teamDatalist.appendChild(option);
     });
+    renderTouchSuggestions(
+      $team,
+      $teamTouchSuggestions,
+      items,
+      (item) => item.name || '',
+      (item) => item.label || item.name || ''
+    );
   }
 
   async function loadSuggestions() {
@@ -967,6 +1031,15 @@
     }
     scheduleSuggestions();
   });
+  $player?.addEventListener('focus', () => {
+    if (String($player.value || '').trim().length >= 2) {
+      renderSuggestions(lastSuggestions);
+      scheduleSuggestions();
+    }
+  });
+  $player?.addEventListener('blur', () => {
+    window.setTimeout(() => closeTouchSuggestions($player, $playerTouchSuggestions), 180);
+  });
   $team?.addEventListener('input', () => {
     if (String($team.value || '').trim()) {
       if ($player) $player.value = '';
@@ -974,6 +1047,15 @@
       if (currentSearchEdition === 'total') setSearchEdition('6');
     }
     scheduleTeamSuggestions();
+  });
+  $team?.addEventListener('focus', () => {
+    if (String($team.value || '').trim().length >= 2) {
+      renderTeamSuggestions(lastTeamSuggestions);
+      scheduleTeamSuggestions();
+    }
+  });
+  $team?.addEventListener('blur', () => {
+    window.setTimeout(() => closeTouchSuggestions($team, $teamTouchSuggestions), 180);
   });
   $category?.addEventListener('change', () => {
     renderSuggestions([]);
