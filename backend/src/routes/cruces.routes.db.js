@@ -3411,6 +3411,30 @@ function buildPlayerMatchesFromValidatedResults(results = [], exact = {}) {
   return { matches, pairMatches };
 }
 
+async function normalizePlayerMatchTeamNames(entries = [], category = '') {
+  const slugs = Array.from(new Set(
+    entries.flatMap((item) => [item?.teamSlug, item?.opponentSlug])
+      .map((slug) => String(slug || '').trim())
+      .filter(Boolean)
+  ));
+  const displayNames = new Map();
+
+  await Promise.all(slugs.map(async (slug) => {
+    try {
+      const info = await resolveEquipoInfoBySlug(slug, category);
+      if (info?.display_name) displayNames.set(canonicalPlayerTeamSlug(slug), info.display_name);
+    } catch (err) {
+      console.warn('No se pudo normalizar el nombre de equipo del jugador', slug, err?.code || err?.message || err);
+    }
+  }));
+
+  return entries.map((item) => ({
+    ...item,
+    teamName: displayNames.get(canonicalPlayerTeamSlug(item?.teamSlug)) || item?.teamName,
+    opponentName: displayNames.get(canonicalPlayerTeamSlug(item?.opponentSlug)) || item?.opponentName
+  }));
+}
+
 router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => {
   setNoCache(res);
   try {
@@ -3431,7 +3455,9 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       findRegisteredPlayerSuggestionsByCategory(category, q),
       findJugadorResultadoSuggestionsByCategory(category, q, edition)
     ]);
-    const suggestions = mergePlayerSuggestions(registeredSuggestions, resultadoSuggestions);
+    const suggestions = Number(edition) === CURRENT_EDITION
+      ? mergePlayerSuggestions(registeredSuggestions, resultadoSuggestions)
+      : mergePlayerSuggestions(resultadoSuggestions, registeredSuggestions);
     if (suggestOnly) {
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
@@ -3461,11 +3487,17 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
     const totalRankingIndex = eligibleTotalRanking.findIndex((item) =>
       Number(item.id || 0) && Number(item.id) === Number(exact.id)
     );
+    const totalTeamRankingIndex = eligibleTotalRanking.findIndex((item) =>
+      sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
+    );
+    const totalNameRankingIndexes = eligibleTotalRanking
+      .map((item, index) => sameNormalizedName(item.name, exact.name) ? index : -1)
+      .filter((index) => index >= 0);
     const totalRankingFallbackIndex = totalRankingIndex >= 0
       ? totalRankingIndex
-      : eligibleTotalRanking.findIndex((item) =>
-          sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
-        );
+      : (totalTeamRankingIndex >= 0
+          ? totalTeamRankingIndex
+          : (totalNameRankingIndexes.length === 1 ? totalNameRankingIndexes[0] : -1));
     const totalRankingPosition = totalRankingFallbackIndex >= 0
       ? totalRankingFallbackIndex + 1
       : null;
@@ -3485,7 +3517,11 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
           name: exact.name || playerRadRow?.name || '',
           names: [exact.name, playerRadRow?.name].filter(Boolean)
         }, edition);
-    const { matches, pairMatches } = storedDetail || liveDetail;
+    const rawDetail = storedDetail || liveDetail;
+    const [matches, pairMatches] = await Promise.all([
+      normalizePlayerMatchTeamNames(rawDetail.matches, category),
+      normalizePlayerMatchTeamNames(rawDetail.pairMatches, category)
+    ]);
 
     const sortByDateAndRow = (a, b) =>
       String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')) ||
@@ -3505,9 +3541,9 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
         ...playerRadRow,
         id: exact.id || playerRadRow.id,
         name: exact.name || playerRadRow.name,
-        teamSlug: exact.teamSlug || playerRadRow.teamSlug,
-        teamName: exact.teamName || playerRadRow.teamName,
-        label: exact.label || playerRadRow.label,
+        teamSlug: playerRadRow.teamSlug || exact.teamSlug,
+        teamName: playerRadRow.teamName || exact.teamName,
+        label: `${exact.name || playerRadRow.name} Â· ${playerRadRow.teamName || exact.teamName}`,
         totalRankingPosition
       } : {
         ...exact,
