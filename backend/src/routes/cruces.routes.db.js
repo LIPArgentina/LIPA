@@ -3239,18 +3239,58 @@ function buildValidatedPlayerSuggestions(results = [], q = '') {
     .slice(0, 12);
 }
 
-function mergePlayerSuggestions(primary = [], fallback = []) {
-  const map = new Map();
-  const visualKeys = new Set();
-  [...primary, ...fallback].forEach((item) => {
-    const id = Number(item?.id || 0) || null;
-    const key = id ? `id:${id}` : `${normalizeText(item?.name)}::${canonicalPlayerTeamSlug(item?.teamSlug)}`;
-    const visualKey = `${normalizeText(item?.name)}::${canonicalPlayerTeamSlug(item?.teamSlug || item?.teamName)}::${normalizeText(item?.teamName)}`;
-    if (!key || map.has(key) || visualKeys.has(visualKey)) return;
-    map.set(key, item);
-    visualKeys.add(visualKey);
+function playerSuggestionTeamsMatch(a = {}, b = {}) {
+  const aSlug = a?.teamSlug || a?.teamName;
+  const bSlug = b?.teamSlug || b?.teamName;
+  const aTeamName = String(a?.teamName || '').trim();
+  const bTeamName = String(b?.teamName || '').trim();
+  return (
+    samePlayerTeamSlug(aSlug, bSlug)
+    || (!!aTeamName && !!bTeamName && sameNormalizedName(aTeamName, bTeamName))
+    || samePlayerTeamSlug(a?.teamSlug, b?.teamName)
+    || samePlayerTeamSlug(a?.teamName, b?.teamSlug)
+  );
+}
+
+function mergePlayerSuggestions(primary = [], fallback = [], { hideTeam = false } = {}) {
+  const merged = [];
+
+  [...primary, ...fallback].forEach((rawItem) => {
+    const name = String(rawItem?.name || '').trim();
+    if (!name) return;
+
+    const item = {
+      ...rawItem,
+      id: Number(rawItem?.id || 0) || null,
+      name
+    };
+    const normalizedName = normalizeText(name);
+    const existingIndex = merged.findIndex((existing) => {
+      const existingId = Number(existing?.id || 0) || null;
+      if (item.id && existingId) return item.id === existingId;
+      if (normalizeText(existing?.name) !== normalizedName) return false;
+      return playerSuggestionTeamsMatch(existing, item);
+    });
+
+    if (existingIndex < 0) {
+      merged.push(item);
+      return;
+    }
+
+    // La sugerencia con ID siempre prevalece sobre referencias historicas
+    // provenientes de planillas antiguas que solo conservan nombre y equipo.
+    if (!merged[existingIndex].id && item.id) {
+      merged[existingIndex] = item;
+    }
   });
-  return Array.from(map.values())
+
+  return merged
+    .map((item) => ({
+      ...item,
+      label: hideTeam || !item.teamName
+        ? item.name
+        : `${item.name} · ${item.teamName}`
+    }))
     .sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'es'))
     .slice(0, 12);
 }
@@ -3455,9 +3495,10 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       findRegisteredPlayerSuggestionsByCategory(category, q),
       findJugadorResultadoSuggestionsByCategory(category, q, edition)
     ]);
+    const mergeOptions = { hideTeam: edition === 'total' };
     const suggestions = Number(edition) === CURRENT_EDITION
-      ? mergePlayerSuggestions(registeredSuggestions, resultadoSuggestions)
-      : mergePlayerSuggestions(resultadoSuggestions, registeredSuggestions);
+      ? mergePlayerSuggestions(registeredSuggestions, resultadoSuggestions, mergeOptions)
+      : mergePlayerSuggestions(resultadoSuggestions, registeredSuggestions, mergeOptions);
     if (suggestOnly) {
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, player: null, total: 0, pairTotal: 0, matches: [], pairMatches: [] });
     }
@@ -4103,7 +4144,8 @@ async function findJugadorResultadoSuggestionsByCategory(category = '', q = '', 
   );
   return mergePlayerSuggestions(
     storedSuggestions,
-    buildValidatedPlayerSuggestions(validatedResults, q)
+    buildValidatedPlayerSuggestions(validatedResults, q),
+    { hideTeam: normalizedEdition === 'total' }
   );
 }
 
@@ -4857,3 +4899,7 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
 
 
 module.exports = router;
+module.exports.__test = {
+  mergePlayerSuggestions,
+  playerSuggestionTeamsMatch
+};

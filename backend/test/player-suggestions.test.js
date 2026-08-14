@@ -1,0 +1,75 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const {
+  mergePlayerSuggestions
+} = require('../src/routes/cruces.routes.db').__test;
+
+test('conserva personas distintas aunque compartan apellido', () => {
+  const result = mergePlayerSuggestions([
+    { id: 2423, name: 'Javier Martino', teamSlug: 'takos', teamName: "TAKO'S" },
+    { id: 2424, name: 'Thiago Martino', teamSlug: 'takos', teamName: "TAKO'S" }
+  ]);
+
+  assert.equal(result.length, 2);
+  assert.deepEqual(result.map((item) => item.id), [2423, 2424]);
+});
+
+test('unifica una referencia antigua sin ID con la ficha real de Thiago', () => {
+  const result = mergePlayerSuggestions(
+    [{ id: 2424, name: 'Thiago Martino', teamSlug: 'lospatosdeltrebol', teamName: 'LOS PATOS DEL TREBOL' }],
+    [{ id: null, name: 'Thiago Martino', teamSlug: 'lospatosdeltrebol_tercera', teamName: 'lospatosdeltrebol_tercera' }]
+  );
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 2424);
+  assert.equal(result[0].label, 'Thiago Martino · LOS PATOS DEL TREBOL');
+});
+
+test('unifica los tres alias historicos de Oldies para Dario', () => {
+  const result = mergePlayerSuggestions(
+    [{ id: 1004, name: 'Darío Vicente Sierra', teamSlug: 'oldies3ra', teamName: 'OLDIES' }],
+    [
+      { id: null, name: 'Dario Vicente Sierra', teamSlug: 'oldies', teamName: 'OLDIES' },
+      { id: null, name: 'Darío Vicente Sierra', teamSlug: 'oldies3ra_tercera', teamName: 'oldies3ra_tercera' }
+    ]
+  );
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 1004);
+  assert.equal(result[0].label, 'Darío Vicente Sierra · OLDIES');
+});
+
+test('en Total conserva la identidad pero oculta el equipo', () => {
+  const result = mergePlayerSuggestions(
+    [{ id: 1004, name: 'Darío Vicente Sierra', teamSlug: 'oldies3ra', teamName: 'OLDIES' }],
+    [{ id: null, name: 'Dario Vicente Sierra', teamSlug: 'oldies', teamName: 'OLDIES' }],
+    { hideTeam: true }
+  );
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 1004);
+  assert.equal(result[0].label, 'Darío Vicente Sierra');
+});
+
+test('no une dos IDs diferentes aunque tengan exactamente el mismo nombre', () => {
+  const result = mergePlayerSuggestions(
+    [{ id: 10, name: 'Juan Perez', teamSlug: 'equipo-a', teamName: 'EQUIPO A' }],
+    [{ id: 20, name: 'Juan Perez', teamSlug: 'equipo-a', teamName: 'EQUIPO A' }],
+    { hideTeam: true }
+  );
+
+  assert.equal(result.length, 2);
+  assert.deepEqual(result.map((item) => item.id), [10, 20]);
+  assert.deepEqual(result.map((item) => item.label), ['Juan Perez', 'Juan Perez']);
+});
+
+test('no adivina una identidad cuando la referencia historica no tiene equipo', () => {
+  const result = mergePlayerSuggestions(
+    [{ id: 10, name: 'Juan Perez', teamSlug: '', teamName: '' }],
+    [{ id: null, name: 'Juan Perez', teamSlug: '', teamName: '' }],
+    { hideTeam: true }
+  );
+
+  assert.equal(result.length, 2);
+});
