@@ -3265,12 +3265,35 @@ function mergePlayerSuggestions(primary = [], fallback = [], { hideTeam = false 
       name
     };
     const normalizedName = canonicalTeamPlayerNameKey(name);
-    const existingIndex = merged.findIndex((existing) => {
+    let existingIndex = merged.findIndex((existing) => {
       const existingId = Number(existing?.id || 0) || null;
       if (item.id && existingId) return item.id === existingId;
       if (canonicalTeamPlayerNameKey(existing?.name) !== normalizedName) return false;
       return playerSuggestionTeamsMatch(existing, item);
     });
+
+    if (existingIndex < 0) {
+      const sameIdentityIndexes = merged
+        .map((existing, index) => (
+          canonicalTeamPlayerNameKey(existing?.name) === normalizedName ? index : -1
+        ))
+        .filter((index) => index >= 0);
+      const knownIds = new Set(
+        sameIdentityIndexes
+          .map((index) => Number(merged[index]?.id || 0) || null)
+          .filter(Boolean)
+      );
+      const itemHasTeam = !!String(item?.teamSlug || item?.teamName || '').trim();
+      const sameIdentityWithTeam = sameIdentityIndexes.filter((index) => (
+        !!String(merged[index]?.teamSlug || merged[index]?.teamName || '').trim()
+      ));
+
+      if (!item.id && itemHasTeam && knownIds.size === 1) {
+        existingIndex = sameIdentityWithTeam.find((index) => Number(merged[index]?.id || 0)) ?? -1;
+      } else if (item.id && itemHasTeam && knownIds.size === 0 && sameIdentityWithTeam.length === 1) {
+        existingIndex = sameIdentityWithTeam[0];
+      }
+    }
 
     if (existingIndex < 0) {
       merged.push(item);
