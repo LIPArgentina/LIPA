@@ -3479,7 +3479,11 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
     ) || categoryRanking.find((item) =>
       sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
     ) || categoryRanking.find((item) =>
+      sameCanonicalPlayerName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
+    ) || categoryRanking.find((item) =>
       sameNormalizedName(item.name, exact.name)
+    ) || categoryRanking.find((item) =>
+      sameCanonicalPlayerName(item.name, exact.name)
     ) || null;
     const promoted = await getPromotedPlayerKeys(category);
     const eligibleTotalRows = excludePromotedPlayers(totalCategoryRanking, promoted);
@@ -3491,7 +3495,7 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       sameNormalizedName(item.name, exact.name) && samePlayerTeamSlug(item.teamSlug, exact.teamSlug)
     );
     const totalNameRankingIndexes = eligibleTotalRanking
-      .map((item, index) => sameNormalizedName(item.name, exact.name) ? index : -1)
+      .map((item, index) => sameCanonicalPlayerName(item.name, exact.name) ? index : -1)
       .filter((index) => index >= 0);
     const totalRankingFallbackIndex = totalRankingIndex >= 0
       ? totalRankingIndex
@@ -3588,7 +3592,9 @@ function ensureRankingRowForPlayer(map, player, teamSlug, teamName, options = {}
   const canonicalName = canonicalTeamPlayerNameKey(playerName);
   const canonicalTeam = canonicalPlayerTeamSlug(teamSlug);
   const key = mergeHistoricalIdentities && playerName
-    ? `historic:${canonicalName}::${canonicalTeam}`
+    ? (isKnownHistoricPlayerIdentity(playerName)
+        ? `historic:${canonicalName}`
+        : `historic:${canonicalName}::${canonicalTeam}`)
     : (playerId
         ? `id:${playerId}`
         : `${normalizeText(playerName)}::${canonicalTeam}`);
@@ -4638,12 +4644,26 @@ function sortPlayerStatsRows(a, b) {
 
 const HISTORIC_PLAYER_NAME_ALIASES = new Map([
   ['NAUEL AROVI', 'NAHUEL AROVI'],
-  ['EDUARDO LOPEZ', 'JUAN EDUARDO LOPEZ']
+  ['EDUARDO LOPEZ', 'JUAN EDUARDO LOPEZ'],
+  ['BENITEZ CRISTIAN JOAQUIN', 'CRISTIAN JOAQUIN BENITEZ'],
+  ['CRISTIAN BENITEZ', 'CRISTIAN JOAQUIN BENITEZ']
 ]);
+
+const HISTORIC_PLAYER_CANONICAL_NAMES = new Set(HISTORIC_PLAYER_NAME_ALIASES.values());
 
 function canonicalTeamPlayerNameKey(value = '') {
   const normalized = normalizeText(value);
   return HISTORIC_PLAYER_NAME_ALIASES.get(normalized) || normalized;
+}
+
+function sameCanonicalPlayerName(left = '', right = '') {
+  const leftKey = canonicalTeamPlayerNameKey(left);
+  return !!leftKey && leftKey === canonicalTeamPlayerNameKey(right);
+}
+
+function isKnownHistoricPlayerIdentity(value = '') {
+  const normalized = normalizeText(value);
+  return HISTORIC_PLAYER_NAME_ALIASES.has(normalized) || HISTORIC_PLAYER_CANONICAL_NAMES.has(normalized);
 }
 
 router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
