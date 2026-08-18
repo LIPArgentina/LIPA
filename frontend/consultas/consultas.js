@@ -38,6 +38,8 @@
   let currentConsultMode = 'individual';
   let currentSearchEdition = 'total';
   let currentRankingEdition = 'total';
+  let currentRankingSort = 'rad';
+  let currentRankingOrder = 'desc';
   let lastRankingData = null;
   let lastRankingLimit = 10;
   let lastRankingMode = 'players';
@@ -658,6 +660,15 @@
       return;
     }
 
+    const sortableHeader = (label, field, title = '') => {
+      const titleAttribute = title ? ` title="${title}"` : '';
+      const arrow = (order, symbol, description) => {
+        const active = currentRankingSort === field && currentRankingOrder === order;
+        return `<button class="ranking-sort-arrow${active ? ' active' : ''}" type="button" data-ranking-sort="${field}" data-ranking-order="${order}" aria-label="Ordenar ${label} ${description}" title="Ordenar ${description}">${symbol}</button>`;
+      };
+      return `<th class="num sortable-ranking-head"${titleAttribute}><span>${label}</span><span class="ranking-sort-arrows">${arrow('asc', '▲', 'de menor a mayor')}${arrow('desc', '▼', 'de mayor a menor')}</span></th>`;
+    };
+
     const rows = items.map((item, idx) => {
       const diff = Number(item.diff || 0);
       const diffClass = diff >= 0 ? 'ok' : 'bad';
@@ -699,11 +710,11 @@
               <th class="player-photo-head" aria-label="Foto"></th>
               <th>Jugador</th>
               <th>Equipo</th>
-              <th class="num">PJ</th>
-              <th class="num rad-head" title="Rendimiento Ajustado Dinámico">RAD</th>
-              <th class="num">EFEC</th>
-              <th class="num">PG</th>
-              <th class="num">PP</th>
+              ${sortableHeader('PJ', 'played')}
+              ${sortableHeader('RAD', 'rad', 'Rendimiento Ajustado Dinámico')}
+              ${sortableHeader('EFEC', 'effectiveness')}
+              ${sortableHeader('PG', 'wins')}
+              ${sortableHeader('PP', 'losses')}
               <th class="num">DIF</th>
               <th class="num">TF</th>
               <th class="num">TC</th>
@@ -941,7 +952,10 @@
       const requestedLimit = Number(limit || 10);
       const fetchLimit = requestedLimit;
       const edition = currentRankingTab === 'teams' && currentRankingEdition === 'total' ? '6' : currentRankingEdition;
-      const data = await fetchJson(apiUrl(withCacheBust(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit) + '&edition=' + encodeURIComponent(edition))));
+      const sortParams = currentRankingTab === 'players'
+        ? '&sort=' + encodeURIComponent(currentRankingSort) + '&order=' + encodeURIComponent(currentRankingOrder)
+        : '';
+      const data = await fetchJson(apiUrl(withCacheBust(endpoint + '?category=' + encodeURIComponent(category) + '&limit=' + encodeURIComponent(fetchLimit) + '&edition=' + encodeURIComponent(edition) + sortParams)));
 
       setStatus('', 'info');
       lastRankingData = data;
@@ -1100,6 +1114,13 @@
     if (ev.target === $radModal) closeRadModal();
   });
   $ranking?.addEventListener('click', (ev) => {
+    const sortButton = ev.target.closest('[data-ranking-sort]');
+    if (sortButton) {
+      currentRankingSort = String(sortButton.dataset.rankingSort || 'rad');
+      currentRankingOrder = String(sortButton.dataset.rankingOrder || 'desc') === 'asc' ? 'asc' : 'desc';
+      loadRanking(lastRankingLimit);
+      return;
+    }
     const photoButton = ev.target.closest('[data-player-photo]');
     if (photoButton) {
       openPlayerPhoto(photoButton).catch(() => {

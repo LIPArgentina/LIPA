@@ -3769,6 +3769,24 @@ function sortPlayerRadRows(a, b) {
   return String(a.name || '').localeCompare(String(b.name || ''), 'es');
 }
 
+const PLAYER_RANKING_SORT_FIELDS = Object.freeze({
+  played: 'played',
+  rad: 'rad',
+  effectiveness: 'effectiveness',
+  wins: 'wins',
+  losses: 'losses'
+});
+
+function sortPlayerRankingRows(rows = [], sort = 'rad', order = 'desc') {
+  const field = PLAYER_RANKING_SORT_FIELDS[String(sort || '').toLowerCase()] || 'rad';
+  const direction = String(order || '').toLowerCase() === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const difference = radNumber(a?.[field]) - radNumber(b?.[field]);
+    if (difference !== 0) return difference * direction;
+    return sortPlayerRadRows(a, b);
+  });
+}
+
 function buildPlayerRowsFromResults(results = [], options = {}) {
   const rankingMap = new Map();
   const idsByCanonicalName = new Map();
@@ -4367,6 +4385,8 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
     const rawLimit = Number(req.query.limit || 10);
     const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
     const edition = normalizeEdition(req.query.edition, { allowTotal: true, defaultEdition: 'total' });
+    const sort = PLAYER_RANKING_SORT_FIELDS[String(req.query.sort || '').toLowerCase()] || 'rad';
+    const order = String(req.query.order || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
@@ -4386,7 +4406,7 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
     }
 
     const totalActivePlayers = fullRanking.filter((item) => Number(item.played || 0) > 0).length;
-    const ranking = fullRanking.slice(0, limit);
+    const ranking = sortPlayerRankingRows(fullRanking, sort, order).slice(0, limit);
 
     return res.json({
       ok: true,
@@ -4394,6 +4414,8 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
       edition,
       editionLabel: getEditionLabel(edition),
       limit,
+      sort,
+      order,
       total: ranking.length,
       totalRegisteredPlayers,
       totalActivePlayers,
@@ -4954,5 +4976,6 @@ module.exports.__test = {
   samePlayerIdentity,
   sortPlayerMatchByDateAndRow,
   ensureRankingRowForPlayer,
-  buildPlayerRowsFromResults
+  buildPlayerRowsFromResults,
+  sortPlayerRankingRows
 };

@@ -6,8 +6,26 @@ const {
   samePlayerIdentity,
   sortPlayerMatchByDateAndRow,
   ensureRankingRowForPlayer,
-  buildPlayerRowsFromResults
+  buildPlayerRowsFromResults,
+  sortPlayerRankingRows
 } = require('../src/routes/cruces.routes.db').__test;
+
+test('ordena todo el ranking antes de recortar el top visible', () => {
+  const rows = [
+    { name: 'Jugador A', played: 12, rad: 40, effectiveness: 60, wins: 7, losses: 5 },
+    { name: 'Jugador B', played: 2, rad: 90, effectiveness: 100, wins: 2, losses: 0 },
+    { name: 'Jugador C', played: 8, rad: 50, effectiveness: 75, wins: 6, losses: 2 }
+  ];
+
+  assert.deepEqual(
+    sortPlayerRankingRows(rows, 'played', 'desc').slice(0, 2).map((item) => item.name),
+    ['Jugador A', 'Jugador C']
+  );
+  assert.deepEqual(
+    sortPlayerRankingRows(rows, 'wins', 'asc').slice(0, 2).map((item) => item.name),
+    ['Jugador B', 'Jugador C']
+  );
+});
 
 test('conserva personas distintas aunque compartan apellido', () => {
   const result = mergePlayerSuggestions([

@@ -136,6 +136,28 @@ header img{ height:34px; width:auto; display:block; }
 .ranking-table th,.ranking-table td{ border-bottom:1px solid var(--line); padding:6px 7px; text-align:left; white-space:nowrap; }
 .ranking-table th{ color:var(--gold); text-transform:uppercase; font-size:10px; letter-spacing:.05em; background:#101113; position:sticky; top:0; }
 .ranking-table td.num,.ranking-table th.num{ text-align:right; }
+.ranking-table th.sortable-ranking-head{ vertical-align:middle; }
+.sortable-ranking-head > span:first-child{ vertical-align:middle; }
+.ranking-sort-arrows{
+  display:inline-flex;
+  flex-direction:column;
+  gap:0;
+  margin-left:3px;
+  vertical-align:middle;
+}
+.ranking-sort-arrow{
+  width:14px;
+  height:10px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#777;
+  font:900 9px/9px Arial,sans-serif;
+  cursor:pointer;
+}
+.ranking-sort-arrow:hover,
+.ranking-sort-arrow:focus-visible{ color:#fff; outline:none; }
+.ranking-sort-arrow.active{ color:var(--gold); }
 .ranking-table .rank-pos{ color:var(--gold-soft); font-weight:900; }
 .ranking-table .player-name{ color:#fff; font-weight:900; text-transform:uppercase; }
 .player-search-button{
