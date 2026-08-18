@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const {
   mergePlayerSuggestions,
   samePlayerIdentity,
-  sortPlayerMatchByDateAndRow
+  sortPlayerMatchByDateAndRow,
+  ensureRankingRowForPlayer
 } = require('../src/routes/cruces.routes.db').__test;
 
 test('conserva personas distintas aunque compartan apellido', () => {
@@ -122,4 +123,29 @@ test('ordena los partidos desde el mas reciente hacia el mas antiguo', () => {
     '2026-07-28',
     '2026-03-17'
   ]);
+});
+
+test('el ranking Total suma el mismo ID aunque haya cambiado de equipo', () => {
+  const ranking = new Map();
+  const oldTeam = ensureRankingRowForPlayer(
+    ranking,
+    { id: 1757, name: 'Eduardo Mendez' },
+    'whynot',
+    'WHY NOT',
+    { mergeHistoricalIdentities: true }
+  );
+  oldTeam.played += 6;
+
+  const newTeam = ensureRankingRowForPlayer(
+    ranking,
+    { id: 1757, name: 'Eduardo Mendez' },
+    '8910ball',
+    '8910 BALL',
+    { mergeHistoricalIdentities: true }
+  );
+  newTeam.played += 2;
+
+  assert.equal(ranking.size, 1);
+  assert.equal(oldTeam, newTeam);
+  assert.equal(newTeam.played, 8);
 });

@@ -3656,12 +3656,12 @@ function ensureRankingRowForPlayer(map, player, teamSlug, teamName, options = {}
   const mergeHistoricalIdentities = !!options.mergeHistoricalIdentities;
   const canonicalName = canonicalTeamPlayerNameKey(playerName);
   const canonicalTeam = canonicalPlayerTeamSlug(teamSlug);
-  const key = mergeHistoricalIdentities && playerName
-    ? (isKnownHistoricPlayerIdentity(playerName)
-        ? `historic:${canonicalName}`
-        : `historic:${canonicalName}::${canonicalTeam}`)
-    : (playerId
-        ? `id:${playerId}`
+  const key = playerId
+    ? `id:${playerId}`
+    : (mergeHistoricalIdentities && playerName
+        ? (isKnownHistoricPlayerIdentity(playerName)
+            ? `historic:${canonicalName}`
+            : `historic:${canonicalName}::${canonicalTeam}`)
         : `${normalizeText(playerName)}::${canonicalTeam}`);
 
   if (!map.has(key) && playerName) {
@@ -4928,5 +4928,6 @@ module.exports.__test = {
   mergePlayerSuggestions,
   playerSuggestionTeamsMatch,
   samePlayerIdentity,
-  sortPlayerMatchByDateAndRow
+  sortPlayerMatchByDateAndRow,
+  ensureRankingRowForPlayer
 };
