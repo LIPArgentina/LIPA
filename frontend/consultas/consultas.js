@@ -1000,6 +1000,9 @@
         return;
       }
 
+      if ($player && data.player?.label) {
+        $player.value = data.player.label;
+      }
       setStatus('', 'info');
       renderSummary(data);
       renderMatches(Array.isArray(data?.matches) ? data.matches : [], Array.isArray(data?.pairMatches) ? data.pairMatches : []);
