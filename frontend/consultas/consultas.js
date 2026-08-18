@@ -1000,9 +1000,12 @@
         return;
       }
 
-      if ($player && data.player?.label) {
-        $player.value = data.player.label;
-        lastExecutedSearch = { mode: 'individual', query: data.player.label };
+      if ($player && data.player?.name) {
+        const playerLabel = String(data.edition || currentSearchEdition).toLowerCase() === 'total'
+          ? data.player.name
+          : `${data.player.name}${data.player.teamName ? ` · ${data.player.teamName}` : ''}`;
+        $player.value = playerLabel;
+        lastExecutedSearch = { mode: 'individual', query: playerLabel };
       }
       setStatus('', 'info');
       renderSummary(data);
