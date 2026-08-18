@@ -5,7 +5,8 @@ const {
   mergePlayerSuggestions,
   samePlayerIdentity,
   sortPlayerMatchByDateAndRow,
-  ensureRankingRowForPlayer
+  ensureRankingRowForPlayer,
+  buildPlayerRowsFromResults
 } = require('../src/routes/cruces.routes.db').__test;
 
 test('conserva personas distintas aunque compartan apellido', () => {
@@ -148,4 +149,28 @@ test('el ranking Total suma el mismo ID aunque haya cambiado de equipo', () => {
   assert.equal(ranking.size, 1);
   assert.equal(oldTeam, newTeam);
   assert.equal(newTeam.played, 8);
+});
+
+test('el ranking Total incorpora un partido nuevo sin ID a la unica ficha compatible', () => {
+  const rows = buildPlayerRowsFromResults([
+    {
+      localSlug: 'whynot', localName: 'WHY NOT', visitanteSlug: 'rival-a', visitanteName: 'RIVAL A',
+      localPlanilla: { individuales: ['Eduardo Mendez'], jugadorIds: { individuales: [1757] } },
+      visitantePlanilla: { individuales: ['Rival Uno'] },
+      local: { scoreRows: [5] }, visitante: { scoreRows: [0] }
+    },
+    {
+      localSlug: '8910ball', localName: '8910 BALL', visitanteSlug: 'thecues', visitanteName: 'THE CUES',
+      localPlanilla: { individuales: ['Eduardo Mendez'], jugadorIds: { individuales: [null] } },
+      visitantePlanilla: { individuales: ['Rival Dos'] },
+      local: { scoreRows: [1] }, visitante: { scoreRows: [5] }
+    }
+  ], { mergeHistoricalIdentities: true });
+
+  const eduardo = rows.find((row) => Number(row.id) === 1757);
+  assert.equal(eduardo.played, 2);
+  assert.equal(eduardo.wins, 1);
+  assert.equal(eduardo.losses, 1);
+  assert.equal(eduardo.triangulosFavor, 6);
+  assert.equal(eduardo.triangulosContra, 5);
 });

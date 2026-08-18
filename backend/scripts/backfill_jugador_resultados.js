@@ -4,6 +4,7 @@ const fs = require('fs');
 const WRITE = process.argv.includes('--write');
 const EXPORT_UNRESOLVED = process.argv.includes('--export-unresolved');
 const CATEGORY_FILTER = readArg('--category');
+const APPEND_SINCE = readArg('--append-since');
 const EDITION_OVERRIDE = Number(readArg('--edition')) || null;
 const OVERRIDES = loadOverrides();
 
@@ -217,6 +218,7 @@ async function loadPlayers(client) {
   const ambiguous = new Set();
   const ambiguousTeamName = new Set();
   const ambiguousName = new Set();
+  const validIds = new Set(rows.map((row) => Number(row.id)).filter((id) => id > 0));
 
   function putIndexed(map, ambiguousSet, key, row) {
     if (!key) return;
@@ -272,7 +274,7 @@ async function loadPlayers(client) {
   for (const key of ambiguous) byKey.delete(key);
   for (const key of ambiguousTeamName) byTeamName.delete(key);
   for (const key of ambiguousName) byName.delete(key);
-  return { byKey, byTeamName, byName, ambiguous, ambiguousTeamName, ambiguousName };
+  return { byKey, byTeamName, byName, ambiguous, ambiguousTeamName, ambiguousName, validIds };
 }
 
 function planillaPlayerRef(planilla = {}, section = '', index = 0) {
@@ -371,7 +373,9 @@ function findTargetPlayer(targetName, category, teamSlug, teamName, playerIndex)
 }
 
 function resolvePlayerId(player, category, teamSlug, teamName, playerIndex, overrideIndexes) {
-  if (player.id) return { id: player.id, source: 'snapshot' };
+  if (player.id && playerIndex.validIds.has(Number(player.id))) {
+    return { id: Number(player.id), source: 'snapshot' };
+  }
 
   const name = normalizeText(player.name);
   const alias = findOverride(overrideIndexes, category, teamSlug, teamName, player.name, 'aliases');
@@ -723,11 +727,11 @@ async function buildRows(client) {
   return { rows: out, stats };
 }
 
-async function writeRows(client, rows) {
+async function writeRows(client, rows, { truncate = true } = {}) {
   await ensureTable(client);
   await client.query('BEGIN');
   try {
-    await client.query('TRUNCATE jugador_resultados');
+    if (truncate) await client.query('TRUNCATE jugador_resultados');
     const columnsPerRow = 20;
     const chunkSize = 100;
     for (let start = 0; start < rows.length; start += chunkSize) {
@@ -807,8 +811,11 @@ async function main() {
   const client = await pool.connect();
   try {
     const { rows, stats } = await buildRows(client);
+    const selectedRows = APPEND_SINCE
+      ? rows.filter((row) => String(row.fecha_iso || '') >= APPEND_SINCE)
+      : rows;
     if (WRITE) {
-      await writeRows(client, rows);
+      await writeRows(client, selectedRows, { truncate: !APPEND_SINCE });
     }
 
     const unresolvedExport = EXPORT_UNRESOLVED ? exportUnresolvedRows(rows) : null;
@@ -818,6 +825,8 @@ async function main() {
       mode: WRITE ? 'write' : 'dry-run',
       category: CATEGORY_FILTER || null,
       edition: EDITION_OVERRIDE || 'inferred',
+      appendSince: APPEND_SINCE || null,
+      rowsSelected: selectedRows.length,
       unresolvedExport,
       ...stats
     }, null, 2));

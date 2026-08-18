@@ -3771,6 +3771,30 @@ function sortPlayerRadRows(a, b) {
 
 function buildPlayerRowsFromResults(results = [], options = {}) {
   const rankingMap = new Map();
+  const idsByCanonicalName = new Map();
+
+  if (options.mergeHistoricalIdentities) {
+    for (const item of results) {
+      const players = [
+        ...getIndividualPlayerRefs(item.localPlanilla),
+        ...getIndividualPlayerRefs(item.visitantePlanilla)
+      ];
+      for (const player of players) {
+        const playerId = Number(player?.id || 0) || null;
+        const canonicalName = canonicalTeamPlayerNameKey(player?.name);
+        if (!playerId || !canonicalName) continue;
+        if (!idsByCanonicalName.has(canonicalName)) idsByCanonicalName.set(canonicalName, new Set());
+        idsByCanonicalName.get(canonicalName).add(playerId);
+      }
+    }
+  }
+
+  const resolveHistoricalPlayer = (player = {}) => {
+    if (!options.mergeHistoricalIdentities || Number(player?.id || 0)) return player;
+    const ids = idsByCanonicalName.get(canonicalTeamPlayerNameKey(player?.name));
+    if (!ids || ids.size !== 1) return player;
+    return { ...player, id: Array.from(ids)[0] };
+  };
 
   for (const item of results) {
     const localPlayers = getIndividualPlayerRefs(item.localPlanilla);
@@ -3780,8 +3804,8 @@ function buildPlayerRowsFromResults(results = [], options = {}) {
     const max = Math.max(localPlayers.length, visitantePlayers.length, 7);
 
     for (let idx = 0; idx < max; idx++) {
-      const localPlayer = localPlayers[idx] || { id: null, name: '' };
-      const visitantePlayer = visitantePlayers[idx] || { id: null, name: '' };
+      const localPlayer = resolveHistoricalPlayer(localPlayers[idx] || { id: null, name: '' });
+      const visitantePlayer = resolveHistoricalPlayer(visitantePlayers[idx] || { id: null, name: '' });
       const localScore = Number(localScores[idx] ?? 0) || 0;
       const visitanteScore = Number(visitanteScores[idx] ?? 0) || 0;
 
@@ -4084,14 +4108,6 @@ async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITI
   }
 
   const value = (async () => {
-    // El total historico debe salir de jugador_resultados: ahi los partidos
-    // antiguos sin jugador_id se resuelven contra la identidad unica del
-    // jugador. Las planillas validadas, en cambio, pueden dejar esos partidos
-    // separados por el equipo con el que fueron cargados.
-    if (normalizedEdition === 'total') {
-      return buildRadRankingFromJugadorResultados(division, normalizedEdition);
-    }
-
     try {
       const results = await filterItemsByEdition(
         await buildAllValidatedCrucesForPlayerQuery(division),
@@ -4937,5 +4953,6 @@ module.exports.__test = {
   playerSuggestionTeamsMatch,
   samePlayerIdentity,
   sortPlayerMatchByDateAndRow,
-  ensureRankingRowForPlayer
+  ensureRankingRowForPlayer,
+  buildPlayerRowsFromResults
 };
