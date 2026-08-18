@@ -1002,6 +1002,7 @@
 
       if ($player && data.player?.label) {
         $player.value = data.player.label;
+        lastExecutedSearch = { mode: 'individual', query: data.player.label };
       }
       setStatus('', 'info');
       renderSummary(data);
