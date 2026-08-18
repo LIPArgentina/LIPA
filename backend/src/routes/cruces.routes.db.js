@@ -4084,6 +4084,14 @@ async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITI
   }
 
   const value = (async () => {
+    // El total historico debe salir de jugador_resultados: ahi los partidos
+    // antiguos sin jugador_id se resuelven contra la identidad unica del
+    // jugador. Las planillas validadas, en cambio, pueden dejar esos partidos
+    // separados por el equipo con el que fueron cargados.
+    if (normalizedEdition === 'total') {
+      return buildRadRankingFromJugadorResultados(division, normalizedEdition);
+    }
+
     try {
       const results = await filterItemsByEdition(
         await buildAllValidatedCrucesForPlayerQuery(division),
