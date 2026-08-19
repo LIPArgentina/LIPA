@@ -192,3 +192,48 @@ test('el ranking Total incorpora un partido nuevo sin ID a la unica ficha compat
   assert.equal(eduardo.triangulosFavor, 6);
   assert.equal(eduardo.triangulosContra, 5);
 });
+
+test('el ranking Total une partidos sin ID de equipos distintos cuando la ficha registrada es unica', () => {
+  const rows = buildPlayerRowsFromResults([
+    {
+      localSlug: 'lospatosdeltrebol', localName: 'LOS PATOS DEL TREBOL', visitanteSlug: 'rival-a', visitanteName: 'RIVAL A',
+      localPlanilla: { individuales: ['Thiago Martino'] }, visitantePlanilla: { individuales: ['Rival Uno'] },
+      local: { scoreRows: [5] }, visitante: { scoreRows: [4] }
+    },
+    {
+      localSlug: 'takos', localName: "TAKO'S", visitanteSlug: 'rival-b', visitanteName: 'RIVAL B',
+      localPlanilla: { individuales: ['Thiago Martino'] }, visitantePlanilla: { individuales: ['Rival Dos'] },
+      local: { scoreRows: [5] }, visitante: { scoreRows: [3] }
+    }
+  ], {
+    mergeHistoricalIdentities: true,
+    registeredIdsByCanonicalName: new Map([['THIAGO MARTINO', new Set([2424])]])
+  });
+
+  const thiago = rows.find((row) => Number(row.id) === 2424);
+  assert.equal(rows.filter((row) => row.name === 'Thiago Martino').length, 1);
+  assert.equal(thiago.played, 2);
+  assert.equal(thiago.wins, 2);
+  assert.equal(thiago.triangulosFavor, 10);
+  assert.equal(thiago.triangulosContra, 7);
+});
+
+test('no une por nombre cuando existen dos fichas registradas compatibles', () => {
+  const rows = buildPlayerRowsFromResults([
+    {
+      localSlug: 'equipo-a', localName: 'EQUIPO A', visitanteSlug: 'rival-a', visitanteName: 'RIVAL A',
+      localPlanilla: { individuales: ['Nombre Repetido'] }, visitantePlanilla: { individuales: ['Rival Uno'] },
+      local: { scoreRows: [5] }, visitante: { scoreRows: [4] }
+    },
+    {
+      localSlug: 'equipo-b', localName: 'EQUIPO B', visitanteSlug: 'rival-b', visitanteName: 'RIVAL B',
+      localPlanilla: { individuales: ['Nombre Repetido'] }, visitantePlanilla: { individuales: ['Rival Dos'] },
+      local: { scoreRows: [5] }, visitante: { scoreRows: [3] }
+    }
+  ], {
+    mergeHistoricalIdentities: true,
+    registeredIdsByCanonicalName: new Map([['NOMBRE REPETIDO', new Set([10, 20])]])
+  });
+
+  assert.equal(rows.filter((row) => row.name === 'Nombre Repetido').length, 2);
+});

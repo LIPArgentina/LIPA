@@ -3792,6 +3792,14 @@ function buildPlayerRowsFromResults(results = [], options = {}) {
   const idsByCanonicalName = new Map();
 
   if (options.mergeHistoricalIdentities) {
+    if (options.registeredIdsByCanonicalName instanceof Map) {
+      for (const [canonicalName, ids] of options.registeredIdsByCanonicalName.entries()) {
+        const cleanIds = ids instanceof Set
+          ? new Set(Array.from(ids).map((id) => Number(id || 0)).filter((id) => id > 0))
+          : new Set([Number(ids || 0)].filter((id) => id > 0));
+        if (canonicalName && cleanIds.size) idsByCanonicalName.set(canonicalName, cleanIds);
+      }
+    }
     for (const item of results) {
       const players = [
         ...getIndividualPlayerRefs(item.localPlanilla),
@@ -3878,6 +3886,31 @@ function buildRadRankingFromPlayerRows(baseRows = []) {
 
 function buildRadRankingFromResults(results = [], options = {}) {
   return buildRadRankingFromPlayerRows(buildPlayerRowsFromResults(results, options));
+}
+
+async function getRegisteredPlayerIdsByCanonicalName(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  if (!division) return new Map();
+
+  const { rows } = await pool.query(
+    `
+    SELECT DISTINCT j.id, j.nombre
+    FROM jugadores j
+    INNER JOIN jugador_equipos je ON je.jugador_id = j.id
+    WHERE LOWER(je.categoria) = $1
+      AND TRIM(COALESCE(j.nombre, '')) <> ''
+    `,
+    [division]
+  );
+  const idsByCanonicalName = new Map();
+  for (const row of rows) {
+    const canonicalName = canonicalTeamPlayerNameKey(row.nombre);
+    const playerId = Number(row.id || 0);
+    if (!canonicalName || !playerId) continue;
+    if (!idsByCanonicalName.has(canonicalName)) idsByCanonicalName.set(canonicalName, new Set());
+    idsByCanonicalName.get(canonicalName).add(playerId);
+  }
+  return idsByCanonicalName;
 }
 
 async function getPromotedPlayerKeys(category = '') {
@@ -4132,8 +4165,12 @@ async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITI
         normalizedEdition,
         division
       );
+      const registeredIdsByCanonicalName = normalizedEdition === 'total'
+        ? await getRegisteredPlayerIdsByCanonicalName(division)
+        : null;
       const rankingData = buildRadRankingFromResults(results, {
-        mergeHistoricalIdentities: normalizedEdition === 'total'
+        mergeHistoricalIdentities: normalizedEdition === 'total',
+        registeredIdsByCanonicalName
       });
       if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {
         return rankingData;
