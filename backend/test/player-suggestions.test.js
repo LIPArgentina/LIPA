@@ -131,6 +131,30 @@ test('suma el partido sin ID de Lucas Ramello a la ficha 1163', () => {
   assert.equal(ramello.triangulosContra, 10);
 });
 
+test('unifica Luis Marcelo Ortiz con la ficha de Luis Ortiz', () => {
+  const suggestions = mergePlayerSuggestions(
+    [{ id: 993, name: 'Luis Ortiz', teamSlug: 'victoria', teamName: 'VICTORIA' }],
+    [{ id: null, name: 'Luis Marcelo Ortiz', teamSlug: 'victoria_segunda', teamName: 'VICTORIA' }],
+    { hideTeam: true }
+  );
+
+  assert.equal(suggestions.length, 1);
+  assert.equal(suggestions[0].id, 993);
+  assert.equal(suggestions[0].name, 'Luis Ortiz');
+});
+
+test('unifica Elias Juan Saavedra con la ficha de Elias Saavedra', () => {
+  const suggestions = mergePlayerSuggestions(
+    [{ id: 2577, name: 'Elias Saavedra', teamSlug: 'anexo', teamName: 'ANEXO' }],
+    [{ id: null, name: 'Elias Juan Saavedra', teamSlug: 'anexo_tercera', teamName: 'ANEXO' }],
+    { hideTeam: true }
+  );
+
+  assert.equal(suggestions.length, 1);
+  assert.equal(suggestions[0].id, 2577);
+  assert.equal(suggestions[0].name, 'Elias Saavedra');
+});
+
 test('unifica Vargas, Claudio con la ficha oficial de Claudio Vargas', () => {
   const result = mergePlayerSuggestions(
     [{ id: 1180, name: 'Claudio Vargas', teamSlug: 'takos', teamName: "TAKO'S" }],
