@@ -96,6 +96,41 @@ test('no adivina una identidad cuando la referencia historica no tiene equipo', 
   assert.equal(result.length, 2);
 });
 
+test('unifica Lucas Ramello con la ficha registrada de Ramello, Lucas Ignacio', () => {
+  const suggestions = mergePlayerSuggestions(
+    [{ id: 1163, name: 'Ramello, Lucas Ignacio', teamSlug: 'takos', teamName: "TAKO'S" }],
+    [{ id: null, name: 'Lucas Ramello', teamSlug: 'takos', teamName: "TAKO'S" }],
+    { hideTeam: true }
+  );
+
+  assert.equal(suggestions.length, 1);
+  assert.equal(suggestions[0].id, 1163);
+  assert.equal(suggestions[0].name, 'Ramello, Lucas Ignacio');
+});
+
+test('suma el partido sin ID de Lucas Ramello a la ficha 1163', () => {
+  const rows = buildPlayerRowsFromResults([
+    {
+      localSlug: 'takos', localName: "TAKO'S", visitanteSlug: 'rival-a', visitanteName: 'RIVAL A',
+      localPlanilla: { individuales: ['Ramello, Lucas Ignacio'], jugadorIds: { individuales: [1163] } },
+      visitantePlanilla: { individuales: ['Rival Uno'] },
+      local: { scoreRows: [3] }, visitante: { scoreRows: [5] }
+    },
+    {
+      localSlug: 'takos', localName: "TAKO'S", visitanteSlug: 'rival-b', visitanteName: 'RIVAL B',
+      localPlanilla: { individuales: ['Lucas Ramello'] }, visitantePlanilla: { individuales: ['Rival Dos'] },
+      local: { scoreRows: [1] }, visitante: { scoreRows: [5] }
+    }
+  ], { mergeHistoricalIdentities: true });
+
+  const ramello = rows.find((row) => Number(row.id) === 1163);
+  assert.equal(rows.filter((row) => /ramello/i.test(row.name)).length, 1);
+  assert.equal(ramello.played, 2);
+  assert.equal(ramello.losses, 2);
+  assert.equal(ramello.triangulosFavor, 4);
+  assert.equal(ramello.triangulosContra, 10);
+});
+
 test('unifica Vargas, Claudio con la ficha oficial de Claudio Vargas', () => {
   const result = mergePlayerSuggestions(
     [{ id: 1180, name: 'Claudio Vargas', teamSlug: 'takos', teamName: "TAKO'S" }],
