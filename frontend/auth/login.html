@@ -6,7 +6,7 @@
   <title>Ingreso | Liga Independiente de Pool</title>
 
   <link rel="icon" href="../logo_liga.png" />
-  <link rel="stylesheet" href="./login.css" />
+  <link rel="stylesheet" href="./login.css?v=renewable-session-1" />
 
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -22,6 +22,8 @@
       <h1>Ingreso</h1>
       <p>Elegí el tipo de acceso</p>
     </div>
+
+    <p id="sessionNotice" class="session-notice" hidden>Tu sesión venció. Iniciá sesión nuevamente para continuar donde estabas.</p>
 
     <div class="category-grid" id="categoryGrid">
       <button type="button" class="category-btn" data-category="primera">Primera</button>
@@ -104,8 +106,8 @@
 
 </main>
 
-<script src="../config.js"></script>
-<script type="module" src="./login.js"></script>
+<script src="../config.js?v=renewable-session-1"></script>
+<script type="module" src="./login.js?v=renewable-session-1"></script>
 
 </body>
 </html>

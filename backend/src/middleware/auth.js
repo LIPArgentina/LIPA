@@ -16,10 +16,17 @@ function getToken(req) {
   return bearer || (req.cookies && req.cookies.lpi_auth) || null;
 }
 
+function authFailure(res, err) {
+  if (err && err.name === 'TokenExpiredError') {
+    return res.status(401).json({ ok: false, code: 'TOKEN_EXPIRED', msg: 'La sesión venció' });
+  }
+  return res.status(401).json({ ok: false, code: 'TOKEN_INVALID', msg: 'token inválido' });
+}
+
 function requireTeam(req, res, next) {
   try {
     const token = getToken(req);
-    if (!token) return res.status(401).json({ ok: false, msg: 'no autenticade' });
+    if (!token) return res.status(401).json({ ok: false, code: 'AUTH_MISSING', msg: 'no autenticade' });
 
     const payload = jwt.verify(token, getJwtSecret());
     if (payload.role !== 'team' || !payload.slug) {
@@ -28,14 +35,14 @@ function requireTeam(req, res, next) {
     req.user = payload;
     return next();
   } catch (err) {
-    return res.status(401).json({ ok: false, msg: 'token inválido' });
+    return authFailure(res, err);
   }
 }
 
 function requireSala(req, res, next) {
   try {
     const token = getToken(req);
-    if (!token) return res.status(401).json({ ok: false, msg: 'no autenticade' });
+    if (!token) return res.status(401).json({ ok: false, code: 'AUTH_MISSING', msg: 'no autenticade' });
 
     const payload = jwt.verify(token, getJwtSecret());
     if (payload.role !== 'sala' || !payload.salaId) {
@@ -44,14 +51,14 @@ function requireSala(req, res, next) {
     req.user = payload;
     return next();
   } catch (err) {
-    return res.status(401).json({ ok: false, msg: 'token inválido' });
+    return authFailure(res, err);
   }
 }
 
 function requireAdmin(req, res, next) {
   try {
     const token = getToken(req);
-    if (!token) return res.status(401).json({ ok: false, msg: 'no autenticade' });
+    if (!token) return res.status(401).json({ ok: false, code: 'AUTH_MISSING', msg: 'no autenticade' });
 
     const payload = jwt.verify(token, getJwtSecret());
     if (payload.role !== 'admin') {
@@ -60,7 +67,7 @@ function requireAdmin(req, res, next) {
     req.user = payload;
     return next();
   } catch (err) {
-    return res.status(401).json({ ok: false, msg: 'token inválido' });
+    return authFailure(res, err);
   }
 }
 

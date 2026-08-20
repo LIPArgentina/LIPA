@@ -519,7 +519,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     btn.className = 'btn-logout';
     btn.type = 'button';
     btn.textContent = 'Cerrar sesión';
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', async ()=>{
+      if (window.LPI_AUTH?.logout) await window.LPI_AUTH.logout();
       logoutAuth();
       location.href = '../index.html';
     });

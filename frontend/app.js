@@ -169,8 +169,9 @@ function renderSession(sess) {
 }
 
 function wireSessionActions() {
-  $("#btnLogout")?.addEventListener("click", () => {
-    localStorage.removeItem(sessionKey);
+  $("#btnLogout")?.addEventListener("click", async () => {
+    if (window.LPI_AUTH?.logout) await window.LPI_AUTH.logout();
+    else localStorage.removeItem(sessionKey);
     renderSession(null);
     window.dispatchEvent(new Event("logout:success"));
   });

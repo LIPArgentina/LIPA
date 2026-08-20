@@ -231,8 +231,18 @@ function openAdmin() {
   adminForm.classList.remove("hidden");
 }
 
-function establishSession({ role, displayName, slug, category, token, salaId }) {
-  const sess = { role, displayName, slug, category, token, salaId: salaId || null, ts: Date.now() };
+function establishSession({ role, displayName, slug, category, token, refreshToken, sessionExpiresAt, salaId }) {
+  const sess = {
+    role,
+    displayName,
+    slug,
+    category,
+    token,
+    refreshToken: refreshToken || '',
+    sessionExpiresAt: sessionExpiresAt || '',
+    salaId: salaId || null,
+    ts: Date.now()
+  };
   localStorage.setItem(sessionKey, JSON.stringify(sess));
 
   if (role === "sala" && slug) localStorage.setItem("lpi.lastSalaSlug", slug);
@@ -243,6 +253,17 @@ function establishSession({ role, displayName, slug, category, token, salaId }) 
 }
 
 function redirectAfterLogin(sess) {
+  const params = new URLSearchParams(window.location.search);
+  let returnPath = params.get('return') || '';
+  if (!returnPath) {
+    try { returnPath = sessionStorage.getItem('lpi.auth.returnUrl') || ''; } catch (_) {}
+  }
+  if (returnPath.startsWith('/') && !returnPath.startsWith('//') && !/\/auth\/login\.html/i.test(returnPath)) {
+    try { sessionStorage.removeItem('lpi.auth.returnUrl'); } catch (_) {}
+    window.location.href = returnPath;
+    return;
+  }
+
   const role = (sess?.role || "").toLowerCase();
   const slug = sess?.slug;
   const token = sess?.token || "";
@@ -325,7 +346,9 @@ async function submitTeamLogin(ev) {
       displayName: selectedUser.username,
       slug: selectedUser.slug,
       category: currentCategory,
-      token: data.token || ""
+      token: data.token || "",
+      refreshToken: data.refreshToken || "",
+      sessionExpiresAt: data.sessionExpiresAt || ""
     });
 
     finishLogin(sess);
@@ -373,7 +396,9 @@ async function submitSalaLogin(ev) {
       slug: data.slug || selectedSala.slug,
       salaId: data.salaId || selectedSala.id || null,
       category: "salas",
-      token: data.token || ""
+      token: data.token || "",
+      refreshToken: data.refreshToken || "",
+      sessionExpiresAt: data.sessionExpiresAt || ""
     });
 
     finishLogin(sess);
@@ -407,7 +432,9 @@ async function submitAdminLogin(ev) {
       displayName: "Admin",
       slug: null,
       category: "admin",
-      token: data.token || ""
+      token: data.token || "",
+      refreshToken: data.refreshToken || "",
+      sessionExpiresAt: data.sessionExpiresAt || ""
     });
 
     finishLogin(sess);
@@ -442,6 +469,11 @@ categoryGrid.addEventListener("click", async (e) => {
 teamForm.addEventListener("submit", submitTeamLogin);
 salaForm.addEventListener("submit", submitSalaLogin);
 adminForm.addEventListener("submit", submitAdminLogin);
+
+if (new URLSearchParams(window.location.search).get('reason') === 'expired') {
+  const notice = document.getElementById('sessionNotice');
+  if (notice) notice.hidden = false;
+}
 
 togglePass.addEventListener("change", () => {
   passwordInput.type = togglePass.checked ? "text" : "password";

@@ -6,6 +6,12 @@ const jwt = require('jsonwebtoken');
 const pool = require('../../db');
 const { readJSON, writeJSON } = require('../utils/fileStorage');
 const { requireAdmin } = require('../middleware/auth');
+const {
+  createRenewableSession,
+  refreshRenewableSession,
+  revokeRenewableSession,
+  setAccessCookie,
+} = require('../utils/authSessions');
 
 const DEFAULT_TEAM_PASSWORD = '1234';
 
@@ -82,28 +88,15 @@ module.exports = function createAdminRouter(deps) {
 
 
   router.post('/admin/login', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     const { password } = req.body || {};
     if (!password) return res.status(400).json({ ok: false, msg: 'faltan campos' });
     const ok = await bcrypt.compare(password, adminPassword.hash);
     if (!ok) return res.status(401).json({ ok: false });
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) return res.status(500).json({ ok:false, msg:'Falta JWT_SECRET en servidor' });
-
-    const token = jwt.sign(
-      { role: 'admin' },
-      secret,
-      { expiresIn: '12h' }
-    );
-
-    res.cookie('lpi_auth', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 12 * 60 * 60 * 1000,
-    });
-
-    return res.json({ ok: true, token });
+    const session = await createRenewableSession({ role: 'admin' }, 'admin');
+    setAccessCookie(res, session.token);
+    return res.json({ ok: true, ...session });
   });
 
   router.get('/admin/session', requireAdmin, (req, res) => {
@@ -124,6 +117,7 @@ module.exports = function createAdminRouter(deps) {
 
 
   router.post('/team/login', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     const { slug, password } = req.body || {};
     if (!slug || !password) {
       return res.status(400).json({ ok: false, msg: 'faltan campos' });
@@ -141,27 +135,14 @@ module.exports = function createAdminRouter(deps) {
     const ok = await bcrypt.compare(password, team.password_hash || '');
     if (!ok) return res.status(401).json({ ok: false, msg: 'contraseña incorrecta' });
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) return res.status(500).json({ ok:false, msg:'Falta JWT_SECRET en servidor' });
-
-    const token = jwt.sign(
-      {
-        role: 'team',
-        teamId: team.id,
-        slug: team.slug_uid,
-        slugBase: team.slug_base,
-        category: team.division,
-      },
-      secret,
-      { expiresIn: '12h' }
-    );
-
-    res.cookie('lpi_auth', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 12 * 60 * 60 * 1000,
-    });
+    const session = await createRenewableSession({
+      role: 'team',
+      teamId: team.id,
+      slug: team.slug_uid,
+      slugBase: team.slug_base,
+      category: team.division,
+    }, `team:${team.id}`);
+    setAccessCookie(res, session.token);
 
     return res.json({
       ok: true,
@@ -169,7 +150,7 @@ module.exports = function createAdminRouter(deps) {
       slug: team.slug_uid,
       category: team.division,
       mustChangePassword: Boolean(team.must_change_password),
-      token,
+      ...session,
     });
   });
 
@@ -254,8 +235,42 @@ module.exports = function createAdminRouter(deps) {
     }
   });
 
-  router.post('/logout', (req,res)=>{
-    res.clearCookie('lpi_auth');
+  router.post('/auth/refresh', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      const session = await refreshRenewableSession(req.body?.refreshToken);
+      if (!session) {
+        return res.status(401).json({ ok: false, code: 'REFRESH_EXPIRED', msg: 'La sesión ya no puede renovarse' });
+      }
+
+      if (session.claims.role === 'team') {
+        const team = await findTeamById(session.claims.teamId);
+        if (!team || team.activo === false) {
+          await revokeRenewableSession(req.body?.refreshToken);
+          return res.status(403).json({ ok: false, code: 'ACCOUNT_DISABLED', msg: 'equipo inactivo' });
+        }
+      }
+
+      setAccessCookie(res, session.token);
+      return res.json({
+        ok: true,
+        token: session.token,
+        refreshToken: session.refreshToken,
+        sessionExpiresAt: session.sessionExpiresAt,
+      });
+    } catch (err) {
+      console.error('POST /auth/refresh', err);
+      return res.status(500).json({ ok: false, code: 'REFRESH_ERROR', msg: 'No se pudo renovar la sesión' });
+    }
+  });
+
+  router.post('/logout', async (req,res)=>{
+    try { await revokeRenewableSession(req.body?.refreshToken); } catch (_) {}
+    res.clearCookie('lpi_auth', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
     return res.json({ ok:true });
   });
 

@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../../db');
 const adminFirebase = require('../../firebase');
 const { requireSala, requireAdmin } = require('../middleware/auth');
+const { createRenewableSession, setAccessCookie } = require('../utils/authSessions');
 
 const DEFAULT_SALA_PASSWORD = '1234';
 const MAX_TORNEOS_POR_SALA = 6;
@@ -669,6 +670,7 @@ module.exports = function createSalasRouter(deps = {}) {
 
 
   router.post('/sala/login', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     try {
       const { slug, salaId, password } = req.body || {};
       if ((!slug && !salaId) || !password) {
@@ -682,23 +684,13 @@ module.exports = function createSalasRouter(deps = {}) {
       const ok = await bcrypt.compare(password, sala.password_hash || '');
       if (!ok) return res.status(401).json({ ok: false, msg: 'contraseña incorrecta' });
 
-      const token = jwt.sign(
-        {
-          role: 'sala',
-          salaId: sala.id,
-          slug: sala.slug,
-          displayName: sala.nombre
-        },
-        getJwtSecret(),
-        { expiresIn: '12h' }
-      );
-
-      res.cookie('lpi_auth', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 12 * 60 * 60 * 1000,
-      });
+      const session = await createRenewableSession({
+        role: 'sala',
+        salaId: sala.id,
+        slug: sala.slug,
+        displayName: sala.nombre
+      }, `sala:${sala.id}`);
+      setAccessCookie(res, session.token);
 
       return res.json({
         ok: true,
@@ -706,7 +698,7 @@ module.exports = function createSalasRouter(deps = {}) {
         salaId: sala.id,
         slug: sala.slug,
         displayName: sala.nombre,
-        token
+        ...session
       });
     } catch (err) {
       console.error('POST /api/sala/login', err);

@@ -70,6 +70,19 @@ body {
   color: var(--muted);
 }
 
+.session-notice {
+  margin: -8px 0 18px;
+  padding: 11px 12px;
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  border-radius: 12px;
+  background: rgba(250, 204, 21, 0.1);
+  color: #fde68a;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .category-grid {
   display: grid;
   gap: 12px;
