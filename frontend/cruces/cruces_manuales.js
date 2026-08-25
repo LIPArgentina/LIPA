@@ -11,7 +11,9 @@
     schedule: [],
     resultsByDate: new Map(),
     rosterCache: new Map(),
+    publishedPlanillas: null,
     loadedResult: null,
+    loadedFromPlanillas: false,
     editorReady: false
   };
 
@@ -206,6 +208,7 @@
     setStatus('Cargando fixture y equipos…');
     state.resultsByDate.clear();
     state.rosterCache.clear();
+    state.publishedPlanillas = null;
     state.loadedResult = null;
 
     try {
@@ -241,6 +244,30 @@
     const players = Array.isArray(data?.players) ? data.players.map(String) : [];
     state.rosterCache.set(key, players);
     return players;
+  }
+
+  async function loadPublishedPlanillas() {
+    if (Array.isArray(state.publishedPlanillas)) return state.publishedPlanillas;
+    const data = await fetchJson('/api/admin/planillas');
+    state.publishedPlanillas = Array.isArray(data) ? data : [];
+    return state.publishedPlanillas;
+  }
+
+  function publishedPlanillaForTeam(items, team) {
+    const wanted = normalizeIdentity(team?.slug || team?.name);
+    const category = String($('#categoria').value || '').toLowerCase();
+    return items.find((item) => {
+      const itemCategory = String(
+        item?.category || item?.division || item?.categoria ||
+        item?.planilla?.category || item?.planilla?.categoria || ''
+      ).toLowerCase();
+      if (itemCategory && itemCategory !== category) return false;
+      const identities = [
+        item?.team, item?.team_base, item?.slug_uid, item?.slug,
+        item?.teamName, item?.name, item?.planilla?.team
+      ].map(normalizeIdentity).filter(Boolean);
+      return identities.includes(wanted);
+    })?.planilla || null;
   }
 
   function pointsSelect() {
@@ -362,6 +389,7 @@
 
   function resetEditor() {
     state.loadedResult = null;
+    state.loadedFromPlanillas = false;
     state.editorReady = false;
     $('#localRoot').replaceChildren();
     $('#visitanteRoot').replaceChildren();
@@ -390,6 +418,17 @@
       if (result) {
         applyPlanilla('localRoot', result.localPlanilla, result.local);
         applyPlanilla('visitanteRoot', result.visitantePlanilla, result.visitante);
+      } else {
+        const planillas = await loadPublishedPlanillas();
+        const localPlanilla = publishedPlanillaForTeam(planillas, {
+          slug: match.localSlug, name: match.localName
+        });
+        const visitantePlanilla = publishedPlanillaForTeam(planillas, {
+          slug: match.visitanteSlug, name: match.visitanteName
+        });
+        if (localPlanilla) applyPlanilla('localRoot', localPlanilla, {});
+        if (visitantePlanilla) applyPlanilla('visitanteRoot', visitantePlanilla, {});
+        state.loadedFromPlanillas = !!(localPlanilla || visitantePlanilla);
       }
       recalc();
       state.loadedResult = result;
@@ -404,7 +443,9 @@
       updateSelectionBadge();
       setStatus(result
         ? 'Cruce cargado desde la base. Podés corregir jugadores o resultados y actualizarlo.'
-        : 'Este partido todavía no tiene un cruce guardado. Completalo y guardalo.', result ? 'loaded' : 'ok');
+        : state.loadedFromPlanillas
+          ? 'El cruce todavía no está validado. Se cargaron las planillas publicadas y ya podés modificar jugadores antes de guardarlo.'
+          : 'Este partido todavía no tiene un cruce guardado ni planillas publicadas. Completalo y guardalo.', result ? 'loaded' : 'ok');
     } catch (error) {
       console.error(error);
       resetEditor();
