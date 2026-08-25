@@ -655,6 +655,38 @@ function authHeaders(extra = {}){
     updateCategoryButtons();
   }
 
+  function setupGenerateCruces(){
+    const link = document.getElementById('btnGenerarCruces');
+    if(!link || link.__wired) return;
+    link.__wired = true;
+    link.addEventListener('click', async (event) => {
+      event.preventDefault();
+      if(link.dataset.loading === 'true') return;
+      const category = state.activeCategory || 'tercera';
+      const destination = link.href;
+      const originalText = link.textContent;
+      link.dataset.loading = 'true';
+      link.setAttribute('aria-disabled', 'true');
+      link.textContent = 'preparando cruces...';
+      try{
+        const response = await fetch(`${API_BASE}/api/cruces/generate-planillas`, {
+          method:'POST',
+          credentials:'include',
+          headers:authHeaders({ 'Content-Type':'application/json' }),
+          body:JSON.stringify({ category })
+        });
+        const data = await response.json().catch(() => ({}));
+        if(!response.ok) throw new Error(data.error || `Error HTTP ${response.status}`);
+        window.location.assign(`${destination}?category=${encodeURIComponent(category)}`);
+      }catch(error){
+        showAlert(error.message || 'No se pudieron preparar las planillas.');
+        link.dataset.loading = 'false';
+        link.removeAttribute('aria-disabled');
+        link.textContent = originalText;
+      }
+    });
+  }
+
   async function init(){
     try{
       const boards = document.getElementById('boards');
@@ -664,6 +696,7 @@ function authHeaders(extra = {}){
       }
 
       setupCategoryFilters();
+      setupGenerateCruces();
       resetCategoryHeaderIndicators();
 
       const [_, planillasResponse] = await Promise.all([

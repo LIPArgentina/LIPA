@@ -811,6 +811,11 @@ function wireToolbar(){
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const requestedCategory = String(new URLSearchParams(window.location.search).get('category') || '').toLowerCase();
+  if (CATEGORY_KEYS[requestedCategory]) state.category = requestedCategory;
+  document.querySelectorAll('[data-category]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.category === state.category);
+  });
   wireCategoryButtons();
   wireToolbar();
   await reload();

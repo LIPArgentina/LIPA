@@ -647,9 +647,6 @@ async function buildCrucesAdminStatus(team) {
   const automationEnabled = !!config.automation_enabled;
   const scheduledEnabled = automationEnabled && !!automation.scheduledEnabled;
   const enabled = manualEnabled || scheduledEnabled;
-  if (enabled && automation.category) {
-    await generateEmptyPlanillasForCategory(automation.category);
-  }
   const remainingMs = enabled
     ? Math.max(Number(automation.remainingMs || 0), 0)
     : 0;
@@ -726,6 +723,33 @@ router.post('/automation', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('POST /api/cruces/automation', err);
     return res.status(500).json({ ok: false, error: 'No se pudo actualizar la automatización.' });
+  }
+});
+
+router.post('/generate-planillas', requireAdmin, async (req, res) => {
+  try {
+    const category = String(req.body?.category || '').trim().toLowerCase();
+    if (!['segunda', 'tercera'].includes(category)) {
+      return res.status(400).json({ ok: false, error: 'Categoría inválida.' });
+    }
+
+    const team = `__categoria_${category}__`;
+    const config = await getOrCreateCrucesAdminConfig(team);
+    const automation = await fetchAutomationFixtureInfo(team);
+    const enabled = !!config.manual_enabled
+      || (!!config.automation_enabled && !!automation.scheduledEnabled);
+    if (!enabled) {
+      return res.status(409).json({
+        ok: false,
+        error: `Los cruces de ${category} todavía no están habilitados.`
+      });
+    }
+
+    const generated = await generateEmptyPlanillasForCategory(category);
+    return res.json({ ok: true, category, generated, generatedCount: generated.length });
+  } catch (err) {
+    console.error('POST /api/cruces/generate-planillas', err);
+    return res.status(500).json({ ok: false, error: 'No se pudieron preparar las planillas para generar los cruces.' });
   }
 });
 
