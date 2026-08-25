@@ -43,6 +43,7 @@ function authHeaders(extra = {}){
   const state = {
     allFiles: [],
     activeCategory: null,
+    rosterCache: new Map(),
     categories: {
       tercera: new Set(),
       segunda: new Set()
@@ -97,8 +98,10 @@ function authHeaders(extra = {}){
     }catch(_){}
   }
 
-  function slot(idx, name){
+  function slot(idx, name, section){
     const el = document.createElement('div'); el.className='slot';
+    el.dataset.section = section;
+    el.dataset.index = String(idx - 1);
     const n  = Object.assign(document.createElement('div'), {className:'nro'});
     n.textContent = idx;
     const y  = Object.assign(document.createElement('div'), {className:'yellow-box'});
@@ -108,9 +111,9 @@ function authHeaders(extra = {}){
   }
 
   function renderBoard(plan, target){
-    function fill(arr, count){
+    function fill(arr, count, section){
       const c = document.createElement('div'); c.className='grid';
-      for(let i=0;i<count;i++){ c.appendChild(slot(i+1, arr[i] || '')); }
+      for(let i=0;i<count;i++){ c.appendChild(slot(i+1, arr[i] || '', section)); }
       return c;
     }
 
@@ -118,26 +121,148 @@ function authHeaders(extra = {}){
     const wrap = document.createElement('div'); wrap.className='board';
     const groups = document.createElement('div'); groups.className='groups';
 
+    const g0 = document.createElement('article'); g0.className='group'; g0.innerHTML = '<h3>CAPITANES</h3>';
+    g0.appendChild(fill(Array.isArray(safePlan.capitan) ? safePlan.capitan : [], 2, 'capitan'));
+
     const g1 = document.createElement('article'); g1.className='group'; g1.innerHTML = '<h3>INDIVIDUALES</h3>';
-    g1.appendChild(fill(Array.isArray(safePlan.individuales) ? safePlan.individuales : [], INDIVIDUAL_COUNT));
+    g1.appendChild(fill(Array.isArray(safePlan.individuales) ? safePlan.individuales : [], INDIVIDUAL_COUNT, 'individuales'));
 
     const g4 = document.createElement('article'); g4.className='group'; g4.innerHTML = '<h3>SUPLENTES</h3>';
-    g4.appendChild(fill(Array.isArray(safePlan.suplentes) ? safePlan.suplentes : [], 2));
+    g4.appendChild(fill(Array.isArray(safePlan.suplentes) ? safePlan.suplentes : [], 2, 'suplentes'));
 
+    groups.appendChild(g0);
     groups.appendChild(g1);
     if (PAIR_COUNT >= 1) {
       const g2 = document.createElement('article'); g2.className='group'; g2.innerHTML = '<h3>PAREJA 1</h3>';
-      g2.appendChild(fill(Array.isArray(safePlan.pareja1) ? safePlan.pareja1 : [], PAIR_SIZE));
+      g2.appendChild(fill(Array.isArray(safePlan.pareja1) ? safePlan.pareja1 : [], PAIR_SIZE, 'pareja1'));
       groups.appendChild(g2);
     }
     if (PAIR_COUNT >= 2) {
       const g3 = document.createElement('article'); g3.className='group'; g3.innerHTML = '<h3>PAREJA 2</h3>';
-      g3.appendChild(fill(Array.isArray(safePlan.pareja2) ? safePlan.pareja2 : [], PAIR_SIZE));
+      g3.appendChild(fill(Array.isArray(safePlan.pareja2) ? safePlan.pareja2 : [], PAIR_SIZE, 'pareja2'));
       groups.appendChild(g3);
     }
     groups.appendChild(g4);
     wrap.appendChild(groups);
     target.appendChild(wrap);
+  }
+
+  async function fetchJson(path, options = {}){
+    const response = await fetch(`${API_BASE}${path}`, {
+      cache:'no-store',
+      ...options,
+      headers: authHeaders({ 'Content-Type':'application/json', ...(options.headers || {}) })
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(data.error || `Error HTTP ${response.status}`);
+    return data;
+  }
+
+  async function loadRoster(item){
+    const key = `${item.__category}:${item.slug_uid || item.team}`;
+    if(state.rosterCache.has(key)) return state.rosterCache.get(key);
+    const query = new URLSearchParams({
+      category: item.__category || '',
+      team: item.slug_uid || item.team || item.teamName || ''
+    });
+    const data = await fetchJson(`/api/players-public/by-team?${query}`);
+    const players = (Array.isArray(data.players) ? data.players : []).map(player => ({
+      id: Number(player.id || 0) || null,
+      name: String(player.nombre || player.name || '').trim()
+    })).filter(player => player.name);
+    state.rosterCache.set(key, players);
+    return players;
+  }
+
+  function enablePlanillaEditor(card, players){
+    card.classList.add('editing');
+    card.querySelectorAll('.slot').forEach(slotElement => {
+      const box = slotElement.querySelector('.yellow-box');
+      if(!box) return;
+      const current = box.textContent.trim();
+      const select = document.createElement('select');
+      select.className = 'planilla-player-select';
+      select.dataset.section = slotElement.dataset.section;
+      select.dataset.index = slotElement.dataset.index;
+      select.appendChild(new Option('— VACÍO —', ''));
+      players.forEach(player => {
+        const option = new Option(player.name, String(player.id || ''));
+        option.dataset.playerName = player.name;
+        if(normalizeTeamName(player.name) === normalizeTeamName(current)) option.selected = true;
+        select.appendChild(option);
+      });
+      box.replaceWith(select);
+    });
+  }
+
+  function collectEditedPlanilla(card, originalPlan){
+    const planilla = { ...originalPlan, jugadorIds: { ...(originalPlan.jugadorIds || {}) } };
+    card.querySelectorAll('.planilla-player-select').forEach(select => {
+      const section = select.dataset.section;
+      const index = Number(select.dataset.index);
+      if(!Array.isArray(planilla[section])) planilla[section] = [];
+      if(!Array.isArray(planilla.jugadorIds[section])) planilla.jugadorIds[section] = [];
+      const selected = select.options[select.selectedIndex];
+      planilla[section][index] = selected?.dataset?.playerName || '';
+      planilla.jugadorIds[section][index] = Number(select.value || 0) || null;
+    });
+    return planilla;
+  }
+
+  function appendEditActions(card, item){
+    const actions = document.createElement('div');
+    actions.className = 'planilla-edit-actions';
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'btn-gold planilla-edit-button';
+    edit.textContent = 'EDITAR PLANILLA';
+    actions.appendChild(edit);
+    card.appendChild(actions);
+
+    edit.addEventListener('click', async () => {
+      edit.disabled = true;
+      edit.textContent = 'CARGANDO…';
+      try{
+        const players = await loadRoster(item);
+        enablePlanillaEditor(card, players);
+        actions.replaceChildren();
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'btn-gold planilla-save-button';
+        save.textContent = 'GUARDAR CAMBIOS';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'btn planilla-cancel-button';
+        cancel.textContent = 'CANCELAR';
+        actions.append(save, cancel);
+        cancel.addEventListener('click', renderBoards);
+        save.addEventListener('click', async () => {
+          save.disabled = true;
+          cancel.disabled = true;
+          save.textContent = 'GUARDANDO…';
+          try{
+            const planilla = collectEditedPlanilla(card, item.planilla || item.plan || {});
+            const data = await fetchJson(`/api/admin/planillas/${encodeURIComponent(item.slug_uid || item.team)}`, {
+              method:'PUT', body:JSON.stringify({ planilla })
+            });
+            item.planilla = data.planilla;
+            item.updatedAt = data.updatedAt || new Date().toISOString();
+            item.receivedAtLocal = null;
+            showAlert('Planilla actualizada correctamente.');
+            renderBoards();
+          }catch(error){
+            showAlert(error.message || 'No se pudo guardar la planilla.');
+            save.disabled = false;
+            cancel.disabled = false;
+            save.textContent = 'GUARDAR CAMBIOS';
+          }
+        });
+      }catch(error){
+        showAlert(error.message || 'No se pudo cargar el plantel.');
+        edit.disabled = false;
+        edit.textContent = 'EDITAR PLANILLA';
+      }
+    });
   }
 
   function formatDateTime(value){
@@ -504,6 +629,8 @@ function authHeaders(extra = {}){
         small.textContent = 'Formato inválido';
         card.appendChild(small);
       }
+
+      appendEditActions(card, item);
 
       boards.appendChild(card);
     }

@@ -172,6 +172,32 @@
     box-shadow:inset 0 -3px 0 #b28900;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;
   }
+  .planilla-player-select{
+    min-height:34px;
+    width:100%;
+    min-width:0;
+    padding:0 8px;
+    border:1px solid #b28900;
+    border-radius:8px;
+    background:#fff8d7;
+    color:#0b0900;
+    font:inherit;
+    font-weight:800;
+  }
+  .planilla-edit-actions{
+    display:flex;
+    justify-content:center;
+    gap:8px;
+    margin:8px 2px 2px;
+  }
+  .planilla-edit-actions .btn-gold{
+    min-height:34px;
+    padding:6px 10px;
+    border-radius:9px;
+    font-size:11px;
+  }
+  .planilla-edit-actions .btn{ min-height:34px; font-weight:800; }
+  .card.editing .board{ zoom:.78; }
 
   .actions{ margin-top:10px; display:flex; justify-content:center; }
   .btn{ background:#0b1224; color:#e2e8f0; border:1px solid rgba(255,255,255,.15); padding:6px 10px; border-radius:8px; cursor:pointer; }
@@ -498,6 +524,6 @@
 </main>
 </div>
   <script src="../match-format.js"></script>
-  <script src="visor_planillas.js?v=20260728-touch-time-1"></script>
+  <script src="visor_planillas.js?v=20260824-edit-planillas-1"></script>
 </body>
 </html>
