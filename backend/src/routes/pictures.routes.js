@@ -14,6 +14,7 @@ module.exports = function createPicturesRouter(deps) {
   const variantsRoot = path.join(picturesRoot, '.variants');
   const REQUIRED_PICTURES = 11;
   const HEIC_EXT_RE = /\.(heic|heif)$/i;
+  const PICTURE_VARIANT_VERSION = '2';
   const PICTURE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i;
   const variantJobs = new Map();
 
@@ -267,7 +268,7 @@ module.exports = function createPicturesRouter(deps) {
   }
 
   function buildPublicImageUrl(filePath, version = '') {
-    return `/api/pictures/public/view?file=${encodeURIComponent(filePath)}${version ? `&v=${encodeURIComponent(version)}` : ''}`;
+    return `/api/pictures/public/view?file=${encodeURIComponent(filePath)}${version ? `&v=${encodeURIComponent(version)}` : ''}&pv=${PICTURE_VARIANT_VERSION}`;
   }
 
   function setPictureCacheHeaders(res) {
@@ -278,7 +279,7 @@ module.exports = function createPicturesRouter(deps) {
 
   async function getOptimizedVariant(fullPath, relativePath, { width, quality }) {
     const stat = await fs.promises.stat(fullPath);
-    const identity = `${relativePath}|${stat.size}|${stat.mtimeMs}|${width}|${quality}`;
+    const identity = `${PICTURE_VARIANT_VERSION}|${relativePath}|${stat.size}|${stat.mtimeMs}|${width}|${quality}`;
     const cacheName = `${crypto.createHash('sha256').update(identity).digest('hex')}.webp`;
     const variantPath = path.join(variantsRoot, `${width}px`, cacheName);
     try {
