@@ -43,7 +43,7 @@ module.exports = function createPicturesRouter(deps) {
   async function convertHeicToJpeg(file) {
     if (!file || !file.path || !isHeicLike(file)) return file;
     const inputBuffer = await fs.promises.readFile(file.path);
-    const outputBuffer = await heicConvert({ buffer: inputBuffer, format: 'JPEG', quality: 0.88 });
+    const outputBuffer = await convertHeicBufferToJpeg(inputBuffer);
     const parsed = path.parse(file.path);
     const jpegPath = path.join(parsed.dir, parsed.name + '.jpg');
     await fs.promises.writeFile(jpegPath, outputBuffer);
@@ -57,6 +57,16 @@ module.exports = function createPicturesRouter(deps) {
       mimetype: 'image/jpeg',
       size: stat.size
     };
+  }
+
+  async function convertHeicBufferToJpeg(inputBuffer) {
+    return heicConvert({ buffer: inputBuffer, format: 'JPEG', quality: 0.88 });
+  }
+
+  async function sharpCompatibleInput(fullPath) {
+    if (!HEIC_EXT_RE.test(String(fullPath || ''))) return fullPath;
+    const inputBuffer = await fs.promises.readFile(fullPath);
+    return convertHeicBufferToJpeg(inputBuffer);
   }
 
   function normalizeSlug(value = '') {
@@ -279,7 +289,8 @@ module.exports = function createPicturesRouter(deps) {
     if (!variantJobs.has(variantPath)) {
       variantJobs.set(variantPath, (async () => {
         await ensureDir(path.dirname(variantPath));
-        await sharp(fullPath, { failOn: 'none', animated: false })
+        const sharpInput = await sharpCompatibleInput(fullPath);
+        await sharp(sharpInput, { failOn: 'none', animated: false })
           .rotate()
           .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
           .webp({ quality, effort: 4 })
