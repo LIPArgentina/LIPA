@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#090b10">
+  <title>Sorteo LIPA · Little Monster BEAST</title>
+  <link rel="icon" href="../logo_liga.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="sorteo.css?v=1">
+</head>
+<body>
+  <main class="raffle-page">
+    <section class="hero-card" aria-labelledby="raffleTitle">
+      <video class="raffle-video" controls playsinline preload="metadata" poster="assets/beast-01.webp">
+        <source src="assets/sorteo.mp4" type="video/mp4">
+        Tu dispositivo no puede reproducir este video.
+      </video>
+
+      <div class="raffle-copy">
+        <img class="lipa-logo" src="../logo_liga.png" alt="LIPA">
+        <h1 id="raffleTitle">¡Sorteamos un taco <strong>Little Monster BEAST Fibra de Carbono de 3 piezas</strong> TOTALMENTE GRATIS!</h1>
+        <p>Para participar solo tenés que completar tus datos y listo.</p>
+      </div>
+
+      <form id="raffleForm" class="raffle-form" novalidate>
+        <label for="nombre">Nombre y apellido</label>
+        <input id="nombre" name="nombre" type="text" autocomplete="name" maxlength="120" placeholder="Tu nombre completo" required>
+
+        <label for="dni">DNI</label>
+        <input id="dni" name="dni" type="text" inputmode="numeric" autocomplete="off" maxlength="9" pattern="[0-9]*" placeholder="Solo números" required>
+
+        <button id="submitButton" type="submit">ENVIAR</button>
+        <p id="formMessage" class="form-message" role="status" aria-live="polite"></p>
+      </form>
+
+      <button id="termsButton" class="terms-link" type="button">Bases y condiciones</button>
+    </section>
+
+    <section class="product-gallery" aria-label="Características del premio">
+      <img src="assets/beast-01.webp" alt="Taco Little Monster BEAST para break y salto" loading="lazy">
+      <img src="assets/beast-02.webp" alt="Eje de fibra de carbono del taco BEAST" loading="lazy">
+      <img src="assets/beast-03.webp" alt="Suela multicapa de 12,9 milímetros" loading="lazy">
+      <img src="assets/beast-04.webp" alt="Especificaciones del taco BEAST de tres piezas" loading="lazy">
+      <img src="assets/beast-05.webp" alt="Taco BEAST Break and Jump Cue" loading="lazy">
+      <img src="assets/beast-06.webp" alt="Detalle de resistencia del taco" loading="lazy">
+      <img src="assets/beast-07.webp" alt="Taco BEAST completo" loading="lazy">
+      <img src="assets/beast-08.webp" alt="Detalle del eje del taco BEAST" loading="lazy">
+    </section>
+  </main>
+
+  <dialog id="termsDialog" class="terms-dialog" aria-labelledby="termsTitle">
+    <article class="terms-panel">
+      <header>
+        <div>
+          <span>Bases y condiciones</span>
+          <h2 id="termsTitle">Sorteo LIPA – Taco Little Monster BEAST</h2>
+        </div>
+        <button id="closeTermsTop" type="button" aria-label="Cerrar">×</button>
+      </header>
+      <div class="terms-content">
+        <section><h3>1. Organizador</h3><p>El presente sorteo es organizado por la <strong>Liga Independiente de Pool Argentina (LIPA)</strong> y se regirá por las presentes Bases y Condiciones.</p><p>La participación en el sorteo es <strong>totalmente gratuita y sin obligación de compra</strong>.</p></section>
+        <section><h3>2. Participantes</h3><p>Podrá participar cualquier persona interesada, sea o no jugador de LIPA, sin necesidad de pertenecer a un equipo, participar de la Superliga o mantener cualquier otro vínculo con la Liga.</p><p>Podrán participar tanto <strong>mayores como menores de 18 años</strong>, siempre que residan en la <strong>República Argentina al momento de realizarse el sorteo</strong>.</p><p>En caso de resultar ganador un menor de 18 años, el retiro del premio deberá realizarse con la intervención y/o autorización de su padre, madre, tutor o representante legal.</p></section>
+        <section><h3>3. Requisitos de participación</h3><p>Para participar será requisito:</p><ul><li>Tener instalada la <strong>aplicación oficial (APK) de LIPA</strong>.</li><li>Encontrarse correctamente registrado en la aplicación al momento de realizarse el sorteo.</li><li>Haberse inscripto al sorteo mediante el mecanismo habilitado a tal efecto dentro de la APK.</li></ul><p>La participación será de <strong>una (1) inscripción por persona</strong>.</p><p>LIPA verificará el cumplimiento de estos requisitos antes de confirmar definitivamente al ganador.</p></section>
+        <section><h3>4. Premio</h3><p>Se sorteará <strong>un (1) taco de pool Little Monster BEAST de Fibra de Carbono, de 3 piezas, Break Jump Cue, 147 cm, 12,9 mm</strong>.</p><p>El premio será entregado exclusivamente en las condiciones establecidas en estas Bases y <strong>no podrá ser canjeado por dinero en efectivo</strong>, ni podrá solicitarse su valor equivalente o sustitución por otro premio.</p></section>
+        <section><h3>5. Fecha y modalidad del sorteo</h3><p>El sorteo se realizará el día <strong>3 de noviembre de 2026</strong>, durante la jornada correspondiente a la <strong>Final de la 6.ª Edición de la Superliga LIPA</strong>.</p><p>El procedimiento será <strong>público y transmitido en directo a través del canal oficial de YouTube de LIPA</strong>.</p><p>La selección se realizará de manera aleatoria entre la totalidad de participantes correctamente inscriptos.</p></section>
+        <section><h3>6. Verificación del ganador</h3><p>Una vez seleccionada una persona, LIPA procederá a verificar que cumpla con todos los requisitos establecidos en estas Bases y Condiciones.</p><p>El participante seleccionado deberá acreditar que mantiene instalada la APK oficial de LIPA y que se encuentra correctamente registrado en ella al momento de la verificación.</p><p><strong>Si la persona seleccionada no cumple con alguno de los requisitos, su selección quedará automáticamente invalidada y se procederá a realizar una nueva selección aleatoria.</strong></p><p>Este procedimiento podrá repetirse tantas veces como resulte necesario hasta obtener un ganador que cumpla con la totalidad de los requisitos.</p><p>La verificación y las eventuales nuevas selecciones se realizarán como parte del procedimiento público del sorteo.</p></section>
+        <section><h3>7. Publicación del ganador</h3><p>Una vez confirmado el ganador, <strong>LIPA no realizará notificaciones individuales ni tendrá la obligación de contactar personalmente a la persona ganadora</strong>.</p><p>El nombre del ganador será publicado en la <strong>APK oficial de LIPA</strong>, junto con el video correspondiente a la transmisión en vivo en la que se realizó el sorteo.</p><p>En la misma publicación se informará el <strong>medio de contacto oficial de LIPA</strong> al cual deberá comunicarse el ganador para reclamar y coordinar el retiro de su premio.</p><p>El nombre del ganador, el medio de contacto y el video del sorteo permanecerán publicados en la APK durante un plazo de <strong>treinta (30) días corridos contados desde la fecha de su publicación</strong>.</p><p>Será responsabilidad del participante consultar el resultado del sorteo y, en caso de resultar ganador, comunicarse con LIPA dentro del plazo establecido.</p></section>
+        <section><h3>8. Plazo para reclamar el premio</h3><p>El ganador dispondrá de un plazo de <strong>treinta (30) días corridos desde la publicación del resultado en la APK de LIPA</strong> para comunicarse mediante el contacto indicado y reclamar su premio.</p><p>LIPA no tendrá obligación de contactar al ganador por otros medios.</p><p>Si transcurrido dicho plazo el ganador <strong>no se hubiera comunicado con LIPA</strong>, se considerará vencido su derecho a reclamar el premio y el mismo será declarado <strong>vacante</strong>, sin que corresponda realizar un nuevo sorteo ni otorgar compensación alguna.</p></section>
+        <section><h3>9. Retiro del premio</h3><p>El premio deberá ser <strong>retirado personalmente por el ganador</strong>, previa coordinación con LIPA a través del medio de contacto publicado.</p><p><strong>LIPA no realizará envíos del premio.</strong></p><p>La modalidad, lugar, día y horario para efectuar el retiro serán coordinados una vez que el ganador se haya comunicado con LIPA.</p><p>En caso de que el ganador sea menor de 18 años, el retiro deberá realizarse con la intervención y/o autorización de su padre, madre, tutor o representante legal.</p></section>
+        <section><h3>10. Datos personales</h3><p>Los datos proporcionados por los participantes serán utilizados por LIPA para administrar el sorteo, verificar el cumplimiento de sus requisitos e identificar al ganador.</p><p>La participación implica la autorización para que LIPA publique el <strong>nombre del ganador</strong> en la APK y demás canales oficiales de la Liga con la finalidad de comunicar y difundir el resultado del sorteo.</p><p>En el caso de participantes menores de edad, cualquier utilización adicional de su imagen o datos que requiera autorización será realizada con consentimiento de su padre, madre, tutor o representante legal cuando corresponda.</p></section>
+        <section><h3>11. Transparencia del sorteo</h3><p>Con el objetivo de garantizar la transparencia del procedimiento, LIPA podrá informar públicamente la cantidad total de participantes habilitados y exhibir durante la transmisión el procedimiento utilizado para efectuar la selección aleatoria.</p><p>La realización del sorteo en directo a través del canal oficial de YouTube de LIPA permitirá que cualquier persona interesada pueda presenciar el procedimiento.</p><p>La grabación de dicha transmisión será posteriormente publicada en la APK oficial de LIPA y permanecerá disponible junto con el resultado durante <strong>treinta (30) días corridos</strong>.</p></section>
+        <section><h3>12. Situaciones excepcionales</h3><p>En caso de que la Final de la 6.ª Edición de la Superliga sea reprogramada, suspendida o no pudiera desarrollarse normalmente, o ante inconvenientes técnicos que imposibiliten realizar o transmitir correctamente el sorteo, <strong>LIPA podrá modificar la fecha u horario de realización</strong>.</p><p>Cualquier modificación será comunicada a través de los canales oficiales de LIPA.</p><p>Asimismo, LIPA podrá adoptar las medidas razonablemente necesarias para resolver cualquier situación no prevista en estas Bases y Condiciones, procurando en todo momento preservar la transparencia, igualdad entre los participantes y finalidad del sorteo.</p></section>
+        <section><h3>13. Aceptación de las bases</h3><p>La inscripción y participación en el sorteo implica el <strong>conocimiento y aceptación íntegra de las presentes Bases y Condiciones</strong>.</p><p>El incumplimiento de cualquiera de los requisitos establecidos dará lugar a la exclusión del participante o, en caso de haber sido seleccionado, a la invalidación de su selección.</p></section>
+        <p class="terms-signature">Liga Independiente de Pool Argentina – LIPA</p>
+      </div>
+      <footer><button id="closeTerms" type="button">CERRAR</button></footer>
+    </article>
+  </dialog>
+
+  <script src="../config.js"></script>
+  <script src="sorteo.js?v=1"></script>
+</body>
+</html>
