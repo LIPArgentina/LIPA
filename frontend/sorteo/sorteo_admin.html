@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Administración del sorteo · LIPA</title>
+  <link rel="icon" href="../logo_liga.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="sorteo_admin.css?v=1">
+</head>
+<body>
+  <header class="admin-header">
+    <a href="../index.html"><img src="../logo_liga.png" alt="Inicio"></a>
+    <h1>SORTEO</h1>
+    <a class="back-button" href="../index.html">VOLVER</a>
+  </header>
+
+  <main class="admin-main">
+    <section class="summary-card">
+      <div><span>Inscriptos</span><strong id="totalCount">—</strong></div>
+      <button id="reloadButton" type="button">ACTUALIZAR</button>
+    </section>
+
+    <section class="list-card">
+      <div class="list-heading">
+        <div><span>Participantes registrados</span><h2>Nombre y DNI</h2></div>
+        <input id="searchInput" type="search" placeholder="Buscar nombre o DNI" autocomplete="off">
+      </div>
+      <p id="adminMessage" class="admin-message" role="status"></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Nombre y apellido</th><th>DNI</th><th>Fecha</th></tr></thead>
+          <tbody id="participantsBody"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="empty-state" hidden>No hay inscriptos para mostrar.</div>
+    </section>
+  </main>
+
+  <script src="../config.js"></script>
+  <script src="sorteo_admin.js?v=1"></script>
+</body>
+</html>

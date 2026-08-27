@@ -12,6 +12,7 @@ const createLlavesRouter = require('./llaves.routes');
 const reglamentoRouter = require('./reglamento.routes');
 const createVideosRouter = require('./videos.routes');
 const createPlayersAdminRouter = require('./playersAdmin.routes');
+const createSorteoRouter = require('./sorteo.routes');
 
 module.exports = function createApiRouter(deps) {
   const { DATA_DIR } = deps;
@@ -59,6 +60,8 @@ module.exports = function createApiRouter(deps) {
 
 
   router.use('/', reglamentoRouter);
+
+  router.use('/', createSorteoRouter(deps));
 
   return router;
 };

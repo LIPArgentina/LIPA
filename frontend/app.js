@@ -6,6 +6,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 
 const btnAdminEquipos = $("#btnAdminEquipos");
 const btnBanner = $("#btnBanner");
+const btnSorteoAdmin = $("#btnSorteoAdmin");
 
 
 function readSession() {
@@ -100,6 +101,7 @@ function renderSession(sess) {
     }
 
     if (btnBanner) btnBanner.classList.add("hidden");
+    if (btnSorteoAdmin) btnSorteoAdmin.classList.add("hidden");
     if (brandCta) brandCta.textContent = defaultCta;
     return;
   }
@@ -124,6 +126,7 @@ function renderSession(sess) {
     }
 
     if (btnBanner) btnBanner.classList.remove("hidden");
+    if (btnSorteoAdmin) btnSorteoAdmin.classList.remove("hidden");
     if (brandCta) brandCta.textContent = "Hola, Admin!";
   } else if (role === "sala") {
     const slug = sess.slug || localStorage.getItem("lpi.lastSalaSlug") || "";
@@ -144,6 +147,7 @@ function renderSession(sess) {
     }
 
     if (btnBanner) btnBanner.classList.add("hidden");
+    if (btnSorteoAdmin) btnSorteoAdmin.classList.add("hidden");
     if (brandCta) brandCta.textContent = `Hola, ${sess.displayName || "Sala"}!`;
   } else {
     const slug =
@@ -162,6 +166,7 @@ function renderSession(sess) {
     }
 
     if (btnBanner) btnBanner.classList.add("hidden");
+    if (btnSorteoAdmin) btnSorteoAdmin.classList.add("hidden");
     if (brandCta) brandCta.textContent = `Hola, ${sess.displayName || "Equipo"}!`;
   }
 

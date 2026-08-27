@@ -14,12 +14,17 @@ const rateLimit = require('express-rate-limit');
 const createApiRouter = require('./routes/index');
 const crucesDbRouter = require('./routes/cruces.routes.db');
 const { ensureSiteStatsTable } = require('./routes/stats.routes');
+const { ensureSorteoTable } = require('./routes/sorteo.routes');
 const { requireAdmin } = require('./middleware/auth');
 
 const app = express();
 
 ensureSiteStatsTable().catch((err) => {
   console.error('Error inicializando tabla de estadísticas:', err);
+});
+
+ensureSorteoTable().catch((err) => {
+  console.error('Error inicializando tabla del sorteo:', err);
 });
 
 app.set('trust proxy', 1);
