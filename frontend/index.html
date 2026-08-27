@@ -133,6 +133,25 @@
     </form>
   </dialog>
 
+  <dialog id="promoSorteoModal" class="promo-video-popup" aria-labelledby="promoSorteoTitle">
+    <div class="promo-video-popup__panel">
+      <button id="closePromoSorteo" class="promo-video-popup__close" type="button" aria-label="Cerrar video">&times;</button>
+      <h2 id="promoSorteoTitle">¡Participá del sorteo LIPA!</h2>
+      <div class="promo-video-popup__video">
+        <iframe
+          id="promoSorteoPlayer"
+          title="Video promocional del sorteo LIPA"
+          src="https://www.youtube-nocookie.com/embed/QFvgFSlJ_rU?playsinline=1&amp;rel=0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
+      </div>
+      <p>Reproducí el video con sonido y completá tus datos desde la app.</p>
+      <a class="promo-video-popup__action" href="./sorteo/sorteo.html">PARTICIPAR AHORA</a>
+    </div>
+  </dialog>
+
   <dialog id="flyerAldoModal" class="flyer-popup" aria-labelledby="flyerAldoTitle">
     <div class="flyer-popup__panel">
       <button type="button" class="flyer-popup__close" aria-label="Cerrar flyer">&times;</button>

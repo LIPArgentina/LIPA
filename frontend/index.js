@@ -831,6 +831,34 @@ function setupBannerPopupLinks() {
   });
 }
 
+function setupPromoSorteoModal() {
+  const modal = document.getElementById('promoSorteoModal');
+  const closeButton = document.getElementById('closePromoSorteo');
+  const player = document.getElementById('promoSorteoPlayer');
+  if (!modal || !closeButton || !player) return;
+
+  const originalSrc = player.src;
+  const close = () => {
+    modal.close();
+    player.src = '';
+  };
+
+  closeButton.addEventListener('click', close);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) close();
+  });
+  modal.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    close();
+  });
+  modal.addEventListener('close', () => {
+    if (player.src) player.src = '';
+  });
+
+  player.src = originalSrc;
+  modal.showModal();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   ensureManageTeamButton();
   ensureConsultasButton();
@@ -846,4 +874,5 @@ document.addEventListener("DOMContentLoaded", () => {
   setupAscensosLipaModal();
   setupFlyerImageZoom();
   setupBannerPopupLinks();
+  setupPromoSorteoModal();
 });
