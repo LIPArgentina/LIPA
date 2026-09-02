@@ -589,16 +589,20 @@
     currentEdition = Number(params.get('edition')) || 0;
     const rawDate = params.get('date') || params.get('fechaISO') || '';
     const rawFecha = params.get('fecha') || '';
+    const isReprogrammed = params.get('reprogramado') === '1';
+    const originalDate = buildDateKey(params.get('originalDate') || '');
     const tipoFiltro = String(params.get('tipo') || '').trim().toLowerCase();
     const localFiltro = normalizeFilterTeam(params.get('local') || '');
     const visitanteFiltro = normalizeFilterTeam(params.get('visitante') || '');
     const fechaISO = buildDateKey(rawDate);
 
-    document.getElementById('categoryLabel').textContent = `Categoría ${category.toUpperCase()}`;
+    document.getElementById('categoryLabel').textContent = isReprogrammed
+      ? `Categoría ${category.toUpperCase()} · ENCUENTRO REPROGRAMADO`
+      : `Categoría ${category.toUpperCase()}`;
     document.getElementById('datePill').textContent = formatDate(fechaISO || rawDate);
-    document.getElementById('metaText').textContent = rawFecha
-      ? `${rawFecha}ª fecha · cruces validados`
-      : 'Resultados validados de la fecha';
+    document.getElementById('metaText').textContent = isReprogrammed
+      ? `Programado originalmente para el ${formatDate(originalDate)}`
+      : (rawFecha ? `${rawFecha}ª fecha · cruces validados` : 'Resultados validados de la fecha');
 
     document.getElementById('btnVolver').addEventListener('click', (ev) => {
       ev.preventDefault();
@@ -639,13 +643,21 @@
     if (localFiltro || visitanteFiltro) {
       results = results.filter(item => resultMatchesTeams(item, localFiltro, visitanteFiltro));
     }
-    document.getElementById('heroTitle').textContent = results.length ? 'Encuentros validados' : 'Sin encuentros validados';
+    document.getElementById('heroTitle').textContent = results.length
+      ? (isReprogrammed ? 'Encuentro reprogramado validado' : 'Encuentros validados')
+      : (isReprogrammed ? 'Encuentro reprogramado' : 'Sin encuentros validados');
     document.getElementById('metaText').textContent = results.length
-      ? `${results.length} encuentro${results.length === 1 ? '' : 's'} validado${results.length === 1 ? '' : 's'}`
-      : 'Todavía no hay cruces validados para esta fecha.';
+      ? (isReprogrammed
+          ? `Jugado el ${formatDate(fechaISO)} · originalmente programado para el ${formatDate(originalDate)}`
+          : `${results.length} encuentro${results.length === 1 ? '' : 's'} validado${results.length === 1 ? '' : 's'}`)
+      : (isReprogrammed
+          ? 'El encuentro reprogramado todavía no fue validado.'
+          : 'Todavía no hay cruces validados para esta fecha.');
 
     if (!results.length) {
-      container.innerHTML = '<div class="empty">Todavía no hay cruces validados para esta fecha.</div>';
+      container.innerHTML = `<div class="empty">${isReprogrammed
+        ? 'El encuentro reprogramado todavía no fue validado.'
+        : 'Todavía no hay cruces validados para esta fecha.'}</div>`;
       return;
     }
 
