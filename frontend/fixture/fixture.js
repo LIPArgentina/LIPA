@@ -562,9 +562,22 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
       const wrapper = document.createElement('div');
       wrapper.className = 'reprogrammed-match';
       const [year, month, day] = String(reprogramadoPara).slice(0, 10).split('-');
-      const label = document.createElement('div');
+      const label = document.createElement('a');
       label.className = 'reprogrammed-match__label';
       label.textContent = `ENCUENTRO REPROGRAMADO PARA EL ${day}/${month}/${year}`;
+      const { cat, kind, edition } = currentCategoryKind();
+      const params = new URLSearchParams({
+        category: cat,
+        kind,
+        edition: String(edition),
+        date: String(reprogramadoPara).slice(0, 10),
+        reprogramado: '1',
+        originalDate: String(fecha || ''),
+        local: L?.equipo || '',
+        visitante: V?.equipo || ''
+      });
+      label.href = `../encuentros/encuentros.html?${params.toString()}`;
+      label.title = 'Abrir el encuentro reprogramado';
       wrapper.append(label, row);
       rowsCont.appendChild(wrapper);
     } else {

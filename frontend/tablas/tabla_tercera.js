@@ -163,7 +163,7 @@ function ensureFechaBlock(section, fechaIndex, fechaText, isAdjustmentBreak = fa
   return section.querySelector(`.rows[data-fecha="${fechaIndex}"]`);
 }
 
-function renderRowsStatic(rowsCont, equipos){
+function renderRowsStatic(rowsCont, equipos, originalDate = ''){
   rowsCont.innerHTML = '';
   const list = Array.isArray(equipos) ? equipos : [];
   const total = Math.floor(list.length / 2);
@@ -211,9 +211,21 @@ function renderRowsStatic(rowsCont, equipos){
       const wrapper = document.createElement('div');
       wrapper.className = 'reprogrammed-match';
       const [year, month, day] = String(reprogramadoPara).slice(0, 10).split('-');
-      const label = document.createElement('div');
+      const label = document.createElement('a');
       label.className = 'reprogrammed-match__label';
       label.textContent = `ENCUENTRO REPROGRAMADO PARA EL ${day}/${month}/${year}`;
+      const params = new URLSearchParams({
+        category: 'tercera',
+        kind: selectedKind,
+        edition: String(selectedEdition),
+        date: String(reprogramadoPara).slice(0, 10),
+        reprogramado: '1',
+        originalDate: buildDateKey(originalDate),
+        local: L?.equipo || '',
+        visitante: V?.equipo || ''
+      });
+      label.href = `../encuentros/encuentros.html?${params.toString()}`;
+      label.title = 'Abrir el encuentro reprogramado';
       wrapper.append(label, row);
       rowsCont.append(wrapper);
     } else {
@@ -243,7 +255,7 @@ function buildFixtureCard(group, fechaIndex, fechaText, equipos, isAdjustmentBre
     rowsCont.classList.add('adjustment-break-static');
     rowsCont.innerHTML = '<div class="adjustment-break-message">FECHA LIBRE POR REAJUSTE</div>';
   } else {
-    renderRowsStatic(rowsCont, equipos);
+    renderRowsStatic(rowsCont, equipos, fechaText);
   }
   return section;
 }
