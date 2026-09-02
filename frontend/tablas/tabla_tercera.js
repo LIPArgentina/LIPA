@@ -176,6 +176,7 @@ function renderRowsStatic(rowsCont, equipos){
 
     const row = document.createElement('div');
     row.className = 'row';
+    const reprogramadoPara = L?.reprogramadoPara || V?.reprogramadoPara || '';
 
     const extraL = document.createElement('div');
     extraL.className = 'score-badge extra-badge';
@@ -206,7 +207,18 @@ function renderRowsStatic(rowsCont, equipos){
     extraV.textContent = V.puntosExtra ?? '';
 
     row.append(extraL, puntL, selL, vs, selV, puntV, extraV);
-    rowsCont.append(row);
+    if (reprogramadoPara) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'reprogrammed-match';
+      const [year, month, day] = String(reprogramadoPara).slice(0, 10).split('-');
+      const label = document.createElement('div');
+      label.className = 'reprogrammed-match__label';
+      label.textContent = `ENCUENTRO REPROGRAMADO PARA EL ${day}/${month}/${year}`;
+      wrapper.append(label, row);
+      rowsCont.append(wrapper);
+    } else {
+      rowsCont.append(row);
+    }
   }
 }
 
