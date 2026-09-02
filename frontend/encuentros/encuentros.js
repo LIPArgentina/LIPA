@@ -606,6 +606,13 @@
 
     document.getElementById('btnVolver').addEventListener('click', (ev) => {
       ev.preventDefault();
+      if (isReprogrammed) {
+        const tablePage = category === 'tercera' ? 'tabla_tercera.html' : 'tabla_segunda.html';
+        const params = new URLSearchParams();
+        if (currentEdition) params.set('edition', String(currentEdition));
+        window.location.assign(`../tablas/${tablePage}${params.toString() ? `?${params}` : ''}`);
+        return;
+      }
       history.back();
     });
 
