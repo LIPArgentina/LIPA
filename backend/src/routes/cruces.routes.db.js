@@ -418,9 +418,10 @@ async function fetchAutomationFixtureInfo(team) {
   for (const row of rows) {
     const fechas = Array.isArray(row?.data?.fechas) ? row.data.fechas : [];
     for (const fecha of fechas) {
-      const dateKey = String(fecha?.date || '').slice(0, 10);
-      if (!isDateKey(dateKey)) continue;
-      fixtures.push({ date: dateKey, kind: row.kind });
+      for (const match of extractFixtureMatches(fecha)) {
+        if (!isDateKey(match.date)) continue;
+        fixtures.push({ date: match.date, kind: row.kind });
+      }
     }
   }
 
@@ -843,51 +844,41 @@ function normalizeDateOnly(value) {
   return String(value || '').slice(0, 10);
 }
 
-function pickFixtureFecha(fechas = []) {
-  const normalized = fechas
-    .map((fecha) => ({
-      raw: fecha,
-      dateKey: normalizeDateOnly(fecha?.date)
-    }))
-    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey))
-    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+function getFixtureMatchDate(fecha, localItem, visitanteItem) {
+  return normalizeDateOnly(
+    localItem?.reprogramadoPara ||
+    visitanteItem?.reprogramadoPara ||
+    fecha?.reprogramadoPara ||
+    fecha?.date
+  );
+}
 
-  if (!normalized.length) return null;
-
-  const todayKey = new Date().toISOString().slice(0, 10);
-  return normalized.find((f) => f.dateKey >= todayKey)?.raw || normalized[normalized.length - 1].raw;
+function extractFixtureMatches(fechaNode) {
+  const matches = [];
+  const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
+  for (const tabla of tablas) {
+    const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
+    for (let index = 0; index + 1 < equipos.length; index += 2) {
+      const localItem = equipos[index];
+      const visitanteItem = equipos[index + 1];
+      if (String(localItem?.categoria || '').toLowerCase() !== 'local') continue;
+      if (String(visitanteItem?.categoria || '').toLowerCase() !== 'visitante') continue;
+      const local = String(localItem?.equipo || '').trim();
+      const visitante = String(visitanteItem?.equipo || '').trim();
+      if (!local || !visitante || local.toUpperCase() === 'WO' || visitante.toUpperCase() === 'WO') continue;
+      matches.push({
+        local,
+        visitante,
+        date: getFixtureMatchDate(fechaNode, localItem, visitanteItem),
+        grupo: tabla?.grupo || null
+      });
+    }
+  }
+  return matches;
 }
 
 function extractCrucesFromFecha(fechaNode) {
-  const tablas = Array.isArray(fechaNode?.tablas) ? fechaNode.tablas : [];
-  const cruces = [];
-
-  for (const tabla of tablas) {
-    const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
-    if (!equipos.length) continue;
-
-    let pendienteLocal = null;
-
-    for (const item of equipos) {
-      const categoria = String(item?.categoria || '').toLowerCase();
-      const nombre = String(item?.equipo || '').trim();
-      if (!nombre) continue;
-
-      if (categoria === 'local') {
-        pendienteLocal = nombre;
-        continue;
-      }
-
-      if (categoria === 'visitante') {
-        if (pendienteLocal && nombre.toUpperCase() !== 'WO' && pendienteLocal.toUpperCase() !== 'WO') {
-          cruces.push({ local: pendienteLocal, visitante: nombre });
-        }
-        pendienteLocal = null;
-      }
-    }
-  }
-
-  return cruces;
+  return extractFixtureMatches(fechaNode);
 }
 
 async function fetchCrucesFromDB(team) {
@@ -900,13 +891,16 @@ async function fetchCrucesFromDB(team) {
   );
 
   const fechas = rows[0]?.data?.fechas || [];
-  const fecha = pickFixtureFecha(fechas);
-
-  if (!fecha) return { cruces: [], fechaFixture: null };
-
+  const matches = fechas.flatMap(extractCrucesFromFecha).filter((match) => isDateKey(match.date));
+  if (!matches.length) return { cruces: [], fechaFixture: null };
+  const todayKey = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+  const dates = [...new Set(matches.map((match) => match.date))].sort();
+  const selectedDate = dates.find((date) => date >= todayKey) || dates[dates.length - 1];
   return {
-    cruces: extractCrucesFromFecha(fecha),
-    fechaFixture: normalizeDateOnly(fecha.date)
+    cruces: matches.filter((match) => match.date === selectedDate),
+    fechaFixture: selectedDate
   };
 }
 
@@ -1831,8 +1825,6 @@ async function syncValidatedMatchIntoFixture({
     let updatedGroup = null;
 
     for (const fecha of fechas) {
-      if (normalizeDateOnly(fecha?.date) !== dateKey) continue;
-
       const tablas = Array.isArray(fecha?.tablas) ? fecha.tablas : [];
       for (const tabla of tablas) {
         const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
@@ -1843,6 +1835,7 @@ async function syncValidatedMatchIntoFixture({
           const visitanteCategoria = String(visitanteItem?.categoria || '').trim().toLowerCase();
 
           if (localCategoria !== 'local' || visitanteCategoria !== 'visitante') continue;
+          if (getFixtureMatchDate(fecha, localItem, visitanteItem) !== dateKey) continue;
           if (!fixtureTeamMatches(localItem, localCandidates)) continue;
           if (!fixtureTeamMatches(visitanteItem, visitanteCandidates)) continue;
 
@@ -2736,7 +2729,6 @@ function fixtureHasScheduledMatch(rows = [], { fechaISO, localSlug, visitanteSlu
   return rows.some((row) => {
     const fechas = Array.isArray(row?.data?.fechas) ? row.data.fechas : [];
     return fechas.some((fecha) => {
-      if (normalizeDateOnly(fecha?.date) !== dateKey) return false;
       const tablas = Array.isArray(fecha?.tablas) ? fecha.tablas : [];
       return tablas.some((tabla) => {
         const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
@@ -2745,6 +2737,7 @@ function fixtureHasScheduledMatch(rows = [], { fechaISO, localSlug, visitanteSlu
           const visitante = equipos[index + 1];
           if (String(local?.categoria || '').toLowerCase() !== 'local') continue;
           if (String(visitante?.categoria || '').toLowerCase() !== 'visitante') continue;
+          if (getFixtureMatchDate(fecha, local, visitante) !== dateKey) continue;
           if (normalizeTeamIdentity(local?.equipo) !== localKey) continue;
           if (normalizeTeamIdentity(visitante?.equipo) !== visitanteKey) continue;
           return true;
@@ -3033,11 +3026,11 @@ async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
   for (const fixtureRow of fixtureRows) {
     const fechas = Array.isArray(fixtureRow?.data?.fechas) ? fixtureRow.data.fechas : [];
     for (const fecha of fechas) {
-      const dateKey = normalizeDateOnly(fecha?.date);
       const tablas = Array.isArray(fecha?.tablas) ? fecha.tablas : [];
       for (const tabla of tablas) {
         const equipos = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
         for (let index = 0; index + 1 < equipos.length; index += 2) {
+          const dateKey = getFixtureMatchDate(fecha, equipos[index], equipos[index + 1]);
           const pair = [
             normalizeTeamIdentity(equipos[index]?.equipo),
             normalizeTeamIdentity(equipos[index + 1]?.equipo)

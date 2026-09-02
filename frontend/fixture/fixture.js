@@ -452,6 +452,8 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
 
     const row = document.createElement('div');
     row.className = 'row';
+    const reprogramadoPara = L?.reprogramadoPara || V?.reprogramadoPara || '';
+    if (reprogramadoPara) row.dataset.reprogramadoPara = reprogramadoPara;
 
     const puntL = document.createElement('select');
     puntL.className = 'score-badge';
@@ -556,7 +558,18 @@ function renderRows(rowsCont, equipos, fecha, grupo, equiposCat, matchesPerGroup
     row.appendChild(selV);
     row.appendChild(extraV);
     row.appendChild(puntV);
-    rowsCont.appendChild(row);
+    if (reprogramadoPara) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'reprogrammed-match';
+      const [year, month, day] = String(reprogramadoPara).slice(0, 10).split('-');
+      const label = document.createElement('div');
+      label.className = 'reprogrammed-match__label';
+      label.textContent = `ENCUENTRO REPROGRAMADO PARA EL ${day}/${month}/${year}`;
+      wrapper.append(label, row);
+      rowsCont.appendChild(wrapper);
+    } else {
+      rowsCont.appendChild(row);
+    }
   }
 }
 
@@ -642,6 +655,7 @@ function buildFixtureFromUI(){
 
       const equipos = [];
       card.querySelectorAll('.row').forEach(row => {
+        const reprogramadoPara = row.dataset.reprogramadoPara || '';
         const selL  = row.querySelector('select.team-name[data-side="L"]');
         const selV  = row.querySelector('select.team-name[data-side="V"]');
         const puntL = row.querySelector('select.score-badge[data-side="L"][data-field="puntos"]');
@@ -651,12 +665,14 @@ function buildFixtureFromUI(){
         equipos.push({
           equipo: normalizeTeamName(selL ? selL.value : ''),
           puntos: puntL ? Number(puntL.value || 0) : 0,
-          puntosExtra: extraL ? Number(extraL.value || 0) : 0
+          puntosExtra: extraL ? Number(extraL.value || 0) : 0,
+          ...(reprogramadoPara ? { reprogramadoPara } : {})
         });
         equipos.push({
           equipo: normalizeTeamName(selV ? selV.value : ''),
           puntos: puntV ? Number(puntV.value || 0) : 0,
-          puntosExtra: extraV ? Number(extraV.value || 0) : 0
+          puntosExtra: extraV ? Number(extraV.value || 0) : 0,
+          ...(reprogramadoPara ? { reprogramadoPara } : {})
         });
       });
 

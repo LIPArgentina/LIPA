@@ -18,6 +18,9 @@
     .h2{ margin:16px 0 10px; font-size:clamp(14px,2.6vw,14px); font-weight:800; opacity:.95; }
     .rule{ height:1px; background:var(--line); margin:10px 0 6px; }
     .row{ display:grid; grid-template-columns:35px 1fr auto 1fr 35px; align-items:center; gap:10px; padding:8px 0; position:relative; }
+    .reprogrammed-match{border:1px solid #ef4444;border-radius:7px;padding:3px 6px 1px;margin:5px -7px;}
+    .reprogrammed-match__label{color:#ff5a5a;font-size:11px;font-weight:900;line-height:1.2;text-align:center;letter-spacing:.15px;padding:1px 3px 0;}
+    .reprogrammed-match .row{padding-top:5px;}
     .row + .row::before{ content:""; position:absolute; top:0; left:0; right:0; height:1px; background:var(--line); }
     .score-badge{ width:32px; height:32px; border-radius:10px; background:var(--gold); box-shadow:0 5px 0 #b28900; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1b1600; }
     .team-name{ font-weight:800; letter-spacing:.04em; }

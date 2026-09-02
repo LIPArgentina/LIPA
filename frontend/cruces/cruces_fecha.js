@@ -592,7 +592,9 @@ function apiUrl(path){
 
         if (categoria === 'visitante') {
           if (pendienteLocal && nombre.toUpperCase() !== 'WO' && String(pendienteLocal?.equipo || '').toUpperCase() !== 'WO') {
-            pushCruce(cruces, pendienteLocal, item, fechaNode?.date || fechaNode?.fecha || fechaNode?.fechaISO || fechaNode?.fechaKey || null);
+            const matchDate = pendienteLocal?.reprogramadoPara || item?.reprogramadoPara ||
+              fechaNode?.reprogramadoPara || fechaNode?.date || fechaNode?.fecha || fechaNode?.fechaISO || fechaNode?.fechaKey || null;
+            pushCruce(cruces, pendienteLocal, item, matchDate);
           }
           pendienteLocal = null;
         }
@@ -687,43 +689,8 @@ function apiUrl(path){
 
     const fechas = [...idaFechas, ...vueltaFechas];
 
-    const toDateKey = (raw) => {
-      const value = String(raw || '').trim();
-      const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) return '';
-      const y = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${y}-${mm}-${dd}`;
-    };
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const makeKey = (date) => {
-      const y = date.getFullYear();
-      const mm = String(date.getMonth() + 1).padStart(2, '0');
-      const dd = String(date.getDate()).padStart(2, '0');
-      return `${y}-${mm}-${dd}`;
-    };
-
-    const todayKey = makeKey(today);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayKey = makeKey(yesterday);
-    const normalized = fechas
-      .map((fecha) => ({ raw: fecha, key: toDateKey(fecha?.date), kind: fecha?.__kind || '' }))
-      .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.key))
-      .sort((a, b) => a.key.localeCompare(b.key));
-
-    const chosen =
-      normalized.find((item) => item.key === todayKey) ||
-      normalized.find((item) => item.key === yesterdayKey) ||
-      normalized.find((item) => item.key > todayKey);
-
-    if (!chosen) {
+    const cruces = fechas.flatMap(extractCrucesFromFecha);
+    if (!cruces.length) {
       const ctx = getCrucesTeamContext();
       const match = await loadProximoCruceFromLlaves(category, ctx.primaryTeam || '');
       if (match) {
@@ -736,7 +703,6 @@ function apiUrl(path){
       return { cruces: [], fechaFixture: null, fixtureKind: null };
     }
 
-    const cruces = extractCrucesFromFecha(chosen.raw);
     const ctx = getCrucesTeamContext();
     const cruceEquipo = findCruceForTeam(cruces, ctx.candidates);
 
@@ -753,8 +719,8 @@ function apiUrl(path){
 
     return {
       cruces,
-      fechaFixture: chosen.key,
-      fixtureKind: chosen.kind || null
+      fechaFixture: cruceEquipo?.date || null,
+      fixtureKind: null
     };
   }
 

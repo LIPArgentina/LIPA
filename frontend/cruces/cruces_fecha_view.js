@@ -93,19 +93,24 @@
           local,
           visitante,
           group: String(table?.grupo || ''),
-          date: String(fecha?.date || '').slice(0, 10)
+          date: String(
+            teams[index]?.reprogramadoPara ||
+            teams[index + 1]?.reprogramadoPara ||
+            fecha?.reprogramadoPara ||
+            fecha?.date || ''
+          ).slice(0, 10)
         });
       }
     }
     return result;
   }
 
-  function selectRelevantDate(fechas) {
+  function selectRelevantDate(matches) {
     const today = localDateKey();
-    const valid = fechas
-      .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(String(item?.date || '').slice(0, 10)))
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    return valid.find(item => String(item.date).slice(0, 10) >= today) || valid[valid.length - 1] || null;
+    const valid = [...new Set(matches.map(item => String(item?.date || '').slice(0, 10)))]
+      .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date))
+      .sort();
+    return valid.find(date => date >= today) || valid[valid.length - 1] || '';
   }
 
   async function loadMatches() {
@@ -119,8 +124,9 @@
       ...(Array.isArray(idaData?.fechas) ? idaData.fechas : []),
       ...(Array.isArray(vueltaData?.fechas) ? vueltaData.fechas : [])
     ];
-    const selected = selectRelevantDate(fechas);
-    return { date: selected?.date || '', matches: extractMatches(selected) };
+    const matches = fechas.flatMap(extractMatches);
+    const selectedDate = selectRelevantDate(matches);
+    return { date: selectedDate, matches: matches.filter(match => match.date === selectedDate) };
   }
 
   async function loadPlans(matches) {
