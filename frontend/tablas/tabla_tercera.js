@@ -290,6 +290,27 @@ function renderSelectedFixture(){
   });
 }
 
+function fixtureHasReprogrammedMatch(fixture){
+  return (fixture?.fechas || []).some(fecha =>
+    (fecha?.tablas || []).some(tabla =>
+      (tabla?.equipos || []).some(equipo => Boolean(equipo?.reprogramadoPara))
+    )
+  );
+}
+
+window.addEventListener('pageshow', (event) => {
+  // Al volver desde encuentros algunos navegadores restauran una copia parcial
+  // del DOM. Si falta la marca especial, reconstruimos la vista desde el fixture.
+  if (!event.persisted) return;
+  window.setTimeout(async () => {
+    let fixture = cache[selectedKind];
+    if (!fixture) fixture = await fetchFixture(selectedKind).catch(() => null);
+    if (fixtureHasReprogrammedMatch(fixture)) {
+      renderSelectedFixture();
+    }
+  }, 50);
+});
+
 
 function collectStandingsEntries(feeds){
   const entries = [];
