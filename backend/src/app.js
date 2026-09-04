@@ -98,6 +98,12 @@ const limiter = rateLimit({
       if (req.path.startsWith('/cruces/match-status')) return true;
       if (req.path.startsWith('/cruces/lock-status')) return true;
       if (req.path.startsWith('/teams')) return true;
+      // Estas lecturas ya requieren sesión de administrador. El visor de
+      // fotos puede solicitar varias miniaturas y no debe consumir el cupo
+      // global destinado a proteger operaciones sensibles.
+      if (req.path === '/pictures/admin/teams') return true;
+      if (req.path === '/pictures/admin/list') return true;
+      if (req.path === '/pictures/admin/thumb') return true;
     }
 
     return false;
