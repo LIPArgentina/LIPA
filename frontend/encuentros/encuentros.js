@@ -12,6 +12,8 @@
   const photosMainImage = document.getElementById('photosMainImage');
   const photosPager = document.getElementById('photosPager');
   const photosCounter = document.getElementById('photosCounter');
+  const photosPrev = document.getElementById('photosPrev');
+  const photosNext = document.getElementById('photosNext');
   const photosModalSubtitle = document.getElementById('photosModalSubtitle');
   const btnClosePhotos = document.getElementById('btnClosePhotos');
   const playerPhotoModal = document.getElementById('playerPhotoModal');
@@ -242,6 +244,8 @@
     }
     if (photosPager) photosPager.innerHTML = '';
     if (photosCounter) photosCounter.textContent = '';
+    if (photosPrev) photosPrev.hidden = true;
+    if (photosNext) photosNext.hidden = true;
     setPhotosStatus('', '');
   }
 
@@ -268,6 +272,8 @@
 
     const item = currentPhotos[safeIndex];
     photosCounter.textContent = `Foto ${safeIndex + 1} de ${currentPhotos.length}`;
+    if (photosPrev) photosPrev.hidden = currentPhotos.length < 2;
+    if (photosNext) photosNext.hidden = currentPhotos.length < 2;
     setPhotosStatus('Cargando foto…', 'info');
 
     try {
@@ -293,6 +299,12 @@
       });
       photosPager.appendChild(btn);
     });
+  }
+
+  function movePhoto(step){
+    if (currentPhotos.length < 2) return;
+    const nextIndex = (currentPhotoIndex + step + currentPhotos.length) % currentPhotos.length;
+    showPhotoAt(nextIndex).catch(console.error);
   }
 
   function openPhotosModal(){
@@ -629,10 +641,15 @@
     photosModal?.addEventListener('click', (ev) => {
       if (ev.target?.matches('[data-close-photos]')) closePhotosModal();
     });
+    photosPrev?.addEventListener('click', () => movePhoto(-1));
+    photosNext?.addEventListener('click', () => movePhoto(1));
     document.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape' && photosModal && !photosModal.hidden) closePhotosModal();
       if (ev.key === 'Escape' && playerPhotoModal && !playerPhotoModal.hidden) closePlayerPhoto();
       if (ev.key === 'Escape' && playerProfileModal && !playerProfileModal.hidden) closePlayerProfile();
+      if (!photosModal || photosModal.hidden) return;
+      if (ev.key === 'ArrowLeft') movePhoto(-1);
+      if (ev.key === 'ArrowRight') movePhoto(1);
     });
 
     const data = await fetchJson(
