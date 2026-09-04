@@ -123,7 +123,7 @@
     const matches = [];
     fixtures.forEach(({ kind, data }) => {
       (Array.isArray(data?.fechas) ? data.fechas : []).forEach((fecha) => {
-        const date = String(fecha?.date || '').slice(0, 10);
+        const originalDate = String(fecha?.date || '').slice(0, 10);
         (Array.isArray(fecha?.tablas) ? fecha.tablas : []).forEach((tabla) => {
           const teams = Array.isArray(tabla?.equipos) ? tabla.equipos : [];
           for (let index = 0; index < teams.length - 1; index += 2) {
@@ -134,8 +134,16 @@
             if (normalizeIdentity(localItem?.equipo) === 'wo' || normalizeIdentity(visitanteItem?.equipo) === 'wo') continue;
             const local = teamForFixtureName(localItem?.equipo);
             const visitante = teamForFixtureName(visitanteItem?.equipo);
+            const date = String(
+              localItem?.reprogramadoPara ||
+              visitanteItem?.reprogramadoPara ||
+              fecha?.reprogramadoPara ||
+              originalDate
+            ).slice(0, 10);
             matches.push({
               date, kind, group: String(tabla?.grupo || ''),
+              originalDate,
+              reprogrammed: Boolean(date && originalDate && date !== originalDate),
               localSlug: local.slug, localName: local.name,
               visitanteSlug: visitante.slug, visitanteName: visitante.name
             });
@@ -181,7 +189,7 @@
       const loaded = !!resultForMatch(match);
       const option = document.createElement('option');
       option.value = matchKey(match);
-      option.textContent = `${match.group ? `GRUPO ${match.group} · ` : ''}${match.localName} vs ${match.visitanteName}${loaded ? ' · CARGADO' : ''}`;
+      option.textContent = `${match.group ? `GRUPO ${match.group} · ` : ''}${match.localName} vs ${match.visitanteName}${match.reprogrammed ? ` · REPROGRAMADO (ORIGINAL ${dateLabel(match.originalDate)})` : ''}${loaded ? ' · CARGADO' : ''}`;
       option.dataset.loaded = String(loaded);
       select.appendChild(option);
     });
@@ -195,9 +203,10 @@
     select.innerHTML = dates.length ? '' : '<option value="">No hay fechas en el fixture</option>';
     dates.forEach((date) => {
       const kinds = [...new Set(state.schedule.filter((match) => match.date === date).map((match) => match.kind))];
+      const reprogrammedMatches = state.schedule.filter((match) => match.date === date && match.reprogrammed);
       const option = document.createElement('option');
       option.value = date;
-      option.textContent = `${dateLabel(date)} · ${kinds.map((kind) => kind.toUpperCase()).join(' / ')}`;
+      option.textContent = `${dateLabel(date)} · ${kinds.map((kind) => kind.toUpperCase()).join(' / ')}${reprogrammedMatches.length ? ` · REPROGRAMADO (ORIGINAL ${dateLabel(reprogrammedMatches[0].originalDate)})` : ''}`;
       select.appendChild(option);
     });
   }
