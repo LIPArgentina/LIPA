@@ -270,6 +270,19 @@
           const raw = String(fecha?.date || fecha?.fecha || fecha?.fechaISO || '').trim();
           const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
           if (match) dates.add(match[1]);
+
+          // Los encuentros reprogramados siguen dentro de su fecha original
+          // para conservar el orden visual del fixture. La carga manual de
+          // fotos, en cambio, debe usar la fecha efectiva del encuentro.
+          const pending = [fecha];
+          while (pending.length) {
+            const node = pending.pop();
+            if (!node || typeof node !== 'object') continue;
+            addISODateFromValue(dates, node.reprogramadoPara);
+            Object.values(node).forEach((value) => {
+              if (value && typeof value === 'object') pending.push(value);
+            });
+          }
         });
       } catch {}
     })));
