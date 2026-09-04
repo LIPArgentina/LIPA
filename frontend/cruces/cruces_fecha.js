@@ -604,7 +604,7 @@ function apiUrl(path){
     return cruces;
   }
 
-  function findCruceForTeam(cruces, teamCandidates){
+  function findCruceForTeam(cruces, teamCandidates, preferredDate = ''){
     const candidateList = Array.isArray(teamCandidates) ? teamCandidates : [teamCandidates];
     const requestedSlugs = new Set(candidateList.map(v => normPlanillaSlug(v)).filter(Boolean));
     const variants = new Set();
@@ -654,6 +654,12 @@ function apiUrl(path){
     const pool = exactSlugMatches.length ? exactSlugMatches : scored;
     const datedPool = pool.filter(x => x.d);
     if (!datedPool.length) return pool[0]?.item || null;
+
+    const activeDateKey = String(preferredDate || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(activeDateKey)) {
+      const activeMatch = datedPool.find(x => String(x.item?.date || '').slice(0, 10) === activeDateKey);
+      if (activeMatch) return activeMatch.item;
+    }
 
     const todayMatch = datedPool.find(x => x.d.getTime() === today.getTime());
     if (todayMatch) return todayMatch.item;
@@ -766,6 +772,7 @@ function apiUrl(path){
       if (!j || !j.enabled) {
         return block('Cruces no habilitados', 'El administrador todavía no habilitó los cruces para esta fecha.');
       }
+      window.__CRUCE_ACTIVE_FIXTURE_DATE = String(j.nextFixtureDate || '').slice(0, 10);
       return true;
     } catch (e) {
       console.error('checkCrucesEnabled', e);
@@ -3227,7 +3234,7 @@ function isAndroidAppWebView(){
       const crucesRaw = await loadCrucesFromDb(category);
       const cruces = Array.isArray(crucesRaw?.cruces) ? crucesRaw.cruces : [];
 
-      let match = findCruceForTeam(cruces, teamCandidates);
+      let match = findCruceForTeam(cruces, teamCandidates, window.__CRUCE_ACTIVE_FIXTURE_DATE || '');
 
       if (!match) {
         match = await loadProximoCruceFromLlaves(category, teamSlug);
