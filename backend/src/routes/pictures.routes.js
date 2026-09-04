@@ -669,11 +669,15 @@ module.exports = function createPicturesRouter(deps) {
       for (const fechaDir of fechas) {
         if (!fechaDir.isDirectory()) continue;
         if (fechaDir.name.startsWith('.')) continue;
+        // Las fotos de ficha y sus variantes pertenecen al módulo de
+        // jugadores, no a las galerías de encuentros o torneos.
+        if (fechaDir.name.toLowerCase() === 'players') continue;
         const fechaISO = fechaDir.name;
         const fechaPath = path.join(picturesRoot, fechaISO);
         const teams = await fs.promises.readdir(fechaPath, { withFileTypes: true });
         for (const teamDir of teams) {
           if (!teamDir.isDirectory()) continue;
+          if (teamDir.name.startsWith('.')) continue;
           const teamSlug = teamDir.name;
           const teamPath = path.join(fechaPath, teamSlug);
           const teamInfo = await getTeamInfoBySlug(teamSlug);
