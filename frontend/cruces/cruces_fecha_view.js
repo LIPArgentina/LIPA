@@ -113,7 +113,7 @@
     return valid.find(date => date >= today) || valid[valid.length - 1] || '';
   }
 
-  async function loadMatches() {
+  async function loadMatches(preferredDate = '') {
     const [ida, vuelta] = await Promise.all([
       fetchJson(`/api/fixture?kind=ida&category=${encodeURIComponent(state.category)}`),
       fetchJson(`/api/fixture?kind=vuelta&category=${encodeURIComponent(state.category)}`)
@@ -125,7 +125,10 @@
       ...(Array.isArray(vueltaData?.fechas) ? vueltaData.fechas : [])
     ];
     const matches = fechas.flatMap(extractMatches);
-    const selectedDate = selectRelevantDate(matches);
+    const requestedDate = String(preferredDate || '').slice(0, 10);
+    const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && matches.some(match => match.date === requestedDate)
+      ? requestedDate
+      : selectRelevantDate(matches);
     return { date: selectedDate, matches: matches.filter(match => match.date === selectedDate) };
   }
 
@@ -323,7 +326,7 @@
       const enabled = Boolean(data?.enabled);
       releaseStatus.textContent = enabled ? 'CRUCES PUBLICADOS' : 'PUBLICACIÓN PENDIENTE';
       releaseStatus.classList.toggle('is-open', enabled);
-      return enabled;
+      return { enabled, nextFixtureDate: String(data?.nextFixtureDate || '').slice(0, 10) };
     } catch (error) {
       releaseStatus.textContent = 'ESTADO NO DISPONIBLE';
       releaseStatus.classList.remove('is-open');
@@ -341,8 +344,8 @@
       button.classList.toggle('active', button.dataset.category === state.category);
     });
     try {
-      const enabled = await loadReleaseStatus();
-      if (!enabled) {
+      const release = await loadReleaseStatus();
+      if (!release.enabled) {
         state.matches = [];
         state.plans = new Map();
         matchSelect.innerHTML = '';
@@ -352,7 +355,7 @@
         return;
       }
 
-      const { date, matches } = await loadMatches();
+      const { date, matches } = await loadMatches(release.nextFixtureDate);
       const plans = await loadPlans(matches);
       state.matches = matches;
       state.plans = plans;

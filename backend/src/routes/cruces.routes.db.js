@@ -893,11 +893,8 @@ async function fetchCrucesFromDB(team) {
   const fechas = rows[0]?.data?.fechas || [];
   const matches = fechas.flatMap(extractCrucesFromFecha).filter((match) => isDateKey(match.date));
   if (!matches.length) return { cruces: [], fechaFixture: null };
-  const todayKey = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).format(new Date());
-  const dates = [...new Set(matches.map((match) => match.date))].sort();
-  const selectedDate = dates.find((date) => date >= todayKey) || dates[dates.length - 1];
+  const automation = computeNextAutomation(matches);
+  const selectedDate = automation.nextFixtureDate;
   return {
     cruces: matches.filter((match) => match.date === selectedDate),
     fechaFixture: selectedDate
