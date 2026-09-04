@@ -274,7 +274,9 @@ module.exports = function createPicturesRouter(deps) {
   function setPictureCacheHeaders(res) {
     res.set('Cache-Control', 'public, max-age=2592000, immutable');
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.set('Access-Control-Allow-Origin', '*');
+    // CORS ya se resuelve globalmente en app.js con el origen concreto.
+    // No usar "*" aquí: las miniaturas administrativas viajan con
+    // credenciales y el navegador rechaza esa combinación.
   }
 
   async function getOptimizedVariant(fullPath, relativePath, { width, quality }) {
