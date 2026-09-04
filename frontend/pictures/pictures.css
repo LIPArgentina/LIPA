@@ -151,6 +151,11 @@ body.modal-open { overflow: hidden; }
   border: 0;
   background: transparent;
 }
+.filter-chip select option,
+.field select option {
+  background: #090d13;
+  color: #f5f7fb;
+}
 .form-grid {
   display: grid;
   gap: 14px;
