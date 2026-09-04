@@ -19,10 +19,16 @@
   const manualTeamSlug = document.getElementById('manualTeamSlug');
   const blobUrlCache = new Map();
   const REQUIRED_PICTURES = 11;
+  const THUMB_CONCURRENCY = 4;
   let allGroups = [];
   let availableDates = [];
   let availableTeams = [];
   let selectedCategory = '';
+  let initializedDateFilter = false;
+  let thumbObserver = null;
+  let thumbQueue = [];
+  let activeThumbLoads = 0;
+  let thumbGeneration = 0;
 
   function getToken() {
     try {
@@ -180,7 +186,7 @@
     const res = await fetch(resourceUrl, {
       headers: authHeaders(),
       credentials: 'include',
-      cache: 'no-store'
+      cache: 'default'
     });
 
     if (!res.ok) {
@@ -189,7 +195,10 @@
         const data = await res.json();
         msg = data?.error || data?.msg || msg;
       } catch {}
-      throw new Error(msg);
+      const error = new Error(msg);
+      error.status = res.status;
+      error.retryAfter = Number(res.headers.get('Retry-After') || 0);
+      throw error;
     }
 
     const blob = await res.blob();
@@ -205,6 +214,9 @@
         return await fetchBlobUrl(url);
       } catch (err) {
         lastError = err;
+        // Un 429 afecta a todos los candidatos. Seguir probando rutas solo
+        // multiplica las solicitudes y prolonga el bloqueo.
+        if (err?.status === 429) throw err;
       }
     }
     throw lastError || new Error('No se pudo cargar la imagen.');
@@ -446,18 +458,59 @@
     }).join('');
   }
 
-  async function hydrateThumbs() {
+  function resetThumbnailLoader() {
+    thumbGeneration += 1;
+    thumbQueue = [];
+    if (thumbObserver) thumbObserver.disconnect();
+    thumbObserver = null;
+    return thumbGeneration;
+  }
+
+  function processThumbnailQueue() {
+    while (activeThumbLoads < THUMB_CONCURRENCY && thumbQueue.length) {
+      const { img, candidates, generation } = thumbQueue.shift();
+      if (generation !== thumbGeneration || !img?.isConnected) continue;
+      activeThumbLoads += 1;
+      fetchFirstAvailableBlobUrl(candidates)
+        .then((src) => {
+          if (generation === thumbGeneration && img.isConnected) img.src = src;
+        })
+        .catch((err) => {
+          if (generation !== thumbGeneration || !img.isConnected) return;
+          img.alt = err?.status === 429
+            ? 'Demasiadas solicitudes. Esperá unos minutos.'
+            : 'No se pudo cargar la miniatura';
+        })
+        .finally(() => {
+          activeThumbLoads -= 1;
+          processThumbnailQueue();
+        });
+    }
+  }
+
+  function enqueueThumbnail(img, generation) {
+    let candidates = [];
+    try { candidates = JSON.parse(img.dataset.thumbCandidates || '[]'); } catch {}
+    if (!Array.isArray(candidates) || !candidates.length) return;
+    thumbQueue.push({ img, candidates, generation });
+    processThumbnailQueue();
+  }
+
+  function hydrateThumbs(generation) {
     const imgs = Array.from(adminList.querySelectorAll('img[data-thumb-candidates]'));
-    await Promise.all(imgs.map(async (img) => {
-      let candidates = [];
-      try { candidates = JSON.parse(img.dataset.thumbCandidates || '[]'); } catch {}
-      if (!Array.isArray(candidates) || !candidates.length) return;
-      try {
-        img.src = await fetchFirstAvailableBlobUrl(candidates);
-      } catch {
-        img.alt = 'No se pudo cargar la miniatura';
-      }
-    }));
+    if (!('IntersectionObserver' in window)) {
+      imgs.forEach((img) => enqueueThumbnail(img, generation));
+      return;
+    }
+
+    thumbObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        thumbObserver?.unobserve(entry.target);
+        enqueueThumbnail(entry.target, generation);
+      });
+    }, { rootMargin: '200px 0px' });
+    imgs.forEach((img) => thumbObserver.observe(img));
   }
 
   function getFilteredGroups() {
@@ -471,13 +524,17 @@
   }
 
   async function renderCurrentGroups() {
+    const generation = resetThumbnailLoader();
     revokeBlobCache();
     renderGroups(getFilteredGroups());
-    await hydrateThumbs();
+    hydrateThumbs(generation);
   }
 
   async function refreshAvailableDates(groups) {
-    const groupDates = unique((groups || []).map(group => String(group?.fechaISO || '').slice(0, 10))).sort(compareDateDesc);
+    const groupDates = unique((groups || [])
+      .map(group => String(group?.fechaISO || '').slice(0, 10))
+      .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value)))
+      .sort(compareDateDesc);
     const [fixtureDates, llavesDates] = await Promise.all([
       fetchFixtureDates(),
       fetchLlavesDates(availableTeams)
@@ -485,6 +542,10 @@
     availableDates = unique([...llavesDates, ...fixtureDates, ...groupDates]).sort(compareDateDesc);
     fillSelectOptions(fechaFilter, availableDates, 'TODAS', true);
     fillSelectOptions(manualFechaISO, availableDates, 'Elegí una fecha', true);
+    if (!initializedDateFilter) {
+      fechaFilter.value = groupDates[0] || '';
+      initializedDateFilter = true;
+    }
   }
 
   async function refreshTeamOptions() {
