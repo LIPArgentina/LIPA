@@ -4179,11 +4179,14 @@ async function buildRadRankingForCategory(category = '', edition = CURRENT_EDITI
         normalizedEdition,
         division
       );
-      const registeredIdsByCanonicalName = normalizedEdition === 'total'
-        ? await getRegisteredPlayerIdsByCanonicalName(division)
-        : null;
+      // Las planillas historicas no siempre conservan jugador_id y algunos
+      // equipos cambiaron de slug durante una misma edicion. Resolver la
+      // identidad contra las fichas registradas en todas las ediciones evita
+      // que la consulta individual y la consulta por equipo armen mitades
+      // distintas de la misma ficha.
+      const registeredIdsByCanonicalName = await getRegisteredPlayerIdsByCanonicalName(division);
       const rankingData = buildRadRankingFromResults(results, {
-        mergeHistoricalIdentities: normalizedEdition === 'total',
+        mergeHistoricalIdentities: true,
         registeredIdsByCanonicalName
       });
       if (Array.isArray(rankingData.ranking) && rankingData.ranking.length > 0) {

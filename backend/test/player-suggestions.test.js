@@ -296,3 +296,28 @@ test('no une por nombre cuando existen dos fichas registradas compatibles', () =
 
   assert.equal(rows.filter((row) => row.name === 'Nombre Repetido').length, 2);
 });
+
+test('una edicion unifica la ficha aunque cambie el slug del mismo equipo', () => {
+  const rows = buildPlayerRowsFromResults([
+    {
+      localSlug: 'albapool', localName: 'ALBA', visitanteSlug: 'rival-a', visitanteName: 'RIVAL A',
+      localPlanilla: { individuales: ['Miguel Cruz'] }, visitantePlanilla: { individuales: ['Rival Uno'] },
+      local: { scoreRows: [6] }, visitante: { scoreRows: [4] }
+    },
+    {
+      localSlug: 'alba', localName: 'ALBA', visitanteSlug: 'rival-b', visitanteName: 'RIVAL B',
+      localPlanilla: { individuales: ['Miguel Cruz'] }, visitantePlanilla: { individuales: ['Rival Dos'] },
+      local: { scoreRows: [6] }, visitante: { scoreRows: [2] }
+    }
+  ], {
+    mergeHistoricalIdentities: true,
+    registeredIdsByCanonicalName: new Map([['MIGUEL CRUZ', new Set([2385])]])
+  });
+
+  const miguel = rows.find((row) => Number(row.id) === 2385);
+  assert.equal(rows.filter((row) => row.name === 'Miguel Cruz').length, 1);
+  assert.equal(miguel.played, 2);
+  assert.equal(miguel.wins, 2);
+  assert.equal(miguel.triangulosFavor, 12);
+  assert.equal(miguel.triangulosContra, 6);
+});
