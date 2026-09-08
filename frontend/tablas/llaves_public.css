@@ -290,3 +290,49 @@
   justify-content:flex-end;
 }
 
+/* En móvil cada columna representa una instancia completa de la llave.
+   Se muestra una por vez (semi, finales, semi) y se navega lateralmente. */
+@media (max-width: 900px){
+  #llavesPublicMount .bracket-scroll{
+    scroll-snap-type:x mandatory;
+    scroll-padding-inline:0;
+  }
+
+  #llavesPublicMount .bracket-segunda{
+    --ll-segunda-mobile-width:min(292px, calc(100vw - 48px));
+    grid-template-columns:repeat(3, var(--ll-segunda-mobile-width));
+  }
+
+  #llavesPublicMount .bracket-segunda .bracket-col{
+    width:var(--ll-segunda-mobile-width);
+    scroll-snap-align:start;
+    scroll-snap-stop:always;
+  }
+
+  #llavesPublicMount .bracket-segunda .tie-card{
+    width:var(--ll-segunda-mobile-width);
+    max-width:var(--ll-segunda-mobile-width);
+    padding:7px 6px;
+  }
+
+  #llavesPublicMount .bracket-segunda .team-row{
+    grid-template-columns:16px 20px minmax(0,1fr) minmax(0,1fr) 20px 16px;
+    gap:3px;
+  }
+
+  #llavesPublicMount .bracket-segunda .match-block{
+    padding:5px 4px;
+  }
+
+  #llavesPublicMount .bracket-segunda .fecha-actions{
+    width:auto;
+    max-width:100%;
+  }
+
+  #llavesPublicMount .bracket-segunda .llaves-encuentros-btn{
+    min-height:19px;
+    padding:2px 5px;
+    font-size:7px;
+  }
+}
+
