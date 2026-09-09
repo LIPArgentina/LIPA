@@ -26,8 +26,8 @@ window.addEventListener('load', () => {
 
 let GROUPS = ['A', 'B'];
 const cache = { ida: null, vuelta: null };
-let selectedKind = 'ida';
 let selectedEdition = Number(new URLSearchParams(window.location.search).get('edition')) || 6;
+let selectedKind = selectedEdition >= 6 ? 'vuelta' : 'ida';
 let standingsSteps = [];
 let selectedStandingsIndex = -1;
 let podiumRefreshId = null;
@@ -591,7 +591,7 @@ async function switchEdition(edition){
 
 async function init(){
   applyEditionLayout();
-  selectedKind = 'ida';
+  selectedKind = selectedEdition >= 6 ? 'vuelta' : 'ida';
   try { localStorage.setItem('fixture_kind', selectedKind); } catch(_) {}
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {
     btn.addEventListener('click', () => {
