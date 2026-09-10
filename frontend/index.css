@@ -460,6 +460,12 @@
   transition:filter .15s ease, transform .05s ease, box-shadow .15s ease;
 }
 
+.cta-grid .btn-cta-location{
+  white-space:nowrap;
+  font-size:.76rem;
+  letter-spacing:.1px;
+}
+
 .cta-grid .btn-cta:hover{
   filter:brightness(1.05);
   box-shadow:
