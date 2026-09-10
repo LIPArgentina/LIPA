@@ -578,7 +578,7 @@
     if (prefill.teamSlug) manualTeamSlug.value = String(prefill.teamSlug).trim();
     modal.hidden = false;
     document.body.classList.add('modal-open');
-    setStatus(manualStatusBox, `Completá los datos y elegí exactamente ${REQUIRED_PICTURES} fotos.`, 'info');
+    setStatus(manualStatusBox, `Completá los datos y elegí entre 1 y ${REQUIRED_PICTURES} fotos.`, 'info');
     setTimeout(() => manualFechaISO?.focus(), 0);
   }
 
@@ -630,11 +630,11 @@
 
     if (!fechaISO) return { ok: false, message: 'Elegí la fecha de carga.', type: 'error' };
     if (!teamSlug) return { ok: false, message: 'Elegí el equipo que sube las fotos.', type: 'error' };
-    if (files.length !== REQUIRED_PICTURES) {
+    if (!files.length || files.length > REQUIRED_PICTURES) {
       return {
         ok: false,
-        message: files.length < REQUIRED_PICTURES
-          ? `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para poder enviar.`
+        message: !files.length
+          ? 'Elegí al menos una foto para enviar.'
           : `Solo se permiten ${REQUIRED_PICTURES} fotos por carga.`,
         type: 'error'
       };
@@ -651,6 +651,12 @@
     }
 
     const { fechaISO, teamSlug, files } = validation.data;
+    if (files.length < REQUIRED_PICTURES) {
+      const missing = REQUIRED_PICTURES - files.length;
+      const confirmed = window.confirm(`Estás subiendo ${files.length} foto${files.length === 1 ? '' : 's'} y faltan ${missing} para completar las ${REQUIRED_PICTURES}. ¿Deseás continuar igual?`);
+      if (!confirmed) return;
+    }
+
     const body = new FormData();
     body.append('fechaISO', fechaISO);
     body.append('teamSlug', teamSlug);
@@ -673,8 +679,14 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'No se pudieron subir las fotos.');
 
-      setStatus(manualStatusBox, `Las ${REQUIRED_PICTURES} fotos se subieron correctamente.`, 'success');
-      setStatus(adminStatus, `Carga manual completada para ${teamSlug} · ${fechaISO}.`, 'success');
+      const uploaded = Number(data?.uploadedCount ?? data?.files?.length ?? files.length);
+      const total = Number(data?.totalPictures ?? uploaded);
+      const missing = Math.max(0, REQUIRED_PICTURES - total);
+      const missingText = missing
+        ? ` Faltan ${missing} foto${missing === 1 ? '' : 's'} para completar las ${REQUIRED_PICTURES}.`
+        : ` Ya están guardadas las ${REQUIRED_PICTURES} fotos.`;
+      setStatus(manualStatusBox, `${uploaded} foto${uploaded === 1 ? '' : 's'} subida${uploaded === 1 ? '' : 's'} correctamente.${missingText}`, 'success');
+      setStatus(adminStatus, `Carga manual realizada para ${teamSlug} · ${fechaISO}.${missingText}`, 'success');
       resetManualForm({ keepPrefill: true });
       await load();
     } catch (err) {
@@ -775,12 +787,12 @@
       manualPicturesInput.value = '';
       manualPreviewContainer.innerHTML = '';
       manualPickedFilesText.textContent = 'No se eligió ningún archivo';
-      setStatus(manualStatusBox, `Solo podés seleccionar ${REQUIRED_PICTURES} fotos exactas.`, 'error');
+      setStatus(manualStatusBox, `Solo podés seleccionar hasta ${REQUIRED_PICTURES} fotos por carga.`, 'error');
       return;
     }
 
     if (files.length > 0 && files.length < REQUIRED_PICTURES) {
-      setStatus(manualStatusBox, `Faltan ${REQUIRED_PICTURES - files.length} foto${REQUIRED_PICTURES - files.length === 1 ? '' : 's'} para completar la carga.`, 'error');
+      setStatus(manualStatusBox, `Seleccionaste ${files.length} foto${files.length === 1 ? '' : 's'}. Podés subirlas ahora y completar las faltantes más tarde.`, 'info');
     } else if (files.length === REQUIRED_PICTURES) {
       setStatus(manualStatusBox, 'Cantidad correcta de fotos lista para subir.', 'success');
     } else {
