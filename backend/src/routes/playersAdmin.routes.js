@@ -1245,6 +1245,64 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   });
 
+  router.post('/players-admin/deactivate-associations', requireAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await ensureSchema();
+      const playerId = Number(req.body?.playerId);
+      const associationIds = [...new Set((Array.isArray(req.body?.associationIds) ? req.body.associationIds : [])
+        .map(Number)
+        .filter(Number.isFinite))];
+      if (!Number.isFinite(playerId)) return res.status(400).json({ ok: false, error: 'Jugador inválido' });
+      if (!associationIds.length) return res.status(400).json({ ok: false, error: 'Elegí al menos una categoría' });
+
+      await client.query('BEGIN');
+      const updated = await client.query(
+        `UPDATE jugador_equipos
+            SET activo = false,
+                hasta = CURRENT_DATE,
+                updated_at = NOW()
+          WHERE jugador_id = $1
+            AND id = ANY($2::int[])
+            AND activo = true
+        RETURNING id, categoria`,
+        [playerId, associationIds]
+      );
+      if (!updated.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ ok: false, error: 'No se encontraron categorías activas para quitar' });
+      }
+      await client.query(
+        `UPDATE jugadores
+            SET categoria_actual = COALESCE(
+                  (SELECT je.categoria
+                     FROM jugador_equipos je
+                    WHERE je.jugador_id = $1
+                      AND je.activo = true
+                    ORDER BY CASE je.categoria
+                      WHEN 'primera' THEN 1
+                      WHEN 'segunda' THEN 2
+                      WHEN 'tercera' THEN 3
+                      ELSE 4
+                    END
+                    LIMIT 1),
+                  categoria_actual
+                ),
+                updated_at = NOW()
+          WHERE id = $1`,
+        [playerId]
+      );
+      await client.query('COMMIT');
+      return res.json({ ok: true, removed: updated.rows });
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      console.error('players-admin/deactivate-associations', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
   router.post('/players-admin/delete-player', requireAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
