@@ -166,6 +166,10 @@ function categoryLabel(value, short = false){
   return labels[value] || value;
 }
 
+function categoryRank(value){
+  return { tercera: 1, segunda: 2, primera: 3 }[value] || 0;
+}
+
 function chooseCategoryChangeMode(playerName, fromCategory, toCategory){
   const dialog = $('#categoryChangeDialog');
   const message = $('#categoryChangeMessage');
@@ -373,6 +377,10 @@ async function savePlayer(ev){
   }
 
   if (associationId && editingOriginalCategory && category !== editingOriginalCategory) {
+    if (categoryRank(category) < categoryRank(editingOriginalCategory)) {
+      setStatus(`Un jugador de ${categoryLabel(editingOriginalCategory)} no puede jugar en ${categoryLabel(category)}.`, true);
+      return;
+    }
     if (!team) {
       setStatus('Elegí el equipo de la nueva categoría antes de guardar.', true);
       return;
