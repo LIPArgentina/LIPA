@@ -71,6 +71,14 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     return v;
   }
 
+  function categoryRank(value) {
+    return { tercera: 1, segunda: 2, primera: 3 }[normalizeCategory(value)] || 0;
+  }
+
+  function categoryDisplayName(value) {
+    return { tercera: 'Tercera', segunda: 'Segunda', primera: 'Primera' }[normalizeCategory(value)] || String(value || '');
+  }
+
   function normalizeBirthDate(value) {
     const text = String(value || '').trim();
     return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
@@ -463,10 +471,28 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       throw new Error(`El jugador ya está activo en ${targetCategory} con otro equipo.`);
     }
 
-    if (targetCategory === 'tercera' && current.some(row => row.categoria === 'segunda')) {
-      throw new Error('Un jugador de 2da no puede jugar en 3ra.');
-    }
+  }
 
+  async function validateCategoryDirection(client, { playerId, targetCategory }) {
+    const normalizedTarget = normalizeCategory(targetCategory);
+    const targetRank = categoryRank(normalizedTarget);
+    if (!targetRank) return;
+
+    const active = await client.query(
+      `SELECT DISTINCT categoria
+         FROM jugador_equipos
+        WHERE jugador_id = $1
+          AND activo = true`,
+      [playerId]
+    );
+    const higherCategory = active.rows
+      .map(row => normalizeCategory(row.categoria))
+      .filter(category => categoryRank(category) > targetRank)
+      .sort((a, b) => categoryRank(b) - categoryRank(a))[0];
+
+    if (higherCategory) {
+      throw new Error(`Un jugador de ${categoryDisplayName(higherCategory)} no puede jugar en ${categoryDisplayName(normalizedTarget)}.`);
+    }
   }
 
   async function ensureTeamHasRoom(client, { playerId, teamId, category }) {
@@ -490,6 +516,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
   async function upsertAssociation(client, { playerId, teamId, category, associationId = null, categoryChangeMode = 'both' }) {
     const normalizedCategory = normalizeCategory(category);
     const startDate = seasonStartDate(normalizedCategory) || new Date().toISOString().slice(0, 10);
+    await validateCategoryDirection(client, { playerId, targetCategory: normalizedCategory });
 
     if (associationId) {
       const current = await client.query(
