@@ -487,7 +487,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   }
 
-  async function upsertAssociation(client, { playerId, teamId, category, associationId = null }) {
+  async function upsertAssociation(client, { playerId, teamId, category, associationId = null, categoryChangeMode = 'both' }) {
     const normalizedCategory = normalizeCategory(category);
     const startDate = seasonStartDate(normalizedCategory) || new Date().toISOString().slice(0, 10);
 
@@ -508,6 +508,22 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       ) {
         await validateAssociation(client, { playerId, category: normalizedCategory, teamId, associationId });
       } else {
+        const changesCategory = currentRow && normalizeCategory(currentRow.categoria) !== normalizedCategory;
+        if (changesCategory) {
+          await validateAssociation(client, { playerId, category: normalizedCategory, teamId });
+          if (categoryChangeMode === 'ascend') {
+            await client.query(
+              `UPDATE jugador_equipos
+                  SET activo = false,
+                      hasta = CURRENT_DATE,
+                      updated_at = NOW()
+                WHERE id = $1
+                  AND jugador_id = $2
+                  AND activo = true`,
+              [associationId, playerId]
+            );
+          }
+        }
         associationId = null;
       }
     }
@@ -1117,6 +1133,8 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         const fechaNacimientoRaw = String(req.body?.fechaNacimiento || req.body?.fecha_nacimiento || '').trim();
         const fechaNacimiento = normalizeBirthDate(fechaNacimientoRaw);
         const categoria = normalizeCategory(req.body?.categoria);
+        const categoryChangeModeRaw = String(req.body?.categoryChangeMode || '').trim().toLowerCase();
+        const categoryChangeMode = categoryChangeModeRaw === 'ascend' ? 'ascend' : 'both';
         const teamRaw = String(req.body?.team || req.body?.teamSlug || req.body?.equipo || '').trim();
 
         if (!nombre) return res.status(400).json({ ok: false, error: 'Falta nombre' });
@@ -1187,6 +1205,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
             teamId: team.id,
             category: categoria,
             associationId,
+            categoryChangeMode,
           });
         }
 
