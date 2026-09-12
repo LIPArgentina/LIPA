@@ -159,6 +159,13 @@ async function fillForm(player){
   setStatus(`Editando ${player?.nombre || player?.name || 'jugador'}`);
 }
 
+function categoryLabel(value, short = false){
+  const labels = short
+    ? { primera: '1ra', segunda: '2da', tercera: '3ra' }
+    : { primera: 'Primera', segunda: 'Segunda', tercera: 'Tercera' };
+  return labels[value] || value;
+}
+
 function chooseCategoryChangeMode(playerName, fromCategory, toCategory){
   const dialog = $('#categoryChangeDialog');
   const message = $('#categoryChangeMessage');
@@ -166,8 +173,7 @@ function chooseCategoryChangeMode(playerName, fromCategory, toCategory){
     return Promise.resolve(window.confirm('¿Deseás ascender al jugador y quitarlo de su categoría anterior?') ? 'ascend' : 'both');
   }
 
-  const categoryLabel = value => ({ primera: 'Primera', segunda: 'Segunda', tercera: 'Tercera' }[value] || value);
-  message.textContent = `${playerName} pasa de ${categoryLabel(fromCategory)} a ${categoryLabel(toCategory)}. ¿Deseás ascenderlo o va a jugar en ambas categorías?`;
+  message.textContent = `El jugador pertenece a la ${categoryLabel(fromCategory, true)} categoría. ¿Desea ascenderlo a ${categoryLabel(toCategory, true)} categoría o va a jugar en ambas?`;
   dialog.showModal();
 
   return new Promise(resolve => {
@@ -185,6 +191,60 @@ function chooseCategoryChangeMode(playerName, fromCategory, toCategory){
       event.preventDefault();
       finish(null);
     };
+  });
+}
+
+function chooseAssociationsToRemove(player, activeAssociations){
+  const dialog = $('#removeAssociationsDialog');
+  const message = $('#removeAssociationsMessage');
+  const actions = $('#removeAssociationsActions');
+  if (!dialog || !message || !actions || typeof dialog.showModal !== 'function') {
+    const ok = window.confirm(`¿Quitar a ${player.nombre || player.name} de sus categorías activas?`);
+    return Promise.resolve(ok ? activeAssociations.map(item => Number(item.id)) : []);
+  }
+
+  message.textContent = `${player.nombre || player.name} está activo en ${activeAssociations.map(item => categoryLabel(item.categoria)).join(' y ')}. ¿De qué categoría desea quitarlo?`;
+  actions.innerHTML = '';
+
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = ids => {
+      if (settled) return;
+      settled = true;
+      dialog.close();
+      resolve(ids);
+    };
+
+    const cancel = document.createElement('button');
+    cancel.className = 'btn btn-ghost';
+    cancel.type = 'button';
+    cancel.textContent = 'Cancelar';
+    cancel.onclick = () => finish([]);
+    actions.appendChild(cancel);
+
+    activeAssociations.forEach(item => {
+      const button = document.createElement('button');
+      button.className = 'btn';
+      button.type = 'button';
+      button.textContent = `Quitar de ${categoryLabel(item.categoria)}`;
+      button.onclick = () => finish([Number(item.id)]);
+      actions.appendChild(button);
+    });
+
+    if (activeAssociations.length > 1) {
+      const all = document.createElement('button');
+      all.className = 'btn btn-gold';
+      all.type = 'button';
+      all.textContent = 'Quitar de ambas';
+      all.onclick = () => finish(activeAssociations.map(item => Number(item.id)));
+      actions.appendChild(all);
+    }
+
+    dialog.oncancel = event => {
+      event.preventDefault();
+      finish([]);
+    };
+    dialog.showModal();
   });
 }
 
@@ -353,17 +413,24 @@ async function savePlayer(ev){
 }
 
 async function deactivateAssociation(player){
-  if (!player?.associationId) return;
-  const ok = confirm(`¿Quitar a ${player.nombre || player.name} de ${player.equipo || 'este equipo'}?`);
-  if (!ok) return;
+  if (!player?.id) return;
   try {
-    await fetchJson('/api/players-admin/deactivate-association', {
+    const data = await fetchJson(`/api/players-admin/history/${encodeURIComponent(player.id)}`);
+    const activeAssociations = (data.history || []).filter(item => item.activo && item.id);
+    if (!activeAssociations.length) {
+      toast('El jugador no tiene categorías activas');
+      return;
+    }
+    const associationIds = await chooseAssociationsToRemove(player, activeAssociations);
+    if (!associationIds.length) return;
+    await fetchJson('/api/players-admin/deactivate-associations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ associationId: player.associationId }),
+      body: JSON.stringify({ playerId: player.id, associationIds }),
     });
-    toast('Asociación desactivada');
-    searchByTeam();
+    toast(associationIds.length > 1 ? 'Categorías desactivadas' : 'Categoría desactivada');
+    if (currentResultsMode === 'players') await searchPlayers();
+    else await searchByTeam();
   } catch (err) {
     toast(err.message || 'No se pudo quitar');
   }
