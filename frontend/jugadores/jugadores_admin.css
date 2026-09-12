@@ -157,6 +157,27 @@
   max-width:min(92vw, 760px);
 }
 
+.category-change-panel{
+  width:min(92vw, 560px);
+}
+
+.category-change-panel .modal__body p{
+  margin:0;
+  color:#fff;
+  font-size:16px;
+  line-height:1.5;
+}
+
+.category-change-panel .category-change-help{
+  margin-top:10px;
+  color:#c9ced8;
+  font-size:14px;
+}
+
+.category-change-actions{
+  flex-wrap:wrap;
+}
+
 .history-table{
   width:100%;
   min-width:0;

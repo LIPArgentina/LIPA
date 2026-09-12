@@ -6,7 +6,7 @@
   <title>Administración de jugadores</title>
   <link rel="stylesheet" href="../admin.css">
   <link rel="stylesheet" href="../photo-cropper.css">
-  <link rel="stylesheet" href="jugadores_admin.css">
+  <link rel="stylesheet" href="jugadores_admin.css?v=category-choice-1">
 </head>
 <body>
   <header class="site-header">
@@ -114,10 +114,27 @@
     </div>
   </dialog>
 
+  <dialog id="categoryChangeDialog" class="modal">
+    <div class="modal__panel category-change-panel">
+      <div class="modal__header">
+        <h3>Cambio de categoría</h3>
+      </div>
+      <div class="modal__body">
+        <p id="categoryChangeMessage"></p>
+        <p class="category-change-help">Elegí qué debe pasar con su categoría actual.</p>
+      </div>
+      <div class="modal__footer category-change-actions">
+        <button id="btnCancelCategoryChange" class="btn btn-ghost" type="button">Cancelar</button>
+        <button id="btnPlayBothCategories" class="btn" type="button">Juega en ambas</button>
+        <button id="btnPromoteCategory" class="btn btn-gold" type="button">Ascender</button>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast"></div>
 
   <script src="../config.js?v=renewable-session-1"></script>
   <script src="../photo-cropper.js"></script>
-  <script src="jugadores_admin.js"></script>
+  <script src="jugadores_admin.js?v=category-choice-1"></script>
 </body>
 </html>

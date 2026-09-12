@@ -3,6 +3,7 @@ const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 const $ = (selector) => document.querySelector(selector);
 let croppedPlayerPhoto = null;
 let editingOriginalName = '';
+let editingOriginalCategory = '';
 let currentResultsMode = 'players';
 const UNASSIGNED_TEAM_VALUE = '__sin_equipo__';
 
@@ -130,6 +131,7 @@ function clearForm(){
   $('#playerName').value = '';
   $('#playerName').readOnly = false;
   editingOriginalName = '';
+  editingOriginalCategory = '';
   $('#playerDni').value = '';
   $('#playerBirth').value = '';
   $('#playerPhoto').value = '';
@@ -142,18 +144,48 @@ function clearForm(){
 
 async function fillForm(player){
   editingOriginalName = player?.nombre || player?.name || '';
+  editingOriginalCategory = player?.categoria || player?.categoriaActual || '';
   $('#playerId').value = player?.id || '';
   $('#associationId').value = player?.associationId || '';
   $('#playerName').value = editingOriginalName;
   $('#playerName').readOnly = true;
   $('#playerDni').value = player?.dni || '';
   $('#playerBirth').value = player?.fechaNacimiento || player?.fecha_nacimiento || '';
-  $('#playerCategory').value = player?.categoriaActual || player?.categoria || 'tercera';
+  $('#playerCategory').value = player?.categoria || player?.categoriaActual || 'tercera';
   await refreshPlayerTeams(player?.teamSlug || player?.equipo || '');
   $('#playerPhoto').value = '';
   croppedPlayerPhoto = null;
   $('#photoPreview').src = photoSrc(player);
   setStatus(`Editando ${player?.nombre || player?.name || 'jugador'}`);
+}
+
+function chooseCategoryChangeMode(playerName, fromCategory, toCategory){
+  const dialog = $('#categoryChangeDialog');
+  const message = $('#categoryChangeMessage');
+  if (!dialog || typeof dialog.showModal !== 'function') {
+    return Promise.resolve(window.confirm('¿Deseás ascender al jugador y quitarlo de su categoría anterior?') ? 'ascend' : 'both');
+  }
+
+  const categoryLabel = value => ({ primera: 'Primera', segunda: 'Segunda', tercera: 'Tercera' }[value] || value);
+  message.textContent = `${playerName} pasa de ${categoryLabel(fromCategory)} a ${categoryLabel(toCategory)}. ¿Deseás ascenderlo o va a jugar en ambas categorías?`;
+  dialog.showModal();
+
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      dialog.close();
+      resolve(value);
+    };
+    $('#btnPromoteCategory').onclick = () => finish('ascend');
+    $('#btnPlayBothCategories').onclick = () => finish('both');
+    $('#btnCancelCategoryChange').onclick = () => finish(null);
+    dialog.oncancel = event => {
+      event.preventDefault();
+      finish(null);
+    };
+  });
 }
 
 function renderPlayers(players = [], { mode = currentResultsMode } = {}){
@@ -273,10 +305,23 @@ async function savePlayer(ev){
   const associationId = $('#associationId').value;
   const playerId = $('#playerId').value;
   const playerName = $('#playerName').value.trim();
+  let categoryChangeMode = '';
 
   if (playerId && slugify(playerName) !== slugify(editingOriginalName)) {
     setStatus('Para cargar otro jugador tocá Nuevo antes de guardar.', true);
     return;
+  }
+
+  if (associationId && editingOriginalCategory && category !== editingOriginalCategory) {
+    if (!team) {
+      setStatus('Elegí el equipo de la nueva categoría antes de guardar.', true);
+      return;
+    }
+    categoryChangeMode = await chooseCategoryChangeMode(playerName, editingOriginalCategory, category);
+    if (!categoryChangeMode) {
+      setStatus('Cambio de categoría cancelado.');
+      return;
+    }
   }
 
   const form = new FormData();
@@ -288,6 +333,7 @@ async function savePlayer(ev){
   form.set('fechaNacimiento', $('#playerBirth').value);
   form.set('categoria', category);
   form.set('team', team);
+  if (categoryChangeMode) form.set('categoryChangeMode', categoryChangeMode);
   if (photo) form.set('foto', photo);
 
   try {
