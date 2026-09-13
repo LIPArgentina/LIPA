@@ -834,20 +834,9 @@ function resetCategoryHeaderIndicators(){
     return y + '-' + m + '-' + day;
   }
 
-  function addDaysToDateKey(dateKey, days){
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return '';
-    const [year, month, day] = String(dateKey).split('-').map(Number);
-    const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-    d.setUTCDate(d.getUTCDate() + Number(days || 0));
-    return d.toISOString().slice(0, 10);
-  }
-
   function scheduledAtFromDateKey(dateKey){
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return '';
-
-
-    const releaseDateKey = addDaysToDateKey(dateKey, -1);
-    return releaseDateKey ? (releaseDateKey + 'T20:00:00-03:00') : '';
+    return dateKey + 'T18:00:00-03:00';
   }
 
   function collectLlavesDateKeys(node, out){

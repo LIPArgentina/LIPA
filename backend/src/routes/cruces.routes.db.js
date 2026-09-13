@@ -11,6 +11,7 @@ const CATEGORY_KEYS = {
 };
 
 const ARG_TZ_OFFSET = '-03:00';
+const AUTOMATION_RELEASE_HOUR = 18;
 const CURRENT_EDITION = 6;
 const DEFAULT_HISTORIC_EDITION = 5;
 let ensureCrucesAdminStoragePromise = null;
@@ -289,11 +290,10 @@ function nowInArgentina() {
 }
 
 function computeFixtureWindow(dateKey) {
-  const startKey = addDaysToDateKey(dateKey, -1);
   const nextDayKey = addDaysToDateKey(dateKey, 1);
   return {
     fixtureDate: dateKey,
-    scheduledAt: parseArgDateAt(startKey, 20, 0, 0),
+    scheduledAt: parseArgDateAt(dateKey, AUTOMATION_RELEASE_HOUR, 0, 0),
     closesAt: parseArgDateAt(nextDayKey, 12, 0, 0)
   };
 }
