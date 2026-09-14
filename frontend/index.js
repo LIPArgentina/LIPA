@@ -91,14 +91,8 @@ function ensureConsultasButton() {
   btn.classList.add("btn", "btn-outline", "btn-sm");
   btn.style.textDecoration = "none";
 
-  if (isAdmin()) {
-    btn.href = "./consultas/consultas.html";
-    btn.classList.remove("hidden");
-    return;
-  }
-
-  btn.classList.add("hidden");
-  btn.removeAttribute("href");
+  btn.href = "./consultas/consultas.html";
+  btn.classList.remove("hidden");
 }
 
 function ensureJugadoresViewButton() {
@@ -108,14 +102,8 @@ function ensureJugadoresViewButton() {
   btn.classList.add("btn", "btn-outline", "btn-sm");
   btn.style.textDecoration = "none";
 
-  if (isAdmin()) {
-    btn.href = "./jugadores/jugadores_view.html";
-    btn.classList.remove("hidden");
-    return;
-  }
-
-  btn.classList.add("hidden");
-  btn.removeAttribute("href");
+  btn.href = "./jugadores/jugadores_view.html";
+  btn.classList.remove("hidden");
 }
 
 function ensureCrucesViewButton() {

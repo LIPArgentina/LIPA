@@ -43,7 +43,7 @@
   let lastRankingData = null;
   let lastRankingLimit = 10;
   let lastRankingMode = 'players';
-  let hasAdminAccess = false;
+  let hasSecondAccess = false;
   let lastExecutedSearch = null;
   const playerPhotoCache = new Map();
 
@@ -283,19 +283,16 @@
     return data;
   }
 
-  async function enableAdminCategories() {
-    const session = readSession();
-    if (String(session?.role || '').toLowerCase() !== 'admin' || !session?.token) return false;
-
+  async function enablePrivateCategories() {
     try {
-      await fetchJson(apiUrl('/api/admin/session'));
-      if ($category && !Array.from($category.options).some((option) => option.value === 'segunda')) {
+      const capabilities = await fetchJson(apiUrl('/api/auth/capabilities'));
+      if (capabilities?.canViewSecond && $category && !Array.from($category.options).some((option) => option.value === 'segunda')) {
         const option = document.createElement('option');
         option.value = 'segunda';
         option.textContent = 'Segunda';
         $category.insertBefore(option, $category.firstChild);
       }
-      return true;
+      return !!capabilities?.canViewSecond;
     } catch (_) {
       return false;
     }
@@ -1202,7 +1199,7 @@
     if (params.get('auto') !== '1') return;
     const category = String(params.get('category') || '').trim().toLowerCase();
     const player = String(params.get('player') || '').trim();
-    if (!['segunda', 'tercera'].includes(category) || (category === 'segunda' && !hasAdminAccess) || player.length < 2) return;
+    if (!['segunda', 'tercera'].includes(category) || (category === 'segunda' && !hasSecondAccess) || player.length < 2) return;
     if ($category) $category.value = category;
     setConsultMode('individual');
     if ($player) $player.value = player;
@@ -1212,7 +1209,7 @@
   }
 
   async function initializeAccess() {
-    hasAdminAccess = await enableAdminCategories();
+    hasSecondAccess = await enablePrivateCategories();
     await applyLinkedPlayerSearch();
   }
 
