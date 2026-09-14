@@ -687,6 +687,27 @@ function apiUrl(path){
     if (!category) throw new Error('Categoría inválida para cruces');
 
     const activeDate = String(window.__CRUCE_ACTIVE_FIXTURE_DATE || '').slice(0, 10);
+    const categoryKey = CATEGORY_KEYS[category];
+    if (categoryKey) {
+      try {
+        const qs = new URLSearchParams({ team: categoryKey });
+        const activeData = await fetchJson(apiUrl('/api/cruces/cruces?') + qs.toString(), {
+          cache: 'no-store',
+          credentials: 'same-origin'
+        });
+        const activeCruces = Array.isArray(activeData?.cruces) ? activeData.cruces : [];
+        if (activeCruces.length) {
+          return {
+            cruces: activeCruces,
+            fechaFixture: String(activeData?.fechaFixture || activeDate).slice(0, 10),
+            fixtureKind: activeData?.source || null
+          };
+        }
+      } catch (err) {
+        console.warn('No se pudieron cargar los cruces activos; se usa el mecanismo compatible.', err);
+      }
+    }
+
     if (window.__CRUCE_ACTIVE_SOURCE === 'llaves') {
       const ctx = getCrucesTeamContext();
       const match = await loadProximoCruceFromLlaves(category, ctx.primaryTeam || '', activeDate);
