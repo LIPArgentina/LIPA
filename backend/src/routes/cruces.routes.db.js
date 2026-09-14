@@ -663,7 +663,8 @@ async function buildCrucesAdminStatus(team) {
     nextFixtureDate: automation.nextFixtureDate,
     scheduledAt: automation.scheduledAt,
     closesAt: automation.closesAt,
-    category: automation.category
+    category: automation.category,
+    source: automation.source
   };
 }
 
