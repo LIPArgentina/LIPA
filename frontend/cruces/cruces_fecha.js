@@ -486,7 +486,7 @@ function apiUrl(path){
     };
   }
 
-  function findProximoCruceInLlavesData(llavesData, team) {
+  function findProximoCruceInLlavesData(llavesData, team, targetDate = '') {
     const teamKey = normalizeLlavesTeam(team);
     if (!teamKey) return null;
 
@@ -510,7 +510,12 @@ function apiUrl(path){
       });
     });
 
-    const pending = candidates
+    const dateKey = String(targetDate || '').slice(0, 10);
+    const eligibleCandidates = dateKey
+      ? candidates.filter(item => String(item.date || '').slice(0, 10) === dateKey)
+      : candidates;
+
+    const pending = eligibleCandidates
       .filter(item => !item.played)
       .sort((a, b) => {
         const ad = a.date || '9999-12-31';
@@ -518,11 +523,11 @@ function apiUrl(path){
         return ad.localeCompare(bd) || (a.roundIndex - b.roundIndex) || (a.legIndex - b.legIndex);
       });
 
-    return pending[0] || candidates
+    return pending[0] || eligibleCandidates
       .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.roundIndex - a.roundIndex) || (b.legIndex - a.legIndex))[0] || null;
   }
 
-  async function loadProximoCruceFromLlaves(category, team){
+  async function loadProximoCruceFromLlaves(category, team, targetDate = ''){
     const cleanCategory = String(category || '').trim();
     const cleanTeam = String(team || '').trim();
     if (!cleanCategory || !cleanTeam) return null;
@@ -539,7 +544,9 @@ function apiUrl(path){
       });
 
       const match = llavesData?.match;
-      if (match?.local && match?.visitante) {
+      const requestedDate = String(targetDate || '').slice(0, 10);
+      const matchDate = String(match?.date || '').slice(0, 10);
+      if (match?.local && match?.visitante && (!requestedDate || matchDate === requestedDate)) {
         return {
           local: match.local,
           visitante: match.visitante,
@@ -561,7 +568,7 @@ function apiUrl(path){
       });
 
       const llavesData = data?.data || data?.llaves || data;
-      const match = findProximoCruceInLlavesData(llavesData, cleanTeam);
+      const match = findProximoCruceInLlavesData(llavesData, cleanTeam, targetDate);
       if (match?.local && match?.visitante) return match;
     } catch (err) {
       console.warn('No se pudo cargar próximo cruce desde llaves fallback', err);
@@ -710,10 +717,14 @@ function apiUrl(path){
     }
 
     const ctx = getCrucesTeamContext();
-    const cruceEquipo = findCruceForTeam(cruces, ctx.candidates);
+    const activeDate = String(window.__CRUCE_ACTIVE_FIXTURE_DATE || '').slice(0, 10);
+    const crucesForActiveDate = activeDate
+      ? cruces.filter(item => String(item?.date || '').slice(0, 10) === activeDate)
+      : cruces;
+    const cruceEquipo = findCruceForTeam(crucesForActiveDate, ctx.candidates, activeDate);
 
     if (!cruceEquipo) {
-      const match = await loadProximoCruceFromLlaves(category, ctx.primaryTeam || '');
+      const match = await loadProximoCruceFromLlaves(category, ctx.primaryTeam || '', activeDate);
       if (match) {
         return {
           cruces: [match],
@@ -3237,7 +3248,7 @@ function isAndroidAppWebView(){
       let match = findCruceForTeam(cruces, teamCandidates, window.__CRUCE_ACTIVE_FIXTURE_DATE || '');
 
       if (!match) {
-        match = await loadProximoCruceFromLlaves(category, teamSlug);
+        match = await loadProximoCruceFromLlaves(category, teamSlug, window.__CRUCE_ACTIVE_FIXTURE_DATE || '');
       }
 
       if (!match) {

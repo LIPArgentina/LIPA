@@ -881,23 +881,63 @@ function extractCrucesFromFecha(fechaNode) {
   return extractFixtureMatches(fechaNode);
 }
 
+function extractCrucesFromLlaves(data) {
+  const matches = [];
+  const rounds = Array.isArray(data?.rounds) ? data.rounds : [];
+
+  for (const round of rounds) {
+    const legs = Array.isArray(round?.legs) ? round.legs : [];
+    for (const leg of legs) {
+      const local = String(leg?.home?.team || '').trim();
+      const visitante = String(leg?.away?.team || '').trim();
+      const date = parseLlavesDateKey(leg?.date);
+      if (!date || !local || !visitante) continue;
+      if (local.toUpperCase() === 'WO' || visitante.toUpperCase() === 'WO') continue;
+      matches.push({
+        local,
+        visitante,
+        date,
+        grupo: null,
+        source: 'llaves',
+        roundId: String(round?.id || ''),
+        legIndex: legs.indexOf(leg)
+      });
+    }
+  }
+
+  return matches;
+}
+
 async function fetchCrucesFromDB(team) {
   const category = inferCategoryFromTeamMarker(team);
   if (!category) throw new Error('Categoría inválida');
 
   const { rows } = await pool.query(
-    "SELECT data FROM fixtures WHERE kind='ida' AND category=$1 AND edicion=$2 ORDER BY id DESC LIMIT 1",
+    `SELECT DISTINCT ON (kind) kind, data
+       FROM fixtures
+      WHERE kind IN ('ida', 'vuelta') AND category=$1 AND edicion=$2
+      ORDER BY kind, updated_at DESC, id DESC`,
     [category, CURRENT_EDITION]
   );
 
-  const fechas = rows[0]?.data?.fechas || [];
-  const matches = fechas.flatMap(extractCrucesFromFecha).filter((match) => isDateKey(match.date));
+  const fixtureMatches = rows.flatMap((row) => {
+    const fechas = Array.isArray(row?.data?.fechas) ? row.data.fechas : [];
+    return fechas.flatMap(extractCrucesFromFecha);
+  }).filter((match) => isDateKey(match.date));
+
+  const llavesResult = await pool.query(
+    `SELECT data FROM llaves_data WHERE category=$1 AND edicion=$2 LIMIT 1`,
+    [category, CURRENT_EDITION]
+  );
+  const llavesMatches = extractCrucesFromLlaves(llavesResult.rows[0]?.data || null);
+  const matches = [...fixtureMatches, ...llavesMatches];
   if (!matches.length) return { cruces: [], fechaFixture: null };
   const automation = computeNextAutomation(matches);
   const selectedDate = automation.nextFixtureDate;
   return {
     cruces: matches.filter((match) => match.date === selectedDate),
-    fechaFixture: selectedDate
+    fechaFixture: selectedDate,
+    source: llavesMatches.some((match) => match.date === selectedDate) ? 'llaves' : 'fixture'
   };
 }
 
