@@ -4,6 +4,7 @@ const $ = (selector) => document.querySelector(selector);
 
 let currentPlayers = [];
 let selectedPlayer = null;
+let hasSecondAccess = false;
 const teamsCache = new Map();
 
 function readSession(){
@@ -74,6 +75,22 @@ async function fetchJson(path, options = {}){
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.ok === false) throw new Error(data.error || data.msg || `HTTP ${res.status}`);
   return data;
+}
+
+async function enableAllowedCategories(){
+  try {
+    const capabilities = await fetchJson('/api/auth/capabilities');
+    hasSecondAccess = !!capabilities?.canViewSecond;
+    const select = $('#teamCategory');
+    if (hasSecondAccess && select && !Array.from(select.options).some(option => option.value === 'segunda')) {
+      const option = document.createElement('option');
+      option.value = 'segunda';
+      option.textContent = '2da';
+      select.insertBefore(option, select.firstChild);
+    }
+  } catch (_) {
+    hasSecondAccess = false;
+  }
 }
 
 async function loadTeams(category){
@@ -218,7 +235,9 @@ async function searchPlayers(ev){
     return;
   }
   try {
-    const data = await fetchJson(`/api/players-public/search?q=${encodeURIComponent(q)}`);
+    const category = $('#teamCategory')?.value || 'tercera';
+    if (category === 'segunda' && !hasSecondAccess) return;
+    const data = await fetchJson(`/api/players-public/search?category=${encodeURIComponent(category)}&q=${encodeURIComponent(q)}`);
     renderPlayers(data.players || []);
   } catch (err) {
     renderPlayers([]);
@@ -248,7 +267,8 @@ async function showHistory(player){
   const body = $('#historyBody');
   if (!dialog || !body || !player?.id) return;
   try {
-    const data = await fetchJson(`/api/players-public/history/${encodeURIComponent(player.id)}`);
+    const category = $('#teamCategory')?.value || 'tercera';
+    const data = await fetchJson(`/api/players-public/history/${encodeURIComponent(player.id)}?category=${encodeURIComponent(category)}`);
     const history = data.history || [];
     body.innerHTML = history.length ? `
       <table class="history-table">
@@ -290,6 +310,11 @@ $('#photoDialog')?.addEventListener('click', (ev) => {
   if (ev.target === ev.currentTarget) ev.currentTarget.close();
 });
 
-refreshSearchTeams();
-clearFicha();
-renderPlayers([]);
+async function init(){
+  await enableAllowedCategories();
+  await refreshSearchTeams();
+  clearFicha();
+  renderPlayers([]);
+}
+
+init();

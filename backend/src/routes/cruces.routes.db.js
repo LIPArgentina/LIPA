@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, requireSecondCategoryAccess } = require('../middleware/auth');
 
 
 
@@ -38,7 +38,7 @@ function invalidateManualCrucesCaches() {
 function requireAdminForPrivateCategory(req, res, next) {
   const category = String(req.query.category || '').trim().toLowerCase();
   if (category !== 'segunda') return next();
-  return requireAdmin(req, res, next);
+  return requireSecondCategoryAccess(req, res, next);
 }
 
 function normalizeEdition(value, options = {}) {

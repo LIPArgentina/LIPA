@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db');
 const { readJSON, writeJSON } = require('../utils/fileStorage');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, readOptionalUser, canViewSecondCategory } = require('../middleware/auth');
 const {
   createRenewableSession,
   refreshRenewableSession,
@@ -19,6 +19,15 @@ module.exports = function createAdminRouter(deps) {
   const { DATA_DIR } = deps;
 
   const router = express.Router();
+
+  router.get('/auth/capabilities', (req, res) => {
+    const user = readOptionalUser(req);
+    return res.json({
+      ok: true,
+      authenticated: !!user,
+      canViewSecond: canViewSecondCategory(user),
+    });
+  });
 
 
   const ADMIN_STORE = path.join(DATA_DIR, 'admin_password.json');

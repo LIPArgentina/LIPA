@@ -4,7 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const sharp = require('sharp');
 const pool = require('../../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, requireSecondCategoryAccess } = require('../middleware/auth');
 
 module.exports = function createPlayersAdminRouter(deps = {}) {
   const router = express.Router();
@@ -473,6 +473,16 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
   }
 
+  function requirePublicPlayerCategoryAccess(req, res, next) {
+    const category = normalizeCategory(req.query.category || 'tercera');
+    if (!['segunda', 'tercera'].includes(category)) {
+      return res.status(400).json({ ok: false, error: 'Categoría inválida' });
+    }
+    req.publicPlayerCategory = category;
+    if (category === 'segunda') return requireSecondCategoryAccess(req, res, next);
+    return next();
+  }
+
   async function validateCategoryDirection(client, { playerId, targetCategory }) {
     const normalizedTarget = normalizeCategory(targetCategory);
     const targetRank = categoryRank(normalizedTarget);
@@ -709,10 +719,11 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   });
 
-  router.get('/players-public/search', async (req, res) => {
+  router.get('/players-public/search', requirePublicPlayerCategoryAccess, async (req, res) => {
     try {
       await ensureSchema();
       const q = String(req.query.q || '').trim();
+      const category = req.publicPlayerCategory;
       const dni = normalizeDni(q);
       const name = normalizeText(q);
       if (!q || q.length < 2) return res.json({ ok: true, players: [] });
@@ -740,14 +751,16 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           ON je.jugador_id = j.id
          AND je.activo = true
         LEFT JOIN equipos e ON e.id = je.equipo_id
-        WHERE
+        WHERE (
           ($1 <> '' AND j.dni ILIKE $1 || '%')
           OR ($2 <> '' AND j.nombre_normalizado ILIKE '%' || $2 || '%')
           OR ($3 <> '' AND LOWER(j.nombre) ILIKE '%' || LOWER($3) || '%')
+        )
+          AND je.categoria = $4
         ORDER BY j.nombre ASC, je.categoria ASC NULLS LAST
         LIMIT 80
         `,
-        [dni, name, q]
+        [dni, name, q, category]
       );
 
       return res.json({ ok: true, players: canonicalizePlayerRows(result.rows) });
@@ -757,10 +770,10 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   });
 
-  router.get('/players-public/by-team', async (req, res) => {
+  router.get('/players-public/by-team', requirePublicPlayerCategoryAccess, async (req, res) => {
     try {
       await ensureSchema();
-      const category = normalizeCategory(req.query.category || '');
+      const category = req.publicPlayerCategory;
       const rawTeam = String(req.query.team || '').trim();
       const team = await resolveTeam(rawTeam, category);
       if (!team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
@@ -821,10 +834,11 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   });
 
-  router.get('/players-public/history/:id', async (req, res) => {
+  router.get('/players-public/history/:id', requirePublicPlayerCategoryAccess, async (req, res) => {
     try {
       await ensureSchema();
       const playerId = Number(req.params.id);
+      const category = req.publicPlayerCategory;
       if (!Number.isFinite(playerId)) return res.status(400).json({ ok: false, error: 'ID inválido' });
 
       const current = await pool.query(
@@ -867,9 +881,10 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           OR ($3 <> '' AND COALESCE(j.nombre_normalizado, '') = $3)
           OR j.id = $1
         )
+          AND je.categoria = $4
         ORDER BY je.activo DESC, je.desde DESC NULLS LAST, je.id DESC
         `,
-        [playerId, dni, normalizedName]
+        [playerId, dni, normalizedName, category]
       );
 
       return res.json({ ok: true, history: dedupeHistoryRows(result.rows) });
