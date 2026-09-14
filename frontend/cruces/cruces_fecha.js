@@ -686,6 +686,19 @@ function apiUrl(path){
   async function loadCrucesFromDb(category){
     if (!category) throw new Error('Categoría inválida para cruces');
 
+    const activeDate = String(window.__CRUCE_ACTIVE_FIXTURE_DATE || '').slice(0, 10);
+    if (window.__CRUCE_ACTIVE_SOURCE === 'llaves') {
+      const ctx = getCrucesTeamContext();
+      const match = await loadProximoCruceFromLlaves(category, ctx.primaryTeam || '', activeDate);
+      if (match) {
+        return {
+          cruces: [match],
+          fechaFixture: match.date,
+          fixtureKind: 'llaves'
+        };
+      }
+    }
+
     const fetchFixtureKind = async (kind) => {
       const data = await fetchJson(apiUrl('/api/fixture?kind=' + encodeURIComponent(kind) + '&category=' + encodeURIComponent(category)), {
         cache: 'no-store',
@@ -717,7 +730,6 @@ function apiUrl(path){
     }
 
     const ctx = getCrucesTeamContext();
-    const activeDate = String(window.__CRUCE_ACTIVE_FIXTURE_DATE || '').slice(0, 10);
     const crucesForActiveDate = activeDate
       ? cruces.filter(item => String(item?.date || '').slice(0, 10) === activeDate)
       : cruces;
@@ -784,6 +796,7 @@ function apiUrl(path){
         return block('Cruces no habilitados', 'El administrador todavía no habilitó los cruces para esta fecha.');
       }
       window.__CRUCE_ACTIVE_FIXTURE_DATE = String(j.nextFixtureDate || '').slice(0, 10);
+      window.__CRUCE_ACTIVE_SOURCE = String(j.source || '').trim().toLowerCase();
       return true;
     } catch (e) {
       console.error('checkCrucesEnabled', e);
