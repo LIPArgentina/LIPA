@@ -3033,8 +3033,27 @@ function getPairScore(scoreRows = [], planilla = {}, pairIndex = 0) {
   return Number(fromPlanilla ?? 0) || 0;
 }
 
+function collectLlavesMatchKeys(llavesRows = []) {
+  const keys = new Set();
+  for (const row of llavesRows) {
+    const rounds = Array.isArray(row?.data?.rounds) ? row.data.rounds : [];
+    for (const round of rounds) {
+      const legs = Array.isArray(round?.legs) ? round.legs : [];
+      for (const leg of legs) {
+        const dateKey = normalizeDateOnly(leg?.date);
+        const pair = [
+          normalizeTeamIdentity(leg?.home?.team),
+          normalizeTeamIdentity(leg?.away?.team)
+        ].filter((team) => team && team !== 'wo').sort();
+        if (dateKey && pair.length === 2) keys.add(`${dateKey}::${pair.join('::')}`);
+      }
+    }
+  }
+  return keys;
+}
+
 async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
-  const [{ rows }, { rows: teamRows }, { rows: fixtureRows }, { rows: historicMatchRows }] = await Promise.all([
+  const [{ rows }, { rows: teamRows }, { rows: fixtureRows }, { rows: llavesRows }, { rows: historicMatchRows }] = await Promise.all([
     pool.query(
       `
       SELECT fecha_key, team, status_json, validated, updated_at
@@ -3051,6 +3070,9 @@ async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
     ),
     category
       ? pool.query(`SELECT data FROM fixtures WHERE category = $1`, [String(category).trim().toLowerCase()])
+      : Promise.resolve({ rows: [] }),
+    category
+      ? pool.query(`SELECT data FROM llaves_data WHERE LOWER(category) = $1`, [String(category).trim().toLowerCase()])
       : Promise.resolve({ rows: [] }),
     category
       ? pool.query(
@@ -3077,6 +3099,9 @@ async function buildAllValidatedCrucesForPlayerQueryUncached(category = '') {
         }
       }
     }
+  }
+  for (const key of collectLlavesMatchKeys(llavesRows)) {
+    categoryMatchKeys.add(key);
   }
   for (const historicRow of historicMatchRows) {
     const parts = String(historicRow?.fecha_key || '').split('::');
@@ -5075,5 +5100,6 @@ module.exports.__test = {
   sortPlayerMatchByDateAndRow,
   ensureRankingRowForPlayer,
   buildPlayerRowsFromResults,
-  sortPlayerRankingRows
+  sortPlayerRankingRows,
+  collectLlavesMatchKeys
 };

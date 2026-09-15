@@ -7,8 +7,25 @@ const {
   sortPlayerMatchByDateAndRow,
   ensureRankingRowForPlayer,
   buildPlayerRowsFromResults,
-  sortPlayerRankingRows
+  sortPlayerRankingRows,
+  collectLlavesMatchKeys
 } = require('../src/routes/cruces.routes.db').__test;
+
+test('incluye los partidos reales de llaves entre las fechas validas del ranking', () => {
+  const keys = collectLlavesMatchKeys([{
+    data: {
+      rounds: [{
+        id: 's1',
+        legs: [
+          { date: '2026-09-14', home: { team: 'VICTORIA' }, away: { team: 'TAKOS PRO' } },
+          { date: '2026-09-28', home: { team: 'WO' }, away: { team: 'ALBA' } }
+        ]
+      }]
+    }
+  }]);
+
+  assert.deepEqual([...keys], ['2026-09-14::takospro::victoria']);
+});
 
 test('ordena todo el ranking antes de recortar el top visible', () => {
   const rows = [
