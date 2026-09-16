@@ -7,6 +7,7 @@ const SECOND_CATEGORY_ALLOWED_TEAMS = new Set([
   'lospatosdelaliga_segunda',
   'takospro_segunda',
   'victoria_segunda',
+  'west_segunda',
 ]);
 
 function getJwtSecret() {

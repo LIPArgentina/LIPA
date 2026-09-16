@@ -8,13 +8,14 @@ const allowedTeams = [
   'lospatosdelaliga_segunda',
   'takospro_segunda',
   'victoria_segunda',
+  'west_segunda',
 ];
 
 test('administradores pueden consultar Segunda', () => {
   assert.equal(canViewSecondCategory({ role: 'admin' }), true);
 });
 
-test('solo los cinco equipos seleccionados de Segunda tienen acceso', () => {
+test('solo los seis equipos seleccionados de Segunda tienen acceso', () => {
   allowedTeams.forEach(slug => {
     assert.equal(canViewSecondCategory({ role: 'team', category: 'segunda', slug }), true, slug);
   });
