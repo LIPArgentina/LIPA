@@ -154,10 +154,12 @@
   }
 
   async function findPlayerPhoto(playerId, playerName, teamName) {
-    const key = `${Number(playerId || 0)}:${normalizePlayerName(playerName)}:${normalizePlayerName(teamName)}`;
+    const category = String($category?.value || 'tercera').trim().toLowerCase();
+    const key = `${category}:${Number(playerId || 0)}:${normalizePlayerName(playerName)}:${normalizePlayerName(teamName)}`;
     if (!playerPhotoCache.has(key)) {
       playerPhotoCache.set(key, (async () => {
-        const data = await fetchJson(apiUrl('/api/players-public/search?q=' + encodeURIComponent(playerName)));
+        const params = new URLSearchParams({ q: playerName, category });
+        const data = await fetchJson(apiUrl('/api/players-public/search?' + params.toString()));
         const players = Array.isArray(data?.players) ? data.players : [];
         const numericId = Number(playerId || 0);
         return players.find((player) => numericId && Number(player?.id || 0) === numericId)
