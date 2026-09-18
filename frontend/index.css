@@ -460,15 +460,6 @@
   transition:filter .15s ease, transform .05s ease, box-shadow .15s ease;
 }
 
-.btn-video-replay.btn-insumos{
-  font-family:Arial,Helvetica,sans-serif;
-  font-size:.75rem;
-  font-weight:700;
-  letter-spacing:-.025em;
-  text-transform:none;
-  white-space:nowrap;
-}
-
 .cta-grid .btn-cta-location{
   white-space:nowrap;
   font-size:.76rem;
