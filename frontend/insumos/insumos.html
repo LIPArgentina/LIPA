@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compra y venta de tacos e insumos - Liga Independiente de Pool</title>
+  <style>
+    :root{--bg:#0f0f12;--text:#eaeaf0;--gold:#ffcc00;}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:Inter,system-ui,sans-serif;
+      background:linear-gradient(135deg,#0b0b10 0%,#14141a 60%,#0b0b10 100%);
+      color:var(--text);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+    }
+    header{
+      position:fixed;
+      top:0;left:0;width:100%;
+      box-sizing:border-box;
+      background:rgba(0,0,0,.85);
+      border-bottom:1px solid rgba(255,255,255,.05);
+      display:flex;
+      align-items:center;
+      padding:20px;
+      z-index:1000;
+    }
+    .logo-link img{height:84px;}
+    main{margin-top:160px;text-align:center;padding:20px;}
+    h1{
+      color:var(--gold);
+      font-size:clamp(25px,5vw,36px);
+      text-transform:uppercase;
+      text-shadow:0 2px 8px rgba(0,0,0,.5);
+    }
+    .mensaje{
+      margin-top:20px;
+      font-size:22px;
+      color:#fff;
+      letter-spacing:2px;
+      animation:blinkGlow 1.5s infinite alternate;
+      text-shadow:0 0 6px #fff,0 0 12px #ffcc00,0 0 18px #ffcc00;
+    }
+    @keyframes blinkGlow{
+      from{opacity:.35;transform:scale(.98);}
+      to{opacity:1;transform:scale(1);}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="../index.html" class="logo-link" aria-label="Volver al inicio">
+      <img src="../logo_liga.png" alt="Logo LIPA">
+    </a>
+  </header>
+  <main>
+    <h1>Compra y venta de tacos e insumos</h1>
+    <div class="mensaje">PRÓXIMAMENTE</div>
+  </main>
+</body>
+</html>
