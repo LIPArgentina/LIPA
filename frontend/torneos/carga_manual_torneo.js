@@ -247,6 +247,11 @@
       return;
     }
 
+    if (state.file.size > 20 * 1024 * 1024) {
+      setStatus('La imagen supera el máximo permitido de 20 MB. Reducí su tamaño e intentá nuevamente.', 'error');
+      return;
+    }
+
     const categoria = categoriaInput.value.trim();
     const estilo = estiloInput.value.trim();
     const fecha = fechaInput.value;

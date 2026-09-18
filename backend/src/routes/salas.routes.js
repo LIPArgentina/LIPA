@@ -12,6 +12,7 @@ const { createRenewableSession, setAccessCookie } = require('../utils/authSessio
 
 const DEFAULT_SALA_PASSWORD = '1234';
 const MAX_TORNEOS_POR_SALA = 6;
+const MAX_TORNEO_IMAGE_BYTES = 20 * 1024 * 1024;
 const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const ALLOWED_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
@@ -560,7 +561,7 @@ module.exports = function createSalasRouter(deps = {}) {
 
   const uploadTorneoImage = multer({
     storage,
-    limits: { fileSize: 8 * 1024 * 1024 },
+    limits: { fileSize: MAX_TORNEO_IMAGE_BYTES },
     fileFilter(_req, file, cb) {
       const ext = path.extname(file.originalname || '').toLowerCase();
       const mime = String(file.mimetype || '').toLowerCase();
@@ -568,6 +569,24 @@ module.exports = function createSalasRouter(deps = {}) {
       return cb(new Error('Solo se permiten imágenes JPG, PNG, WEBP o GIF.'));
     }
   });
+
+  function receiveTorneoImage(req, res, next) {
+    uploadTorneoImage.single('imagen')(req, res, (err) => {
+      if (!err) return next();
+      const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+      console.warn('No se pudo recibir la imagen del torneo', {
+        code: err.code || 'UPLOAD_ERROR',
+        message: err.message,
+        salaId: req.params.salaId || req.user?.salaId || null
+      });
+      return res.status(tooLarge ? 413 : 400).json({
+        ok: false,
+        error: tooLarge
+          ? 'La imagen supera el máximo permitido de 20 MB. Reducí su tamaño e intentá nuevamente.'
+          : (err.message || 'No se pudo recibir la imagen del torneo.')
+      });
+    });
+  }
 
 
   router.get('/salas', async (_req, res) => {
@@ -832,7 +851,7 @@ module.exports = function createSalasRouter(deps = {}) {
   });
 
 
-  router.post('/sala/torneos/:slot', requireSala, uploadTorneoImage.single('imagen'), async (req, res) => {
+  router.post('/sala/torneos/:slot', requireSala, receiveTorneoImage, async (req, res) => {
     try {
       await ensureTable();
 
@@ -929,7 +948,7 @@ module.exports = function createSalasRouter(deps = {}) {
   });
 
 
-  router.post('/admin/sala-torneos/:salaId/:slot', requireAdmin, uploadTorneoImage.single('imagen'), async (req, res) => {
+  router.post('/admin/sala-torneos/:salaId/:slot', requireAdmin, receiveTorneoImage, async (req, res) => {
     try {
       const salaId = Number(req.params.salaId);
       const slot = Number(req.params.slot);
