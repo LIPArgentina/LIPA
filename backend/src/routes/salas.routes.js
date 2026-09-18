@@ -540,6 +540,51 @@ module.exports = function createSalasRouter(deps = {}) {
     try { await fs.promises.unlink(fullPath); } catch (_) {}
   }
 
+  async function cleanupOrphanTorneoMedia() {
+    await ensureTable();
+    const { rows } = await pool.query('SELECT media_path FROM sala_torneos');
+    const referenced = new Set(rows.map((row) => path.resolve(String(row.media_path || ''))));
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    let removed = 0;
+    let freedBytes = 0;
+    const salaDirs = await fs.promises.readdir(torneosRoot, { withFileTypes: true }).catch((err) => {
+      if (err.code === 'ENOENT') return [];
+      throw err;
+    });
+
+    for (const salaDir of salaDirs) {
+      if (!salaDir.isDirectory()) continue;
+      const salaPath = path.join(torneosRoot, salaDir.name);
+      const entries = await fs.promises.readdir(salaPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        const filePath = path.resolve(salaPath, entry.name);
+        if (referenced.has(filePath)) continue;
+        const stat = await fs.promises.stat(filePath).catch(() => null);
+        if (!stat || stat.mtimeMs > cutoff) continue;
+        try {
+          await fs.promises.unlink(filePath);
+          removed += 1;
+          freedBytes += stat.size;
+        } catch (err) {
+          console.warn('[sala-torneos-orphans] No se pudo eliminar archivo huérfano', err?.message);
+        }
+      }
+    }
+    if (removed) console.info(`[sala-torneos-orphans] ${removed} archivo(s) sin registro eliminados; ${freedBytes} bytes liberados`);
+    return { removed, freedBytes };
+  }
+
+  async function prepareTorneoUpload(_req, _res, next) {
+    try {
+      await cleanupExpiredTorneos({ force: true });
+      await cleanupOrphanTorneoMedia();
+    } catch (err) {
+      console.error('[sala-torneos-upload-cleanup]', err);
+    }
+    next();
+  }
+
   const storage = multer.diskStorage({
     async destination(req, _file, cb) {
       try {
@@ -574,14 +619,17 @@ module.exports = function createSalasRouter(deps = {}) {
     uploadTorneoImage.single('imagen')(req, res, (err) => {
       if (!err) return next();
       const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+      const diskFull = err.code === 'ENOSPC';
       console.warn('No se pudo recibir la imagen del torneo', {
         code: err.code || 'UPLOAD_ERROR',
         message: err.message,
         salaId: req.params.salaId || req.user?.salaId || null
       });
-      return res.status(tooLarge ? 413 : 400).json({
+      return res.status(diskFull ? 507 : tooLarge ? 413 : 400).json({
         ok: false,
-        error: tooLarge
+        error: diskFull
+          ? 'El almacenamiento de imágenes del servidor está lleno. La publicación no se guardó; contactá al administrador para liberar o ampliar el espacio.'
+          : tooLarge
           ? 'La imagen supera el máximo permitido de 20 MB. Reducí su tamaño e intentá nuevamente.'
           : (err.message || 'No se pudo recibir la imagen del torneo.')
       });
@@ -851,7 +899,7 @@ module.exports = function createSalasRouter(deps = {}) {
   });
 
 
-  router.post('/sala/torneos/:slot', requireSala, receiveTorneoImage, async (req, res) => {
+  router.post('/sala/torneos/:slot', requireSala, prepareTorneoUpload, receiveTorneoImage, async (req, res) => {
     try {
       await ensureTable();
 
@@ -948,7 +996,7 @@ module.exports = function createSalasRouter(deps = {}) {
   });
 
 
-  router.post('/admin/sala-torneos/:salaId/:slot', requireAdmin, receiveTorneoImage, async (req, res) => {
+  router.post('/admin/sala-torneos/:salaId/:slot', requireAdmin, prepareTorneoUpload, receiveTorneoImage, async (req, res) => {
     try {
       const salaId = Number(req.params.salaId);
       const slot = Number(req.params.slot);
