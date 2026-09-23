@@ -513,7 +513,7 @@ function renderBracket(data){
       .join('');
 
     slot.innerHTML = `
-      <article class="tie-card" data-round-card="${config.id}" data-extra-deleted="${round.extraDeleted ? '1' : '0'}" data-manual-order="${round.manualOrder ? '1' : '0'}">
+      <article class="tie-card" data-round-card="${config.id}" data-extra-deleted="${round.extraDeleted ? '1' : '0'}">
         <div class="tie-header">
           <div>
             <div class="tie-subtitle">${escapeHtml(config.subtitle)}</div>
@@ -560,7 +560,6 @@ function readBracketFromUI(){
       id: config.id,
       title: config.title,
       extraDeleted: card?.dataset.extraDeleted === '1',
-      manualOrder: card?.dataset.manualOrder === '1',
       legs: legEls.map(legEl => ({
         date: legEl.querySelector('[data-field="date"]')?.value || '',
         home: {
@@ -619,10 +618,6 @@ function wireInputs(){
   document.querySelectorAll('#bracketRoot select, #bracketRoot input[type="date"]').forEach(el => {
     el.addEventListener('change', () => {
       const data = readBracketFromUI();
-      const block = el.closest('.match-block');
-      if (currentCategory === 'segunda' && el.dataset.field === 'team' && block) {
-        applyManualSeriesOrder(data, block.dataset.round, Number(block.dataset.leg), el.dataset.side, el.value);
-      }
       applyAutomaticAdvance(data);
       renderBracket(data);
       wireInputs();
@@ -813,42 +808,12 @@ function llSetSeriesTeams(round, teamA, teamB){
     return;
   }
 
-  const expected = new Set([normalizeForCompare(teamA), normalizeForCompare(teamB)]);
-  const current = new Set([
-    normalizeForCompare(round.legs[0]?.home?.team),
-    normalizeForCompare(round.legs[0]?.away?.team)
-  ]);
-  const keepsManualOrder = round.manualOrder && expected.size === 2 && current.size === 2 && [...expected].every(team => current.has(team));
-  if (keepsManualOrder) return;
-
-  round.manualOrder = false;
-  const directFinalOrder = currentCategory === 'segunda' && ['final','third'].includes(round.id);
-  llSetLegTeams(round, 0, directFinalOrder ? teamA : teamB, directFinalOrder ? teamB : teamA);
-  llSetLegTeams(round, 1, directFinalOrder ? teamB : teamA, directFinalOrder ? teamA : teamB);
+  llSetLegTeams(round, 0, teamB, teamA);
+  llSetLegTeams(round, 1, teamA, teamB);
 
   if (round.legs[2]) {
     llSetLegTeams(round, 2, teamA, teamB);
   }
-}
-
-function applyManualSeriesOrder(data, roundId, legIndex, side, selectedTeam){
-  if (!['final','third'].includes(roundId) || ![0, 1].includes(legIndex) || !['home','away'].includes(side)) return;
-  const round = llGetRound(data, roundId);
-  if (!round || round.legs.length < 2) return;
-
-  const selected = normalizeTeamName(selectedTeam);
-  const other = [
-    round.legs[0]?.home?.team,
-    round.legs[0]?.away?.team,
-    round.legs[1]?.home?.team,
-    round.legs[1]?.away?.team
-  ].map(normalizeTeamName).find(team => llIsRealTeam(team) && normalizeForCompare(team) !== normalizeForCompare(selected));
-  if (!llIsRealTeam(selected) || !llIsRealTeam(other)) return;
-
-  const selectedIsHomeInIda = (legIndex === 0 && side === 'home') || (legIndex === 1 && side === 'away');
-  llSetLegTeams(round, 0, selectedIsHomeInIda ? selected : other, selectedIsHomeInIda ? other : selected);
-  llSetLegTeams(round, 1, selectedIsHomeInIda ? other : selected, selectedIsHomeInIda ? selected : other);
-  round.manualOrder = true;
 }
 
 function flattenStandings(standings){
@@ -960,7 +925,6 @@ function mergeSavedEditableData(baseData, savedData){
     const savedRound = savedData.rounds.find(r => r?.id === round.id);
     if (!savedRound || !Array.isArray(savedRound.legs)) return;
 
-    round.manualOrder = !!savedRound.manualOrder;
     while (round.legs.length < savedRound.legs.length) {
       const savedLeg = savedRound.legs[round.legs.length] || {};
       const extra = getEmptyLeg();
@@ -976,7 +940,7 @@ function mergeSavedEditableData(baseData, savedData){
 
       leg.date = typeof savedLeg.date === 'string' ? savedLeg.date : leg.date;
 
-      if (round.manualOrder || index >= 2) {
+      if (index >= 2) {
         leg.home.team = normalizeTeamName(savedLeg?.home?.team) || leg.home.team;
         leg.away.team = normalizeTeamName(savedLeg?.away?.team) || leg.away.team;
       }
