@@ -37,8 +37,8 @@ const CATEGORY_CONFIG = {
     teamSource: 'segunda',
     rounds: [
       { id: 's1', slot: 'slot-s1', title: 'Semifinal', subtitle: 'Semifinal', legs: 2, helper: 'Serie ida y vuelta' },
-      { id: 'final', slot: 'slot-final', title: 'Final', subtitle: 'Final única', legs: 1, helper: 'Partido único' },
-      { id: 'third', slot: 'slot-third', title: '3er y 4to puesto', subtitle: 'Partido por el podio', legs: 1, helper: 'Partido único' },
+      { id: 'final', slot: 'slot-final', title: 'Final', subtitle: 'Final', legs: 2, helper: 'Serie ida y vuelta' },
+      { id: 'third', slot: 'slot-third', title: '3er y 4to puesto', subtitle: 'Partido por el podio', legs: 2, helper: 'Serie ida y vuelta' },
       { id: 's2', slot: 'slot-s2', title: 'Semifinal', subtitle: 'Semifinal', legs: 2, helper: 'Serie ida y vuelta' }
     ],
     slots: ['slot-s1','slot-final','slot-third','slot-s2']
@@ -103,6 +103,11 @@ function unique(list){
 
 function getCategoryConfig(category = currentCategory){
   return CATEGORY_CONFIG[category] || CATEGORY_CONFIG.tercera;
+}
+
+function roundSupportsTiebreak(roundId){
+  if (['q1','q2','q3','q4','s1','s2'].includes(roundId)) return true;
+  return currentCategory === 'segunda' && ['final','third'].includes(roundId);
 }
 
 function getTeamOptions(){
@@ -489,7 +494,7 @@ function renderBracket(data){
     const slot = document.getElementById(config.slot);
     if (!slot) return;
 
-    const needsExtra = ['q1','q2','q3','q4','s1','s2'].includes(round.id) && llSeriesWinner(round).needsExtra;
+    const needsExtra = roundSupportsTiebreak(round.id) && llSeriesWinner(round).needsExtra;
     const legsMarkup = round.legs
       .filter((leg, index) => {
         if (index < 2) return true;
@@ -775,7 +780,7 @@ function llSeriesWinner(round){
 function llEnsureExtraIfNeeded(data){
   const target = currentCategory === 'segunda' ? 6 : 5;
   (data.rounds || []).forEach(round => {
-    if (!['q1','q2','q3','q4','s1','s2'].includes(round.id)) return;
+    if (!roundSupportsTiebreak(round.id)) return;
     const outcome = llSeriesWinner(round);
 
     if (outcome.needsExtra && !round.extraDeleted) {
