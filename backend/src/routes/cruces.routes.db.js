@@ -2060,8 +2060,17 @@ function llavesAutoSetSeriesTeams(round, teamA, teamB) {
   }
 
 
-  llavesAutoSetLegTeams(round, 0, teamB, teamA);
-  llavesAutoSetLegTeams(round, 1, teamA, teamB);
+  const expected = new Set([normalizeLlavesTeamKey(teamA), normalizeLlavesTeamKey(teamB)]);
+  const current = new Set([
+    normalizeLlavesTeamKey(round.legs[0]?.home?.team),
+    normalizeLlavesTeamKey(round.legs[0]?.away?.team)
+  ]);
+  if (round.manualOrder && expected.size === 2 && current.size === 2 && [...expected].every(team => current.has(team))) return;
+
+  round.manualOrder = false;
+  const directFinalOrder = ['final', 'third'].includes(round.id);
+  llavesAutoSetLegTeams(round, 0, directFinalOrder ? teamA : teamB, directFinalOrder ? teamB : teamA);
+  llavesAutoSetLegTeams(round, 1, directFinalOrder ? teamB : teamA, directFinalOrder ? teamA : teamB);
 
   if (round.legs[2]) {
     llavesAutoSetLegTeams(round, 2, teamA, teamB);

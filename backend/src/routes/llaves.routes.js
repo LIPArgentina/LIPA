@@ -167,8 +167,14 @@ module.exports = function createLlavesRouter() {
     }
 
 
-    setLegTeams(round, 0, teamB, teamA);
-    setLegTeams(round, 1, teamA, teamB);
+    const expected = new Set([normalizeTeam(teamA), normalizeTeam(teamB)]);
+    const current = new Set([normalizeTeam(round.legs[0]?.home?.team), normalizeTeam(round.legs[0]?.away?.team)]);
+    if (round.manualOrder && expected.size === 2 && current.size === 2 && [...expected].every(team => current.has(team))) return;
+
+    round.manualOrder = false;
+    const directFinalOrder = ['final', 'third'].includes(round.id);
+    setLegTeams(round, 0, directFinalOrder ? teamA : teamB, directFinalOrder ? teamB : teamA);
+    setLegTeams(round, 1, directFinalOrder ? teamB : teamA, directFinalOrder ? teamA : teamB);
 
     if (round.legs[2]) {
       setLegTeams(round, 2, teamA, teamB);
