@@ -1,4 +1,4 @@
-import { loadPodiumResult } from './podio_superliga.js?v=20260928-bola9';
+import { loadPodiumResult } from './podio_superliga_bola9.js';
 
 function debounce(fn, wait = 100){
   let t;
