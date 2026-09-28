@@ -113,6 +113,39 @@
       .toUpperCase();
   }
 
+  function playerNameDistance(left, right){
+    const a = normalizePlayerName(left);
+    const b = normalizePlayerName(right);
+    const row = Array.from({ length: b.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= a.length; i++) {
+      let previous = row[0];
+      row[0] = i;
+      for (let j = 1; j <= b.length; j++) {
+        const current = row[j];
+        row[j] = Math.min(
+          row[j] + 1,
+          row[j - 1] + 1,
+          previous + (a[i - 1] === b[j - 1] ? 0 : 1)
+        );
+        previous = current;
+      }
+    }
+    return row[b.length];
+  }
+
+  function playerNamesLikelyMatch(left, right){
+    const a = normalizePlayerName(left);
+    const b = normalizePlayerName(right);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const aTokens = a.split(' ').filter(Boolean);
+    const bTokens = b.split(' ').filter(Boolean);
+    const contained = aTokens.length >= 2 && aTokens.every(token => bTokens.includes(token));
+    const reverseContained = bTokens.length >= 2 && bTokens.every(token => aTokens.includes(token));
+    if (contained || reverseContained) return true;
+    return aTokens[0] === bTokens[0] && playerNameDistance(a, b) <= 2;
+  }
+
   function playerPhotoUrl(player){
     return player?.fotoUrl ? apiUrl(player.fotoUrl) : '../logo_liga.png';
   }
@@ -137,6 +170,8 @@
     const teamPlayers = await loadTeamPlayers(teamRef).catch(() => []);
     const teamMatch = teamPlayers.find(player => normalizePlayerName(player?.nombre || player?.name) === wanted);
     if (teamMatch) return teamMatch;
+    const likelyTeamMatch = teamPlayers.find(player => playerNamesLikelyMatch(playerNameValue, player?.nombre || player?.name));
+    if (likelyTeamMatch) return likelyTeamMatch;
 
     const params = new URLSearchParams({ q: playerNameValue, category: currentCategory });
     const data = await fetchJson(apiUrl('/api/players-public/search?' + params.toString()), {
@@ -173,6 +208,9 @@
     if (!player) {
       playerPhotoStatus.textContent = 'No se encontró la ficha del jugador.';
       return;
+    }
+    if (playerProfileButton) {
+      playerProfileButton.dataset.player = String(player?.nombre || player?.name || playerNameValue);
     }
     playerPhotoImage.src = playerPhotoUrl(player);
     playerPhotoStatus.textContent = player?.fotoUrl ? '' : 'Este jugador todavía no tiene una foto cargada.';
