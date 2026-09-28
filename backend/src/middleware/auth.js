@@ -1,15 +1,6 @@
 
 const jwt = require('jsonwebtoken');
 
-const SECOND_CATEGORY_ALLOWED_TEAMS = new Set([
-  'albapool_segunda',
-  'eltrebol_segunda',
-  'lospatosdelaliga_segunda',
-  'takospro_segunda',
-  'victoria_segunda',
-  'west_segunda',
-]);
-
 function getJwtSecret() {
   const s = process.env.JWT_SECRET;
   if (!s) throw new Error('Falta JWT_SECRET en .env');
@@ -41,12 +32,8 @@ function readOptionalUser(req) {
   }
 }
 
-function canViewSecondCategory(user) {
-  const role = String(user?.role || '').trim().toLowerCase();
-  if (role === 'admin') return true;
-  const slug = String(user?.slug || '').trim().toLowerCase();
-  const category = String(user?.category || '').trim().toLowerCase();
-  return role === 'team' && category === 'segunda' && SECOND_CATEGORY_ALLOWED_TEAMS.has(slug);
+function canViewSecondCategory() {
+  return true;
 }
 
 function requireSecondCategoryAccess(req, res, next) {

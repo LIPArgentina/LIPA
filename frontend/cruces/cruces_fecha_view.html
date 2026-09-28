@@ -8,17 +8,17 @@
 </head>
 <body>
   <header class="viewer-header">
-    <a href="../admin.html" class="logo-link" aria-label="Volver a administración">
+    <a href="../index.html" class="logo-link" aria-label="Volver al inicio">
       <img src="../logo_liga.png" alt="LIPA" />
     </a>
     <h1>VISOR DE CRUCES</h1>
-    <a class="header-button" href="../admin.html">VOLVER</a>
+    <a class="header-button" href="../index.html">VOLVER</a>
   </header>
 
   <main class="viewer-main">
     <section class="viewer-controls" aria-label="Selección del cruce">
       <div class="category-switch" role="group" aria-label="Categoría">
-        <button type="button" data-category="segunda" disabled aria-disabled="true" title="Próximamente">SEGUNDA</button>
+        <button type="button" data-category="segunda">SEGUNDA</button>
         <button type="button" data-category="tercera" class="active">TERCERA</button>
       </div>
       <label class="match-picker">
@@ -29,7 +29,7 @@
       <div class="release-status" id="releaseStatus">Comprobando publicación…</div>
     </section>
 
-    <div class="viewer-message" id="viewerMessage">Validando acceso de administrador…</div>
+    <div class="viewer-message" id="viewerMessage">Cargando cruces…</div>
 
     <section class="teams-grid" id="teamsGrid" hidden>
       <article class="team-card" id="localCard" aria-label="Equipo local"></article>
@@ -60,6 +60,6 @@
 
   <script src="../config.js?v=renewable-session-1"></script>
   <script src="../match-format.js"></script>
-  <script src="./cruces_fecha_view.js?v=20260904-active-date-1" defer></script>
+  <script src="./cruces_fecha_view.js?v=20260928-public-all-1" defer></script>
 </body>
 </html>

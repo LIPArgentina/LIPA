@@ -11,15 +11,15 @@ const allowedTeams = [
   'west_segunda',
 ];
 
-test('administradores pueden consultar Segunda', () => {
+test('Segunda es publica para administradores y visitantes', () => {
   assert.equal(canViewSecondCategory({ role: 'admin' }), true);
+  assert.equal(canViewSecondCategory(null), true);
 });
 
-test('solo los seis equipos seleccionados de Segunda tienen acceso', () => {
+test('todos los equipos pueden consultar Segunda', () => {
   allowedTeams.forEach(slug => {
     assert.equal(canViewSecondCategory({ role: 'team', category: 'segunda', slug }), true, slug);
   });
-  assert.equal(canViewSecondCategory({ role: 'team', category: 'segunda', slug: 'oldies_segunda' }), false);
-  assert.equal(canViewSecondCategory({ role: 'team', category: 'tercera', slug: 'victoria_segunda' }), false);
-  assert.equal(canViewSecondCategory(null), false);
+  assert.equal(canViewSecondCategory({ role: 'team', category: 'segunda', slug: 'oldies_segunda' }), true);
+  assert.equal(canViewSecondCategory({ role: 'team', category: 'tercera', slug: 'victoria_segunda' }), true);
 });

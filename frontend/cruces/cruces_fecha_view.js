@@ -114,6 +114,21 @@
   }
 
   async function loadMatches(preferredDate = '') {
+    const active = await fetchJson(`/api/cruces/cruces?team=__categoria_${state.category}__`).catch(() => null);
+    const activeMatches = (Array.isArray(active?.cruces) ? active.cruces : []).map(match => ({
+      local: String(match?.local || '').trim(),
+      visitante: String(match?.visitante || '').trim(),
+      group: String(match?.grupo || ''),
+      date: String(match?.date || active?.fechaFixture || '').slice(0, 10)
+    })).filter(match => match.local && match.visitante);
+    if (activeMatches.length) {
+      const activeDate = String(active?.fechaFixture || preferredDate || activeMatches[0]?.date || '').slice(0, 10);
+      return {
+        date: activeDate,
+        matches: activeMatches.filter(match => !activeDate || match.date === activeDate)
+      };
+    }
+
     const [ida, vuelta] = await Promise.all([
       fetchJson(`/api/fixture?kind=ida&category=${encodeURIComponent(state.category)}`),
       fetchJson(`/api/fixture?kind=vuelta&category=${encodeURIComponent(state.category)}`)
@@ -224,10 +239,6 @@
     const status = document.getElementById('playerPhotoStatus');
     const player = String(button?.dataset.player || '').trim();
     const category = String(button?.dataset.category || state.category).trim().toLowerCase();
-    if (category !== 'tercera') {
-      status.textContent = 'Ficha no disponible por falta de datos para esta categoría. Pedir al capitán que lo complete.';
-      return;
-    }
     if (!player) {
       status.textContent = 'No se pudo identificar al jugador.';
       return;
@@ -351,7 +362,7 @@
         matchSelect.innerHTML = '';
         fixtureDate.textContent = '—';
         message.className = 'viewer-message';
-        message.textContent = 'Los cruces de Tercera todavía no están habilitados.';
+        message.textContent = `Los cruces de ${state.category === 'segunda' ? 'Segunda' : 'Tercera'} todavía no están habilitados.`;
         return;
       }
 
@@ -375,9 +386,13 @@
   }
 
   async function init() {
+    const requestedCategory = String(new URLSearchParams(location.search).get('cat') || '').trim().toLowerCase();
+    if (requestedCategory === 'segunda' || requestedCategory === 'tercera') {
+      state.category = requestedCategory;
+    }
     document.querySelectorAll('[data-category]').forEach(button => {
       button.addEventListener('click', () => {
-        if (button.disabled || button.dataset.category !== 'tercera') return;
+        if (button.disabled) return;
         state.category = button.dataset.category;
         const url = new URL(location.href);
         url.searchParams.set('cat', state.category);

@@ -113,14 +113,8 @@ function ensureCrucesViewButton() {
   btn.classList.add("btn", "btn-outline", "btn-sm");
   btn.style.textDecoration = "none";
 
-  if (isAdmin()) {
-    btn.href = "./cruces/cruces_fecha_view.html";
-    btn.classList.remove("hidden");
-    return;
-  }
-
-  btn.classList.add("hidden");
-  btn.removeAttribute("href");
+  btn.href = "./cruces/cruces_fecha_view.html";
+  btn.classList.remove("hidden");
 }
 
 function redirectAfterLogin() {
