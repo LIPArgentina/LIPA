@@ -487,12 +487,28 @@ module.exports = function createLlavesRouter() {
         [category, edition]
       );
 
+      const rawData = result.rows[0]?.data || null;
+      const data = rawData ? JSON.parse(JSON.stringify(rawData)) : null;
+
+      // Los equipos de las rondas siguientes se calculan a partir de los
+      // resultados ya cargados. Todos los consumidores de /api/llaves
+      // (incluido el generador de planillas) deben recibir la misma llave
+      // resuelta que se muestra en pantalla.
+      if (data && Array.isArray(data.rounds)) {
+        const [ida, vuelta] = await Promise.all([
+          fetchFixtureData('ida', category, edition),
+          fetchFixtureData('vuelta', category, edition)
+        ]);
+        const standings = computeStandings(category, ida, vuelta, edition);
+        applyAutomaticAdvance(data, category, standings, edition);
+      }
+
       res.set('Cache-Control', 'no-store');
       res.json({
         ok: true,
         category,
         edition,
-        data: result.rows[0]?.data || null
+        data
       });
     } catch (err) {
       console.error('GET /api/llaves', err);

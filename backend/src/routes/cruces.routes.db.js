@@ -930,7 +930,11 @@ async function fetchCrucesFromDB(team) {
     `SELECT data FROM llaves_data WHERE category=$1 AND edicion=$2 LIMIT 1`,
     [category, CURRENT_EDITION]
   );
-  const llavesMatches = extractCrucesFromLlaves(llavesResult.rows[0]?.data || null);
+  const rawLlavesData = llavesResult.rows[0]?.data || null;
+  const resolvedLlavesData = rawLlavesData
+    ? await buildLlavesAutoData(rawLlavesData, category, CURRENT_EDITION)
+    : null;
+  const llavesMatches = extractCrucesFromLlaves(resolvedLlavesData);
   const matches = [...fixtureMatches, ...llavesMatches];
   if (!matches.length) return { cruces: [], fechaFixture: null };
   const automation = computeNextAutomation(matches);
