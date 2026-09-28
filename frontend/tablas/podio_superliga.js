@@ -9,6 +9,10 @@ const CATEGORY_CONFIG = {
       { id: 's2', legs: 2 }
     ],
     images: {
+      'TAKOS PRO|ALBA|VICTORIA': 'podio_takos_alba_victoria_2da_bola9.png',
+      'TAKOS PRO|ALBA|THE WEST': 'podio_takos_alba_thewest_2da_bola9.png',
+      'ALBA|TAKOS PRO|VICTORIA': 'podio_alba_takos_victoria_2da_bola9.png',
+      'ALBA|TAKOS PRO|THE WEST': 'podio_alba_takos_thewest_2da_bola9.png',
       'EL TREBOL|MALENA|OLDIES': 'podio_trebol_malena_oldies_2da.png',
       'MALENA|EL TREBOL|OLDIES': 'podio_malena_trebol_oldies_2da.png',
       'MALENA|EL TREBOL|VICTORIA': 'podio_malena_trebol_victoria_2da.png',
