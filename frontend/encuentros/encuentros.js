@@ -138,7 +138,8 @@
     const teamMatch = teamPlayers.find(player => normalizePlayerName(player?.nombre || player?.name) === wanted);
     if (teamMatch) return teamMatch;
 
-    const data = await fetchJson(apiUrl('/api/players-public/search?q=' + encodeURIComponent(playerNameValue)), {
+    const params = new URLSearchParams({ q: playerNameValue, category: currentCategory });
+    const data = await fetchJson(apiUrl('/api/players-public/search?' + params.toString()), {
       cache: 'no-store',
       credentials: 'same-origin'
     }).catch(() => null);
@@ -180,10 +181,6 @@
   function openPlayerProfile(){
     const player = String(playerProfileButton?.dataset.player || '').trim();
     const category = String(playerProfileButton?.dataset.category || currentCategory).trim().toLowerCase();
-    if (category !== 'tercera') {
-      playerPhotoStatus.textContent = 'Ficha no disponible para esta categoría.';
-      return;
-    }
     if (!player || !playerProfileModal || !playerProfileFrame) {
       playerPhotoStatus.textContent = 'No se pudo identificar al jugador.';
       return;

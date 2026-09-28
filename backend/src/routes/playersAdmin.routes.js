@@ -292,6 +292,8 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         OR LOWER(e.slug_base) = $1
         OR LOWER(e.display_name) = $1
         OR LOWER(a.alias_slug) = $1
+        OR REGEXP_REPLACE(LOWER(e.display_name), '[^a-z0-9]+', '', 'g') = REGEXP_REPLACE($1, '[^a-z0-9]+', '', 'g')
+        OR REGEXP_REPLACE(LOWER(a.alias_slug), '[^a-z0-9]+', '', 'g') = REGEXP_REPLACE($1, '[^a-z0-9]+', '', 'g')
       )
       ${divisionFilter}
       ORDER BY e.display_name ASC
