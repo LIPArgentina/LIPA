@@ -33,6 +33,7 @@ const TEAM_ALIASES = {
 
 const state = {
   category: 'tercera',
+  adminPreview: false,
   allPlanillas: [],
   completeSheets: []
 };
@@ -124,6 +125,15 @@ async function checkCrucesEnabled(category){
   const data = await fetchJson(`${API_BASE}/api/cruces/status?` + params.toString(), { cache: 'no-store' });
 
   return !!data?.enabled;
+}
+
+async function authorizeAdminPreview(category){
+  return await fetchJson(`${API_BASE}/api/cruces/generate-planillas`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category, preview: true })
+  });
 }
 
 
@@ -745,7 +755,9 @@ async function reload(){
   try {
     await sleep(150);
     const enabled = await checkCrucesEnabled(category);
-    if (!enabled) {
+    if (!enabled && state.adminPreview) {
+      await authorizeAdminPreview(category);
+    } else if (!enabled) {
       state.completeSheets = [];
       renderEmpty('Los cruces de ' + categoryLabel(category) + ' no están habilitados en este momento.');
       setStatus('warn', 'Cruces no habilitados', 'No se encontró habilitación activa.');
@@ -776,7 +788,7 @@ async function reload(){
     setStatus(
       totalCompletos ? 'ok' : 'warn',
       totalCompletos
-        ? ('Se encontraron ' + totalCompletos + ' planilla' + (totalCompletos === 1 ? '' : 's') + ' completa' + (totalCompletos === 1 ? '' : 's'))
+        ? ((state.adminPreview && !enabled ? 'Vista previa administrativa: se encontraron ' : 'Se encontraron ') + totalCompletos + ' planilla' + (totalCompletos === 1 ? '' : 's') + ' completa' + (totalCompletos === 1 ? '' : 's'))
         : 'No hay cruces completos todavía',
       (selectedKind === 'llaves' ? 'Llaves usadas: ' : 'Fixture usado: ') + selectedKind.toUpperCase() +
       ' · Fecha: ' + selectedDate +
@@ -811,7 +823,9 @@ function wireToolbar(){
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const requestedCategory = String(new URLSearchParams(window.location.search).get('category') || '').toLowerCase();
+  const params = new URLSearchParams(window.location.search);
+  const requestedCategory = String(params.get('category') || '').toLowerCase();
+  state.adminPreview = params.get('adminPreview') === '1';
   if (CATEGORY_KEYS[requestedCategory]) state.category = requestedCategory;
   document.querySelectorAll('[data-category]').forEach((button) => {
     button.classList.toggle('active', button.dataset.category === state.category);

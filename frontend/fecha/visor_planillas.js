@@ -673,11 +673,11 @@ function authHeaders(extra = {}){
           method:'POST',
           credentials:'include',
           headers:authHeaders({ 'Content-Type':'application/json' }),
-          body:JSON.stringify({ category })
+          body:JSON.stringify({ category, preview:true })
         });
         const data = await response.json().catch(() => ({}));
         if(!response.ok) throw new Error(data.error || `Error HTTP ${response.status}`);
-        window.location.assign(`${destination}?category=${encodeURIComponent(category)}`);
+        window.location.assign(`${destination}?category=${encodeURIComponent(category)}&adminPreview=1`);
       }catch(error){
         showAlert(error.message || 'No se pudieron preparar las planillas.');
         link.dataset.loading = 'false';

@@ -731,6 +731,7 @@ router.post('/automation', requireAdmin, async (req, res) => {
 router.post('/generate-planillas', requireAdmin, async (req, res) => {
   try {
     const category = String(req.body?.category || '').trim().toLowerCase();
+    const preview = req.body?.preview === true;
     if (!['segunda', 'tercera'].includes(category)) {
       return res.status(400).json({ ok: false, error: 'Categoría inválida.' });
     }
@@ -740,15 +741,27 @@ router.post('/generate-planillas', requireAdmin, async (req, res) => {
     const automation = await fetchAutomationFixtureInfo(team);
     const enabled = !!config.manual_enabled
       || (!!config.automation_enabled && !!automation.scheduledEnabled);
-    if (!enabled) {
+    if (!enabled && !preview) {
       return res.status(409).json({
         ok: false,
         error: `Los cruces de ${category} todavía no están habilitados.`
       });
     }
 
-    const generated = await generateEmptyPlanillasForCategory(category);
-    return res.json({ ok: true, category, generated, generatedCount: generated.length });
+    // Antes del horario de liberación, el administrador puede previsualizar
+    // únicamente los cruces que ya tengan ambas planillas. No completamos las
+    // planillas faltantes hasta que la categoría esté realmente habilitada.
+    const generated = enabled
+      ? await generateEmptyPlanillasForCategory(category)
+      : [];
+    return res.json({
+      ok: true,
+      category,
+      preview: !enabled,
+      enabled,
+      generated,
+      generatedCount: generated.length
+    });
   } catch (err) {
     console.error('POST /api/cruces/generate-planillas', err);
     return res.status(500).json({ ok: false, error: 'No se pudieron preparar las planillas para generar los cruces.' });
