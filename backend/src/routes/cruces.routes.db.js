@@ -2803,6 +2803,19 @@ function fixtureHasScheduledMatch(rows = [], { fechaISO, localSlug, visitanteSlu
   });
 }
 
+function llavesHasScheduledMatch(data, { fechaISO, localSlug, visitanteSlug } = {}) {
+  const dateKey = normalizeDateOnly(fechaISO);
+  const localKey = normalizeTeamIdentity(localSlug);
+  const visitanteKey = normalizeTeamIdentity(visitanteSlug);
+  if (!dateKey || !localKey || !visitanteKey) return false;
+
+  return extractCrucesFromLlaves(data).some((match) => (
+    normalizeDateOnly(match.date) === dateKey &&
+    normalizeTeamIdentity(match.local) === localKey &&
+    normalizeTeamIdentity(match.visitante) === visitanteKey
+  ));
+}
+
 router.post('/manual-save', requireAdmin, async (req, res) => {
   const client = await pool.connect();
   let transactionOpen = false;
@@ -2827,16 +2840,37 @@ router.post('/manual-save', requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: statusError });
     }
 
-    const fixtureResult = await client.query(
-      `SELECT kind, data
-       FROM fixtures
-       WHERE category = $1 AND edicion = $2 AND kind IN ('ida', 'vuelta')`,
-      [category, edition]
+    const [fixtureResult, llavesResult] = await Promise.all([
+      client.query(
+        `SELECT kind, data
+         FROM fixtures
+         WHERE category = $1 AND edicion = $2 AND kind IN ('ida', 'vuelta')`,
+        [category, edition]
+      ),
+      client.query(
+        `SELECT data
+         FROM llaves_data
+         WHERE category = $1 AND edicion = $2
+         LIMIT 1`,
+        [category, edition]
+      )
+    ]);
+    const rawLlavesData = llavesResult.rows[0]?.data || null;
+    const resolvedLlavesData = rawLlavesData && ['segunda', 'tercera'].includes(category)
+      ? await buildLlavesAutoData(rawLlavesData, category, edition)
+      : rawLlavesData;
+    const existsInFixture = fixtureHasScheduledMatch(
+      fixtureResult.rows,
+      { fechaISO, localSlug, visitanteSlug }
     );
-    if (!fixtureHasScheduledMatch(fixtureResult.rows, { fechaISO, localSlug, visitanteSlug })) {
+    const existsInLlaves = llavesHasScheduledMatch(
+      resolvedLlavesData,
+      { fechaISO, localSlug, visitanteSlug }
+    );
+    if (!existsInFixture && !existsInLlaves) {
       return res.status(400).json({
         ok: false,
-        error: 'Ese partido no existe en el fixture de la categoría, edición y fecha seleccionadas.'
+        error: 'Ese partido no existe en el fixture ni en las llaves de la categoría, edición y fecha seleccionadas.'
       });
     }
 

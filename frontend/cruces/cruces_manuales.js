@@ -154,6 +154,32 @@
     return matches.sort((a, b) => a.date.localeCompare(b.date) || a.group.localeCompare(b.group));
   }
 
+  function extractLlavesSchedule(data) {
+    const matches = [];
+    (Array.isArray(data?.rounds) ? data.rounds : []).forEach((round) => {
+      (Array.isArray(round?.legs) ? round.legs : []).forEach((leg) => {
+        const date = String(leg?.date || '').slice(0, 10);
+        const localName = String(leg?.home?.team || '').trim();
+        const visitanteName = String(leg?.away?.team || '').trim();
+        if (!date || !localName || !visitanteName) return;
+        if (normalizeIdentity(localName) === 'wo' || normalizeIdentity(visitanteName) === 'wo') return;
+        const local = teamForFixtureName(localName);
+        const visitante = teamForFixtureName(visitanteName);
+        matches.push({
+          date,
+          kind: 'llaves',
+          group: String(round?.title || round?.id || 'Llaves'),
+          roundId: String(round?.id || ''),
+          localSlug: local.slug,
+          localName: local.name,
+          visitanteSlug: visitante.slug,
+          visitanteName: visitante.name
+        });
+      });
+    });
+    return matches.sort((a, b) => a.date.localeCompare(b.date) || a.group.localeCompare(b.group));
+  }
+
   function matchKey(match) {
     return `${normalizeIdentity(match?.localSlug || match?.localName)}::${normalizeIdentity(match?.visitanteSlug || match?.visitanteName)}`;
   }
@@ -168,6 +194,13 @@
     const results = state.resultsByDate.get(match?.date) || [];
     const key = matchKey(match);
     return results.find((result) => matchKey(result) === key) || null;
+  }
+
+  function matchContextLabel(match) {
+    if (!match?.group) return '';
+    return match.kind === 'llaves'
+      ? `${String(match.group).toUpperCase()} · `
+      : `GRUPO ${match.group} · `;
   }
 
   async function loadResultsForDate(date) {
@@ -189,7 +222,7 @@
       const loaded = !!resultForMatch(match);
       const option = document.createElement('option');
       option.value = matchKey(match);
-      option.textContent = `${match.group ? `GRUPO ${match.group} · ` : ''}${match.localName} vs ${match.visitanteName}${match.reprogrammed ? ` · REPROGRAMADO (ORIGINAL ${dateLabel(match.originalDate)})` : ''}${loaded ? ' · CARGADO' : ''}`;
+      option.textContent = `${matchContextLabel(match)}${match.localName} vs ${match.visitanteName}${match.reprogrammed ? ` · REPROGRAMADO (ORIGINAL ${dateLabel(match.originalDate)})` : ''}${loaded ? ' · CARGADO' : ''}`;
       option.dataset.loaded = String(loaded);
       select.appendChild(option);
     });
@@ -209,6 +242,13 @@
       option.textContent = `${dateLabel(date)} · ${kinds.map((kind) => kind.toUpperCase()).join(' / ')}${reprogrammedMatches.length ? ` · REPROGRAMADO (ORIGINAL ${dateLabel(reprogrammedMatches[0].originalDate)})` : ''}`;
       select.appendChild(option);
     });
+    if (dates.length) {
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date());
+      select.value = dates.includes(today) ? today : dates[dates.length - 1];
+    }
   }
 
   async function loadSearchData() {
@@ -221,17 +261,23 @@
     state.loadedResult = null;
 
     try {
-      const [teamsData, ida, vuelta] = await Promise.all([
+      const [teamsData, ida, vuelta, llaves] = await Promise.all([
         fetchJson(`/api/teams?division=${encodeURIComponent(category)}`),
         fetchJson(`/api/fixture?kind=ida&category=${encodeURIComponent(category)}&edition=${edition}`),
-        fetchJson(`/api/fixture?kind=vuelta&category=${encodeURIComponent(category)}&edition=${edition}`)
+        fetchJson(`/api/fixture?kind=vuelta&category=${encodeURIComponent(category)}&edition=${edition}`),
+        category === 'primera'
+          ? Promise.resolve({ data: null })
+          : fetchJson(`/api/llaves?category=${encodeURIComponent(category)}&edition=${edition}`)
       ]);
       const rawTeams = Array.isArray(teamsData) ? teamsData : (teamsData?.teams || teamsData?.users || []);
       state.teams = rawTeams.map(normalizeTeam);
-      state.schedule = extractSchedule([
+      state.schedule = [
+        ...extractSchedule([
         { kind: 'ida', data: ida?.data || {} },
         { kind: 'vuelta', data: vuelta?.data || {} }
-      ]);
+        ]),
+        ...extractLlavesSchedule(llaves?.data || null)
+      ].sort((a, b) => a.date.localeCompare(b.date) || a.group.localeCompare(b.group));
       fillDateOptions();
       await refreshMatchOptions();
       setStatus(state.schedule.length
@@ -547,7 +593,7 @@
     $('#fixtureMatch').innerHTML = '';
     matches.forEach((match) => {
       const option = new Option(
-        `${match.group ? `GRUPO ${match.group} · ` : ''}${match.localName} vs ${match.visitanteName}${resultForMatch(match) ? ' · CARGADO' : ''}`,
+        `${matchContextLabel(match)}${match.localName} vs ${match.visitanteName}${resultForMatch(match) ? ' · CARGADO' : ''}`,
         matchKey(match)
       );
       $('#fixtureMatch').add(option);
