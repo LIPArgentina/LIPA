@@ -387,7 +387,7 @@ async function exportTeamPlayers(){
     const data = await fetchJson(`/api/players-admin/team-file?category=${encodeURIComponent(category)}&team=${encodeURIComponent(team)}`);
     const players = Array.isArray(data.players) ? data.players : [];
     const lines = players.map(player => [
-      csvCell(player.nombre || player.name),
+      csvCell(String(player.nombre || player.name || '').replaceAll(',', ' ').replace(/\s+/g, ' ').trim()),
       csvCell(player.dni)
     ].join(', '));
     const blob = new Blob([`\uFEFF${lines.join('\r\n')}\r\n`], { type: 'text/csv;charset=utf-8' });
