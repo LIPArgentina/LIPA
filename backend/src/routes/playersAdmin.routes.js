@@ -1049,7 +1049,6 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
       const result = await pool.query(
         `SELECT DISTINCT ON (j.id)
-           j.id,
            j.nombre,
            COALESCE(j.dni, '') AS dni
          FROM jugador_equipos je
@@ -1086,28 +1085,18 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       if (!team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
 
       const rows = incomingRows.map((item, index) => {
-        const rawId = String(item?.id ?? '').trim();
-        const id = rawId ? Number(rawId) : null;
         return {
           row: Number(item?.row) || index + 2,
-          id: Number.isSafeInteger(id) && id > 0 ? id : null,
-          invalidId: !!rawId && !(Number.isSafeInteger(id) && id > 0),
           nombre: String(item?.nombre || item?.name || '').trim().replace(/\s+/g, ' '),
           dni: normalizeDni(item?.dni || '')
         };
       });
 
       const conflicts = [];
-      const usedIds = new Map();
       const usedDnis = new Map();
       rows.forEach((row) => {
-        if (row.invalidId) conflicts.push({ row: row.row, message: 'El ID no es válido.' });
         if (!row.nombre) conflicts.push({ row: row.row, message: 'Falta nombre y apellido.' });
-        if (!row.id && !row.dni) conflicts.push({ row: row.row, message: 'Un jugador nuevo debe tener DNI.' });
-        if (row.id) {
-          if (usedIds.has(row.id)) conflicts.push({ row: row.row, message: `El ID ${row.id} está repetido (también figura en la fila ${usedIds.get(row.id)}).` });
-          else usedIds.set(row.id, row.row);
-        }
+        if (!row.dni) conflicts.push({ row: row.row, message: 'Falta DNI.' });
         if (row.dni) {
           if (usedDnis.has(row.dni)) conflicts.push({ row: row.row, message: `El DNI ${row.dni} está repetido (también figura en la fila ${usedDnis.get(row.dni)}).` });
           else usedDnis.set(row.dni, row.row);
@@ -1119,17 +1108,21 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
       await client.query('BEGIN');
       transactionOpen = true;
-      const ids = rows.map(row => row.id).filter(Boolean);
       const dnis = rows.map(row => row.dni).filter(Boolean);
       const playersResult = await client.query(
         `SELECT id, nombre, COALESCE(dni, '') AS dni
            FROM jugadores
-          WHERE id = ANY($1::int[])
-             OR COALESCE(dni, '') = ANY($2::text[])
+          WHERE COALESCE(dni, '') = ANY($1::text[])
+             OR id IN (
+               SELECT jugador_id
+                 FROM jugador_equipos
+                WHERE equipo_id = $2
+                  AND categoria = $3
+                  AND activo = true
+             )
           FOR UPDATE`,
-        [ids, dnis]
+        [dnis, team.id, category]
       );
-      const playersById = new Map(playersResult.rows.map(player => [Number(player.id), player]));
       const playersByDni = new Map();
       playersResult.rows.forEach((player) => {
         const dni = normalizeDni(player.dni || '');
@@ -1156,21 +1149,32 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         if (!associationsByPlayer.has(playerId)) associationsByPlayer.set(playerId, []);
         associationsByPlayer.get(playerId).push(association);
       });
+      const currentPlayersByName = new Map();
+      playersResult.rows.forEach((player) => {
+        const associations = associationsByPlayer.get(Number(player.id)) || [];
+        const belongsToSelectedTeam = associations.some(association =>
+          normalizeCategory(association.categoria) === category && Number(association.equipo_id) === Number(team.id)
+        );
+        if (!belongsToSelectedTeam) return;
+        const nameKey = normalizeText(player.nombre || '');
+        if (!nameKey) return;
+        if (!currentPlayersByName.has(nameKey)) currentPlayersByName.set(nameKey, []);
+        currentPlayersByName.get(nameKey).push(player);
+      });
 
       const planned = [];
       for (const row of rows) {
-        if (row.id) {
-          const player = playersById.get(row.id);
-          if (!player) {
-            conflicts.push({ row: row.row, message: `No existe el jugador con ID ${row.id}.` });
-            continue;
-          }
-          const dniOwners = row.dni ? (playersByDni.get(row.dni) || []) : [];
-          if (dniOwners.some(owner => Number(owner.id) !== row.id)) {
-            conflicts.push({ row: row.row, message: `El DNI ${row.dni} pertenece a otro jugador.` });
-            continue;
-          }
-          const associations = associationsByPlayer.get(row.id) || [];
+        const dniOwners = playersByDni.get(row.dni) || [];
+        if (dniOwners.length > 1) {
+          conflicts.push({
+            row: row.row,
+            message: `El DNI ${row.dni} está asociado a más de un registro interno.`
+          });
+          continue;
+        }
+        if (dniOwners.length === 1) {
+          const playerId = Number(dniOwners[0].id);
+          const associations = associationsByPlayer.get(playerId) || [];
           const selectedAssociation = associations.find(association =>
             normalizeCategory(association.categoria) === category && Number(association.equipo_id) === Number(team.id)
           );
@@ -1179,25 +1183,40 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
             conflicts.push({
               row: row.row,
               message: categoryAssociation
-                ? `El jugador con ID ${row.id} está activo en ${categoryDisplayName(category)} con ${categoryAssociation.equipo}.`
-                : `El jugador con ID ${row.id} no pertenece actualmente a este equipo y categoría.`
+                ? `El DNI ${row.dni} pertenece a un jugador activo en ${categoryDisplayName(category)} con ${categoryAssociation.equipo}.`
+                : `El DNI ${row.dni} ya pertenece a otro jugador o a otra categoría.`
             });
             continue;
           }
-          planned.push({ type: 'update', row, playerId: row.id });
+          planned.push({ type: 'update', row, playerId });
           continue;
         }
-
-        const dniOwners = playersByDni.get(row.dni) || [];
-        if (dniOwners.length) {
+        const sameNamePlayers = currentPlayersByName.get(normalizeText(row.nombre)) || [];
+        if (sameNamePlayers.length > 1) {
           conflicts.push({
             row: row.row,
-            message: `El DNI ${row.dni} ya existe con ID ${dniOwners.map(owner => owner.id).join(', ')}. Conservá ese ID en el archivo o revisá el jugador.`
+            message: `Hay más de un jugador llamado ${row.nombre} en el equipo y no se puede determinar a cuál corresponde el nuevo DNI.`
           });
+          continue;
+        }
+        if (sameNamePlayers.length === 1) {
+          planned.push({ type: 'update', row, playerId: Number(sameNamePlayers[0].id) });
           continue;
         }
         planned.push({ type: 'create', row });
       }
+
+      const plannedPlayerRows = new Map();
+      planned.filter(item => item.type === 'update').forEach((item) => {
+        if (plannedPlayerRows.has(item.playerId)) {
+          conflicts.push({
+            row: item.row.row,
+            message: `La fila corresponde al mismo jugador que la fila ${plannedPlayerRows.get(item.playerId)}.`
+          });
+        } else {
+          plannedPlayerRows.set(item.playerId, item.row.row);
+        }
+      });
 
       if (conflicts.length) {
         await client.query('ROLLBACK');
@@ -1233,7 +1252,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
             `UPDATE jugadores
                 SET nombre = $1,
                     nombre_normalizado = $2,
-                    dni = CASE WHEN $3 <> '' THEN $3 ELSE dni END,
+                    dni = $3,
                     updated_at = NOW()
               WHERE id = $4`,
             [item.row.nombre, normalizeText(item.row.nombre), item.row.dni, item.playerId]

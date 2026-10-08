@@ -376,8 +376,9 @@ function selectedTeamContext(){
   return { category, team, teamName };
 }
 
-function tsvCell(value){
-  return String(value ?? '').replace(/[\t\r\n]+/g, ' ').trim();
+function csvCell(value){
+  const text = String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
+  return /[",]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 async function exportTeamPlayers(){
@@ -385,15 +386,11 @@ async function exportTeamPlayers(){
     const { category, team, teamName } = selectedTeamContext();
     const data = await fetchJson(`/api/players-admin/team-file?category=${encodeURIComponent(category)}&team=${encodeURIComponent(team)}`);
     const players = Array.isArray(data.players) ? data.players : [];
-    const lines = [
-      ['ID', 'Nombre y apellido', 'DNI'].join('\t'),
-      ...players.map(player => [
-        tsvCell(player.id),
-        tsvCell(player.nombre || player.name),
-        tsvCell(player.dni)
-      ].join('\t'))
-    ];
-    const blob = new Blob([`\uFEFF${lines.join('\r\n')}\r\n`], { type: 'text/tab-separated-values;charset=utf-8' });
+    const lines = players.map(player => [
+      csvCell(player.nombre || player.name),
+      csvCell(player.dni)
+    ].join(','));
+    const blob = new Blob([`\uFEFF${lines.join('\r\n')}\r\n`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -441,18 +438,9 @@ function normalizeHeader(value){
 function parseTeamImport(text){
   const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   if (!lines.length) throw new Error('El archivo está vacío.');
-  const sample = lines[0];
-  const delimiter = ['\t', ';', ','].find(char => sample.includes(char)) || null;
-  const split = line => {
-    if (delimiter) return parseDelimitedLine(line, delimiter);
-    const idAndRest = line.match(/^\s*(\d+)\s+(.+?)\s+(\d+)\s*$/);
-    if (idAndRest) return [idAndRest[1], idAndRest[2], idAndRest[3]];
-    const nameAndDni = line.match(/^\s*(.+?)\s+(\d+)\s*$/);
-    return nameAndDni ? ['', nameAndDni[1], nameAndDni[2]] : [line];
-  };
+  const split = line => parseDelimitedLine(line, ',');
   const first = split(lines[0]);
   const headers = first.map(normalizeHeader);
-  const idIndex = headers.findIndex(value => value === 'id' || value === 'jugadorid');
   const nameIndex = headers.findIndex(value => ['nombre', 'nombreyapellido', 'jugador'].includes(value));
   const dniIndex = headers.findIndex(value => value === 'dni' || value === 'documento');
   const hasHeader = nameIndex >= 0 && dniIndex >= 0;
@@ -463,14 +451,12 @@ function parseTeamImport(text){
     if (hasHeader) {
       return {
         row: rowNumber,
-        id: idIndex >= 0 ? cells[idIndex] || '' : '',
         nombre: cells[nameIndex] || '',
         dni: cells[dniIndex] || ''
       };
     }
-    if (cells.length >= 3) return { row: rowNumber, id: cells[0], nombre: cells.slice(1, -1).join(delimiter || ' '), dni: cells.at(-1) };
-    if (cells.length === 2) return { row: rowNumber, id: '', nombre: cells[0], dni: cells[1] };
-    return { row: rowNumber, id: '', nombre: '', dni: '' };
+    if (cells.length === 2) return { row: rowNumber, nombre: cells[0], dni: cells[1] };
+    return { row: rowNumber, nombre: '', dni: '' };
   });
   if (!rows.length) throw new Error('El archivo no contiene jugadores.');
   return rows;
