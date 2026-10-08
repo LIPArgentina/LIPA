@@ -6,7 +6,7 @@
 
 .players-toolbar{
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:minmax(300px, .8fr) minmax(660px, 1.2fr);
   gap:14px;
   margin-bottom:16px;
 }
@@ -35,7 +35,13 @@
 }
 
 .search-line--team{
-  grid-template-columns:110px 1fr auto;
+  grid-template-columns:90px minmax(180px, 1fr) auto auto auto;
+}
+
+.search-line--team .btn{
+  padding-left:14px;
+  padding-right:14px;
+  white-space:nowrap;
 }
 
 .players-layout{

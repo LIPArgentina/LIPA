@@ -6,7 +6,7 @@
   <title>Administración de jugadores</title>
   <link rel="stylesheet" href="../admin.css">
   <link rel="stylesheet" href="../photo-cropper.css">
-  <link rel="stylesheet" href="jugadores_admin.css?v=category-choice-1">
+  <link rel="stylesheet" href="jugadores_admin.css?v=team-import-export-1">
 </head>
 <body>
   <header class="site-header">
@@ -40,6 +40,9 @@
           </select>
           <select id="teamSearch" class="input" required></select>
           <button class="btn btn-gold" type="submit">Ver equipo</button>
+          <button id="btnExportTeam" class="btn" type="button">Exportar</button>
+          <button id="btnImportTeam" class="btn" type="button">Importar</button>
+          <input id="teamImportFile" type="file" accept=".txt,.csv,text/plain,text/csv" hidden>
         </div>
       </form>
     </section>
@@ -148,6 +151,6 @@
 
   <script src="../config.js?v=renewable-session-1"></script>
   <script src="../photo-cropper.js"></script>
-  <script src="jugadores_admin.js?v=category-direction-1"></script>
+  <script src="jugadores_admin.js?v=team-import-export-1"></script>
 </body>
 </html>

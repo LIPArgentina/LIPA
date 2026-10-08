@@ -315,7 +315,11 @@ async function fetchJson(path, options = {}){
       : authHeaders({ ...(options.headers || {}) }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ok === false) throw new Error(data.error || data.msg || `HTTP ${res.status}`);
+  if (!res.ok || data.ok === false) {
+    const error = new Error(data.error || data.msg || `HTTP ${res.status}`);
+    error.data = data;
+    throw error;
+  }
   return data;
 }
 
@@ -359,6 +363,146 @@ async function searchByTeam(ev){
   } catch (err) {
     renderPlayers([], { mode: 'team' });
     toast(err.message || 'No se pudo buscar el equipo');
+  }
+}
+
+function selectedTeamContext(){
+  const category = $('#teamCategory')?.value || '';
+  const team = $('#teamSearch')?.value?.trim() || '';
+  const teamName = $('#teamSearch')?.selectedOptions?.[0]?.textContent?.trim() || '';
+  if (!team || team === UNASSIGNED_TEAM_VALUE) {
+    throw new Error('Elegí un equipo antes de importar o exportar.');
+  }
+  return { category, team, teamName };
+}
+
+function tsvCell(value){
+  return String(value ?? '').replace(/[\t\r\n]+/g, ' ').trim();
+}
+
+async function exportTeamPlayers(){
+  try {
+    const { category, team, teamName } = selectedTeamContext();
+    const data = await fetchJson(`/api/players-admin/team-file?category=${encodeURIComponent(category)}&team=${encodeURIComponent(team)}`);
+    const players = Array.isArray(data.players) ? data.players : [];
+    const lines = [
+      ['ID', 'Nombre y apellido', 'DNI'].join('\t'),
+      ...players.map(player => [
+        tsvCell(player.id),
+        tsvCell(player.nombre || player.name),
+        tsvCell(player.dni)
+      ].join('\t'))
+    ];
+    const blob = new Blob([`\uFEFF${lines.join('\r\n')}\r\n`], { type: 'text/tab-separated-values;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `jugadores-${slugify(teamName || team)}-${category}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`Se exportaron ${players.length} jugadores`);
+  } catch (err) {
+    toast(err.message || 'No se pudo exportar el equipo');
+  }
+}
+
+function parseDelimitedLine(line, delimiter){
+  const cells = [];
+  let current = '';
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === '"') {
+      if (quoted && line[index + 1] === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === delimiter && !quoted) {
+      cells.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function normalizeHeader(value){
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function parseTeamImport(text){
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  if (!lines.length) throw new Error('El archivo está vacío.');
+  const sample = lines[0];
+  const delimiter = ['\t', ';', ','].find(char => sample.includes(char)) || null;
+  const split = line => {
+    if (delimiter) return parseDelimitedLine(line, delimiter);
+    const idAndRest = line.match(/^\s*(\d+)\s+(.+?)\s+(\d+)\s*$/);
+    if (idAndRest) return [idAndRest[1], idAndRest[2], idAndRest[3]];
+    const nameAndDni = line.match(/^\s*(.+?)\s+(\d+)\s*$/);
+    return nameAndDni ? ['', nameAndDni[1], nameAndDni[2]] : [line];
+  };
+  const first = split(lines[0]);
+  const headers = first.map(normalizeHeader);
+  const idIndex = headers.findIndex(value => value === 'id' || value === 'jugadorid');
+  const nameIndex = headers.findIndex(value => ['nombre', 'nombreyapellido', 'jugador'].includes(value));
+  const dniIndex = headers.findIndex(value => value === 'dni' || value === 'documento');
+  const hasHeader = nameIndex >= 0 && dniIndex >= 0;
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+  const rows = dataLines.map((line, index) => {
+    const cells = split(line);
+    const rowNumber = index + (hasHeader ? 2 : 1);
+    if (hasHeader) {
+      return {
+        row: rowNumber,
+        id: idIndex >= 0 ? cells[idIndex] || '' : '',
+        nombre: cells[nameIndex] || '',
+        dni: cells[dniIndex] || ''
+      };
+    }
+    if (cells.length >= 3) return { row: rowNumber, id: cells[0], nombre: cells.slice(1, -1).join(delimiter || ' '), dni: cells.at(-1) };
+    if (cells.length === 2) return { row: rowNumber, id: '', nombre: cells[0], dni: cells[1] };
+    return { row: rowNumber, id: '', nombre: '', dni: '' };
+  });
+  if (!rows.length) throw new Error('El archivo no contiene jugadores.');
+  return rows;
+}
+
+async function importTeamFile(file){
+  const { category, team, teamName } = selectedTeamContext();
+  const rows = parseTeamImport(await file.text());
+  if (!confirm(`Se procesarán ${rows.length} filas para ${teamName}.\n\nLos jugadores omitidos no serán eliminados. ¿Continuar?`)) return;
+  const data = await fetchJson('/api/players-admin/import-team', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category, team, rows })
+  });
+  toast(`Importación completa: ${data.created || 0} nuevos y ${data.updated || 0} actualizados`);
+  await searchByTeam();
+}
+
+async function handleTeamImportChange(){
+  const input = $('#teamImportFile');
+  const file = input?.files?.[0];
+  if (!file) return;
+  try {
+    await importTeamFile(file);
+  } catch (err) {
+    const conflicts = Array.isArray(err?.data?.conflicts) ? err.data.conflicts : [];
+    const detail = conflicts.length
+      ? `\n\n${conflicts.slice(0, 12).map(item => `Fila ${item.row}: ${item.message}`).join('\n')}`
+      : '';
+    alert(`${err.message || 'No se pudo importar el equipo'}${detail}`);
+  } finally {
+    input.value = '';
   }
 }
 
@@ -556,6 +700,16 @@ $('#btnClearForm')?.addEventListener('click', clearForm);
 $('#btnCloseHistory')?.addEventListener('click', () => $('#historyDialog')?.close());
 $('#playerCategory')?.addEventListener('change', () => refreshPlayerTeams());
 $('#teamCategory')?.addEventListener('change', () => refreshSearchTeams());
+$('#btnExportTeam')?.addEventListener('click', exportTeamPlayers);
+$('#btnImportTeam')?.addEventListener('click', () => {
+  try {
+    selectedTeamContext();
+    $('#teamImportFile')?.click();
+  } catch (err) {
+    toast(err.message || 'Elegí un equipo');
+  }
+});
+$('#teamImportFile')?.addEventListener('change', handleTeamImportChange);
 
 clearForm();
 refreshSearchTeams();
