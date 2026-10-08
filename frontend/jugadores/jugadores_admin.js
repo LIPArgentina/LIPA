@@ -389,7 +389,7 @@ async function exportTeamPlayers(){
     const lines = players.map(player => [
       csvCell(player.nombre || player.name),
       csvCell(player.dni)
-    ].join(','));
+    ].join(', '));
     const blob = new Blob([`\uFEFF${lines.join('\r\n')}\r\n`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
