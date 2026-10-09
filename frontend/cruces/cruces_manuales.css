@@ -206,6 +206,14 @@ input,select{
   letter-spacing:.06em;
   font-size:8px;
 }
+.planilla-subgroup-title{
+  margin:7px 0 4px;
+  text-align:center;
+  color:var(--accent);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
 .row{
   display:grid;
   grid-template-columns:20px 46% 38px;
@@ -317,6 +325,16 @@ input,select{
   outline:2px solid var(--ok);
   outline-offset:1px;
   background:#c8ffb8;
+}
+.player-select.substitution-in{
+  outline:2px solid var(--ok);
+  outline-offset:1px;
+  background:#c8ffb8;
+}
+.player-select.substitution-out{
+  outline:2px solid var(--danger);
+  outline-offset:1px;
+  background:#ffb6b6;
 }
 
 @media (max-width: 900px){

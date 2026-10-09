@@ -29,12 +29,13 @@
         substituteCount: 2
       };
     }
+    const category = String($('#categoria')?.value || '').toLowerCase();
     return {
       individualCount: Number(FORMAT.individualCount || 11),
       pairCount: Number(FORMAT.pairCount || 0),
       pairSize: Number(FORMAT.pairSize || 2),
       captainCount: Number(FORMAT.captainCount || 2),
-      substituteCount: Number(FORMAT.substituteCount || 2)
+      substituteCount: category === 'segunda' ? 3 : Number(FORMAT.substituteCount || 2)
     };
   }
 
@@ -296,9 +297,23 @@
     const key = `${$('#categoria').value}::${teamSlug}`;
     if (state.rosterCache.has(key)) return state.rosterCache.get(key);
     const data = await fetchJson(`/api/team-assets?team=${encodeURIComponent(teamSlug)}`);
-    const players = Array.isArray(data?.players) ? data.players.map(String) : [];
-    state.rosterCache.set(key, players);
-    return players;
+    const secondNames = Array.isArray(data?.players) ? data.players.map(String) : [];
+    let firstNames = [];
+    if ($('#categoria').value === 'segunda') {
+      const query = new URLSearchParams({ category: 'primera', team: teamSlug });
+      const firstData = await fetchJson(`/api/players-public/by-team?${query}`).catch(() => ({ players: [] }));
+      firstNames = (Array.isArray(firstData?.players) ? firstData.players : [])
+        .map(player => String(player?.nombre || player?.name || '').trim())
+        .filter(Boolean);
+    }
+    const unique = values => [...new Map(values.filter(Boolean).map(name => [normalizeIdentity(name), name])).values()];
+    const roster = {
+      firstNames: unique(firstNames),
+      secondNames: unique(secondNames),
+      allNames: unique([...firstNames, ...secondNames])
+    };
+    state.rosterCache.set(key, roster);
+    return roster;
   }
 
   async function loadPublishedPlanillas() {
@@ -325,15 +340,22 @@
     })?.planilla || null;
   }
 
-  function pointsSelect() {
-    return `<div class="ptsbox"><select class="pts-select">${Array.from({ length: 7 }, (_, value) => `<option value="${value}">${value}</option>`).join('')}</select></div>`;
+  function scoreMaxFor(sectionKey, index) {
+    const category = String($('#categoria')?.value || '').toLowerCase();
+    if (category === 'segunda' && sectionKey === 'individuales' && index < 2) return 7;
+    const configured = Number(FORMAT?.scoreMaxByCategory?.[category]);
+    return Number.isFinite(configured) ? configured : 6;
   }
 
-  function playerSelect(players) {
-    return `<select class="player-select"><option value="">— Seleccionar —</option>${players.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}</select>`;
+  function pointsSelect(maxScore) {
+    return `<div class="ptsbox"><select class="pts-select" data-max-score="${maxScore}">${Array.from({ length: maxScore + 1 }, (_, value) => `<option value="${value}">${value}</option>`).join('')}</select></div>`;
   }
 
-  function renderTeam(rootId, role, teamName, players, right = false) {
+  function playerSelect(players, allowedCategory = 'team') {
+    return `<select class="player-select" data-allowed-category="${allowedCategory}"><option value="">— Seleccionar —</option>${players.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}</select>`;
+  }
+
+  function renderTeam(rootId, role, teamName, roster, right = false) {
     const root = document.getElementById(rootId);
     const card = $('#cardTpl').content.firstElementChild.cloneNode(true);
     card.querySelector('.team-role').textContent = role;
@@ -346,18 +368,39 @@
     }
 
     const sectionsNode = card.querySelector('.sections');
+    const category = String($('#categoria')?.value || '').toLowerCase();
+    const allPlayers = Array.isArray(roster?.allNames) ? roster.allNames : [];
+    const secondPlayers = Array.isArray(roster?.secondNames) ? roster.secondNames : allPlayers;
     editorSections().forEach((section) => {
       const sectionNode = document.createElement('div');
       sectionNode.className = 'section';
       sectionNode.dataset.section = section.key;
       sectionNode.innerHTML = `<h3>${section.title}</h3>`;
       for (let index = 0; index < section.count; index += 1) {
+        if (category === 'segunda' && section.key === 'individuales' && (index === 0 || index === 2)) {
+          const subtitle = document.createElement('h4');
+          subtitle.className = 'planilla-subgroup-title';
+          subtitle.textContent = index === 0 ? 'PRIMERAS' : 'SEGUNDAS';
+          sectionNode.appendChild(subtitle);
+        }
+        if (category === 'segunda' && section.key === 'suplentes' && (index === 0 || index === 1)) {
+          const subtitle = document.createElement('h4');
+          subtitle.className = 'planilla-subgroup-title';
+          subtitle.textContent = index === 0 ? 'PRIMERAS' : 'SEGUNDAS';
+          sectionNode.appendChild(subtitle);
+        }
         const row = document.createElement('div');
         row.className = `row${right ? ' right' : ''}`;
         const badge = `<div class="badge">${index + 1}</div>`;
-        const field = `<div class="select-wrap">${playerSelect(players)}</div>`;
+        const secondOnly = category === 'segunda' && (
+          (section.key === 'individuales' && index >= 2) ||
+          (section.key === 'suplentes' && index >= 1)
+        );
+        const allowedCategory = secondOnly ? 'segunda' : (category === 'segunda' ? 'mixed' : 'team');
+        const players = secondOnly ? secondPlayers : allPlayers;
+        const field = `<div class="select-wrap">${playerSelect(players, allowedCategory)}</div>`;
         const score = section.score === true || (section.score === 'single' && index === 0)
-          ? pointsSelect() : '<div class="ptsbox hidden-box"></div>';
+          ? pointsSelect(scoreMaxFor(section.key, index)) : '<div class="ptsbox hidden-box"></div>';
         row.innerHTML = right ? `${score}${field}${badge}` : `${badge}${field}${score}`;
         sectionNode.appendChild(row);
       }
@@ -423,6 +466,19 @@
         if (!selectedSubstitute?.value || !select.value || selectedSubstitute.value === select.value) return;
         const outgoing = select.value;
         const incoming = selectedSubstitute.value;
+        const firstNames = new Set(
+          (state.rosterCache.get(`${$('#categoria').value}::${rootId === 'localRoot' ? $('#localTeam').value : $('#visitanteTeam').value}`)?.firstNames || [])
+            .map(normalizeIdentity)
+        );
+        if (
+          $('#categoria').value === 'segunda' &&
+          select.dataset.allowedCategory === 'segunda' &&
+          firstNames.has(normalizeIdentity(incoming))
+        ) {
+          setStatus('Un jugador de Primera no puede ingresar en un casillero de Segundas.', 'error');
+          select.value = outgoing;
+          return;
+        }
         const repeated = [...root.querySelectorAll('.section:not([data-section="suplentes"]):not([data-section="capitan"]) .player-select')]
           .filter((other) => other !== select && other.value === outgoing);
         select.value = incoming;
@@ -430,6 +486,12 @@
           repeated.forEach((other) => { other.value = incoming; });
         }
         selectedSubstitute.value = outgoing;
+        selectedSubstitute.classList.remove('bench-selected', 'substitution-in');
+        selectedSubstitute.classList.add('substitution-out');
+        select.classList.remove('substitution-out');
+        select.classList.add('substitution-in');
+        selectedSubstitute = null;
+        setStatus('Cambio aplicado: el jugador que entra está marcado en verde y el que sale en rojo.', 'ok');
       });
     });
   }
