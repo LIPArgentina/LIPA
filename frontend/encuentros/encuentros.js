@@ -696,6 +696,12 @@
         item.visitantePlanilla.substitutions = inferSubstitutions(visitanteOriginal, item.visitantePlanilla);
       }
     });
+    document.documentElement.dataset.substitutionRestore = JSON.stringify(
+      results.map(item => ({
+        local: item?.localPlanilla?.substitutions?.length || 0,
+        visitante: item?.visitantePlanilla?.substitutions?.length || 0
+      }))
+    );
   }
 
   async function init(){
