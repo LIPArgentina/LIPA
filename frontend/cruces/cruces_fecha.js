@@ -1485,6 +1485,10 @@ function apiUrl(path){
 
   const substitutionsByRoot = new WeakMap();
 
+  function getEffectiveSubstituteCount(){
+    return deriveCategory() === 'segunda' ? 3 : SUBSTITUTE_COUNT;
+  }
+
   function getSectionSlots(root, sectionKey){
     const wanted = String(sectionKey || '').toLowerCase();
     const section = Array.from(root.querySelectorAll('.section')).find(sec =>
@@ -1495,11 +1499,12 @@ function apiUrl(path){
 
   function normalizeSubstitutions(value){
     if (!Array.isArray(value)) return [];
-    return value.slice(0, SUBSTITUTE_COUNT).map(item => {
+    const substituteCount = getEffectiveSubstituteCount();
+    return value.slice(0, substituteCount).map(item => {
       const benchIndex = Number(item?.benchIndex);
       const fieldIndex = Number(item?.fieldIndex);
       const fieldSection = sectionKeyToPlanKey(item?.fieldSection || 'INDIVIDUALES');
-      if (!Number.isInteger(benchIndex) || benchIndex < 0 || benchIndex >= SUBSTITUTE_COUNT) return null;
+      if (!Number.isInteger(benchIndex) || benchIndex < 0 || benchIndex >= substituteCount) return null;
       if (!Number.isInteger(fieldIndex) || fieldIndex < 0 || fieldSection !== 'individuales') return null;
       return {
         benchIndex,
@@ -2961,7 +2966,7 @@ function isAndroidAppWebView(){
   }
 
   function buildExportSubsRows(items){
-    return safeArr(items, SUBSTITUTE_COUNT).map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join('');
+    return safeArr(items, getEffectiveSubstituteCount()).map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join('');
   }
 
   function buildExportSheetElement(){
