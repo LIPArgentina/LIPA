@@ -76,12 +76,18 @@ async function fetchWithAuth(url, options = {}) {
     ).join('');
     if (roster) {
       roster.innerHTML = `
-        <h2>CAPITANES</h2>
-        <div class="fila fila-capitan" draggable="true"><div class="numero">C1</div><div class="jugador"></div></div>
-        <div class="fila fila-capitan" draggable="true"><div class="numero">C2</div><div class="jugador"></div></div>
         <h2>JUGADORES</h2>
         <h3 class="roster-subtitle">PRIMERAS</h3>${makeRows(5, 'primera')}
         <h3 class="roster-subtitle">SEGUNDAS</h3>${makeRows(25, 'segunda')}`;
+    }
+    const planColumn = document.querySelector('.extra-column');
+    if (planColumn) {
+      planColumn.insertAdjacentHTML('afterbegin', `
+        <section class="second-captains-panel" aria-label="Capitanes del equipo de Primera">
+          <h2>CAPITANES</h2>
+          <div class="fila fila-capitan" draggable="true"><div class="numero">C1</div><div class="jugador"></div></div>
+          <div class="fila fila-capitan" draggable="true"><div class="numero">C2</div><div class="jugador"></div></div>
+        </section>`);
     }
     const makeSlots = (count, allowed, subgroup) => Array.from({ length: count }, (_, index) =>
       `<div class="fila-extra"><div class="white-box">${index + 1}</div><div class="yellow-box" data-player="" data-player-id="" data-player-category="" data-allowed-category="${allowed}" data-subgroup="${subgroup}" draggable="true"></div></div>`

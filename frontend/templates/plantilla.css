@@ -102,6 +102,18 @@ body {
     max-height:none;
   }
 
+  .second-captains-panel{
+    width:250px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin:0 0 8px;
+  }
+
+  .second-captains-panel h2{
+    margin:0 0 4px;
+  }
+
   #alert {
     position: fixed;
     top: 100px;
