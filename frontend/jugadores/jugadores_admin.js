@@ -277,9 +277,9 @@ function renderPlayers(players = [], { mode = currentResultsMode } = {}){
         <button class="btn btn-edit-player" type="button">Editar</button>
         <button class="btn btn-rename-player" type="button">Editar nombre</button>
         <button class="btn btn-history-player" type="button">Historial</button>
-        ${mode === 'unassigned'
-          ? '<button class="btn btn-delete-player" type="button">Eliminar</button>'
-          : (player.associationId ? '<button class="btn btn-deactivate-player" type="button">Quitar</button>' : '')}
+        ${player.associationId
+          ? '<button class="btn btn-deactivate-player" type="button">Quitar</button>'
+          : '<button class="btn btn-delete-player" type="button">Eliminar</button>'}
       </div>
     </article>
   `).join('');
@@ -672,7 +672,8 @@ async function deletePlayer(player){
     });
     toast('Jugador eliminado');
     clearForm();
-    searchByTeam();
+    if (currentResultsMode === 'players') await searchPlayers();
+    else await searchByTeam();
   } catch (err) {
     toast(err.message || 'No se pudo eliminar');
   }
