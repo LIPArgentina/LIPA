@@ -1236,26 +1236,24 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
             normalizeCategory(association.categoria) === category && Number(association.equipo_id) === Number(team.id)
           );
           const nameChanged = normalizeText(currentPlayer.nombre || '') !== normalizeText(row.nombre);
+          let shouldUpdateName = false;
           if (nameChanged) {
             const nameDecision = decisionFor(row, 'name');
-            if (!['update', 'skip'].includes(nameDecision)) {
+            if (!['update', 'keep'].includes(nameDecision)) {
               addReview(
                 row,
                 'name',
                 `El DNI ${row.dni} figura como ${currentPlayer.nombre}. El archivo dice ${row.nombre}.`,
                 [
                   { value: 'update', label: `Cambiar el nombre a ${row.nombre}` },
-                  { value: 'skip', label: 'Omitir esta fila y conservar el nombre anterior' }
+                  { value: 'keep', label: `Conservar el nombre registrado: ${currentPlayer.nombre}` }
                 ]
               );
             }
-            if (nameDecision === 'skip') {
-              planned.push({ type: 'skip', row, playerId });
-              continue;
-            }
+            shouldUpdateName = nameDecision === 'update';
           }
           if (selectedAssociation) {
-            planned.push({ type: nameChanged ? 'update_name' : 'noop', row, playerId });
+            planned.push({ type: shouldUpdateName ? 'update_name' : 'noop', row, playerId });
             continue;
           }
 
@@ -1278,7 +1276,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
               row,
               playerId,
               associationId: Number(categoryAssociation.id),
-              updateName: nameChanged
+              updateName: shouldUpdateName
             });
             continue;
           }
@@ -1313,12 +1311,12 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
               categoryMode: categoryDecision,
               row,
               playerId,
-              updateName: nameChanged
+              updateName: shouldUpdateName
             });
             continue;
           }
 
-          planned.push({ type: 'attach', row, playerId, updateName: nameChanged });
+          planned.push({ type: 'attach', row, playerId, updateName: shouldUpdateName });
           continue;
         }
         const sameNamePlayers = currentPlayersByName.get(normalizeText(row.nombre)) || [];
@@ -1332,18 +1330,18 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         if (sameNamePlayers.length === 1) {
           const currentPlayer = sameNamePlayers[0];
           const dniDecision = decisionFor(row, 'dni');
-          if (!['update', 'skip'].includes(dniDecision)) {
+          if (!['update', 'keep'].includes(dniDecision)) {
             addReview(
               row,
               'dni',
               `${row.nombre} ya está en el equipo con DNI ${currentPlayer.dni || 'sin registrar'}. El archivo indica ${row.dni}.`,
               [
                 { value: 'update', label: `Actualizar el DNI a ${row.dni}` },
-                { value: 'skip', label: 'Omitir esta fila y conservar el DNI anterior' }
+                { value: 'keep', label: `Conservar el DNI registrado: ${currentPlayer.dni || 'sin registrar'}` }
               ]
             );
           }
-          planned.push({ type: dniDecision === 'update' ? 'update_dni' : 'skip', row, playerId: Number(currentPlayer.id) });
+          planned.push({ type: dniDecision === 'update' ? 'update_dni' : 'noop', row, playerId: Number(currentPlayer.id) });
           continue;
         }
         planned.push({ type: 'create', row });
