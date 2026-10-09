@@ -27,7 +27,22 @@ window.addEventListener('load', () => {
 const GROUPS = ['A', 'B'];
 const cache = { ida: null, vuelta: null };
 let selectedKind = 'ida';
-let selectedEdition = Number(new URLSearchParams(window.location.search).get('edition')) || 6;
+const SPECIAL_EDITION = 'especial';
+
+function normalizeEditionSelection(value){
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === SPECIAL_EDITION || raw === 'special') return SPECIAL_EDITION;
+  const numeric = Number(raw);
+  return numeric ? String(numeric) : SPECIAL_EDITION;
+}
+
+function dataEdition(){
+  return selectedEdition === SPECIAL_EDITION ? 6 : Number(selectedEdition);
+}
+
+// La portada de Segunda siempre abre en la edición especial; los botones permiten
+// consultar las ediciones anteriores sin cambiar los datos usados por la especial.
+let selectedEdition = SPECIAL_EDITION;
 let standingsSteps = [];
 let selectedStandingsIndex = -1;
 let podiumRefreshId = null;
@@ -84,11 +99,12 @@ const API_BASE = (() => {
 })();
 
 async function fetchFixture(kind){
-  const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=segunda&edition=${encodeURIComponent(selectedEdition)}`;
+  const edition = dataEdition();
+  const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=segunda&edition=${encodeURIComponent(edition)}`;
   const apiRes = await fetch(apiUrl, { cache: 'no-store' });
   const apiData = await apiRes.json().catch(() => null);
 
-  if (apiRes.status === 404 && selectedEdition === 6) {
+  if (apiRes.status === 404 && edition === 6) {
     cache[kind] = buildEmptyCurrentFixture();
     return cache[kind];
   }
@@ -97,7 +113,7 @@ async function fetchFixture(kind){
     throw new Error(apiData?.error || `No se pudo cargar fixture ${kind} desde PostgreSQL`);
   }
 
-  cache[kind] = selectedEdition === 6 && !apiData.data.fechas?.length
+  cache[kind] = edition === 6 && !apiData.data.fechas?.length
     ? buildEmptyCurrentFixture()
     : apiData.data;
   return cache[kind];
@@ -129,7 +145,7 @@ function ensureFechaBlock(section, fechaIndex, fechaText){
   const encuentrosBtn = clone.querySelector('.encuentros-btn');
   if (encuentrosBtn) {
     const dateValue = String(fechaText || '').trim();
-    const href = `../encuentros/encuentros.html?category=segunda&kind=${encodeURIComponent(selectedKind)}&edition=${encodeURIComponent(String(selectedEdition))}&date=${encodeURIComponent(dateValue)}&fecha=${encodeURIComponent(String(fechaIndex))}`;
+    const href = `../encuentros/encuentros.html?category=segunda&kind=${encodeURIComponent(selectedKind)}&edition=${encodeURIComponent(String(dataEdition()))}&date=${encodeURIComponent(dateValue)}&fecha=${encodeURIComponent(String(fechaIndex))}`;
     encuentrosBtn.href = href;
   }
 
@@ -339,7 +355,7 @@ function fillBoard(group, data){
   const holder = document.querySelector(`[data-group-rows="${group}"]`);
   if (!holder) return;
   holder.innerHTML = '';
-  const rowCount = selectedEdition >= 6 ? 4 : (Array.isArray(data) ? data.length : 0);
+  const rowCount = dataEdition() >= 6 ? 4 : (Array.isArray(data) ? data.length : 0);
   const rows = Array.isArray(data) ? data.slice(0, rowCount) : [];
   while (rows.length < rowCount) {
     rows.push({ pos: rows.length + 1, equipo: '', ju: '', tr: '', pts: '' });
@@ -432,7 +448,7 @@ async function switchFixture(kind){
 
 function applyEditionState(){
   document.querySelectorAll('.edition-option').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.edition) === selectedEdition);
+    btn.classList.toggle('active', normalizeEditionSelection(btn.dataset.edition) === selectedEdition);
   });
   const url = new URL(window.location.href);
   url.searchParams.set('edition', String(selectedEdition));
@@ -440,7 +456,7 @@ function applyEditionState(){
 }
 
 async function switchEdition(edition){
-  selectedEdition = Number(edition) || 6;
+  selectedEdition = normalizeEditionSelection(edition);
   cache.ida = null;
   cache.vuelta = null;
   applyEditionState();
@@ -449,7 +465,7 @@ async function switchEdition(edition){
   populateStandingsControls();
   renderStandings();
   renderSelectedFixture();
-  window.dispatchEvent(new CustomEvent('tournament:edition-changed', { detail: { edition: selectedEdition } }));
+  window.dispatchEvent(new CustomEvent('tournament:edition-changed', { detail: { edition: dataEdition(), editionSelection: selectedEdition } }));
 }
 
 async function init(){

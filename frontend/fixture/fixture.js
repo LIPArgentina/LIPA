@@ -31,6 +31,18 @@ const KIND_KEY = 'fixture_kind';
 const CAT_KEY  = 'fixture_cat';
 const EDITION_KEY = 'fixture_edition';
 const CURRENT_EDITION = 6;
+const SPECIAL_EDITION = 'especial';
+
+function normalizeEditionSelection(value){
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === SPECIAL_EDITION || raw === 'special') return SPECIAL_EDITION;
+  return String(Number(raw) || CURRENT_EDITION);
+}
+
+function dataEdition(value){
+  const selection = normalizeEditionSelection(value);
+  return selection === SPECIAL_EDITION ? CURRENT_EDITION : Number(selection);
+}
 const API_BASE = (() => {
   const configured = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   if (configured) return configured + '/api';
@@ -77,10 +89,12 @@ function setStored(key, val){
 }
 
 function currentCategoryKind(){
+  const editionSelection = normalizeEditionSelection(getStored(EDITION_KEY, String(CURRENT_EDITION)));
   return {
     cat: (getStored(CAT_KEY, 'tercera') || 'tercera').toLowerCase(),
     kind: getStored(KIND_KEY, 'ida') || 'ida',
-    edition: Number(getStored(EDITION_KEY, String(CURRENT_EDITION))) || CURRENT_EDITION
+    edition: dataEdition(editionSelection),
+    editionSelection
   };
 }
 
@@ -133,8 +147,9 @@ async function loadFixtureJSON(src, meta = null){
 }
 
 function markActiveEdition(edition){
+  const selection = normalizeEditionSelection(edition);
   document.querySelectorAll('[data-edition]').forEach(el => {
-    const active = Number(el.getAttribute('data-edition')) === Number(edition);
+    const active = normalizeEditionSelection(el.getAttribute('data-edition')) === selection;
     el.classList.toggle('active', active);
     el.setAttribute('aria-pressed', String(active));
   });
@@ -158,7 +173,8 @@ function markActiveCat(cat){
 window.FixtureSwitcher = {
   async switch(kind, opts = {}){
     const category = (opts.category || getStored(CAT_KEY, 'tercera')).toLowerCase();
-    const edition = Number(opts.edition || getStored(EDITION_KEY, String(CURRENT_EDITION))) || CURRENT_EDITION;
+    const editionSelection = normalizeEditionSelection(opts.editionSelection ?? opts.edition ?? getStored(EDITION_KEY, String(CURRENT_EDITION)));
+    const edition = dataEdition(editionSelection);
     const base = opts.base || './';
     const persist = opts.persist !== false;
 
@@ -177,9 +193,9 @@ window.FixtureSwitcher = {
 
     markActiveKind(kind);
     markActiveCat(category);
-    markActiveEdition(edition);
+    markActiveEdition(editionSelection);
 
-    const detail = { src, kind, category, edition, fixture: window.LPI_FIXTURE || null };
+    const detail = { src, kind, category, edition, editionSelection, fixture: window.LPI_FIXTURE || null };
     document.dispatchEvent(new CustomEvent('fixture:data-ready', { detail }));
 
     if (typeof window.applyFixture === 'function'){
@@ -189,7 +205,7 @@ window.FixtureSwitcher = {
     if (persist){
       setStored(KIND_KEY, kind);
       setStored(CAT_KEY, category);
-      setStored(EDITION_KEY, String(edition));
+      setStored(EDITION_KEY, editionSelection);
     }
     return detail;
   },
@@ -202,13 +218,13 @@ window.FixtureSwitcher = {
   },
 
   async setEdition(value, opts = {}){
-    const edition = Number(value) || CURRENT_EDITION;
-    setStored(EDITION_KEY, String(edition));
-    markActiveEdition(edition);
+    const editionSelection = normalizeEditionSelection(value);
+    setStored(EDITION_KEY, editionSelection);
+    markActiveEdition(editionSelection);
     return this.switch(getStored(KIND_KEY, 'ida'), {
       base: opts.base,
       category: getStored(CAT_KEY, 'tercera'),
-      edition,
+      editionSelection,
       persist: true
     });
   },
@@ -219,9 +235,9 @@ window.FixtureSwitcher = {
         if (el.tagName === 'A') ev.preventDefault();
         const kind = el.getAttribute('data-fixture') || 'ida';
         const category = getStored(CAT_KEY, 'tercera');
-        const edition = Number(getStored(EDITION_KEY, String(CURRENT_EDITION))) || CURRENT_EDITION;
+        const editionSelection = normalizeEditionSelection(getStored(EDITION_KEY, String(CURRENT_EDITION)));
         try {
-          await this.switch(kind, { category, edition, base: opts.base });
+          await this.switch(kind, { category, editionSelection, base: opts.base });
         } catch(err){
           console.error(err);
           alert(err.message || String(err));
@@ -270,13 +286,13 @@ window.FixtureSwitcher = {
 
   restore(opts = {}){
     const category = getStored(CAT_KEY, 'tercera');
-    const edition = Number(getStored(EDITION_KEY, String(CURRENT_EDITION))) || CURRENT_EDITION;
+    const editionSelection = normalizeEditionSelection(getStored(EDITION_KEY, String(CURRENT_EDITION)));
     let kind = getStored(KIND_KEY, null);
     if (!kind) kind = opts.fallback || 'ida';
     markActiveCat(category);
     markActiveKind(kind);
-    markActiveEdition(edition);
-    return this.switch(kind, { base: opts.base, category, edition });
+    markActiveEdition(editionSelection);
+    return this.switch(kind, { base: opts.base, category, editionSelection });
   }
 };
 
