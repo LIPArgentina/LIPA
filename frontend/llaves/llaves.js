@@ -58,7 +58,16 @@ function editionUrlValue(edition){
 }
 
 function fixtureDataEdition(){
-  return currentEdition === SPECIAL_EDITION ? 6 : currentEdition;
+  return currentEdition;
+}
+
+function clearFixtureScores(fixture){
+  const clean = JSON.parse(JSON.stringify(fixture || { fechas: [] }));
+  (clean.fechas || []).forEach(fecha => (fecha.tablas || []).forEach(tabla => (tabla.equipos || []).forEach(equipo => {
+    equipo.puntos = 0;
+    equipo.puntosExtra = 0;
+  })));
+  return clean;
 }
 
 let currentCategory = 'tercera';
@@ -209,10 +218,17 @@ function parseScore(value){
 }
 
 async function fetchFixtureData(kind, category){
-  const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}&edition=${encodeURIComponent(fixtureDataEdition())}`, {
+  const edition = fixtureDataEdition();
+  const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}&edition=${encodeURIComponent(edition)}`, {
     cache: 'no-store'
   });
   const data = await resp.json().catch(() => null);
+  if (resp.status === 404 && edition === SPECIAL_EDITION) {
+    const sourceResp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}&edition=6`, { cache: 'no-store' });
+    const sourceData = await sourceResp.json().catch(() => null);
+    if (!sourceResp.ok || !sourceData?.ok || !sourceData?.data) throw new Error(sourceData?.error || `No se pudo preparar fixture ${kind}`);
+    return clearFixtureScores(sourceData.data);
+  }
   if (resp.status === 404 && currentEdition >= 6) {
     return { fechas: [] };
   }

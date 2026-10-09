@@ -1,5 +1,5 @@
 const CURRENT_EDITION = 6;
-const HISTORIC_EDITIONS = new Set([5, 6]);
+const HISTORIC_EDITIONS = new Set([5, 6, 7]);
 
 function normalizeTournamentEdition(value, fallback = CURRENT_EDITION) {
   const parsed = Number.parseInt(String(value ?? ''), 10);

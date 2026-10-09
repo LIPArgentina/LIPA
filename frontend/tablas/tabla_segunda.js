@@ -37,7 +37,20 @@ function normalizeEditionSelection(value){
 }
 
 function dataEdition(){
-  return selectedEdition === SPECIAL_EDITION ? 6 : Number(selectedEdition);
+  return selectedEdition === SPECIAL_EDITION ? 7 : Number(selectedEdition);
+}
+
+function clearFixtureScores(fixture){
+  const clean = JSON.parse(JSON.stringify(fixture || { fechas: [] }));
+  (clean.fechas || []).forEach(fecha => {
+    (fecha.tablas || []).forEach(tabla => {
+      (tabla.equipos || []).forEach(equipo => {
+        equipo.puntos = 0;
+        equipo.puntosExtra = 0;
+      });
+    });
+  });
+  return clean;
 }
 
 // La portada de Segunda siempre abre en la edición especial; los botones permiten
@@ -103,6 +116,17 @@ async function fetchFixture(kind){
   const apiUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=segunda&edition=${encodeURIComponent(edition)}`;
   const apiRes = await fetch(apiUrl, { cache: 'no-store' });
   const apiData = await apiRes.json().catch(() => null);
+
+  if (apiRes.status === 404 && edition === 7) {
+    const sourceUrl = `${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=segunda&edition=6`;
+    const sourceRes = await fetch(sourceUrl, { cache: 'no-store' });
+    const sourceData = await sourceRes.json().catch(() => null);
+    if (!sourceRes.ok || !sourceData?.ok || !sourceData?.data) {
+      throw new Error(sourceData?.error || `No se pudo preparar fixture ${kind} de la edición especial`);
+    }
+    cache[kind] = clearFixtureScores(sourceData.data);
+    return cache[kind];
+  }
 
   if (apiRes.status === 404 && edition === 6) {
     cache[kind] = buildEmptyCurrentFixture();
@@ -475,7 +499,7 @@ async function switchEdition(edition){
   window.dispatchEvent(new CustomEvent('tournament:edition-changed', {
     detail: {
       edition: dataEdition(),
-      bracketEdition: selectedEdition === SPECIAL_EDITION ? 7 : dataEdition(),
+      bracketEdition: dataEdition(),
       editionSelection: selectedEdition
     }
   }));
@@ -485,7 +509,7 @@ async function init(){
   applyEditionState();
   selectedKind = 'ida';
   window.dispatchEvent(new CustomEvent('tournament:edition-changed', {
-    detail: { edition: dataEdition(), bracketEdition: 7, editionSelection: selectedEdition }
+    detail: { edition: dataEdition(), bracketEdition: dataEdition(), editionSelection: selectedEdition }
   }));
   try { localStorage.setItem('fixture_kind_segunda', selectedKind); } catch(_) {}
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {

@@ -32,6 +32,7 @@ const CAT_KEY  = 'fixture_cat';
 const EDITION_KEY = 'fixture_edition';
 const CURRENT_EDITION = 6;
 const SPECIAL_EDITION = 'especial';
+const SPECIAL_EDITION_DATA = 7;
 
 function normalizeEditionSelection(value){
   const raw = String(value ?? '').trim().toLowerCase();
@@ -41,7 +42,20 @@ function normalizeEditionSelection(value){
 
 function dataEdition(value){
   const selection = normalizeEditionSelection(value);
-  return selection === SPECIAL_EDITION ? CURRENT_EDITION : Number(selection);
+  return selection === SPECIAL_EDITION ? SPECIAL_EDITION_DATA : Number(selection);
+}
+
+function clearFixtureScores(fixture){
+  const clean = JSON.parse(JSON.stringify(fixture || { fechas: [] }));
+  (clean.fechas || []).forEach(fecha => {
+    (fecha.tablas || []).forEach(tabla => {
+      (tabla.equipos || []).forEach(equipo => {
+        equipo.puntos = 0;
+        equipo.puntosExtra = 0;
+      });
+    });
+  });
+  return clean;
 }
 const API_BASE = (() => {
   const configured = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
@@ -134,6 +148,15 @@ async function loadFixtureJSON(src, meta = null){
   });
 
   const apiData = await apiResp.json().catch(() => null);
+  if (apiResp.status === 404 && Number(meta.edition) === SPECIAL_EDITION_DATA) {
+    const sourceResp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(meta.kind)}&category=${encodeURIComponent(meta.category)}&edition=${CURRENT_EDITION}`, { cache: 'no-store' });
+    const sourceData = await sourceResp.json().catch(() => null);
+    if (!sourceResp.ok || !sourceData?.ok || !sourceData?.data) {
+      throw new Error(sourceData?.error || 'No se pudo preparar el fixture de la edición especial');
+    }
+    window.LPI_FIXTURE = clearFixtureScores(sourceData.data);
+    return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}&edition=${meta.edition}`;
+  }
   if (apiResp.status === 404 && Number(meta.edition) === CURRENT_EDITION) {
     window.LPI_FIXTURE = { fechas: [] };
     return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}&edition=${meta.edition}`;
