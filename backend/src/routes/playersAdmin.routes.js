@@ -309,9 +309,10 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
            SELECT 1
              FROM jugador_equipos
             WHERE jugador_id = $1
-              AND equipo_id = $2
               AND categoria = $3
-         )`,
+              AND activo = true
+         )
+         ON CONFLICT DO NOTHING`,
         [row.id, row.equipo_id, row.division || 'sin_categoria', row.orden, seasonStartDate(row.division)]
       );
     }
