@@ -680,12 +680,10 @@
       String(item?.tipo || 'cruce').toLowerCase() === 'cruce' &&
       (!item?.localPlanilla?.substitutions?.length || !item?.visitantePlanilla?.substitutions?.length)
     );
-    document.documentElement.dataset.substitutionRestore = `needed:${needsRestore};results:${results.length}`;
     if (!needsRestore) return;
     const planillas = await fetchJson(apiUrl('/api/admin/planillas'), {
       cache: 'no-store', credentials: 'same-origin'
     }).catch(() => []);
-    document.documentElement.dataset.substitutionRestore += `;planillas:${Array.isArray(planillas) ? planillas.length : 'invalid'}`;
     if (!Array.isArray(planillas)) return;
     results.forEach(item => {
       if (String(item?.tipo || 'cruce').toLowerCase() !== 'cruce') return;
@@ -698,12 +696,6 @@
         item.visitantePlanilla.substitutions = inferSubstitutions(visitanteOriginal, item.visitantePlanilla);
       }
     });
-    document.documentElement.dataset.substitutionRestore += ';changes:' + JSON.stringify(
-      results.map(item => ({
-        local: item?.localPlanilla?.substitutions?.length || 0,
-        visitante: item?.visitantePlanilla?.substitutions?.length || 0
-      }))
-    );
   }
 
   async function init(){
