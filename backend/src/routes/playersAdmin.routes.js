@@ -26,6 +26,38 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     return String(value || '').replace(/\D/g, '').trim();
   }
 
+  function editDistance(left, right) {
+    const a = String(left || '');
+    const b = String(right || '');
+    const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= a.length; i += 1) {
+      const current = [i];
+      for (let j = 1; j <= b.length; j += 1) {
+        current[j] = Math.min(
+          current[j - 1] + 1,
+          previous[j] + 1,
+          previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+        );
+      }
+      previous.splice(0, previous.length, ...current);
+    }
+    return previous[b.length];
+  }
+
+  function namesProbablyMatch(left, right) {
+    const a = normalizeText(left);
+    const b = normalizeText(right);
+    if (!a || !b || a === b) return false;
+    if (editDistance(a, b) <= 2) return true;
+    const aParts = a.split(' ');
+    const bParts = b.split(' ');
+    if (aParts.length < 2 || bParts.length < 2) return false;
+    const sameSurname = aParts.at(-1) === bParts.at(-1);
+    const sameFirstName = aParts[0] === bParts[0];
+    return (sameSurname && editDistance(aParts[0], bParts[0]) <= 2)
+      || (sameFirstName && editDistance(aParts.at(-1), bParts.at(-1)) <= 2);
+  }
+
   async function getPlayerDisplayVariant(sourcePath, safeFilename) {
     const sourceStat = await fs.promises.stat(sourcePath);
     const parsed = path.parse(safeFilename);
@@ -1317,16 +1349,60 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         planned.push({ type: 'create', row });
       }
 
+      const currentRosterPlayers = playersResult.rows.filter((player) => {
+        const associations = associationsByPlayer.get(Number(player.id)) || [];
+        return associations.some(association =>
+          normalizeCategory(association.categoria) === category && Number(association.equipo_id) === Number(team.id)
+        );
+      });
       const representedPlayerIds = new Set(
         planned.map(item => Number(item.playerId)).filter(Number.isFinite)
       );
-      playersResult.rows.forEach((player) => {
+      const provisionalSimilarIds = new Set();
+      planned.forEach((item, index) => {
+        if (item.type !== 'create') return;
+        const candidates = currentRosterPlayers.filter(player => {
+          const playerId = Number(player.id);
+          return !representedPlayerIds.has(playerId)
+            && !provisionalSimilarIds.has(playerId)
+            && namesProbablyMatch(item.row.nombre, player.nombre);
+        });
+        if (!candidates.length) return;
+        const reviewId = `${item.row.row}:similar`;
+        const similarDecision = String(decisions[reviewId] || '').trim().toLowerCase();
+        if (similarDecision.startsWith('same:')) {
+          const selectedId = Number(similarDecision.slice(5));
+          const selected = candidates.find(candidate => Number(candidate.id) === selectedId);
+          if (selected) {
+            planned[index] = { type: 'update_identity', row: item.row, playerId: selectedId };
+            representedPlayerIds.add(selectedId);
+            return;
+          }
+        }
+        if (similarDecision === 'different') return;
+        candidates.forEach(candidate => provisionalSimilarIds.add(Number(candidate.id)));
+        reviews.push({
+          id: reviewId,
+          row: item.row.row,
+          kind: 'similar',
+          message: `${item.row.nombre} (DNI ${item.row.dni}) tiene nombres similares en el plantel actual. ¿Es la misma persona?`,
+          options: [
+            ...candidates.map(candidate => ({
+              value: `same:${candidate.id}`,
+              label: `Sí: es ${candidate.nombre} (DNI ${candidate.dni || 'sin registrar'})`
+            })),
+            { value: 'different', label: 'No: crear como un jugador diferente' }
+          ]
+        });
+      });
+
+      currentRosterPlayers.forEach((player) => {
         const playerId = Number(player.id);
         const associations = associationsByPlayer.get(playerId) || [];
         const selectedAssociation = associations.find(association =>
           normalizeCategory(association.categoria) === category && Number(association.equipo_id) === Number(team.id)
         );
-        if (!selectedAssociation || representedPlayerIds.has(playerId)) return;
+        if (!selectedAssociation || representedPlayerIds.has(playerId) || provisionalSimilarIds.has(playerId)) return;
         const reviewId = `missing:${playerId}`;
         const missingDecision = String(decisions[reviewId] || '').trim().toLowerCase();
         if (!['remove', 'keep'].includes(missingDecision)) {
@@ -1424,7 +1500,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           updated += 1;
           continue;
         }
-        if (['update_name', 'update_dni'].includes(item.type)) {
+        if (['update_name', 'update_dni', 'update_identity'].includes(item.type)) {
           await client.query(
             `UPDATE jugadores
                 SET nombre = $1,

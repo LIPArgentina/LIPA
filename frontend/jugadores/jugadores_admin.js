@@ -469,20 +469,21 @@ async function importTeamFile(file){
   const { category, team, teamName } = selectedTeamContext();
   const rows = parseTeamImport(await file.text());
   if (!confirm(`Se procesarán ${rows.length} filas para ${teamName}.\n\nLos jugadores omitidos no serán eliminados. ¿Continuar?`)) return;
+  const decisions = {};
   let data = await fetchJson('/api/players-admin/import-team', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category, team, rows })
   });
-  if (data.requiresReview) {
-    const decisions = await reviewTeamImport(data.reviews || []);
-    if (!decisions) return;
+  while (data.requiresReview) {
+    const reviewed = await reviewTeamImport(data.reviews || []);
+    if (!reviewed) return;
+    Object.assign(decisions, reviewed);
     data = await fetchJson('/api/players-admin/import-team', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ category, team, rows, decisions })
     });
-    if (data.requiresReview) throw new Error('La revisión quedó incompleta. No se realizó ningún cambio.');
   }
   toast(`Importación completa: ${data.created || 0} nuevos y ${data.updated || 0} actualizados`);
   await searchByTeam();
