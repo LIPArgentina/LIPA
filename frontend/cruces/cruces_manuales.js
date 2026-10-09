@@ -11,6 +11,7 @@
     schedule: [],
     resultsByDate: new Map(),
     rosterCache: new Map(),
+    firstTeams: null,
     publishedPlanillas: null,
     loadedResult: null,
     loadedFromPlanillas: false,
@@ -117,7 +118,15 @@
 
   function normalizeTeam(item) {
     const name = item?.username || item?.name || item?.equipo || item?.slug || 'Equipo';
-    return { name: String(name), slug: String(item?.slug || normalizeIdentity(name)) };
+    return { name: String(name), slug: String(item?.slug || item?.slug_uid || normalizeIdentity(name)) };
+  }
+
+  async function loadFirstTeams() {
+    if (Array.isArray(state.firstTeams)) return state.firstTeams;
+    const data = await fetchJson('/api/teams?division=primera');
+    const raw = Array.isArray(data) ? data : (data?.teams || data?.users || []);
+    state.firstTeams = raw.map(normalizeTeam);
+    return state.firstTeams;
   }
 
   function extractSchedule(fixtures) {
@@ -258,6 +267,7 @@
     setStatus('Cargando fixture y equipos…');
     state.resultsByDate.clear();
     state.rosterCache.clear();
+    state.firstTeams = null;
     state.publishedPlanillas = null;
     state.loadedResult = null;
 
@@ -300,8 +310,15 @@
     const secondNames = Array.isArray(data?.players) ? data.players.map(String) : [];
     let firstNames = [];
     if ($('#categoria').value === 'segunda') {
-      const query = new URLSearchParams({ category: 'primera', team: teamSlug });
-      const firstData = await fetchJson(`/api/players-public/by-team?${query}`).catch(() => ({ players: [] }));
+      const firstTeams = await loadFirstTeams().catch(() => []);
+      const counterpart = firstTeams.find(team =>
+        normalizeIdentity(team.slug) === normalizeIdentity(teamSlug) ||
+        normalizeIdentity(team.name) === normalizeIdentity(teamSlug)
+      );
+      const query = new URLSearchParams({ category: 'primera', team: counterpart?.slug || '' });
+      const firstData = counterpart
+        ? await fetchJson(`/api/players-public/by-team?${query}`).catch(() => ({ players: [] }))
+        : { players: [] };
       firstNames = (Array.isArray(firstData?.players) ? firstData.players : [])
         .map(player => String(player?.nombre || player?.name || '').trim())
         .filter(Boolean);
