@@ -420,6 +420,12 @@ function apiUrl(path){
     return Number.isFinite(configuredMax) ? configuredMax : 6;
   }
 
+  function getIndividualScoreMax(index){
+    return deriveCategory() === 'segunda' && Number(index) < 2
+      ? 7
+      : getRegulationScoreMax();
+  }
+
   function teamNameFromRef(ref){
     if (typeof ref === 'string') return ref.trim();
     if (!ref || typeof ref !== 'object') return '';
@@ -973,12 +979,12 @@ function apiUrl(path){
   }
 
 
-  function createPtsSelect() {
+  function createPtsSelect(maxScore = getRegulationScoreMax()) {
     const wrap = document.createElement('div');
     wrap.className = 'pts-edit';
     const sel = document.createElement('select');
     sel.className = 'pts-select';
-    const maxScore = getRegulationScoreMax();
+    sel.dataset.maxScore = String(maxScore);
     for (let v = 0; v <= maxScore; v++) {
       const opt = document.createElement('option');
       opt.value = String(v);
@@ -1007,7 +1013,7 @@ function apiUrl(path){
     return Number.isFinite(id) && id > 0 ? String(id) : '';
   }
 
-  function makeRow(num, text, side, includePoints = false, sectionKey = '', playerId = '') {
+  function makeRow(num, text, side, includePoints = false, sectionKey = '', playerId = '', scoreMax = getRegulationScoreMax()) {
     const row = document.createElement('div');
     row.className = 'row';
     if (sectionKey) row.dataset.section = sectionKey;
@@ -1029,7 +1035,7 @@ function apiUrl(path){
 
     let ptsElement = null;
     if (includePoints) {
-      ptsElement = createPtsSelect();
+      ptsElement = createPtsSelect(scoreMax);
     } else {
       ptsElement = document.createElement('div');
       ptsElement.className = 'pts-edit';
@@ -1192,7 +1198,8 @@ function apiUrl(path){
             side,
             sec === 'INDIVIDUALES',
             sec,
-            playerIdFromPlanilla(planilla, sec, dataIndex)
+            playerIdFromPlanilla(planilla, sec, dataIndex),
+            sec === 'INDIVIDUALES' ? getIndividualScoreMax(dataIndex) : getRegulationScoreMax()
           ));
         });
       };
@@ -1732,10 +1739,10 @@ function writeAllSelects(rootId, values) {
   const root = document.getElementById(rootId);
   if (!root) return;
   const selects = Array.from(root.querySelectorAll('.pts-select'));
-  const maxScore = getRegulationScoreMax();
   selects.forEach((sel,i) => {
     if (i < values.length) {
       const value = Number(values[i]);
+      const maxScore = Number(sel.dataset.maxScore || getIndividualScoreMax(i));
       const safeValue = Number.isFinite(value)
         ? Math.max(0, Math.min(maxScore, Math.trunc(value)))
         : 0;
@@ -1779,12 +1786,14 @@ function validateRegulationRows() {
     return `La planilla debe tener exactamente ${INDIVIDUAL_COUNT} partidos individuales.`;
   }
 
-  const maxScore = getRegulationScoreMax();
   for (let i = 0; i < INDIVIDUAL_COUNT; i++) {
+    const maxScore = getIndividualScoreMax(i);
     if (leftScores[i] < 0 || leftScores[i] > maxScore || rightScores[i] < 0 || rightScores[i] > maxScore) {
       markPtsError('planilla-root-left', i);
       markPtsError('planilla-root-right', i);
-      return `Los puntos de cada partido deben estar entre 0 y ${maxScore}.`;
+      return deriveCategory() === 'segunda'
+        ? 'Los partidos de Primeras admiten de 0 a 7 puntos y los de Segundas de 0 a 6.'
+        : `Los puntos de cada partido deben estar entre 0 y ${maxScore}.`;
     }
   }
 
