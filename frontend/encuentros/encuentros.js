@@ -91,7 +91,11 @@
       return { individualCount: 7, pairCount: 2, substituteCount: 2 };
     }
     if (currentEdition >= 6) {
-      return { individualCount: INDIVIDUAL_COUNT, pairCount: 0, substituteCount: SUBSTITUTE_COUNT };
+      return {
+        individualCount: INDIVIDUAL_COUNT,
+        pairCount: 0,
+        substituteCount: currentCategory === 'segunda' ? 3 : SUBSTITUTE_COUNT
+      };
     }
 
     const individualItems = Array.isArray(planilla?.individuales) ? planilla.individuales : [];
@@ -454,10 +458,21 @@
     div.className = 'section';
     div.innerHTML = `<h2>${section}</h2>`;
 
+    const appendSubgroup = (title) => {
+      const subtitle = document.createElement('h3');
+      subtitle.className = 'planilla-subgroup-title';
+      subtitle.textContent = title;
+      div.appendChild(subtitle);
+    };
+
     if (section === 'INDIVIDUALES') {
       items.forEach((name, idx) => {
+        if (currentCategory === 'segunda' && (idx === 0 || idx === 2)) {
+          appendSubgroup(idx === 0 ? 'PRIMERAS' : 'SEGUNDAS');
+        }
         const changed = substitutions.some(change => Number(change?.fieldIndex) === idx);
-        div.appendChild(makeRow(idx + 1, name, side, scoreRows[idx] ?? 0, section, changed ? 'slot-sub-in' : ''));
+        const displayIndex = currentCategory === 'segunda' && idx >= 2 ? idx - 1 : idx + 1;
+        div.appendChild(makeRow(displayIndex, name, side, scoreRows[idx] ?? 0, section, changed ? 'slot-sub-in' : ''));
       });
     } else if (section === 'PAREJA 1') {
       div.appendChild(makeRow(1, items[0] || '', side, scoreRows[7] ?? 0, section));
@@ -467,8 +482,12 @@
       div.appendChild(makeRow(2, items[1] || '', side, null, section));
     } else {
       items.forEach((name, idx) => {
+        if (currentCategory === 'segunda' && section === 'SUPLENTES' && (idx === 0 || idx === 1)) {
+          appendSubgroup(idx === 0 ? 'PRIMERAS' : 'SEGUNDAS');
+        }
         const changed = section === 'SUPLENTES' && substitutions.some(change => Number(change?.benchIndex) === idx);
-        div.appendChild(makeRow(idx + 1, name, side, null, section, changed ? 'slot-sub-out' : ''));
+        const displayIndex = currentCategory === 'segunda' && section === 'SUPLENTES' && idx >= 1 ? idx : idx + 1;
+        div.appendChild(makeRow(displayIndex, name, side, null, section, changed ? 'slot-sub-out' : ''));
       });
     }
 

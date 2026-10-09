@@ -156,6 +156,19 @@
   margin:8px 0 6px;
 }
 
+.encounter-shell .planilla-subgroup-title{
+  margin:12px 0 7px;
+  color:var(--accent);
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:1px;
+  text-align:center;
+}
+
+.encounter-shell .section h2 + .planilla-subgroup-title{
+  margin-top:2px;
+}
+
 .encounter-left .row,
 .encounter-right .row{
   gap:8px;
