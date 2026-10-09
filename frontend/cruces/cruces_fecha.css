@@ -72,6 +72,19 @@ body {
   font-size: 22px;
 }
 
+.planilla-subgroup-title {
+  margin: 14px 0 8px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.section h2 + .planilla-subgroup-title {
+  margin-top: 2px;
+}
+
 
 .row {
   display: flex;

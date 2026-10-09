@@ -1174,6 +1174,7 @@ function apiUrl(path){
     if (PAIR_COUNT >= 1) sections.push('PAREJA 1');
     if (PAIR_COUNT >= 2) sections.push('PAREJA 2');
     sections.push('SUPLENTES');
+    const category = deriveCategory();
     sections.forEach(sec => {
       const div = document.createElement('div');
       div.className = 'section';
@@ -1182,14 +1183,39 @@ function apiUrl(path){
       const items = data[sec];
 
       const side = rootId.includes('left') ? 'left' : 'right';
+      const appendRows = (values, startIndex = 0, displayStart = 1) => {
+        values.forEach((p, offset) => {
+          const dataIndex = startIndex + offset;
+          div.appendChild(makeRow(
+            displayStart + offset,
+            p,
+            side,
+            sec === 'INDIVIDUALES',
+            sec,
+            playerIdFromPlanilla(planilla, sec, dataIndex)
+          ));
+        });
+      };
+
+      const appendSubgroup = (title, values, startIndex) => {
+        const subtitle = document.createElement('h3');
+        subtitle.className = 'planilla-subgroup-title';
+        subtitle.textContent = title;
+        div.appendChild(subtitle);
+        appendRows(values, startIndex, 1);
+      };
+
       if (sec.includes('PAREJA') && items.length === 2) {
         div.appendChild(makeRow(1, items[0], side, true, sec, playerIdFromPlanilla(planilla, sec, 0)));
         div.appendChild(makeRow(2, items[1], side, false, sec, playerIdFromPlanilla(planilla, sec, 1)));
+      } else if (category === 'segunda' && sec === 'INDIVIDUALES') {
+        appendSubgroup('PRIMERAS', items.slice(0, 2), 0);
+        appendSubgroup('SEGUNDAS', items.slice(2, 11), 2);
+      } else if (category === 'segunda' && sec === 'SUPLENTES') {
+        appendSubgroup('PRIMERAS', items.slice(0, 1), 0);
+        appendSubgroup('SEGUNDAS', items.slice(1, 3), 1);
       } else {
-        const includePts = sec === 'INDIVIDUALES';
-        items.forEach((p, i) => {
-          div.appendChild(makeRow(i + 1, p, side, includePts, sec, playerIdFromPlanilla(planilla, sec, i)));
-        });
+        appendRows(items);
       }
 
       secs.appendChild(div);
