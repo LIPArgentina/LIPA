@@ -184,6 +184,41 @@
   flex-wrap:wrap;
 }
 
+.import-review-panel{
+  width:min(94vw, 760px);
+  max-height:90vh;
+}
+
+.import-review-intro{
+  margin:0 0 14px;
+  color:#d7dbe5;
+  line-height:1.45;
+}
+
+.import-review-list{
+  display:grid;
+  gap:12px;
+}
+
+.import-review-item{
+  padding:12px;
+  border:1px solid var(--border-2);
+  border-radius:10px;
+  background:#111319;
+}
+
+.import-review-item label{
+  display:block;
+  margin-bottom:8px;
+  color:#fff;
+  font-weight:800;
+  line-height:1.4;
+}
+
+.import-review-item small{
+  color:var(--gold);
+}
+
 .history-table{
   width:100%;
   min-width:0;

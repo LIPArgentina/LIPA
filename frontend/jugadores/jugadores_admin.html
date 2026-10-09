@@ -6,7 +6,7 @@
   <title>Administración de jugadores</title>
   <link rel="stylesheet" href="../admin.css">
   <link rel="stylesheet" href="../photo-cropper.css">
-  <link rel="stylesheet" href="jugadores_admin.css?v=team-import-export-1">
+  <link rel="stylesheet" href="jugadores_admin.css?v=team-import-review-1">
 </head>
 <body>
   <header class="site-header">
@@ -147,10 +147,26 @@
     </div>
   </dialog>
 
+  <dialog id="teamImportReviewDialog" class="modal">
+    <div class="modal__panel import-review-panel">
+      <div class="modal__header">
+        <h3>Revisar importación</h3>
+      </div>
+      <div class="modal__body">
+        <p class="import-review-intro">Resolvé cada caso antes de modificar la base de datos. Si cancelás, no se realizará ningún cambio.</p>
+        <div id="teamImportReviewList" class="import-review-list"></div>
+      </div>
+      <div class="modal__footer category-change-actions">
+        <button id="btnCancelTeamImport" class="btn btn-ghost" type="button">Cancelar</button>
+        <button id="btnConfirmTeamImport" class="btn btn-gold" type="button">Confirmar importación</button>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast"></div>
 
   <script src="../config.js?v=renewable-session-1"></script>
   <script src="../photo-cropper.js"></script>
-  <script src="jugadores_admin.js?v=second-team-limit-25-1"></script>
+  <script src="jugadores_admin.js?v=team-import-review-1"></script>
 </body>
 </html>

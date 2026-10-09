@@ -469,13 +469,66 @@ async function importTeamFile(file){
   const { category, team, teamName } = selectedTeamContext();
   const rows = parseTeamImport(await file.text());
   if (!confirm(`Se procesarán ${rows.length} filas para ${teamName}.\n\nLos jugadores omitidos no serán eliminados. ¿Continuar?`)) return;
-  const data = await fetchJson('/api/players-admin/import-team', {
+  let data = await fetchJson('/api/players-admin/import-team', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category, team, rows })
   });
+  if (data.requiresReview) {
+    const decisions = await reviewTeamImport(data.reviews || []);
+    if (!decisions) return;
+    data = await fetchJson('/api/players-admin/import-team', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, team, rows, decisions })
+    });
+    if (data.requiresReview) throw new Error('La revisión quedó incompleta. No se realizó ningún cambio.');
+  }
   toast(`Importación completa: ${data.created || 0} nuevos y ${data.updated || 0} actualizados`);
   await searchByTeam();
+}
+
+function reviewTeamImport(reviews){
+  const dialog = $('#teamImportReviewDialog');
+  const list = $('#teamImportReviewList');
+  if (!dialog || !list || !reviews.length) return Promise.resolve({});
+  list.innerHTML = reviews.map((review, index) => `
+    <div class="import-review-item">
+      <label for="importReview${index}"><small>Fila ${escapeHtml(review.row)}</small><br>${escapeHtml(review.message)}</label>
+      <select id="importReview${index}" class="input" data-review-id="${escapeHtml(review.id)}">
+        <option value="">Elegir una opción</option>
+        ${(review.options || []).map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      dialog.close();
+      resolve(value);
+    };
+    $('#btnCancelTeamImport').onclick = () => finish(null);
+    $('#btnConfirmTeamImport').onclick = () => {
+      const decisions = {};
+      const selects = [...list.querySelectorAll('[data-review-id]')];
+      const missing = selects.find(select => !select.value);
+      if (missing) {
+        missing.focus();
+        toast('Elegí una opción para cada caso');
+        return;
+      }
+      selects.forEach(select => { decisions[select.dataset.reviewId] = select.value; });
+      finish(decisions);
+    };
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      finish(null);
+    }, { once:true });
+    dialog.showModal();
+  });
 }
 
 async function handleTeamImportChange(){

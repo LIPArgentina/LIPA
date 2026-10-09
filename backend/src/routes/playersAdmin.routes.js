@@ -95,6 +95,17 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     return null;
   }
 
+  function currentLeagueDate() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  }
+
   function safeName(value = '') {
     return String(value || '')
       .normalize('NFD')
@@ -1080,6 +1091,9 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       const category = normalizeCategory(req.body?.category || '');
       const rawTeam = String(req.body?.team || '').trim();
       const incomingRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+      const decisions = req.body?.decisions && typeof req.body.decisions === 'object'
+        ? req.body.decisions
+        : {};
       if (!['primera', 'segunda', 'tercera'].includes(category)) {
         return res.status(400).json({ ok: false, error: 'Categoría inválida' });
       }
@@ -1168,6 +1182,11 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       });
 
       const planned = [];
+      const reviews = [];
+      const decisionFor = (row, kind) => String(decisions[`${row.row}:${kind}`] || '').trim().toLowerCase();
+      const addReview = (row, kind, message, options) => {
+        reviews.push({ id: `${row.row}:${kind}`, row: row.row, kind, message, options });
+      };
       for (const row of rows) {
         const dniOwners = playersByDni.get(row.dni) || [];
         if (dniOwners.length > 1) {
@@ -1179,21 +1198,95 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         }
         if (dniOwners.length === 1) {
           const playerId = Number(dniOwners[0].id);
+          const currentPlayer = dniOwners[0];
           const associations = associationsByPlayer.get(playerId) || [];
           const selectedAssociation = associations.find(association =>
             normalizeCategory(association.categoria) === category && Number(association.equipo_id) === Number(team.id)
           );
-          if (!selectedAssociation) {
-            const categoryAssociation = associations.find(association => normalizeCategory(association.categoria) === category);
-            conflicts.push({
-              row: row.row,
-              message: categoryAssociation
-                ? `El DNI ${row.dni} pertenece a un jugador activo en ${categoryDisplayName(category)} con ${categoryAssociation.equipo}.`
-                : `El DNI ${row.dni} ya pertenece a otro jugador o a otra categoría.`
+          const nameChanged = normalizeText(currentPlayer.nombre || '') !== normalizeText(row.nombre);
+          if (nameChanged) {
+            const nameDecision = decisionFor(row, 'name');
+            if (!['update', 'skip'].includes(nameDecision)) {
+              addReview(
+                row,
+                'name',
+                `El DNI ${row.dni} figura como ${currentPlayer.nombre}. El archivo dice ${row.nombre}.`,
+                [
+                  { value: 'update', label: `Cambiar el nombre a ${row.nombre}` },
+                  { value: 'skip', label: 'Omitir esta fila y conservar el nombre anterior' }
+                ]
+              );
+            }
+            if (nameDecision === 'skip') {
+              planned.push({ type: 'skip', row, playerId });
+              continue;
+            }
+          }
+          if (selectedAssociation) {
+            planned.push({ type: nameChanged ? 'update_name' : 'noop', row, playerId });
+            continue;
+          }
+
+          const categoryAssociation = associations.find(association => normalizeCategory(association.categoria) === category);
+          if (categoryAssociation) {
+            const teamDecision = decisionFor(row, 'team');
+            if (!['transfer', 'skip'].includes(teamDecision)) {
+              addReview(
+                row,
+                'team',
+                `${currentPlayer.nombre} está activo en ${categoryDisplayName(category)} con ${categoryAssociation.equipo}.`,
+                [
+                  { value: 'transfer', label: `Pasarlo a ${team.display_name}` },
+                  { value: 'skip', label: `Omitir y mantenerlo en ${categoryAssociation.equipo}` }
+                ]
+              );
+            }
+            planned.push({
+              type: teamDecision === 'transfer' ? 'transfer' : 'skip',
+              row,
+              playerId,
+              associationId: Number(categoryAssociation.id),
+              updateName: nameChanged
             });
             continue;
           }
-          planned.push({ type: 'update', row, playerId });
+
+          const targetRank = categoryRank(category);
+          const higherAssociation = associations.find(association => categoryRank(association.categoria) > targetRank);
+          if (higherAssociation) {
+            conflicts.push({
+              row: row.row,
+              message: `${currentPlayer.nombre} pertenece a ${categoryDisplayName(higherAssociation.categoria)} y no puede bajar a ${categoryDisplayName(category)}.`
+            });
+            continue;
+          }
+          const lowerAssociations = associations.filter(association => categoryRank(association.categoria) < targetRank);
+          if (lowerAssociations.length) {
+            const categoryDecision = decisionFor(row, 'category');
+            const lowerLabels = [...new Set(lowerAssociations.map(item => categoryDisplayName(item.categoria)))].join(' y ');
+            if (!['both', 'ascend', 'skip'].includes(categoryDecision)) {
+              addReview(
+                row,
+                'category',
+                `${currentPlayer.nombre} pertenece a ${lowerLabels}. ¿Cómo debe incorporarse a ${categoryDisplayName(category)}?`,
+                [
+                  { value: 'both', label: 'Juega en ambas categorías' },
+                  { value: 'ascend', label: `Ascenderlo a ${categoryDisplayName(category)}` },
+                  { value: 'skip', label: 'Omitir esta fila' }
+                ]
+              );
+            }
+            planned.push({
+              type: ['both', 'ascend'].includes(categoryDecision) ? 'category_add' : 'skip',
+              categoryMode: categoryDecision,
+              row,
+              playerId,
+              updateName: nameChanged
+            });
+            continue;
+          }
+
+          planned.push({ type: 'attach', row, playerId, updateName: nameChanged });
           continue;
         }
         const sameNamePlayers = currentPlayersByName.get(normalizeText(row.nombre)) || [];
@@ -1205,14 +1298,27 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           continue;
         }
         if (sameNamePlayers.length === 1) {
-          planned.push({ type: 'update', row, playerId: Number(sameNamePlayers[0].id) });
+          const currentPlayer = sameNamePlayers[0];
+          const dniDecision = decisionFor(row, 'dni');
+          if (!['update', 'skip'].includes(dniDecision)) {
+            addReview(
+              row,
+              'dni',
+              `${row.nombre} ya está en el equipo con DNI ${currentPlayer.dni || 'sin registrar'}. El archivo indica ${row.dni}.`,
+              [
+                { value: 'update', label: `Actualizar el DNI a ${row.dni}` },
+                { value: 'skip', label: 'Omitir esta fila y conservar el DNI anterior' }
+              ]
+            );
+          }
+          planned.push({ type: dniDecision === 'update' ? 'update_dni' : 'skip', row, playerId: Number(currentPlayer.id) });
           continue;
         }
         planned.push({ type: 'create', row });
       }
 
       const plannedPlayerRows = new Map();
-      planned.filter(item => item.type === 'update').forEach((item) => {
+      planned.filter(item => !['create', 'skip'].includes(item.type)).forEach((item) => {
         if (plannedPlayerRows.has(item.playerId)) {
           conflicts.push({
             row: item.row.row,
@@ -1229,6 +1335,22 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         return res.status(409).json({ ok: false, error: 'Se encontraron conflictos de identidad. No se realizó ningún cambio.', conflicts });
       }
 
+      if (reviews.length) {
+        await client.query('ROLLBACK');
+        transactionOpen = false;
+        return res.json({
+          ok: true,
+          requiresReview: true,
+          team,
+          category,
+          reviews,
+          summary: {
+            rows: rows.length,
+            newPlayers: planned.filter(item => item.type === 'create').length
+          }
+        });
+      }
+
       const rosterCount = await client.query(
         `SELECT COUNT(DISTINCT jugador_id)::int AS total
            FROM jugador_equipos
@@ -1237,7 +1359,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
             AND activo = true`,
         [team.id, category]
       );
-      const createdCount = planned.filter(item => item.type === 'create').length;
+      const createdCount = planned.filter(item => ['create', 'transfer', 'attach', 'category_add'].includes(item.type)).length;
       const limit = teamPlayerLimit(category);
       if (Number(rosterCount.rows[0]?.total || 0) + createdCount > limit) {
         await client.query('ROLLBACK');
@@ -1251,9 +1373,10 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
       let created = 0;
       let updated = 0;
-      const startDate = seasonStartDate(category) || new Date().toISOString().slice(0, 10);
+      const startDate = currentLeagueDate();
       for (const item of planned) {
-        if (item.type === 'update') {
+        if (item.type === 'skip' || item.type === 'noop') continue;
+        if (['update_name', 'update_dni'].includes(item.type)) {
           await client.query(
             `UPDATE jugadores
                 SET nombre = $1,
@@ -1262,6 +1385,50 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
                     updated_at = NOW()
               WHERE id = $4`,
             [item.row.nombre, normalizeText(item.row.nombre), item.row.dni, item.playerId]
+          );
+          updated += 1;
+          continue;
+        }
+        if (item.updateName) {
+          await client.query(
+            `UPDATE jugadores
+                SET nombre = $1, nombre_normalizado = $2, updated_at = NOW()
+              WHERE id = $3`,
+            [item.row.nombre, normalizeText(item.row.nombre), item.playerId]
+          );
+        }
+        if (item.type === 'transfer') {
+          await client.query(
+            `UPDATE jugador_equipos
+                SET equipo_id = $1, desde = $2::date, updated_at = NOW()
+              WHERE id = $3`,
+            [team.id, startDate, item.associationId]
+          );
+          updated += 1;
+          continue;
+        }
+        if (item.type === 'attach' || item.type === 'category_add') {
+          if (item.type === 'category_add' && item.categoryMode === 'ascend') {
+            await client.query(
+              `UPDATE jugador_equipos
+                  SET activo = false, hasta = ($2::date - INTERVAL '1 day')::date, updated_at = NOW()
+                WHERE jugador_id = $1
+                  AND activo = true
+                  AND CASE categoria WHEN 'tercera' THEN 1 WHEN 'segunda' THEN 2 WHEN 'primera' THEN 3 ELSE 0 END < $3`,
+              [item.playerId, startDate, categoryRank(category)]
+            );
+          }
+          await client.query(
+            `INSERT INTO jugador_equipos
+               (jugador_id, equipo_id, categoria, activo, desde, created_at, updated_at)
+             VALUES ($1, $2, $3, true, $4::date, NOW(), NOW())`,
+            [item.playerId, team.id, category, startDate]
+          );
+          await client.query(
+            `UPDATE jugadores
+                SET categoria_actual = $1, updated_at = NOW()
+              WHERE id = $2`,
+            [category, item.playerId]
           );
           updated += 1;
           continue;
