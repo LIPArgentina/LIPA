@@ -232,11 +232,16 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
     const value = String(rawValue || '').trim().toLowerCase();
     if (!value) return null;
     const result = await pool.query(
-      `SELECT DISTINCT e.id, e.slug_uid, e.slug_base, e.display_name, e.division, e.captain, e.subcaptain
+      `SELECT e.id, e.slug_uid, e.slug_base, e.display_name, e.division, e.captain, e.subcaptain
          FROM equipos e
-         LEFT JOIN equipo_slug_aliases a ON a.equipo_id = e.id
-        WHERE e.division = $2
-          AND (LOWER(e.slug_uid) = $1 OR LOWER(e.slug_base) = $1 OR LOWER(e.display_name) = $1 OR LOWER(a.alias_slug) = $1)
+        WHERE e.id IN (
+          SELECT candidate.id
+          FROM equipos candidate
+          LEFT JOIN equipo_slug_aliases a ON a.equipo_id = candidate.id
+          WHERE candidate.division = $2
+            AND (LOWER(candidate.slug_uid) = $1 OR LOWER(candidate.slug_base) = $1 OR LOWER(candidate.display_name) = $1 OR LOWER(a.alias_slug) = $1)
+        )
+          AND e.division = $2
         ORDER BY CASE WHEN LOWER(e.slug_uid) = $1 THEN 0 WHEN LOWER(e.slug_base) = $1 THEN 1 ELSE 2 END, e.id
         LIMIT 1`,
       [value, division]

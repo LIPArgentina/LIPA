@@ -524,7 +524,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
 
   function requirePublicPlayerCategoryAccess(req, res, next) {
     const category = normalizeCategory(req.query.category || 'tercera');
-    if (!['segunda', 'tercera'].includes(category)) {
+    if (!['primera', 'segunda', 'tercera'].includes(category)) {
       return res.status(400).json({ ok: false, error: 'Categoría inválida' });
     }
     req.publicPlayerCategory = category;
