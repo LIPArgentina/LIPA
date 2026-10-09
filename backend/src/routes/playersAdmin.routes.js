@@ -375,10 +375,10 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
   }
 
   function canonicalPersonKey(row = {}) {
-    const name = normalizeText(row.nombre_normalizado || row.nombre || '');
-    if (name) return `name:${name}`;
     const dni = normalizeDni(row.dni || '');
-    return dni ? `dni:${dni}` : `id:${row.id}`;
+    if (dni) return `dni:${dni}`;
+    const name = normalizeText(row.nombre_normalizado || row.nombre || '');
+    return name ? `name:${name}` : `id:${row.id}`;
   }
 
   function associationSortValue(row = {}) {
@@ -929,7 +929,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         JOIN equipos e ON e.id = je.equipo_id
         WHERE (
           ($2 <> '' AND j.dni = $2)
-          OR ($3 <> '' AND COALESCE(j.nombre_normalizado, '') = $3)
+          OR ($2 = '' AND $3 <> '' AND COALESCE(j.nombre_normalizado, '') = $3)
           OR j.id = $1
         )
           AND je.categoria = $4
@@ -1707,6 +1707,63 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     } catch (err) {
       console.error('players-admin/rename-player', err);
       return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  router.post('/players-admin/split-category-identity', requireAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await ensureSchema();
+      const playerId = Number(req.body?.playerId);
+      const category = normalizeCategory(req.body?.category);
+      const newDni = normalizeDni(req.body?.dni);
+      if (!Number.isFinite(playerId)) return res.status(400).json({ ok: false, error: 'Jugador inválido' });
+      if (!category) return res.status(400).json({ ok: false, error: 'Categoría inválida' });
+      if (!newDni) return res.status(400).json({ ok: false, error: 'Falta el DNI correcto' });
+
+      await client.query('BEGIN');
+      const sourceResult = await client.query(`SELECT * FROM jugadores WHERE id = $1 FOR UPDATE`, [playerId]);
+      const source = sourceResult.rows[0];
+      if (!source) throw new Error('Jugador no encontrado');
+
+      const owner = await client.query(`SELECT id FROM jugadores WHERE dni = $1 AND id <> $2 LIMIT 1`, [newDni, playerId]);
+      if (owner.rowCount) throw new Error('El DNI correcto ya pertenece a otro jugador. No se modificó nada.');
+
+      const categories = await client.query(`SELECT DISTINCT categoria FROM jugador_equipos WHERE jugador_id = $1`, [playerId]);
+      if (categories.rows.length < 2) throw new Error('El jugador no tiene historiales de categorías diferentes para separar.');
+
+      const targetAssociations = await client.query(
+        `SELECT id FROM jugador_equipos WHERE jugador_id = $1 AND categoria = $2 FOR UPDATE`,
+        [playerId, category]
+      );
+      if (!targetAssociations.rowCount) throw new Error('No se encontró historial en la categoría seleccionada.');
+
+      const inserted = await client.query(
+        `INSERT INTO jugadores
+           (nombre, dni, fecha_nacimiento, foto_path, nombre_normalizado, categoria_actual, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+         RETURNING id`,
+        [source.nombre, newDni, source.fecha_nacimiento, source.foto_path, source.nombre_normalizado, category]
+      );
+      const newPlayerId = inserted.rows[0].id;
+
+      await client.query(
+        `UPDATE jugador_equipos SET jugador_id = $1, updated_at = NOW() WHERE jugador_id = $2 AND categoria = $3`,
+        [newPlayerId, playerId, category]
+      );
+      await client.query(
+        `UPDATE jugadores SET categoria_actual = COALESCE((SELECT categoria FROM jugador_equipos WHERE jugador_id = $1 AND activo = true ORDER BY id DESC LIMIT 1), categoria_actual), updated_at = NOW() WHERE id = $1`,
+        [playerId]
+      );
+      await client.query('COMMIT');
+      const players = await readPlayer(newPlayerId);
+      return res.json({ ok: true, player: players[0] || null, associations: players, previousPlayerId: playerId });
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      console.error('players-admin/split-category-identity', err);
+      return res.status(400).json({ ok: false, error: err.message || 'No se pudo separar la identidad' });
+    } finally {
+      client.release();
     }
   });
 

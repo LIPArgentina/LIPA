@@ -4,6 +4,7 @@ const $ = (selector) => document.querySelector(selector);
 let croppedPlayerPhoto = null;
 let editingOriginalName = '';
 let editingOriginalCategory = '';
+let editingOriginalDni = '';
 let currentResultsMode = 'players';
 const UNASSIGNED_TEAM_VALUE = '__sin_equipo__';
 
@@ -134,6 +135,7 @@ function clearForm(){
   $('#playerName').readOnly = false;
   editingOriginalName = '';
   editingOriginalCategory = '';
+  editingOriginalDni = '';
   $('#playerDni').value = '';
   $('#playerBirth').value = '';
   $('#playerPhoto').value = '';
@@ -147,6 +149,7 @@ function clearForm(){
 async function fillForm(player){
   editingOriginalName = player?.nombre || player?.name || '';
   editingOriginalCategory = player?.categoria || player?.categoriaActual || '';
+  editingOriginalDni = player?.dni || '';
   $('#playerId').value = player?.id || '';
   $('#associationId').value = player?.associationId || '';
   $('#playerName').value = editingOriginalName;
@@ -549,6 +552,19 @@ async function handleTeamImportChange(){
   }
 }
 
+async function splitCategoryIdentity({ playerId, category, dni, playerName }){
+  const confirmed = confirm(
+    `${playerName} tiene historial en más de una categoría.\n\n` +
+    `¿Separar todo su historial de ${categoryLabel(category)} con el DNI ${dni}, conservando el registro anterior para las demás categorías?`
+  );
+  if (!confirmed) return null;
+  return fetchJson('/api/players-admin/split-category-identity', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerId, category, dni }),
+  });
+}
+
 async function savePlayer(ev){
   ev?.preventDefault();
   const category = $('#playerCategory').value;
@@ -556,11 +572,34 @@ async function savePlayer(ev){
   const associationId = $('#associationId').value;
   const playerId = $('#playerId').value;
   const playerName = $('#playerName').value.trim();
+  const requestedDni = $('#playerDni').value.trim();
   let categoryChangeMode = '';
 
   if (playerId && slugify(playerName) !== slugify(editingOriginalName)) {
     setStatus('Para cargar otro jugador tocá Nuevo antes de guardar.', true);
     return;
+  }
+
+  if (playerId && editingOriginalDni && requestedDni && requestedDni !== editingOriginalDni) {
+    try {
+      const historyData = await fetchJson(`/api/players-admin/history/${encodeURIComponent(playerId)}`);
+      const categories = new Set((historyData.history || []).map(item => item.categoria).filter(Boolean));
+      if (categories.size > 1) {
+        const splitData = await splitCategoryIdentity({ playerId, category, dni: requestedDni, playerName });
+        if (!splitData) {
+          setStatus('Separación cancelada. No se modificó nada.');
+          return;
+        }
+        const splitPlayer = splitData.player || {};
+        await fillForm(splitPlayer);
+        renderPlayers(splitData.associations || (splitPlayer.id ? [splitPlayer] : []));
+        toast('Jugador e historial separados correctamente');
+        return;
+      }
+    } catch (err) {
+      setStatus(err.message || 'No se pudo separar la identidad', true);
+      return;
+    }
   }
 
   if (associationId && editingOriginalCategory && category !== editingOriginalCategory) {
@@ -584,7 +623,7 @@ async function savePlayer(ev){
   if (playerId) form.set('id', playerId);
   if (associationId) form.set('associationId', associationId);
   form.set('nombre', playerName);
-  form.set('dni', $('#playerDni').value.trim());
+  form.set('dni', requestedDni);
   form.set('fechaNacimiento', $('#playerBirth').value);
   form.set('categoria', category);
   form.set('team', team);
