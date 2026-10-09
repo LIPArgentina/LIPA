@@ -67,8 +67,10 @@
   const normalizeCategoryValue = (raw) => {
     const v = String(raw || '').trim().toLowerCase();
     if (!v) return '';
+    if (v.includes('prim')) return 'primera';
     if (v.includes('terc')) return 'tercera';
     if (v.includes('seg')) return 'segunda';
+    if (v === '1' || v === 'a') return 'primera';
     if (v === '3' || v === 'c') return 'tercera';
     if (v === '2' || v === 'b') return 'segunda';
     return '';
@@ -296,8 +298,8 @@ function apiUrl(path){
     document.body.classList.remove('player-photo-open');
   }
 
-  async function loadTeamPlayers(teamRef){
-    const category = deriveCategory();
+  async function loadTeamPlayers(teamRef, categoryOverride = ''){
+    const category = normalizeCategoryValue(categoryOverride) || deriveCategory();
     const cacheKey = `${category}:${normalizePlayerName(teamRef)}`;
     if (!teamPlayersCache.has(cacheKey)) {
       const params = new URLSearchParams({ category, team: String(teamRef || '') });
@@ -310,6 +312,18 @@ function apiUrl(path){
       }));
     }
     return teamPlayersCache.get(cacheKey);
+  }
+
+  async function isFirstCategoryPlayer(playerNameValue, playerId, teamRef){
+    if (deriveCategory() !== 'segunda') return false;
+    const wantedId = Number(playerId || 0);
+    const wantedName = normalizePlayerName(playerNameValue);
+    const firstPlayers = await loadTeamPlayers(teamRef, 'primera').catch(() => []);
+    return firstPlayers.some(player => {
+      const candidateId = Number(player?.id || 0);
+      if (wantedId > 0 && candidateId > 0) return candidateId === wantedId;
+      return wantedName && normalizePlayerName(player?.nombre || player?.name) === wantedName;
+    });
   }
 
   async function findPlayer(playerNameValue, teamRef){
@@ -1645,6 +1659,14 @@ function apiUrl(path){
         } else {
           if (substitutions.some(change => change.fieldIndex === fieldIndex)) {
             showToast('Esa posición ya tiene un cambio realizado.', 'info');
+            return;
+          }
+          if (
+            deriveCategory() === 'segunda' &&
+            fieldIndex >= 2 &&
+            await isFirstCategoryPlayer(selectedSub, selectedSubId, root.dataset.teamRef)
+          ) {
+            showToast('Un jugador de Primera no puede ingresar en un casillero de Segundas.', 'error');
             return;
           }
           setSlotValue(slot, selectedSub, selectedSubId);
