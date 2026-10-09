@@ -60,7 +60,9 @@ function setStatus(message, isError = false){
 }
 
 const teamsCache = new Map();
-const MAX_TEAM_PLAYERS = 20;
+function maxTeamPlayers(category){
+  return category === 'segunda' ? 25 : 20;
+}
 
 async function loadTeams(category){
   if (teamsCache.has(category)) return teamsCache.get(category);
@@ -300,8 +302,9 @@ async function ensureTeamHasRoom({ category, team, associationId, playerId }){
     (associationId && String(player.associationId || '') === String(associationId)) ||
     (playerId && String(player.id || '') === String(playerId))
   );
-  if (!alreadyInTeam && players.length >= MAX_TEAM_PLAYERS) {
-    throw new Error(`Ese equipo ya tiene ${MAX_TEAM_PLAYERS} jugadores activos. Quitá uno antes de agregar otro.`);
+  const limit = maxTeamPlayers(category);
+  if (!alreadyInTeam && players.length >= limit) {
+    throw new Error(`Ese equipo ya tiene ${limit} jugadores activos. Quitá uno antes de agregar otro.`);
   }
   return true;
 }

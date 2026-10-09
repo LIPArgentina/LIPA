@@ -79,6 +79,10 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     return { tercera: 'Tercera', segunda: 'Segunda', primera: 'Primera' }[normalizeCategory(value)] || String(value || '');
   }
 
+  function teamPlayerLimit(category) {
+    return normalizeCategory(category) === 'segunda' ? 25 : 20;
+  }
+
   function normalizeBirthDate(value) {
     const text = String(value || '').trim();
     return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
@@ -520,8 +524,9 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       `,
       [teamId, category, playerId]
     );
-    if (Number(count.rows[0]?.total || 0) >= 20) {
-      throw new Error('Ese equipo ya tiene 20 jugadores activos. Quitá uno antes de agregar otro.');
+    const limit = teamPlayerLimit(category);
+    if (Number(count.rows[0]?.total || 0) >= limit) {
+      throw new Error(`Ese equipo ya tiene ${limit} jugadores activos. Quitá uno antes de agregar otro.`);
     }
   }
 
@@ -1233,12 +1238,13 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         [team.id, category]
       );
       const createdCount = planned.filter(item => item.type === 'create').length;
-      if (Number(rosterCount.rows[0]?.total || 0) + createdCount > 20) {
+      const limit = teamPlayerLimit(category);
+      if (Number(rosterCount.rows[0]?.total || 0) + createdCount > limit) {
         await client.query('ROLLBACK');
         transactionOpen = false;
         return res.status(409).json({
           ok: false,
-          error: `La importación dejaría ${Number(rosterCount.rows[0]?.total || 0) + createdCount} jugadores activos. El máximo por equipo es 20.`,
+          error: `La importación dejaría ${Number(rosterCount.rows[0]?.total || 0) + createdCount} jugadores activos. El máximo por equipo es ${limit}.`,
           conflicts: [{ row: 0, message: 'Reducí la cantidad de jugadores nuevos antes de importar.' }]
         });
       }
