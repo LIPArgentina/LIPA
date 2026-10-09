@@ -648,6 +648,56 @@
     return itemLocal === only || itemVisitante === only;
   }
 
+  function inferSubstitutions(original = {}, current = {}) {
+    const originalPlayers = Array.isArray(original?.individuales) ? original.individuales : [];
+    const currentPlayers = Array.isArray(current?.individuales) ? current.individuales : [];
+    const originalBench = Array.isArray(original?.suplentes) ? original.suplentes : [];
+    const currentBench = Array.isArray(current?.suplentes) ? current.suplentes : [];
+    const changes = [];
+    originalPlayers.forEach((starter, fieldIndex) => {
+      const substitute = String(currentPlayers[fieldIndex] || '').trim();
+      if (!starter || !substitute || normalizePlayerName(starter) === normalizePlayerName(substitute)) return;
+      const benchIndex = originalBench.findIndex(name => normalizePlayerName(name) === normalizePlayerName(substitute));
+      if (benchIndex < 0 || normalizePlayerName(currentBench[benchIndex]) !== normalizePlayerName(starter)) return;
+      changes.push({ benchIndex, fieldSection: 'individuales', fieldIndex, substitute, starter: String(starter).trim() });
+    });
+    return changes;
+  }
+
+  function publishedPlanillaForTeam(items, teamRef, category) {
+    const wanted = normalizeFilterTeam(teamRef);
+    const found = items.find(item => {
+      const itemCategory = String(item?.category || item?.division || item?.planilla?.category || '').toLowerCase();
+      if (itemCategory && itemCategory !== category) return false;
+      return [item?.team, item?.team_base, item?.slug_uid, item?.teamName, item?.planilla?.team]
+        .some(value => normalizeFilterTeam(value) === wanted);
+    });
+    return found?.planilla || null;
+  }
+
+  async function restoreResultSubstitutions(results, category) {
+    const needsRestore = results.some(item =>
+      String(item?.tipo || 'cruce').toLowerCase() === 'cruce' &&
+      (!item?.localPlanilla?.substitutions?.length || !item?.visitantePlanilla?.substitutions?.length)
+    );
+    if (!needsRestore) return;
+    const planillas = await fetchJson(apiUrl('/api/admin/planillas'), {
+      cache: 'no-store', credentials: 'same-origin'
+    }).catch(() => []);
+    if (!Array.isArray(planillas)) return;
+    results.forEach(item => {
+      if (String(item?.tipo || 'cruce').toLowerCase() !== 'cruce') return;
+      const localOriginal = publishedPlanillaForTeam(planillas, item.localSlug || item.localName, category);
+      const visitanteOriginal = publishedPlanillaForTeam(planillas, item.visitanteSlug || item.visitanteName, category);
+      if (!item.localPlanilla?.substitutions?.length) {
+        item.localPlanilla.substitutions = inferSubstitutions(localOriginal, item.localPlanilla);
+      }
+      if (!item.visitantePlanilla?.substitutions?.length) {
+        item.visitantePlanilla.substitutions = inferSubstitutions(visitanteOriginal, item.visitantePlanilla);
+      }
+    });
+  }
+
   async function init(){
     const params = new URLSearchParams(location.search);
     const category = String(params.get('category') || 'segunda').trim().toLowerCase();
@@ -721,6 +771,7 @@
     if (localFiltro || visitanteFiltro) {
       results = results.filter(item => resultMatchesTeams(item, localFiltro, visitanteFiltro));
     }
+    await restoreResultSubstitutions(results, category);
     document.getElementById('heroTitle').textContent = results.length
       ? (isReprogrammed ? 'Encuentro reprogramado validado' : 'Encuentros validados')
       : (isReprogrammed ? 'Encuentro reprogramado' : 'Sin encuentros validados');

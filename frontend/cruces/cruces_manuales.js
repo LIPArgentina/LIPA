@@ -454,6 +454,48 @@
     select.value = player;
   }
 
+  function inferSubstitutions(original = {}, current = {}) {
+    const originalPlayers = Array.isArray(original?.individuales) ? original.individuales : [];
+    const currentPlayers = Array.isArray(current?.individuales) ? current.individuales : [];
+    const originalBench = Array.isArray(original?.suplentes) ? original.suplentes : [];
+    const currentBench = Array.isArray(current?.suplentes) ? current.suplentes : [];
+    const changes = [];
+
+    originalPlayers.forEach((starter, fieldIndex) => {
+      const substitute = String(currentPlayers[fieldIndex] || '').trim();
+      if (!starter || !substitute || normalizeIdentity(starter) === normalizeIdentity(substitute)) return;
+      const benchIndex = originalBench.findIndex(name => normalizeIdentity(name) === normalizeIdentity(substitute));
+      if (benchIndex < 0 || normalizeIdentity(currentBench[benchIndex]) !== normalizeIdentity(starter)) return;
+      changes.push({
+        benchIndex,
+        fieldSection: 'individuales',
+        fieldIndex,
+        substitute,
+        starter: String(starter).trim()
+      });
+    });
+    return changes;
+  }
+
+  function getRootSubstitutions(root) {
+    try { return JSON.parse(root?.dataset?.substitutions || '[]'); }
+    catch (_) { return []; }
+  }
+
+  function setRootSubstitutions(root, substitutions) {
+    const safe = Array.isArray(substitutions) ? substitutions : [];
+    root.dataset.substitutions = JSON.stringify(safe);
+    root.querySelectorAll('.player-select').forEach(select => {
+      select.classList.remove('substitution-in', 'substitution-out');
+    });
+    const fieldSlots = root.querySelectorAll('.section[data-section="individuales"] .player-select');
+    const benchSlots = root.querySelectorAll('.section[data-section="suplentes"] .player-select');
+    safe.forEach(change => {
+      fieldSlots[Number(change?.fieldIndex)]?.classList.add('substitution-in');
+      benchSlots[Number(change?.benchIndex)]?.classList.add('substitution-out');
+    });
+  }
+
   function applyPlanilla(rootId, planilla = {}, side = {}) {
     ['capitan', 'individuales', 'pareja1', 'pareja2', 'suplentes'].forEach((key) => {
       const values = Array.isArray(planilla?.[key]) ? planilla[key] : [];
@@ -465,6 +507,8 @@
     document.querySelectorAll(`#${rootId} .pts-select`).forEach((select, index) => {
       select.value = String(Number(scores[index] || 0));
     });
+    const root = document.getElementById(rootId);
+    setRootSubstitutions(root, planilla?.substitutions || []);
   }
 
   function wireEditorEvents(rootId) {
@@ -507,6 +551,20 @@
         selectedSubstitute.classList.add('substitution-out');
         select.classList.remove('substitution-out');
         select.classList.add('substitution-in');
+        const benchSlots = [...root.querySelectorAll('.section[data-section="suplentes"] .player-select')];
+        const fieldSlots = [...root.querySelectorAll('.section[data-section="individuales"] .player-select')];
+        const benchIndex = benchSlots.indexOf(selectedSubstitute);
+        const fieldIndex = fieldSlots.indexOf(select);
+        const substitutions = getRootSubstitutions(root)
+          .filter(change => Number(change?.benchIndex) !== benchIndex && Number(change?.fieldIndex) !== fieldIndex);
+        substitutions.push({
+          benchIndex,
+          fieldSection: 'individuales',
+          fieldIndex,
+          substitute: incoming,
+          starter: outgoing
+        });
+        setRootSubstitutions(root, substitutions);
         selectedSubstitute = null;
         setStatus('Cambio aplicado: el jugador que entra está marcado en verde y el que sale en rojo.', 'ok');
       });
@@ -549,17 +607,25 @@
       wireEditorEvents('visitanteRoot');
 
       const result = resultForMatch(match);
+      const planillas = await loadPublishedPlanillas();
+      const localOriginal = publishedPlanillaForTeam(planillas, {
+        slug: match.localSlug, name: match.localName
+      });
+      const visitanteOriginal = publishedPlanillaForTeam(planillas, {
+        slug: match.visitanteSlug, name: match.visitanteName
+      });
       if (result) {
+        if (!Array.isArray(result.localPlanilla?.substitutions) || !result.localPlanilla.substitutions.length) {
+          result.localPlanilla.substitutions = inferSubstitutions(localOriginal, result.localPlanilla);
+        }
+        if (!Array.isArray(result.visitantePlanilla?.substitutions) || !result.visitantePlanilla.substitutions.length) {
+          result.visitantePlanilla.substitutions = inferSubstitutions(visitanteOriginal, result.visitantePlanilla);
+        }
         applyPlanilla('localRoot', result.localPlanilla, result.local);
         applyPlanilla('visitanteRoot', result.visitantePlanilla, result.visitante);
       } else {
-        const planillas = await loadPublishedPlanillas();
-        const localPlanilla = publishedPlanillaForTeam(planillas, {
-          slug: match.localSlug, name: match.localName
-        });
-        const visitantePlanilla = publishedPlanillaForTeam(planillas, {
-          slug: match.visitanteSlug, name: match.visitanteName
-        });
+        const localPlanilla = localOriginal;
+        const visitantePlanilla = visitanteOriginal;
         if (localPlanilla) applyPlanilla('localRoot', localPlanilla, {});
         if (visitantePlanilla) applyPlanilla('visitanteRoot', visitantePlanilla, {});
         state.loadedFromPlanillas = !!(localPlanilla || visitantePlanilla);
@@ -599,6 +665,7 @@
     output.individualesPts = scores.slice(0, format.individualCount);
     output.pareja1Pts = format.pairCount >= 1 ? [scores[format.individualCount] || 0] : [];
     output.pareja2Pts = format.pairCount >= 2 ? [scores[format.individualCount + 1] || 0] : [];
+    output.substitutions = getRootSubstitutions(document.getElementById(rootId));
     return output;
   }
 
