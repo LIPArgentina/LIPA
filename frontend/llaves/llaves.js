@@ -45,8 +45,24 @@ const CATEGORY_CONFIG = {
   }
 };
 
+const SPECIAL_EDITION = 7;
+
+function parseEdition(value){
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === 'especial' || raw === 'special') return SPECIAL_EDITION;
+  return Number(raw) || 6;
+}
+
+function editionUrlValue(edition){
+  return Number(edition) === SPECIAL_EDITION ? 'especial' : String(edition);
+}
+
+function fixtureDataEdition(){
+  return currentEdition === SPECIAL_EDITION ? 6 : currentEdition;
+}
+
 let currentCategory = 'tercera';
-let currentEdition = Number(new URLSearchParams(window.location.search).get('edition')) || 6;
+let currentEdition = parseEdition(new URLSearchParams(window.location.search).get('edition'));
 let TEAM_OPTIONS = ['WO'];
 let CURRENT_STANDINGS = null;
 let currentPublicVisible = currentEdition < 6;
@@ -193,7 +209,7 @@ function parseScore(value){
 }
 
 async function fetchFixtureData(kind, category){
-  const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}&edition=${encodeURIComponent(currentEdition)}`, {
+  const resp = await fetch(`${API_BASE}/fixture?kind=${encodeURIComponent(kind)}&category=${encodeURIComponent(category)}&edition=${encodeURIComponent(fixtureDataEdition())}`, {
     cache: 'no-store'
   });
   const data = await resp.json().catch(() => null);
@@ -978,6 +994,11 @@ async function renderCategory(category){
 
 
 async function bootstrap(){
+  document.querySelectorAll('.edition-btn[data-edition]').forEach(item => {
+    const active = parseEdition(item.dataset.edition) === currentEdition;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-pressed', String(active));
+  });
   await renderCategory(currentCategory);
 
   document.querySelectorAll('.cat-btn[data-category]').forEach(btn => {
@@ -994,12 +1015,14 @@ async function bootstrap(){
 
   document.querySelectorAll('.edition-btn[data-edition]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      currentEdition = Number(btn.dataset.edition) || 6;
+      currentEdition = parseEdition(btn.dataset.edition);
       document.querySelectorAll('.edition-btn[data-edition]').forEach(item => {
-        item.classList.toggle('active', Number(item.dataset.edition) === currentEdition);
+        const active = parseEdition(item.dataset.edition) === currentEdition;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
       });
       const url = new URL(window.location.href);
-      url.searchParams.set('edition', String(currentEdition));
+      url.searchParams.set('edition', editionUrlValue(currentEdition));
       window.history.replaceState({}, '', url);
       try {
         await renderCategory(currentCategory);

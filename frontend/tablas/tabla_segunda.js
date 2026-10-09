@@ -421,6 +421,12 @@ async function renderPodium(){
   const mount = document.getElementById('podioSuperligaMount');
   if (!mount) return;
 
+  if (selectedEdition === SPECIAL_EDITION) {
+    mount.hidden = true;
+    mount.innerHTML = '';
+    return;
+  }
+
   const result = await loadPodiumResult('segunda').catch(() => null);
   if (!result) {
     mount.hidden = true;
@@ -465,12 +471,22 @@ async function switchEdition(edition){
   populateStandingsControls();
   renderStandings();
   renderSelectedFixture();
-  window.dispatchEvent(new CustomEvent('tournament:edition-changed', { detail: { edition: dataEdition(), editionSelection: selectedEdition } }));
+  renderPodium();
+  window.dispatchEvent(new CustomEvent('tournament:edition-changed', {
+    detail: {
+      edition: dataEdition(),
+      bracketEdition: selectedEdition === SPECIAL_EDITION ? 7 : dataEdition(),
+      editionSelection: selectedEdition
+    }
+  }));
 }
 
 async function init(){
   applyEditionState();
   selectedKind = 'ida';
+  window.dispatchEvent(new CustomEvent('tournament:edition-changed', {
+    detail: { edition: dataEdition(), bracketEdition: 7, editionSelection: selectedEdition }
+  }));
   try { localStorage.setItem('fixture_kind_segunda', selectedKind); } catch(_) {}
   document.querySelectorAll('.pill-btn[data-fixture]').forEach(btn => {
     btn.addEventListener('click', () => {
