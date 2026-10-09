@@ -98,10 +98,11 @@ function authHeaders(extra = {}){
     }catch(_){}
   }
 
-  function slot(idx, name, section){
+  function slot(idx, name, section, allowedCategory = 'team', dataIndex = idx - 1){
     const el = document.createElement('div'); el.className='slot';
     el.dataset.section = section;
-    el.dataset.index = String(idx - 1);
+    el.dataset.index = String(dataIndex);
+    el.dataset.allowedCategory = allowedCategory;
     const n  = Object.assign(document.createElement('div'), {className:'nro'});
     n.textContent = idx;
     const y  = Object.assign(document.createElement('div'), {className:'yellow-box'});
@@ -110,11 +111,18 @@ function authHeaders(extra = {}){
     return el;
   }
 
-  function renderBoard(plan, target){
-    function fill(arr, count, section){
+  function renderBoard(plan, target, category){
+    function fill(arr, count, section, startIndex = 0, allowedCategory = 'team'){
       const c = document.createElement('div'); c.className='grid';
-      for(let i=0;i<count;i++){ c.appendChild(slot(i+1, arr[i] || '', section)); }
+      for(let i=0;i<count;i++){ c.appendChild(slot(i+1, arr[startIndex + i] || '', section, allowedCategory, startIndex + i)); }
       return c;
+    }
+
+    function appendSubgroup(group, title, content){
+      const subtitle = document.createElement('h4');
+      subtitle.className = 'planilla-subgroup-title';
+      subtitle.textContent = title;
+      group.append(subtitle, content);
     }
 
     const safePlan = plan || {};
@@ -122,13 +130,25 @@ function authHeaders(extra = {}){
     const groups = document.createElement('div'); groups.className='groups';
 
     const g0 = document.createElement('article'); g0.className='group'; g0.innerHTML = '<h3>CAPITANES</h3>';
-    g0.appendChild(fill(Array.isArray(safePlan.capitan) ? safePlan.capitan : [], 2, 'capitan'));
+    g0.appendChild(fill(Array.isArray(safePlan.capitan) ? safePlan.capitan : [], 2, 'capitan', 0, category === 'segunda' ? 'mixed' : 'team'));
 
     const g1 = document.createElement('article'); g1.className='group'; g1.innerHTML = '<h3>INDIVIDUALES</h3>';
-    g1.appendChild(fill(Array.isArray(safePlan.individuales) ? safePlan.individuales : [], INDIVIDUAL_COUNT, 'individuales'));
+    const individualPlayers = Array.isArray(safePlan.individuales) ? safePlan.individuales : [];
+    if(category === 'segunda'){
+      appendSubgroup(g1, 'PRIMERAS', fill(individualPlayers, 2, 'individuales', 0, 'mixed'));
+      appendSubgroup(g1, 'SEGUNDAS', fill(individualPlayers, 9, 'individuales', 2, 'segunda'));
+    }else{
+      g1.appendChild(fill(individualPlayers, INDIVIDUAL_COUNT, 'individuales'));
+    }
 
     const g4 = document.createElement('article'); g4.className='group'; g4.innerHTML = '<h3>SUPLENTES</h3>';
-    g4.appendChild(fill(Array.isArray(safePlan.suplentes) ? safePlan.suplentes : [], 2, 'suplentes'));
+    const substitutePlayers = Array.isArray(safePlan.suplentes) ? safePlan.suplentes : [];
+    if(category === 'segunda'){
+      appendSubgroup(g4, 'PRIMERAS', fill(substitutePlayers, 1, 'suplentes', 0, 'mixed'));
+      appendSubgroup(g4, 'SEGUNDAS', fill(substitutePlayers, 2, 'suplentes', 1, 'segunda'));
+    }else{
+      g4.appendChild(fill(substitutePlayers, 2, 'suplentes'));
+    }
 
     groups.appendChild(g0);
     groups.appendChild(g1);
@@ -166,10 +186,27 @@ function authHeaders(extra = {}){
       team: item.slug_uid || item.team || item.teamName || ''
     });
     const data = await fetchJson(`/api/players-public/by-team?${query}`);
-    const players = (Array.isArray(data.players) ? data.players : []).map(player => ({
+    let players = (Array.isArray(data.players) ? data.players : []).map(player => ({
       id: Number(player.id || 0) || null,
-      name: String(player.nombre || player.name || '').trim()
+      name: String(player.nombre || player.name || '').trim(),
+      category: item.__category || ''
     })).filter(player => player.name);
+    if(item.__category === 'segunda'){
+      const firstQuery = new URLSearchParams({ category:'primera', team:item.team_base || item.team || item.teamName || '' });
+      const firstData = await fetchJson(`/api/players-public/by-team?${firstQuery}`);
+      const firstPlayers = (Array.isArray(firstData.players) ? firstData.players : []).map(player => ({
+        id: Number(player.id || 0) || null,
+        name: String(player.nombre || player.name || '').trim(),
+        category:'primera'
+      })).filter(player => player.name);
+      players = firstPlayers.concat(players.map(player => ({ ...player, category:'segunda' })));
+      for(const captainName of (Array.isArray(item.sourceCaptains) ? item.sourceCaptains : [])){
+        const name = String(captainName || '').trim();
+        if(name && !players.some(player => normalizeTeamName(player.name) === normalizeTeamName(name))){
+          players.unshift({ id:null, name, category:'captain' });
+        }
+      }
+    }
     state.rosterCache.set(key, players);
     return players;
   }
@@ -185,8 +222,16 @@ function authHeaders(extra = {}){
       select.dataset.section = slotElement.dataset.section;
       select.dataset.index = slotElement.dataset.index;
       select.appendChild(new Option('— VACÍO —', ''));
-      players.forEach(player => {
-        const option = new Option(player.name, String(player.id || ''));
+      const allowedCategory = slotElement.dataset.allowedCategory || 'team';
+      const availablePlayers = allowedCategory === 'segunda'
+        ? players.filter(player => player.category === 'segunda')
+        : [...players];
+      if(current && !availablePlayers.some(player => normalizeTeamName(player.name) === normalizeTeamName(current))){
+        availablePlayers.unshift({ id:null, name:current, category:'current' });
+      }
+      availablePlayers.forEach(player => {
+        const optionValue = player.id ? String(player.id) : `name:${encodeURIComponent(player.name)}`;
+        const option = new Option(player.name, optionValue);
         option.dataset.playerName = player.name;
         if(normalizeTeamName(player.name) === normalizeTeamName(current)) option.selected = true;
         select.appendChild(option);
@@ -619,10 +664,10 @@ function authHeaders(extra = {}){
       card.appendChild(h2);
 
       if(plan && (plan.individuales || plan.pareja1 || plan.pareja2 || plan.suplentes)){
-        renderBoard(plan, card);
+        renderBoard(plan, card, item.__category);
         markFreshness(card, updatedAt);
       }else{
-        renderBoard({ individuales:[], pareja1:[], pareja2:[], suplentes:[] }, card);
+        renderBoard({ individuales:[], pareja1:[], pareja2:[], suplentes:[] }, card, item.__category);
         markFreshness(card, updatedAt);
         const small = document.createElement('div');
         small.style.cssText = 'opacity:.8;text-align:center;margin-top:6px;font-size:12px;';
