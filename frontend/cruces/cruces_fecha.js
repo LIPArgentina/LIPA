@@ -1165,22 +1165,29 @@ function apiUrl(path){
     }
 
     const secs = card.querySelector('.sections');
+    const category = deriveCategory();
+    const padSection = (values, count) => Array.from(
+      { length: count },
+      (_, index) => String(values?.[index] || '').trim()
+    );
     const data = {
       'CAPITÁN': Array.from(
         { length: CAPTAIN_COUNT },
         (_, index) => String(planilla?.capitan?.[index] || '').trim()
       ),
-      'INDIVIDUALES': planilla.individuales || [],
+      'INDIVIDUALES': padSection(planilla?.individuales, INDIVIDUAL_COUNT),
       'PAREJA 1': planilla.pareja1 || [],
       'PAREJA 2': planilla.pareja2 || [],
-      'SUPLENTES': planilla.suplentes || []
+      'SUPLENTES': padSection(
+        planilla?.suplentes,
+        category === 'segunda' ? 3 : SUBSTITUTE_COUNT
+      )
     };
 
     const sections = ['CAPITÁN', 'INDIVIDUALES'];
     if (PAIR_COUNT >= 1) sections.push('PAREJA 1');
     if (PAIR_COUNT >= 2) sections.push('PAREJA 2');
     sections.push('SUPLENTES');
-    const category = deriveCategory();
     sections.forEach(sec => {
       const div = document.createElement('div');
       div.className = 'section';
