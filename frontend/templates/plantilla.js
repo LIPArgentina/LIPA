@@ -1010,7 +1010,7 @@ trash.addEventListener('drop', e => {
   }
   function fillCapitanes(){
     var captains = Array.isArray(window.LPI_CAPTAINS) ? window.LPI_CAPTAINS : [];
-    var slots = document.querySelectorAll(".jugadores-container .fila-capitan .jugador");
+    var slots = document.querySelectorAll(".fila-capitan .jugador");
     slots.forEach(function(div, i){
       div.textContent = captains[i] || '';
       var row = div.closest('.fila');

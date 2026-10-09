@@ -103,15 +103,41 @@ body {
   }
 
   .second-captains-panel{
-    width:250px;
+    width:100%;
+    max-width:250px;
     display:flex;
     flex-direction:column;
     gap:6px;
     margin:0 0 8px;
+    box-sizing:border-box;
   }
 
   .second-captains-panel h2{
     margin:0 0 4px;
+  }
+
+  .second-captains-panel .fila{
+    width:100%;
+    min-width:0;
+  }
+
+  .second-captains-panel .fila-capitan .numero{
+    width:20px;
+    min-width:20px;
+  }
+
+  .second-captains-panel .fila-capitan .jugador{
+    min-width:0;
+    width:auto;
+    flex:1 1 auto;
+    box-sizing:border-box;
+  }
+
+  @media (max-width:768px){
+    .second-captains-panel{
+      max-width:100%;
+      margin-bottom:5px;
+    }
   }
 
   #alert {
