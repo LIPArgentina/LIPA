@@ -228,6 +228,58 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
     }));
   }
 
+  async function resolveTeamInDivision(rawValue, division) {
+    const value = String(rawValue || '').trim().toLowerCase();
+    if (!value) return null;
+    const result = await pool.query(
+      `SELECT DISTINCT e.id, e.slug_uid, e.slug_base, e.display_name, e.division, e.captain, e.subcaptain
+         FROM equipos e
+         LEFT JOIN equipo_slug_aliases a ON a.equipo_id = e.id
+        WHERE e.division = $2
+          AND (LOWER(e.slug_uid) = $1 OR LOWER(e.slug_base) = $1 OR LOWER(e.display_name) = $1 OR LOWER(a.alias_slug) = $1)
+        ORDER BY CASE WHEN LOWER(e.slug_uid) = $1 THEN 0 WHEN LOWER(e.slug_base) = $1 THEN 1 ELSE 2 END, e.id
+        LIMIT 1`,
+      [value, division]
+    );
+    return result.rows[0] || null;
+  }
+
+  async function resolveCounterpartTeam(team, division) {
+    if (!team?.slug_base) return null;
+    const result = await pool.query(
+      `SELECT id, slug_uid, slug_base, display_name, division, captain, subcaptain
+         FROM equipos
+        WHERE division = $2
+          AND LOWER(slug_base) = LOWER($1)
+        ORDER BY activo DESC, id ASC
+        LIMIT 1`,
+      [team.slug_base, division]
+    );
+    return result.rows[0] || null;
+  }
+
+  async function buildSecondSheetResponse(secondTeam) {
+    const firstTeam = await resolveCounterpartTeam(secondTeam, 'primera');
+    const [secondPlayers, firstPlayers] = await Promise.all([
+      fetchPlayerDetailsForTeam(secondTeam.id),
+      firstTeam ? fetchPlayerDetailsForTeam(firstTeam.id) : Promise.resolve([])
+    ]);
+    const limitedFirst = firstPlayers.slice(0, 5);
+    const limitedSecond = secondPlayers.slice(0, 25);
+    return {
+      ok: true,
+      teamName: secondTeam.display_name,
+      division: 'segunda',
+      captain: firstTeam?.captain || '',
+      subcaptain: firstTeam?.subcaptain || '',
+      captains: [firstTeam?.captain || '', firstTeam?.subcaptain || ''].filter(Boolean),
+      firstPlayers: limitedFirst,
+      secondPlayers: limitedSecond,
+      players: [...limitedFirst, ...limitedSecond].map(player => player.name || player.nombre).filter(Boolean),
+      playerDetails: [...limitedFirst, ...limitedSecond]
+    };
+  }
+
   function normalizePlayers(input) {
     if (!Array.isArray(input)) return [];
 
@@ -424,6 +476,17 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
     }
   });
 
+  router.get('/team/second-sheet-assets', requireTeam, async (req, res) => {
+    try {
+      const secondTeam = await resolveTeamInDivision(req.user.slug, 'segunda');
+      if (!secondTeam) return res.status(404).json({ ok: false, error: 'Equipo de Segunda no encontrado' });
+      return res.json(await buildSecondSheetResponse(secondTeam));
+    } catch (err) {
+      console.error('GET /team/second-sheet-assets', err);
+      return res.status(500).json({ ok: false, error: 'No se pudieron cargar los planteles de Primera y Segunda' });
+    }
+  });
+
   router.post('/save-team-assets', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
@@ -502,14 +565,19 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
         const team = await resolveTeam(req.user.slug);
         if (!team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
 
+        const allowedTeamIds = [team.id];
+        if (team.division === 'segunda') {
+          const firstTeam = await resolveCounterpartTeam(team, 'primera');
+          if (firstTeam?.id) allowedTeamIds.push(firstTeam.id);
+        }
         const belongs = await pool.query(
           `SELECT 1
              FROM jugador_equipos
             WHERE jugador_id = $1
-              AND equipo_id = $2
+              AND equipo_id = ANY($2::int[])
               AND activo = true
             LIMIT 1`,
-          [playerId, team.id]
+          [playerId, allowedTeamIds]
         );
         if (!belongs.rows.length) {
           return res.status(403).json({ ok: false, error: 'Ese jugador no pertenece a tu equipo' });
@@ -536,6 +604,11 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
           [dni, fechaNacimiento, fotoPath, playerId]
         );
 
+        if (team.division === 'segunda') {
+          const sheet = await buildSecondSheetResponse(team);
+          const player = sheet.playerDetails.find(item => Number(item.id) === playerId) || null;
+          return res.json({ ...sheet, player });
+        }
         const players = await fetchPlayerDetailsForTeam(team.id);
         const player = players.find(item => Number(item.id) === playerId) || null;
         return res.json({ ok: true, player, players, ...buildResponse(team, players) });

@@ -86,6 +86,22 @@ body {
   .yellow-box.repeated { background-color: orange; color: black; }
   .yellow-box-free { background-color: #ffef5e; border-radius: 5px; height: 20px; min-width: 200px; padding: 0 5px; display: flex; align-items: center; font-size: 12px; cursor: pointer; color: black; }
 
+  .roster-subtitle,
+  .plan-subtitle{
+    width:100%;
+    margin:8px 0 2px;
+    color:#ffd966;
+    text-align:center;
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+
+  .second-template .jugadores-container{
+    max-height:none;
+  }
+
   #alert {
     position: fixed;
     top: 100px;

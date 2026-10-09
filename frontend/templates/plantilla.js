@@ -62,6 +62,117 @@ async function fetchWithAuth(url, options = {}) {
     return base + (p.startsWith('/') ? p : '/' + p);
   }
 
+  function LPI_isSecondTemplate(){
+    try { return typeof deriveCategory === 'function' && deriveCategory() === 'segunda'; }
+    catch(_) { return false; }
+  }
+
+  function LPI_setupSecondTemplate(){
+    if (!LPI_isSecondTemplate()) return;
+    document.body.classList.add('second-template');
+    const roster = document.querySelector('.jugadores-container');
+    const makeRows = (count, category) => Array.from({ length: count }, (_, index) =>
+      `<div class="fila" draggable="true" data-player-category="${category}"><div class="numero">${index + 1}</div><div class="jugador"></div></div>`
+    ).join('');
+    if (roster) {
+      roster.innerHTML = `
+        <h2>CAPITANES</h2>
+        <div class="fila fila-capitan" draggable="true"><div class="numero">C1</div><div class="jugador"></div></div>
+        <div class="fila fila-capitan" draggable="true"><div class="numero">C2</div><div class="jugador"></div></div>
+        <h2>JUGADORES</h2>
+        <h3 class="roster-subtitle">PRIMERAS</h3>${makeRows(5, 'primera')}
+        <h3 class="roster-subtitle">SEGUNDAS</h3>${makeRows(25, 'segunda')}`;
+    }
+    const makeSlots = (count, allowed, subgroup) => Array.from({ length: count }, (_, index) =>
+      `<div class="fila-extra"><div class="white-box">${index + 1}</div><div class="yellow-box" data-player="" data-player-id="" data-player-category="" data-allowed-category="${allowed}" data-subgroup="${subgroup}" draggable="true"></div></div>`
+    ).join('');
+    const individual = document.querySelector('.group-container[data-group="individual"]');
+    if (individual) individual.innerHTML = `
+      <div class="group-title">INDIVIDUALES</div>
+      <div class="plan-subtitle">PRIMERAS</div>${makeSlots(2, 'mixed', 'primeras')}
+      <div class="plan-subtitle">SEGUNDAS</div>${makeSlots(9, 'segunda', 'segundas')}`;
+    const substitutes = document.querySelector('.group-container[data-group="suplentes"]');
+    if (substitutes) {
+      substitutes.dataset.free = 'false';
+      substitutes.innerHTML = `
+        <div class="group-title">SUPLENTES</div>
+        <div class="plan-subtitle">PRIMERAS</div>${makeSlots(1, 'mixed', 'primeras')}
+        <div class="plan-subtitle">SEGUNDAS</div>${makeSlots(2, 'segunda', 'segundas')}`;
+    }
+  }
+
+  LPI_setupSecondTemplate();
+
+  window.LPI_SECOND_PLACEMENT = {
+    canPlace(box, player, category, playerId, origin){
+      if (!LPI_isSecondTemplate() || box.classList.contains('yellow-box-free')) return { ok:true };
+      if (box.dataset.allowedCategory === 'segunda' && category !== 'segunda') {
+        return { ok:false, message:'En esta subtabla solo se pueden cargar jugadores de Segunda.' };
+      }
+      const duplicate = Array.from(document.querySelectorAll('.group-container[data-group="individual"] .yellow-box, .group-container[data-group="suplentes"] .yellow-box'))
+        .filter(item => item !== origin && item !== box && item.dataset.player)
+        .some(item => playerId && item.dataset.playerId
+          ? String(item.dataset.playerId) === String(playerId)
+          : String(item.dataset.player).trim().toLowerCase() === String(player).trim().toLowerCase());
+      return duplicate
+        ? { ok:false, message:'Ese jugador ya está cargado en individuales o suplentes.' }
+        : { ok:true };
+    },
+    place(box, player, category, playerId, origin){
+      const result = this.canPlace(box, player, category, playerId, origin);
+      if (!result.ok) { showAlert(result.message); return false; }
+      box.dataset.player = player;
+      box.dataset.playerCategory = category || '';
+      box.dataset.playerId = playerId || '';
+      box.textContent = player;
+      if (origin && origin !== box) {
+        origin.dataset.player = '';
+        origin.dataset.playerCategory = '';
+        origin.dataset.playerId = '';
+        origin.textContent = '';
+      }
+      return true;
+    }
+  };
+
+  (function initSecondNativeDrag(){
+    if (!LPI_isSecondTemplate()) return;
+    let state = null;
+    document.addEventListener('dragstart', function(event){
+      const source = event.target.closest('.fila, .yellow-box, .yellow-box-free');
+      if (!source) return;
+      const row = source.classList.contains('fila') ? source : null;
+      const name = row ? row.querySelector('.jugador')?.textContent.trim() : String(source.dataset.player || '').trim();
+      if (!name) return;
+      state = {
+        player:name,
+        category:row ? (row.dataset.playerCategory || '') : (source.dataset.playerCategory || ''),
+        playerId:row ? (row.dataset.playerId || '') : (source.dataset.playerId || ''),
+        origin:row ? null : source
+      };
+    }, true);
+    document.addEventListener('dragover', function(event){
+      const box = event.target.closest('.yellow-box, .yellow-box-free');
+      if (!box || !state) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const result = window.LPI_SECOND_PLACEMENT.canPlace(box, state.player, state.category, state.playerId, state.origin);
+      box.classList.toggle('valid', result.ok);
+      box.classList.toggle('invalid', !result.ok);
+      box.classList.add('over');
+    }, true);
+    document.addEventListener('drop', function(event){
+      const box = event.target.closest('.yellow-box, .yellow-box-free');
+      if (!box || !state) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      box.classList.remove('valid','invalid','over');
+      window.LPI_SECOND_PLACEMENT.place(box, state.player, state.category, state.playerId, state.origin);
+      state = null;
+    }, true);
+    document.addEventListener('dragend', function(){ state = null; }, true);
+  })();
+
 (function(){
   function localSlugify(s){
     return String(s||'').toLowerCase().normalize('NFD')
@@ -92,7 +203,15 @@ async function fetchWithAuth(url, options = {}) {
   }
 
   function applyPlayersPayload(data){
-    window.LPI_PLAYER_DETAILS = Array.isArray(data && data.playerDetails) ? data.playerDetails : [];
+    const incomingDetails = Array.isArray(data && data.playerDetails) ? data.playerDetails : [];
+    const hasSplitRoster = Array.isArray(data && data.firstPlayers) || Array.isArray(data && data.secondPlayers);
+    window.LPI_FIRST_PLAYER_DETAILS = Array.isArray(data && data.firstPlayers) ? data.firstPlayers : [];
+    window.LPI_SECOND_PLAYER_DETAILS = Array.isArray(data && data.secondPlayers)
+      ? data.secondPlayers
+      : (LPI_isSecondTemplate() && !hasSplitRoster ? incomingDetails : []);
+    window.LPI_PLAYER_DETAILS = incomingDetails.length
+      ? incomingDetails
+      : window.LPI_FIRST_PLAYER_DETAILS.concat(window.LPI_SECOND_PLAYER_DETAILS);
     window.LPI_PLAYERS = window.LPI_PLAYER_DETAILS.length
       ? window.LPI_PLAYER_DETAILS.map(function(player){ return player.name || player.nombre || ''; }).filter(Boolean)
       : normalizePlayersPayload(data);
@@ -120,7 +239,10 @@ async function fetchWithAuth(url, options = {}) {
     });
   }
 
-  fetchJson(LPI_apiUrl('/api/team-assets?team=' + encodeURIComponent(slug)))
+  const assetsUrl = LPI_isSecondTemplate()
+    ? LPI_apiUrl('/api/team/second-sheet-assets')
+    : LPI_apiUrl('/api/team-assets?team=' + encodeURIComponent(slug));
+  fetchJson(assetsUrl)
     .catch(function(err){
       console.warn('No se pudo cargar jugadores desde /api/team-assets, pruebo fallback:', err);
       return fetchJson(LPI_apiUrl('/api/team/players?team=' + encodeURIComponent(slug)));
@@ -305,6 +427,8 @@ async function fetchWithAuth(url, options = {}) {
       var data = await res.json().catch(function(){ return {}; });
       if (!res.ok || data.ok === false) throw new Error(data.error || 'No se pudo guardar');
 
+      if (Array.isArray(data.firstPlayers)) window.LPI_FIRST_PLAYER_DETAILS = data.firstPlayers;
+      if (Array.isArray(data.secondPlayers)) window.LPI_SECOND_PLAYER_DETAILS = data.secondPlayers;
       window.LPI_PLAYER_DETAILS = Array.isArray(data.playerDetails) ? data.playerDetails : (Array.isArray(data.players) ? data.players : window.LPI_PLAYER_DETAILS);
       if (Array.isArray(data.playerDetails)) {
         window.LPI_PLAYERS = data.playerDetails.map(function(player){ return player.name || player.nombre || ''; }).filter(Boolean);
@@ -644,6 +768,8 @@ setTimeout(() => {
 
 let draggedPlayer = null;
 let originBox = null;
+let draggedPlayerCategory = '';
+let draggedPlayerId = '';
 const trash = document.getElementById('trash');
 
 function computeCountsExcludingOrigin() {
@@ -675,11 +801,15 @@ function updateRepeatedHighlight() {
 document.querySelectorAll('.fila').forEach(el => {
   el.addEventListener('dragstart', e => {
     draggedPlayer = el.querySelector('.jugador').textContent;
+    draggedPlayerCategory = el.dataset.playerCategory || '';
+    draggedPlayerId = el.dataset.playerId || '';
     originBox = null;
     trash.style.display = 'flex';
   });
   el.addEventListener('dragend', e => {
     draggedPlayer = null;
+    draggedPlayerCategory = '';
+    draggedPlayerId = '';
     originBox = null;
     trash.style.display = 'none';
   });
@@ -690,6 +820,8 @@ document.querySelectorAll('.yellow-box').forEach(box => {
   box.addEventListener('dragstart', e => {
     if(box.dataset.player) {
       draggedPlayer = box.dataset.player;
+      draggedPlayerCategory = box.dataset.playerCategory || '';
+      draggedPlayerId = box.dataset.playerId || '';
       originBox = box;
       trash.style.display = 'flex';
     } else {
@@ -698,6 +830,8 @@ document.querySelectorAll('.yellow-box').forEach(box => {
   });
   box.addEventListener('dragend', e => {
     draggedPlayer = null;
+    draggedPlayerCategory = '';
+    draggedPlayerId = '';
     originBox = null;
     trash.style.display = 'none';
     box.classList.remove('valid','invalid','over');
@@ -706,6 +840,12 @@ document.querySelectorAll('.yellow-box').forEach(box => {
   box.addEventListener('dragover', e => {
     e.preventDefault();
     if(!draggedPlayer) return;
+    if (LPI_isSecondTemplate()) {
+      const result = window.LPI_SECOND_PLACEMENT.canPlace(box, draggedPlayer, draggedPlayerCategory, draggedPlayerId, originBox);
+      box.classList.remove('valid','invalid','over');
+      box.classList.add('over', result.ok ? 'valid' : 'invalid');
+      return;
+    }
     const gc = box.closest('.group-container');
     if (gc && (gc.dataset.group === 'suplentes' || gc.dataset.free === 'true')) {
       box.classList.remove('valid','invalid','over');
@@ -741,6 +881,10 @@ document.querySelectorAll('.yellow-box').forEach(box => {
     e.preventDefault();
     if(!draggedPlayer) return;
     box.classList.remove('valid','invalid','over');
+    if (LPI_isSecondTemplate()) {
+      window.LPI_SECOND_PLACEMENT.place(box, draggedPlayer, draggedPlayerCategory, draggedPlayerId, originBox);
+      return;
+    }
     const gc2 = box.closest('.group-container');
     if (gc2 && (gc2.dataset.group === 'suplentes' || gc2.dataset.free === 'true')) {
       box.dataset.player = draggedPlayer;
@@ -789,11 +933,15 @@ trash.addEventListener('drop', e => {
   trash.classList.remove('over');
   if(originBox) {
     originBox.dataset.player = "";
+    originBox.dataset.playerCategory = "";
+    originBox.dataset.playerId = "";
     originBox.textContent = "";
     originBox = null;
     updateRepeatedHighlight();
   }
   draggedPlayer = null;
+  draggedPlayerCategory = '';
+  draggedPlayerId = '';
   trash.style.display = 'none';
 });
 
@@ -865,6 +1013,24 @@ trash.addEventListener('drop', e => {
   }
   function fillJugadores(){
     fillCapitanes();
+    if (LPI_isSecondTemplate()) {
+      const fillCategory = function(category, players, limit){
+        const rows = document.querySelectorAll(`.jugadores-container .fila[data-player-category="${category}"]`);
+        const list = (Array.isArray(players) ? players : []).slice(0, limit);
+        rows.forEach(function(row, index){
+          const player = list[index];
+          const name = String(getPlayerName(player) || '').trim();
+          const div = row.querySelector('.jugador');
+          if (div) div.textContent = name;
+          row.dataset.playerId = player?.id ? String(player.id) : '';
+          row.classList.toggle('has-player', Boolean(name));
+          wirePlayerSelection(row);
+        });
+      };
+      fillCategory('primera', window.LPI_FIRST_PLAYER_DETAILS, 5);
+      fillCategory('segunda', window.LPI_SECOND_PLAYER_DETAILS, 25);
+      return;
+    }
     const jugadores = selectPlayers().filter(Boolean).slice(0, 20);
     const rows = document.querySelectorAll(".jugadores-container .fila:not(.fila-capitan)");
     rows.forEach(function(row, i){
@@ -1176,9 +1342,26 @@ function collectPlanillaPayload(){
     return groups.some(arr => Array.isArray(arr) && arr.some(name => String(name || '').trim()));
   }
 
+  function validateSecondTemplateTables(){
+    if (!LPI_isSecondTemplate()) return '';
+    const requirements = [
+      ['individual', 'primeras', 'Individuales - Primeras'],
+      ['individual', 'segundas', 'Individuales - Segundas'],
+      ['suplentes', 'primeras', 'Suplentes - Primeras'],
+      ['suplentes', 'segundas', 'Suplentes - Segundas']
+    ];
+    for (const [group, subgroup, label] of requirements) {
+      const boxes = document.querySelectorAll(`.group-container[data-group="${group}"] .yellow-box[data-subgroup="${subgroup}"]`);
+      if (![...boxes].some(box => String(box.dataset.player || '').trim())) return `La tabla ${label} no puede quedar completamente vacía.`;
+    }
+    return '';
+  }
+
   function clearPlanillaFields(){
     document.querySelectorAll('.yellow-box, .yellow-box-free').forEach(function(box){
       box.dataset.player = '';
+      box.dataset.playerId = '';
+      box.dataset.playerCategory = '';
       box.textContent = '';
     });
     if (typeof updateRepeatedHighlight === 'function') updateRepeatedHighlight();
@@ -1202,6 +1385,12 @@ async function savePlanilla(){
     }
 
     const payloadObj = collectPlanillaPayload();
+
+    const secondTemplateError = validateSecondTemplateTables();
+    if (secondTemplateError) {
+      if (typeof showSendError === 'function') showSendError(secondTemplateError);
+      return { ok:false, validation:true };
+    }
 
     if (!planillaHasAnyPlayer(payloadObj)) {
       const accepted = await confirmEmptyPlanillaSend();
@@ -1370,18 +1559,34 @@ document.addEventListener('DOMContentLoaded', function(){
 (function(){
   function wireFree(box){
     box.addEventListener('dragstart', function(e){
-      if (box.dataset.player) { draggedPlayer = box.dataset.player; originBox = box; trash.style.display='flex'; }
+      if (box.dataset.player) {
+        draggedPlayer = box.dataset.player;
+        draggedPlayerCategory = box.dataset.playerCategory || '';
+        draggedPlayerId = box.dataset.playerId || '';
+        originBox = box;
+        trash.style.display='flex';
+      }
       else { e.preventDefault(); }
     });
-    box.addEventListener('dragend', function(){ draggedPlayer=null; originBox=null; trash.style.display='none'; });
+    box.addEventListener('dragend', function(){
+      draggedPlayer = null;
+      draggedPlayerCategory = '';
+      draggedPlayerId = '';
+      originBox = null;
+      trash.style.display='none';
+    });
     box.addEventListener('dragover', function(e){ e.preventDefault(); });
     box.addEventListener('drop', function(e){
       e.preventDefault();
       if (!draggedPlayer) return;
       box.dataset.player = draggedPlayer;
+      box.dataset.playerCategory = draggedPlayerCategory || '';
+      box.dataset.playerId = draggedPlayerId || '';
       box.textContent = draggedPlayer;
       if (originBox && originBox !== box) {
         originBox.dataset.player = "";
+        originBox.dataset.playerCategory = "";
+        originBox.dataset.playerId = "";
         originBox.textContent = "";
         originBox = null;
       }
@@ -1451,6 +1656,10 @@ document.addEventListener('DOMContentLoaded', function(){
     try {
       window.draggedPlayer = p;
       window.originBox = (el.classList.contains('yellow-box') || el.classList.contains('yellow-box-free')) ? el : null;
+      draggedPlayer = p;
+      originBox = window.originBox;
+      draggedPlayerCategory = el.dataset?.playerCategory || '';
+      draggedPlayerId = el.dataset?.playerId || '';
       const trashEl = document.getElementById('trash');
       if (trashEl) trashEl.style.display = 'flex';
     } catch(_) {}
@@ -1503,6 +1712,10 @@ document.addEventListener('DOMContentLoaded', function(){
     const trashEl = document.getElementById('trash');
     if (trashEl) trashEl.style.display = 'none';
     try { window.draggedPlayer = null; window.originBox = null; } catch(_){}
+    draggedPlayer = null;
+    originBox = null;
+    draggedPlayerCategory = '';
+    draggedPlayerId = '';
     dragging = false;
     pointerId = null;
   }
@@ -1559,6 +1772,8 @@ document.addEventListener('DOMContentLoaded', function(){
 
   var selectedPlayer = null;
   var selectedOrigin = null;
+  var selectedPlayerCategory = '';
+  var selectedPlayerId = '';
 
   function clearHints(){
     document.querySelectorAll('.tap-hint, .tap-selecting').forEach(function(n){
@@ -1576,9 +1791,13 @@ document.addEventListener('DOMContentLoaded', function(){
     if (el.classList.contains('fila')){
       var j = el.querySelector('.jugador');
       p = (j && j.textContent || '').trim();
+      selectedPlayerCategory = el.dataset.playerCategory || '';
+      selectedPlayerId = el.dataset.playerId || '';
       selectedOrigin = null;
     } else if (el.classList.contains('yellow-box') || el.classList.contains('yellow-box-free')){
       p = (el.dataset && el.dataset.player) ? String(el.dataset.player).trim() : '';
+      selectedPlayerCategory = el.dataset.playerCategory || '';
+      selectedPlayerId = el.dataset.playerId || '';
       selectedOrigin = el;
     }
     if (!p) return false;
@@ -1610,6 +1829,10 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   function applyPlacementToBox(box){
+    if (LPI_isSecondTemplate()) {
+      window.LPI_SECOND_PLACEMENT.place(box, selectedPlayer, selectedPlayerCategory, selectedPlayerId, selectedOrigin);
+      return;
+    }
     var gc2 = box.closest('.group-container');
     if (gc2 && (gc2.dataset.group === 'suplentes' || gc2.dataset.free === 'true')) {
       box.dataset.player = selectedPlayer;
@@ -1652,6 +1875,8 @@ document.addEventListener('DOMContentLoaded', function(){
   function endSelection(){
     selectedPlayer = null;
     selectedOrigin = null;
+    selectedPlayerCategory = '';
+    selectedPlayerId = '';
     clearHints();
     showTrash(false);
   }
@@ -1662,6 +1887,8 @@ document.addEventListener('DOMContentLoaded', function(){
       if (targetTrash){
         if (selectedOrigin){
           selectedOrigin.dataset.player = "";
+        selectedOrigin.dataset.playerId = "";
+        selectedOrigin.dataset.playerCategory = "";
           selectedOrigin.textContent = "";
           try { if (typeof window.updateRepeatedHighlight === 'function') window.updateRepeatedHighlight(); } catch(_){}
         }
@@ -1813,7 +2040,17 @@ document.addEventListener('DOMContentLoaded', function(){
     if (!el) return;
     const value = (name || '').trim();
     el.dataset.player = value;
+    el.dataset.playerId = '';
+    el.dataset.playerCategory = '';
     el.textContent = value;
+    if (LPI_isSecondTemplate() && value) {
+      const normalize = text => String(text || '').trim().toLowerCase();
+      const second = (window.LPI_SECOND_PLAYER_DETAILS || []).find(player => normalize(player.name || player.nombre) === normalize(value));
+      const first = (window.LPI_FIRST_PLAYER_DETAILS || []).find(player => normalize(player.name || player.nombre) === normalize(value));
+      const player = second || first;
+      el.dataset.playerId = player?.id ? String(player.id) : '';
+      el.dataset.playerCategory = second ? 'segunda' : (first ? 'primera' : '');
+    }
   }
   function fillGroup(group, arr, useFreeBox){
     const selector = '.group-container[data-group="' + group + '"] ' + (useFreeBox ? '.yellow-box-free' : '.yellow-box');

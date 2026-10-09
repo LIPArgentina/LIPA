@@ -84,16 +84,19 @@ module.exports = function createFechasRouter(deps) {
       .toUpperCase();
   }
 
-  async function fetchPlayerIdentityMap(equipoId) {
+  async function fetchPlayerIdentityMap(equipoIds) {
+    const ids = (Array.isArray(equipoIds) ? equipoIds : [equipoIds]).map(Number).filter(Number.isFinite);
     const result = await pool.query(
       `
-        SELECT id, nombre
-        FROM jugadores
-        WHERE equipo_id = $1
-          AND TRIM(COALESCE(nombre, '')) <> ''
-        ORDER BY orden ASC, id ASC
+        SELECT DISTINCT j.id, j.nombre, je.orden
+        FROM jugador_equipos je
+        JOIN jugadores j ON j.id = je.jugador_id
+        WHERE je.equipo_id = ANY($1::int[])
+          AND je.activo = true
+          AND TRIM(COALESCE(j.nombre, '')) <> ''
+        ORDER BY je.orden ASC NULLS LAST, j.id ASC
       `,
-      [equipoId]
+      [ids]
     );
 
     const map = new Map();
@@ -106,9 +109,9 @@ module.exports = function createFechasRouter(deps) {
     return map;
   }
 
-  async function enrichPlanillaWithPlayerIds(planilla, equipoId) {
+  async function enrichPlanillaWithPlayerIds(planilla, equipoId, additionalTeamIds = []) {
     const cleanPlanilla = planilla && typeof planilla === 'object' ? planilla : {};
-    const identityMap = await fetchPlayerIdentityMap(equipoId);
+    const identityMap = await fetchPlayerIdentityMap([equipoId, ...additionalTeamIds]);
     const used = new Set();
     const sections = ['capitan', 'individuales', 'pareja1', 'pareja2', 'suplentes'];
     const jugadorIds = {};
@@ -137,6 +140,64 @@ module.exports = function createFechasRouter(deps) {
       ...cleanPlanilla,
       jugadorIds
     };
+  }
+
+  async function validateSecondDivisionSheet(planilla, secondTeam) {
+    if (String(secondTeam?.division || '').toLowerCase() !== 'segunda') return '';
+
+    const counterpart = await pool.query(
+      `SELECT id
+         FROM equipos
+        WHERE division = 'primera'
+          AND LOWER(slug_base) = LOWER($1)
+          AND activo = true
+        ORDER BY id ASC
+        LIMIT 1`,
+      [secondTeam.slug_base]
+    );
+    const firstTeamId = counterpart.rows[0]?.id || null;
+    const teamIds = [secondTeam.id, firstTeamId].filter(Boolean);
+    const roster = await pool.query(
+      `SELECT j.nombre, je.equipo_id
+         FROM jugador_equipos je
+         JOIN jugadores j ON j.id = je.jugador_id
+        WHERE je.activo = true
+          AND je.equipo_id = ANY($1::int[])`,
+      [teamIds]
+    );
+    const firstNames = new Set();
+    const secondNames = new Set();
+    roster.rows.forEach((row) => {
+      const key = normalizePlayerKey(row.nombre);
+      if (!key) return;
+      if (Number(row.equipo_id) === Number(secondTeam.id)) secondNames.add(key);
+      if (firstTeamId && Number(row.equipo_id) === Number(firstTeamId)) firstNames.add(key);
+    });
+    const mixedNames = new Set([...firstNames, ...secondNames]);
+    const individuales = Array.isArray(planilla.individuales) ? planilla.individuales : [];
+    const suplentes = Array.isArray(planilla.suplentes) ? planilla.suplentes : [];
+    const groups = [
+      { values: individuales.slice(0, 2), label: 'Individuales - Primeras', allowed: mixedNames },
+      { values: individuales.slice(2, 11), label: 'Individuales - Segundas', allowed: secondNames },
+      { values: suplentes.slice(0, 1), label: 'Suplentes - Primeras', allowed: mixedNames },
+      { values: suplentes.slice(1, 3), label: 'Suplentes - Segundas', allowed: secondNames }
+    ];
+
+    for (const group of groups) {
+      const names = group.values.map(normalizePlayerKey).filter(Boolean);
+      if (!names.length) return `La tabla ${group.label} no puede quedar completamente vacía.`;
+      const invalid = names.find((name) => !group.allowed.has(name));
+      if (invalid) return `Hay un jugador que no pertenece al plantel habilitado para ${group.label}.`;
+    }
+
+    const used = new Set();
+    for (const value of [...individuales, ...suplentes]) {
+      const key = normalizePlayerKey(value);
+      if (!key) continue;
+      if (used.has(key)) return 'Un jugador no puede repetirse entre individuales y suplentes.';
+      used.add(key);
+    }
+    return '';
   }
 
   function extractPlanFromContent(content) {
@@ -356,7 +417,24 @@ module.exports = function createFechasRouter(deps) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
       }
 
-      finalPlan = await enrichPlanillaWithPlayerIds(finalPlan, equipo.id);
+      const secondSheetError = await validateSecondDivisionSheet(finalPlan, equipo);
+      if (secondSheetError) {
+        return res.status(400).json({ ok:false, error:secondSheetError });
+      }
+
+      let relatedTeamIds = [];
+      if (String(equipo.division || '').toLowerCase() === 'segunda') {
+        const counterpart = await pool.query(
+          `SELECT id FROM equipos
+            WHERE division = 'primera'
+              AND LOWER(slug_base) = LOWER($1)
+              AND activo = true
+            ORDER BY id ASC LIMIT 1`,
+          [equipo.slug_base]
+        );
+        relatedTeamIds = counterpart.rows[0]?.id ? [counterpart.rows[0].id] : [];
+      }
+      finalPlan = await enrichPlanillaWithPlayerIds(finalPlan, equipo.id, relatedTeamIds);
 
       const client = await pool.connect();
       let confirmedPlanilla = null;
