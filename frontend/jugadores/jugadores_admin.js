@@ -494,7 +494,7 @@ function reviewTeamImport(reviews){
   if (!dialog || !list || !reviews.length) return Promise.resolve({});
   list.innerHTML = reviews.map((review, index) => `
     <div class="import-review-item">
-      <label for="importReview${index}"><small>Fila ${escapeHtml(review.row)}</small><br>${escapeHtml(review.message)}</label>
+      <label for="importReview${index}"><small>${review.row ? `Fila ${escapeHtml(review.row)}` : 'Plantel actual'}</small><br>${escapeHtml(review.message)}</label>
       <select id="importReview${index}" class="input" data-review-id="${escapeHtml(review.id)}">
         <option value="">Elegir una opción</option>
         ${(review.options || []).map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join('')}

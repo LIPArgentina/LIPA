@@ -1317,6 +1317,38 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         planned.push({ type: 'create', row });
       }
 
+      const representedPlayerIds = new Set(
+        planned.map(item => Number(item.playerId)).filter(Number.isFinite)
+      );
+      playersResult.rows.forEach((player) => {
+        const playerId = Number(player.id);
+        const associations = associationsByPlayer.get(playerId) || [];
+        const selectedAssociation = associations.find(association =>
+          normalizeCategory(association.categoria) === category && Number(association.equipo_id) === Number(team.id)
+        );
+        if (!selectedAssociation || representedPlayerIds.has(playerId)) return;
+        const reviewId = `missing:${playerId}`;
+        const missingDecision = String(decisions[reviewId] || '').trim().toLowerCase();
+        if (!['remove', 'keep'].includes(missingDecision)) {
+          reviews.push({
+            id: reviewId,
+            row: null,
+            kind: 'missing',
+            message: `${player.nombre} pertenece actualmente a ${team.display_name}, pero no figura en el archivo importado.`,
+            options: [
+              { value: 'remove', label: `Quitar a ${player.nombre} del equipo` },
+              { value: 'keep', label: 'Mantenerlo en el equipo' }
+            ]
+          });
+        }
+        planned.push({
+          type: missingDecision === 'remove' ? 'remove' : 'skip',
+          row: { row: 0, nombre: player.nombre, dni: player.dni || '' },
+          playerId,
+          associationId: Number(selectedAssociation.id)
+        });
+      });
+
       const plannedPlayerRows = new Map();
       planned.filter(item => !['create', 'skip'].includes(item.type)).forEach((item) => {
         if (plannedPlayerRows.has(item.playerId)) {
@@ -1360,13 +1392,15 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         [team.id, category]
       );
       const createdCount = planned.filter(item => ['create', 'transfer', 'attach', 'category_add'].includes(item.type)).length;
+      const removedCount = planned.filter(item => item.type === 'remove').length;
+      const projectedRosterCount = Number(rosterCount.rows[0]?.total || 0) + createdCount - removedCount;
       const limit = teamPlayerLimit(category);
-      if (Number(rosterCount.rows[0]?.total || 0) + createdCount > limit) {
+      if (projectedRosterCount > limit) {
         await client.query('ROLLBACK');
         transactionOpen = false;
         return res.status(409).json({
           ok: false,
-          error: `La importación dejaría ${Number(rosterCount.rows[0]?.total || 0) + createdCount} jugadores activos. El máximo por equipo es ${limit}.`,
+          error: `La importación dejaría ${projectedRosterCount} jugadores activos. El máximo por equipo es ${limit}.`,
           conflicts: [{ row: 0, message: 'Reducí la cantidad de jugadores nuevos antes de importar.' }]
         });
       }
@@ -1376,6 +1410,20 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       const startDate = currentLeagueDate();
       for (const item of planned) {
         if (item.type === 'skip' || item.type === 'noop') continue;
+        if (item.type === 'remove') {
+          await client.query(
+            `UPDATE jugador_equipos
+                SET activo = false, hasta = $1::date, updated_at = NOW()
+              WHERE id = $2
+                AND jugador_id = $3
+                AND equipo_id = $4
+                AND categoria = $5
+                AND activo = true`,
+            [startDate, item.associationId, item.playerId, team.id, category]
+          );
+          updated += 1;
+          continue;
+        }
         if (['update_name', 'update_dni'].includes(item.type)) {
           await client.query(
             `UPDATE jugadores
