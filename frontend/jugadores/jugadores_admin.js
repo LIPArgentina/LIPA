@@ -480,7 +480,7 @@ async function importTeamFile(file){
   const rows = parseTeamImport(await file.text());
   const nameOnly = rows.every(row => !row.dni);
   const warning = nameOnly
-    ? '\n\nEs una lista sin DNI: sólo se vincularán jugadores ya existentes y no se crearán personas nuevas.'
+    ? '\n\nEs una lista sin DNI: podrás vincular cada nombre con un jugador existente o crearlo como jugador nuevo para completar sus datos más adelante.'
     : '';
   if (!confirm(`Se procesarán ${rows.length} filas para ${teamName}.${warning}\n\nLos jugadores omitidos no serán eliminados. ¿Continuar?`)) return;
   const decisions = {};

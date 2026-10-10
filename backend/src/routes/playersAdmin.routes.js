@@ -1267,6 +1267,8 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           if (nameOnlyDecision.startsWith('match:')) {
             const selectedId = Number(nameOnlyDecision.slice(6));
             dniOwners = playersResult.rows.filter(player => Number(player.id) === selectedId);
+          } else if (nameOnlyDecision === 'create') {
+            dniOwners = [];
           } else if (!dniOwners.length || dniOwners.length > 1) {
             const candidates = playersResult.rows
               .filter(player => namesProbablyMatch(row.nombre, player.nombre))
@@ -1283,6 +1285,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
                     value: `match:${candidate.id}`,
                     label: `${candidate.nombre} (DNI ${candidate.dni || 'sin registrar'})`
                   })),
+                  { value: 'create', label: `Crear a ${row.nombre} como jugador nuevo` },
                   { value: 'skip', label: 'Omitir: no crear un jugador sin DNI' }
                 ]
               );
@@ -1417,13 +1420,21 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           continue;
         }
         if (nameOnlyImport) {
-          addReview(
-            row,
-            'name_only',
-            `No se pudo identificar a ${row.nombre}.`,
-            [{ value: 'skip', label: 'Omitir: no crear un jugador sin DNI' }]
-          );
-          planned.push({ type: 'skip', row });
+          const nameOnlyDecision = decisionFor(row, 'name_only');
+          if (nameOnlyDecision === 'create') {
+            planned.push({ type: 'create', row, confirmedDifferent: true });
+          } else {
+            addReview(
+              row,
+              'name_only',
+              `No se pudo identificar a ${row.nombre}.`,
+              [
+                { value: 'create', label: `Crear a ${row.nombre} como jugador nuevo` },
+                { value: 'skip', label: 'Omitir: no crear un jugador sin DNI' }
+              ]
+            );
+            planned.push({ type: 'skip', row });
+          }
         } else {
           planned.push({ type: 'create', row });
         }
@@ -1440,7 +1451,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       );
       const provisionalSimilarIds = new Set();
       planned.forEach((item, index) => {
-        if (item.type !== 'create') return;
+        if (item.type !== 'create' || item.confirmedDifferent) return;
         const candidates = currentRosterPlayers.filter(player => {
           const playerId = Number(player.id);
           return !representedPlayerIds.has(playerId)
@@ -1655,7 +1666,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
              (nombre, dni, nombre_normalizado, categoria_actual, created_at, updated_at)
            VALUES ($1, $2, $3, $4, NOW(), NOW())
            RETURNING id`,
-          [item.row.nombre, item.row.dni, normalizeText(item.row.nombre), category]
+          [item.row.nombre, item.row.dni || null, normalizeText(item.row.nombre), category]
         );
         await client.query(
           `INSERT INTO jugador_equipos
