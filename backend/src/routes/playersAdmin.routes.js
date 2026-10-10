@@ -19,6 +19,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
       .replace(/\s+/g, ' ');
   }
 
@@ -49,13 +50,35 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     const b = normalizeText(right);
     if (!a || !b || a === b) return false;
     if (editDistance(a, b) <= 2) return true;
-    const aParts = a.split(' ');
-    const bParts = b.split(' ');
+    const aParts = a.split(' ').filter(Boolean);
+    const bParts = b.split(' ').filter(Boolean);
     if (aParts.length < 2 || bParts.length < 2) return false;
-    const sameSurname = aParts.at(-1) === bParts.at(-1);
-    const sameFirstName = aParts[0] === bParts[0];
-    return (sameSurname && editDistance(aParts[0], bParts[0]) <= 2)
-      || (sameFirstName && editDistance(aParts.at(-1), bParts.at(-1)) <= 2);
+
+    // The imported list often has an abbreviated name (for example,
+    // "Cristian Villarroel") while the database keeps additional names or
+    // surnames ("Cristhian Villarroel Ruiz"). Match every word from the
+    // shorter name against a distinct, similar word in the longer one.
+    const shorter = aParts.length <= bParts.length ? aParts : bParts;
+    const longer = aParts.length <= bParts.length ? bParts : aParts;
+    const usedIndexes = new Set();
+
+    return shorter.every((part) => {
+      let bestIndex = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      longer.forEach((candidate, index) => {
+        if (usedIndexes.has(index)) return;
+        const maxLength = Math.max(part.length, candidate.length);
+        const allowedDistance = maxLength >= 8 ? 2 : 1;
+        const distance = editDistance(part, candidate);
+        if (distance <= allowedDistance && distance < bestDistance) {
+          bestIndex = index;
+          bestDistance = distance;
+        }
+      });
+      if (bestIndex < 0) return false;
+      usedIndexes.add(bestIndex);
+      return true;
+    });
   }
 
   async function getPlayerDisplayVariant(sourcePath, safeFilename) {
