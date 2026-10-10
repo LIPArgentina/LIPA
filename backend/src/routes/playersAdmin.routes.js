@@ -1143,15 +1143,22 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           dni: normalizeDni(item?.dni || '')
         };
       });
+      const nameOnlyImport = rows.every(row => !row.dni);
+      const mixedIdentityImport = rows.some(row => row.dni) && rows.some(row => !row.dni);
 
       const conflicts = [];
       const usedDnis = new Map();
+      const usedNames = new Map();
       rows.forEach((row) => {
         if (!row.nombre) conflicts.push({ row: row.row, message: 'Falta nombre y apellido.' });
-        if (!row.dni) conflicts.push({ row: row.row, message: 'Falta DNI.' });
+        if (mixedIdentityImport && !row.dni) conflicts.push({ row: row.row, message: 'Falta DNI. El archivo no puede mezclar filas con DNI y filas sólo con nombre.' });
         if (row.dni) {
           if (usedDnis.has(row.dni)) conflicts.push({ row: row.row, message: `El DNI ${row.dni} está repetido (también figura en la fila ${usedDnis.get(row.dni)}).` });
           else usedDnis.set(row.dni, row.row);
+        } else if (row.nombre) {
+          const nameKey = normalizeText(row.nombre);
+          if (usedNames.has(nameKey)) conflicts.push({ row: row.row, message: `${row.nombre} está repetido (también figura en la fila ${usedNames.get(nameKey)}).` });
+          else usedNames.set(nameKey, row.row);
         }
       });
       if (conflicts.length) {
@@ -1161,10 +1168,13 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
       await client.query('BEGIN');
       transactionOpen = true;
       const dnis = rows.map(row => row.dni).filter(Boolean);
+      const normalizedNames = rows.map(row => normalizeText(row.nombre)).filter(Boolean);
       const playersResult = await client.query(
         `SELECT id, nombre, COALESCE(dni, '') AS dni
            FROM jugadores
           WHERE COALESCE(dni, '') = ANY($1::text[])
+             OR COALESCE(nombre_normalizado, '') = ANY($4::text[])
+             OR $5::boolean = true
              OR id IN (
                SELECT jugador_id
                  FROM jugador_equipos
@@ -1173,7 +1183,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
                   AND activo = true
              )
           FOR UPDATE`,
-        [dnis, team.id, category]
+        [dnis, team.id, category, normalizedNames, nameOnlyImport]
       );
       const playersByDni = new Map();
       playersResult.rows.forEach((player) => {
@@ -1202,13 +1212,18 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         associationsByPlayer.get(playerId).push(association);
       });
       const currentPlayersByName = new Map();
+      const allPlayersByName = new Map();
       playersResult.rows.forEach((player) => {
+        const nameKey = normalizeText(player.nombre || '');
+        if (nameKey) {
+          if (!allPlayersByName.has(nameKey)) allPlayersByName.set(nameKey, []);
+          allPlayersByName.get(nameKey).push(player);
+        }
         const associations = associationsByPlayer.get(Number(player.id)) || [];
         const belongsToSelectedTeam = associations.some(association =>
           normalizeCategory(association.categoria) === category && Number(association.equipo_id) === Number(team.id)
         );
         if (!belongsToSelectedTeam) return;
-        const nameKey = normalizeText(player.nombre || '');
         if (!nameKey) return;
         if (!currentPlayersByName.has(nameKey)) currentPlayersByName.set(nameKey, []);
         currentPlayersByName.get(nameKey).push(player);
@@ -1221,7 +1236,38 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
         reviews.push({ id: `${row.row}:${kind}`, row: row.row, kind, message, options });
       };
       for (const row of rows) {
-        const dniOwners = playersByDni.get(row.dni) || [];
+        let dniOwners = row.dni
+          ? (playersByDni.get(row.dni) || [])
+          : (allPlayersByName.get(normalizeText(row.nombre)) || []);
+        if (!row.dni) {
+          const nameOnlyDecision = decisionFor(row, 'name_only');
+          if (nameOnlyDecision.startsWith('match:')) {
+            const selectedId = Number(nameOnlyDecision.slice(6));
+            dniOwners = playersResult.rows.filter(player => Number(player.id) === selectedId);
+          } else if (!dniOwners.length || dniOwners.length > 1) {
+            const candidates = playersResult.rows
+              .filter(player => namesProbablyMatch(row.nombre, player.nombre))
+              .slice(0, 8);
+            if (nameOnlyDecision !== 'skip') {
+              addReview(
+                row,
+                'name_only',
+                dniOwners.length > 1
+                  ? `Hay más de un jugador llamado ${row.nombre}. Elegí la persona correcta.`
+                  : `No se encontró una coincidencia exacta para ${row.nombre}.`,
+                [
+                  ...candidates.map(candidate => ({
+                    value: `match:${candidate.id}`,
+                    label: `${candidate.nombre} (DNI ${candidate.dni || 'sin registrar'})`
+                  })),
+                  { value: 'skip', label: 'Omitir: no crear un jugador sin DNI' }
+                ]
+              );
+            }
+            planned.push({ type: 'skip', row });
+            continue;
+          }
+        }
         if (dniOwners.length > 1) {
           conflicts.push({
             row: row.row,
@@ -1244,7 +1290,9 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
               addReview(
                 row,
                 'name',
-                `El DNI ${row.dni} figura como ${currentPlayer.nombre}. El archivo dice ${row.nombre}.`,
+                row.dni
+                  ? `El DNI ${row.dni} figura como ${currentPlayer.nombre}. El archivo dice ${row.nombre}.`
+                  : `La persona seleccionada figura como ${currentPlayer.nombre}. El archivo dice ${row.nombre}.`,
                 [
                   { value: 'update', label: `Cambiar el nombre a ${row.nombre}` },
                   { value: 'keep', label: `Conservar el nombre registrado: ${currentPlayer.nombre}` }
@@ -1345,7 +1393,17 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           planned.push({ type: dniDecision === 'update' ? 'update_dni' : 'noop', row, playerId: Number(currentPlayer.id) });
           continue;
         }
-        planned.push({ type: 'create', row });
+        if (nameOnlyImport) {
+          addReview(
+            row,
+            'name_only',
+            `No se pudo identificar a ${row.nombre}.`,
+            [{ value: 'skip', label: 'Omitir: no crear un jugador sin DNI' }]
+          );
+          planned.push({ type: 'skip', row });
+        } else {
+          planned.push({ type: 'create', row });
+        }
       }
 
       const currentRosterPlayers = playersResult.rows.filter((player) => {
@@ -1394,6 +1452,19 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           ]
         });
       });
+
+      if (reviews.some(review => review.kind === 'name_only')) {
+        await client.query('ROLLBACK');
+        transactionOpen = false;
+        return res.json({
+          ok: true,
+          requiresReview: true,
+          team,
+          category,
+          reviews,
+          summary: { rows: rows.length, newPlayers: 0, nameOnly: true }
+        });
+      }
 
       currentRosterPlayers.forEach((player) => {
         const playerId = Number(player.id);

@@ -462,6 +462,13 @@ function parseTeamImport(text){
       };
     }
     if (cells.length === 2) return { row: rowNumber, nombre: cells[0], dni: cells[1] };
+    if (cells.length === 1) {
+      return {
+        row: rowNumber,
+        nombre: cells[0].replace(/^\s*\d+\s*[-.)]\s*/, '').trim(),
+        dni: ''
+      };
+    }
     return { row: rowNumber, nombre: '', dni: '' };
   });
   if (!rows.length) throw new Error('El archivo no contiene jugadores.');
@@ -471,7 +478,11 @@ function parseTeamImport(text){
 async function importTeamFile(file){
   const { category, team, teamName } = selectedTeamContext();
   const rows = parseTeamImport(await file.text());
-  if (!confirm(`Se procesarán ${rows.length} filas para ${teamName}.\n\nLos jugadores omitidos no serán eliminados. ¿Continuar?`)) return;
+  const nameOnly = rows.every(row => !row.dni);
+  const warning = nameOnly
+    ? '\n\nEs una lista sin DNI: sólo se vincularán jugadores ya existentes y no se crearán personas nuevas.'
+    : '';
+  if (!confirm(`Se procesarán ${rows.length} filas para ${teamName}.${warning}\n\nLos jugadores omitidos no serán eliminados. ¿Continuar?`)) return;
   const decisions = {};
   let data = await fetchJson('/api/players-admin/import-team', {
     method: 'POST',
