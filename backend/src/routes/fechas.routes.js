@@ -149,11 +149,14 @@ module.exports = function createFechasRouter(deps) {
       `SELECT id
          FROM equipos
         WHERE division = 'primera'
-          AND LOWER(slug_base) = LOWER($1)
+          AND (
+            LOWER(slug_base) = LOWER($1)
+            OR LOWER(display_name) = LOWER($2)
+          )
           AND activo = true
-        ORDER BY id ASC
+        ORDER BY CASE WHEN LOWER(slug_base) = LOWER($1) THEN 0 ELSE 1 END, id ASC
         LIMIT 1`,
-      [secondTeam.slug_base]
+      [secondTeam.slug_base || '', secondTeam.display_name || '']
     );
     const firstTeamId = counterpart.rows[0]?.id || null;
     const teamIds = [secondTeam.id, firstTeamId].filter(Boolean);
@@ -427,10 +430,13 @@ module.exports = function createFechasRouter(deps) {
         const counterpart = await pool.query(
           `SELECT id FROM equipos
             WHERE division = 'primera'
-              AND LOWER(slug_base) = LOWER($1)
+              AND (
+                LOWER(slug_base) = LOWER($1)
+                OR LOWER(display_name) = LOWER($2)
+              )
               AND activo = true
-            ORDER BY id ASC LIMIT 1`,
-          [equipo.slug_base]
+            ORDER BY CASE WHEN LOWER(slug_base) = LOWER($1) THEN 0 ELSE 1 END, id ASC LIMIT 1`,
+          [equipo.slug_base || '', equipo.display_name || '']
         );
         relatedTeamIds = counterpart.rows[0]?.id ? [counterpart.rows[0].id] : [];
       }

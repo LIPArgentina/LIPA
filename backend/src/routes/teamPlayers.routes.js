@@ -250,15 +250,21 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
   }
 
   async function resolveCounterpartTeam(team, division) {
-    if (!team?.slug_base) return null;
+    if (!team?.slug_base && !team?.display_name) return null;
     const result = await pool.query(
       `SELECT id, slug_uid, slug_base, display_name, division, captain, subcaptain
          FROM equipos
         WHERE division = $2
-          AND LOWER(slug_base) = LOWER($1)
-        ORDER BY activo DESC, id ASC
+          AND (
+            LOWER(slug_base) = LOWER($1)
+            OR LOWER(display_name) = LOWER($3)
+          )
+        ORDER BY
+          CASE WHEN LOWER(slug_base) = LOWER($1) THEN 0 ELSE 1 END,
+          activo DESC,
+          id ASC
         LIMIT 1`,
-      [team.slug_base, division]
+      [team.slug_base || '', division, team.display_name || '']
     );
     return result.rows[0] || null;
   }

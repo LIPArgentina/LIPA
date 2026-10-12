@@ -98,8 +98,12 @@ router.get('/planillas', async (req, res) => {
           FROM equipos e1
          WHERE e.division = 'segunda'
            AND e1.division = 'primera'
-           AND LOWER(e1.slug_base) = LOWER(e.slug_base)
-         ORDER BY e1.activo DESC, e1.id ASC
+           AND (
+             LOWER(e1.slug_base) = LOWER(e.slug_base)
+             OR LOWER(e1.display_name) = LOWER(e.display_name)
+           )
+         ORDER BY CASE WHEN LOWER(e1.slug_base) = LOWER(e.slug_base) THEN 0 ELSE 1 END,
+                  e1.activo DESC, e1.id ASC
          LIMIT 1
       ) first_team ON true
       ORDER BY e.display_name ASC
@@ -146,8 +150,12 @@ router.put('/planillas/:team', requireAdmin, async (req, res) => {
              FROM equipos e1
             WHERE e.division = 'segunda'
               AND e1.division = 'primera'
-              AND LOWER(e1.slug_base) = LOWER(e.slug_base)
-            ORDER BY e1.activo DESC, e1.id ASC
+              AND (
+                LOWER(e1.slug_base) = LOWER(e.slug_base)
+                OR LOWER(e1.display_name) = LOWER(e.display_name)
+              )
+            ORDER BY CASE WHEN LOWER(e1.slug_base) = LOWER(e.slug_base) THEN 0 ELSE 1 END,
+                     e1.activo DESC, e1.id ASC
             LIMIT 1
          ) first_team ON true
         WHERE LOWER(slug_uid) = $1
