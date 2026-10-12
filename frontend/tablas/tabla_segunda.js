@@ -209,7 +209,7 @@ function ensureFechaBlock(section, fechaIndex, fechaText){
 function renderRowsStatic(rowsCont, equipos){
   rowsCont.innerHTML = '';
   const list = Array.isArray(equipos) ? equipos : [];
-  const total = selectedEdition === SPECIAL_EDITION ? 4 : Math.floor(list.length / 2);
+  const total = Math.floor(list.length / 2);
 
   for (let k = 0; k < total; k++){
     const iL = 2 * k;
