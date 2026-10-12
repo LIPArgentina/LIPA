@@ -53,32 +53,6 @@ function clearFixtureScores(fixture){
   return clean;
 }
 
-function activeGroups(){
-  return selectedEdition === SPECIAL_EDITION ? ['A'] : GROUPS;
-}
-
-function normalizeSpecialFixture(fixture, { clearScores = false } = {}){
-  const sourceDates = Array.isArray(fixture?.fechas) ? fixture.fechas : [];
-  const totalDates = Math.max(7, sourceDates.length);
-  return {
-    fechas: Array.from({ length: totalDates }, (_, index) => {
-      const source = sourceDates[index] || {};
-      const equipos = (Array.isArray(source.tablas) ? source.tablas : [])
-        .flatMap(tabla => Array.isArray(tabla?.equipos) ? tabla.equipos : [])
-        .slice(0, 8)
-        .map(equipo => ({
-          ...equipo,
-          puntos: clearScores ? 0 : Number(equipo?.puntos || 0),
-          puntosExtra: clearScores ? 0 : Number(equipo?.puntosExtra || 0)
-        }));
-      return {
-        date: String(source.date || source.fecha || ''),
-        tablas: [{ grupo: 'A', equipos }]
-      };
-    })
-  };
-}
-
 // La portada de Segunda siempre abre en la edición especial; los botones permiten
 // consultar las ediciones anteriores sin cambiar los datos usados por la especial.
 let selectedEdition = SPECIAL_EDITION;
@@ -150,7 +124,7 @@ async function fetchFixture(kind){
     if (!sourceRes.ok || !sourceData?.ok || !sourceData?.data) {
       throw new Error(sourceData?.error || `No se pudo preparar fixture ${kind} de la edición especial`);
     }
-    cache[kind] = normalizeSpecialFixture(sourceData.data, { clearScores: true });
+    cache[kind] = clearFixtureScores(sourceData.data);
     return cache[kind];
   }
 
@@ -163,11 +137,9 @@ async function fetchFixture(kind){
     throw new Error(apiData?.error || `No se pudo cargar fixture ${kind} desde PostgreSQL`);
   }
 
-  cache[kind] = edition === 7
-    ? normalizeSpecialFixture(apiData.data)
-    : (edition === 6 && !apiData.data.fechas?.length
-        ? buildEmptyCurrentFixture()
-        : apiData.data);
+  cache[kind] = edition === 6 && !apiData.data.fechas?.length
+    ? buildEmptyCurrentFixture()
+    : apiData.data;
   return cache[kind];
 }
 
@@ -272,7 +244,7 @@ function buildFixtureCard(group, fechas){
 function renderSelectedFixture(){
   const fx = cache[selectedKind];
   if (!fx || !Array.isArray(fx.fechas)) return;
-  activeGroups().forEach(group => buildFixtureCard(group, fx.fechas));
+  GROUPS.forEach(group => buildFixtureCard(group, fx.fechas));
 }
 
 function collectStandingsEntries(feeds){
@@ -292,18 +264,17 @@ function collectStandingsEntries(feeds){
 }
 
 function calcRowsFromEntries(entries){
-  const groups = activeGroups();
-  const puntos = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
-  const ju = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
-  const tr = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
-  const trContra = Object.fromEntries(groups.map(g => [g, Object.create(null)]));
-  const teamsSeen = Object.fromEntries(groups.map(g => [g, new Map()]));
+  const puntos = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const ju = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const tr = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const trContra = Object.fromEntries(GROUPS.map(g => [g, Object.create(null)]));
+  const teamsSeen = Object.fromEntries(GROUPS.map(g => [g, new Map()]));
 
   (entries || []).forEach(entry => {
     const fecha = entry?.fecha;
     (fecha?.tablas || []).forEach(tabla => {
       const g = String(tabla?.grupo || '').toUpperCase();
-      if (!groups.includes(g)) return;
+      if (!GROUPS.includes(g)) return;
 
       const equipos = (tabla?.equipos || []).map(e => ({
         equipo: e?.equipo || '',
@@ -342,7 +313,7 @@ function calcRowsFromEntries(entries){
   });
 
   const result = {};
-  groups.forEach(g => {
+  GROUPS.forEach(g => {
     result[g] = Array.from(teamsSeen[g].entries()).map(([key, display]) => ({
       key,
       equipo: puntos[g][key]?.equipo || display,
@@ -408,9 +379,7 @@ function fillBoard(group, data){
   const holder = document.querySelector(`[data-group-rows="${group}"]`);
   if (!holder) return;
   holder.innerHTML = '';
-  const rowCount = selectedEdition === SPECIAL_EDITION
-    ? 8
-    : (dataEdition() >= 6 ? 4 : (Array.isArray(data) ? data.length : 0));
+  const rowCount = dataEdition() >= 6 ? 4 : (Array.isArray(data) ? data.length : 0);
   const rows = Array.isArray(data) ? data.slice(0, rowCount) : [];
   while (rows.length < rowCount) {
     rows.push({ pos: rows.length + 1, equipo: '', ju: '', tr: '', pts: '' });
@@ -425,7 +394,7 @@ function renderStandings(){
   const step = standingsSteps[safeIndex];
   const result = step?.result || {};
 
-  activeGroups().forEach(g => fillBoard(g, result[g] || []));
+  GROUPS.forEach(g => fillBoard(g, result[g] || []));
   syncStandingsControls();
   equalizeTableWidths();
 }
@@ -514,16 +483,6 @@ function applyEditionState(){
   const url = new URL(window.location.href);
   url.searchParams.set('edition', String(selectedEdition));
   window.history.replaceState({}, '', url);
-  const special = selectedEdition === SPECIAL_EDITION;
-  document.querySelectorAll('[data-special-hidden]').forEach(element => {
-    element.hidden = special;
-  });
-  document.getElementById('tables')?.classList.toggle('single-group', special);
-  document.querySelector('.grid')?.classList.toggle('single-group', special);
-  const title = document.getElementById('titulo-a');
-  if (title) title.innerHTML = special
-    ? 'GRUPO <span class="group-letter">ÚNICO</span>'
-    : 'GRUPO <span class="group-letter">A</span>';
 }
 
 async function switchEdition(edition){

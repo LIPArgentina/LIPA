@@ -24,16 +24,6 @@ const EDITION_LAYOUTS = {
         B: { matchesPerGroup: 3, minFechas: 7 }
       }
     }
-  },
-  7: {
-    segunda: {
-      groups: ['A'],
-      matchesPerGroup: 4,
-      minFechas: 7,
-      groupSettings: {
-        A: { matchesPerGroup: 4, minFechas: 7 }
-      }
-    }
   }
 };
 
@@ -66,28 +56,6 @@ function clearFixtureScores(fixture){
     });
   });
   return clean;
-}
-
-function normalizeSpecialSecondFixture(fixture, { clearScores = false } = {}){
-  const sourceDates = Array.isArray(fixture?.fechas) ? fixture.fechas : [];
-  const totalDates = Math.max(7, sourceDates.length);
-  return {
-    fechas: Array.from({ length: totalDates }, (_, index) => {
-      const source = sourceDates[index] || {};
-      const equipos = (Array.isArray(source.tablas) ? source.tablas : [])
-        .flatMap(tabla => Array.isArray(tabla?.equipos) ? tabla.equipos : [])
-        .slice(0, 8)
-        .map(equipo => ({
-          ...equipo,
-          puntos: clearScores ? 0 : Number(equipo?.puntos || 0),
-          puntosExtra: clearScores ? 0 : Number(equipo?.puntosExtra || 0)
-        }));
-      return {
-        date: String(source.date || source.fecha || ''),
-        tablas: [{ grupo: 'A', equipos }]
-      };
-    })
-  };
 }
 const API_BASE = (() => {
   const configured = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
@@ -186,9 +154,7 @@ async function loadFixtureJSON(src, meta = null){
     if (!sourceResp.ok || !sourceData?.ok || !sourceData?.data) {
       throw new Error(sourceData?.error || 'No se pudo preparar el fixture de la edición especial');
     }
-    window.LPI_FIXTURE = meta.category === 'segunda'
-      ? normalizeSpecialSecondFixture(sourceData.data, { clearScores: true })
-      : clearFixtureScores(sourceData.data);
+    window.LPI_FIXTURE = clearFixtureScores(sourceData.data);
     return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}&edition=${meta.edition}`;
   }
   if (apiResp.status === 404 && Number(meta.edition) === CURRENT_EDITION) {
@@ -199,9 +165,7 @@ async function loadFixtureJSON(src, meta = null){
     throw new Error(apiData?.error || 'No se pudo cargar el fixture desde PostgreSQL');
   }
 
-  window.LPI_FIXTURE = Number(meta.edition) === SPECIAL_EDITION_DATA && meta.category === 'segunda'
-    ? normalizeSpecialSecondFixture(apiData.data)
-    : apiData.data;
+  window.LPI_FIXTURE = apiData.data;
   return `${API_BASE}/fixture?kind=${meta.kind}&category=${meta.category}&edition=${meta.edition}`;
 }
 
@@ -367,11 +331,9 @@ function getCategoryConfig(cat, fixture, edition){
     .filter(Boolean)));
 
   const groups = base.groups.slice();
-  if (!editionLayout) {
-    fixtureGroups.forEach(group => {
-      if (!groups.includes(group)) groups.push(group);
-    });
-  }
+  fixtureGroups.forEach(group => {
+    if (!groups.includes(group)) groups.push(group);
+  });
 
   const visibleDatesByGroup = {};
   const roundNumberByGroupAndDate = {};
@@ -448,7 +410,7 @@ function buildFixtureLayout(config){
     block.dataset.fecha = String(fecha);
 
     const inner = document.createElement('div');
-    inner.className = `fecha-grid${config.groups.length === 1 ? ' single-group' : ''}`;
+    inner.className = 'fecha-grid';
 
     config.groups.forEach(grupo => {
       const visibleDates = config.visibleDatesByGroup?.[grupo] || [];

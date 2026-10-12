@@ -173,10 +173,6 @@ select.score-badge-white {
   gap:20px;
   align-items:stretch;
 }
-.fecha-grid.single-group{
-  grid-template-columns:minmax(0, 640px);
-  justify-content:center;
-}
 @media (max-width:1100px){
   .fecha-grid{
     grid-template-columns:1fr;
