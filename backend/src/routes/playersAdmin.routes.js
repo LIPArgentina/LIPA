@@ -135,7 +135,9 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
   }
 
   function teamPlayerLimit(category) {
-    return normalizeCategory(category) === 'segunda' ? 25 : 20;
+    const normalized = normalizeCategory(category);
+    if (normalized === 'primera') return 6;
+    return normalized === 'segunda' ? 25 : 20;
   }
 
   function normalizeBirthDate(value) {

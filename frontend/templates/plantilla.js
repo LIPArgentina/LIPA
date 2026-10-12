@@ -77,7 +77,7 @@ async function fetchWithAuth(url, options = {}) {
     if (roster) {
       roster.innerHTML = `
         <h2>JUGADORES</h2>
-        <h3 class="roster-subtitle">PRIMERAS</h3>${makeRows(5, 'primera')}
+        <h3 class="roster-subtitle">PRIMERAS</h3>${makeRows(6, 'primera')}
         <h3 class="roster-subtitle">SEGUNDAS</h3>${makeRows(25, 'segunda')}`;
     }
     const planColumn = document.querySelector('.extra-column');
@@ -1033,7 +1033,7 @@ trash.addEventListener('drop', e => {
           wirePlayerSelection(row);
         });
       };
-      fillCategory('primera', window.LPI_FIRST_PLAYER_DETAILS, 5);
+      fillCategory('primera', window.LPI_FIRST_PLAYER_DETAILS, 6);
       fillCategory('segunda', window.LPI_SECOND_PLAYER_DETAILS, 25);
       return;
     }

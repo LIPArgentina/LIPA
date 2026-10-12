@@ -275,7 +275,7 @@ module.exports = function createTeamPlayersRouter(deps = {}) {
       fetchPlayerDetailsForTeam(secondTeam.id),
       firstTeam ? fetchPlayerDetailsForTeam(firstTeam.id) : Promise.resolve([])
     ]);
-    const limitedFirst = firstPlayers.slice(0, 5);
+    const limitedFirst = firstPlayers.slice(0, 6);
     const limitedSecond = secondPlayers.slice(0, 25);
     return {
       ok: true,

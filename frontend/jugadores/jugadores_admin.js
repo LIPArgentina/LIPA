@@ -62,6 +62,7 @@ function setStatus(message, isError = false){
 
 const teamsCache = new Map();
 function maxTeamPlayers(category){
+  if (category === 'primera') return 6;
   return category === 'segunda' ? 25 : 20;
 }
 
