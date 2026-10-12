@@ -16,6 +16,10 @@
       max-width:900px;
       margin:0 auto;
     }
+    .tables.single-group{
+      grid-template-columns:minmax(0,450px) !important;
+      justify-content:center;
+    }
     @media (max-width: 640px){
       .tables{ grid-template-columns:1fr; gap:12px; }
     }
@@ -43,6 +47,10 @@
       max-width:1200px;
       margin-left:auto;
       margin-right:auto;
+    }
+    .grid.single-group{
+      grid-template-columns:minmax(0,600px) !important;
+      justify-content:center;
     }
     @media (max-width: 900px){
       .grid{ grid-template-columns:1fr; }
@@ -108,7 +116,7 @@
           </div>
         </div>
 
-        <div class="poster">
+        <div class="poster" data-special-hidden>
           <div class="table-wrap">
             <div class="hero">
               <div class="subtitle">POSICIONES</div>
@@ -139,7 +147,7 @@
 
     <div class="grid">
       <section class="card" data-group="A" aria-label="Fixture GRUPO A"><h1 class="h1">GRUPO A</h1></section>
-      <section class="card" data-group="B" aria-label="Fixture GRUPO B"><h1 class="h1">GRUPO B</h1></section>
+      <section class="card" data-group="B" data-special-hidden aria-label="Fixture GRUPO B"><h1 class="h1">GRUPO B</h1></section>
     </div>
   </div>
 
@@ -154,6 +162,6 @@
   </template>
 
   <script type="module" src="llaves_public.js?v=20261009-edicion-especial-2"></script>
-  <script type="module" src="tabla_segunda.js?v=20261009-edicion-especial-3" defer></script>
+  <script type="module" src="tabla_segunda.js?v=20261012-grupo-unico-1" defer></script>
 </body>
 </html>
