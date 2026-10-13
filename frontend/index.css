@@ -1015,6 +1015,8 @@
 .promo-video-popup__action{
   display: block;
   width: 100%;
+  margin-top:12px;
+  box-sizing:border-box;
   padding: 13px 16px;
   border-radius: 10px;
   background: linear-gradient(180deg, #ffdb64, #e9aa13);
