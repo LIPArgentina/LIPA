@@ -78,16 +78,21 @@ body {
   .extra-column { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .group-container { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 250px; }
   .fila-extra { display: flex; align-items: center; margin-bottom: 1px; }
+  .fila-extra--scheduled {
+    position: relative;
+  }
   .individual-start-time {
-    width: 52px;
-    margin-right: 5px;
+    position: absolute;
+    left: 0;
+    width: auto;
     color: #ffef5e;
     font-size: 11px;
     font-weight: 900;
     line-height: 1;
     text-align: right;
     white-space: nowrap;
-    flex: 0 0 52px;
+    transform: translateX(calc(-100% - 5px));
+    pointer-events: none;
   }
   .white-box { width: 20px; height: 20px; background-color: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-right: 5px; color: black; }
   .yellow-box { background-color: #ffef5e; border-radius: 5px; height: 20px; min-width: 200px; padding: 0 5px; display: flex; align-items: center; font-size: 12px; cursor: pointer; color: black; transition: background 0.12s, outline 0.12s; }
@@ -662,10 +667,8 @@ dialog.modal { padding: 0 !important; }
   }
 
   .individual-start-time{
-    width: 38px;
-    margin-right: 1px;
     font-size: 8px;
-    flex-basis: 38px;
+    transform: translateX(calc(-100% - 3px));
   }
 
   .jugador,
