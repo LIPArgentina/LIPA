@@ -998,6 +998,20 @@
   height: 100%;
   border: 0;
 }
+.promo-video-popup__flyer{
+  width:min(100%, 390px);
+  margin:0 auto;
+  overflow:hidden;
+  border-radius:12px;
+  background:#000;
+}
+.promo-video-popup__flyer img{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:calc(100vh - 130px);
+  object-fit:contain;
+}
 .promo-video-popup__action{
   display: block;
   width: 100%;
@@ -1011,6 +1025,7 @@
 }
 @media (max-height: 760px){
   .promo-video-popup__video{ width: min(100%, 250px); }
+  .promo-video-popup__flyer{ width:min(100%, 300px); }
   .promo-video-popup__panel{ padding: 13px; }
   .promo-video-popup__panel p{ margin: 9px 4px; }
 }

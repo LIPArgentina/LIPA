@@ -812,13 +812,10 @@ function setupBannerPopupLinks() {
 function setupPromoSorteoModal() {
   const modal = document.getElementById('promoSorteoModal');
   const closeButton = document.getElementById('closePromoSorteo');
-  const player = document.getElementById('promoSorteoPlayer');
-  if (!modal || !closeButton || !player) return;
+  if (!modal || !closeButton) return;
 
-  const originalSrc = player.src;
   const close = () => {
     modal.close();
-    player.src = '';
   };
 
   closeButton.addEventListener('click', close);
@@ -829,11 +826,6 @@ function setupPromoSorteoModal() {
     event.preventDefault();
     close();
   });
-  modal.addEventListener('close', () => {
-    if (player.src) player.src = '';
-  });
-
-  player.src = originalSrc;
   modal.showModal();
 }
 
