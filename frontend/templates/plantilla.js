@@ -89,8 +89,8 @@ async function fetchWithAuth(url, options = {}) {
           <div class="fila fila-capitan" draggable="true"><div class="numero">C2</div><div class="jugador"></div></div>
         </section>`);
     }
-    const makeSlots = (count, allowed, subgroup, showStartTime = false) => Array.from({ length: count }, (_, index) => {
-      const startTime = showStartTime && index < 2
+    const makeSlots = (count, allowed, subgroup, scheduledCount = 0) => Array.from({ length: count }, (_, index) => {
+      const startTime = index < scheduledCount
         ? '<span class="individual-start-time">20:30hs</span>'
         : '';
       return `<div class="fila-extra${startTime ? ' fila-extra--scheduled' : ''}">${startTime}<div class="white-box">${index + 1}</div><div class="yellow-box" data-player="" data-player-id="" data-player-category="" data-allowed-category="${allowed}" data-subgroup="${subgroup}" draggable="true"></div></div>`;
@@ -98,8 +98,8 @@ async function fetchWithAuth(url, options = {}) {
     const individual = document.querySelector('.group-container[data-group="individual"]');
     if (individual) individual.innerHTML = `
       <div class="group-title">INDIVIDUALES</div>
-      <div class="plan-subtitle">PRIMERAS</div>${makeSlots(2, 'mixed', 'primeras', true)}
-      <div class="plan-subtitle">SEGUNDAS</div>${makeSlots(9, 'segunda', 'segundas', true)}`;
+      <div class="plan-subtitle">PRIMERAS</div>${makeSlots(2, 'mixed', 'primeras')}
+      <div class="plan-subtitle">SEGUNDAS</div>${makeSlots(9, 'segunda', 'segundas', 4)}`;
     const substitutes = document.querySelector('.group-container[data-group="suplentes"]');
     if (substitutes) {
       substitutes.dataset.free = 'false';
