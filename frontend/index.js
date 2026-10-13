@@ -84,37 +84,33 @@ function ensureManageTeamButton() {
 }
 
 
-function ensureConsultasButton() {
-  const btn = document.getElementById("btnConsultas");
+function ensureAdminHeaderLink(id, href) {
+  const btn = document.getElementById(id);
   if (!btn) return;
 
   btn.classList.add("btn", "btn-outline", "btn-sm");
   btn.style.textDecoration = "none";
 
-  btn.href = "./consultas/consultas.html";
-  btn.classList.remove("hidden");
+  if (isAdmin()) {
+    btn.href = href;
+    btn.classList.remove("hidden");
+    return;
+  }
+
+  btn.classList.add("hidden");
+  btn.removeAttribute("href");
+}
+
+function ensureConsultasButton() {
+  ensureAdminHeaderLink("btnConsultas", "./consultas/consultas.html");
 }
 
 function ensureJugadoresViewButton() {
-  const btn = document.getElementById("btnJugadoresView");
-  if (!btn) return;
-
-  btn.classList.add("btn", "btn-outline", "btn-sm");
-  btn.style.textDecoration = "none";
-
-  btn.href = "./jugadores/jugadores_view.html";
-  btn.classList.remove("hidden");
+  ensureAdminHeaderLink("btnJugadoresView", "./jugadores/jugadores_view.html");
 }
 
 function ensureCrucesViewButton() {
-  const btn = document.getElementById("btnCrucesView");
-  if (!btn) return;
-
-  btn.classList.add("btn", "btn-outline", "btn-sm");
-  btn.style.textDecoration = "none";
-
-  btn.href = "./cruces/cruces_fecha_view.html";
-  btn.classList.remove("hidden");
+  ensureAdminHeaderLink("btnCrucesView", "./cruces/cruces_fecha_view.html");
 }
 
 function redirectAfterLogin() {
