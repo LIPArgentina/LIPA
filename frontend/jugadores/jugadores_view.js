@@ -86,7 +86,7 @@ async function enableAllowedCategories(){
       const option = document.createElement('option');
       option.value = 'segunda';
       option.textContent = '2da';
-      select.insertBefore(option, select.firstChild);
+      select.insertBefore(option, select.querySelector('option[value="tercera"]'));
     }
   } catch (_) {
     hasSecondAccess = false;
