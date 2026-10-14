@@ -2347,15 +2347,14 @@ document.addEventListener("DOMContentLoaded", function () {
 (function setupModelSheetDownload(){
   function blankIndividualRows(isSecond = false){
     if (isSecond) {
-      const subgroup = (title, count, scheduledCount = 0) => {
+      const subgroup = (title, count) => {
         const rows = [`<tr class="model-subgroup-row"><th colspan="5">${title}</th></tr>`];
         for (let index = 0; index < count; index++) {
-          const time = index < scheduledCount ? '<span class="model-time">20:30hs</span>' : '';
-          rows.push(`<tr><td></td><td></td><td class="model-vs">${time}<span>VS.</span></td><td></td><td></td></tr>`);
+          rows.push('<tr><td></td><td></td><td class="model-vs">VS.</td><td></td><td></td></tr>');
         }
         return rows.join('');
       };
-      return subgroup('PRIMERAS', 2) + subgroup('SEGUNDAS', 9, 4);
+      return subgroup('PRIMERAS', 2) + subgroup('SEGUNDAS', 9);
     }
     return Array.from({ length: 11 }, (_, index) => index === 0
       ? '<tr><td></td><td></td><td class="model-vs" rowspan="11">VS.</td><td></td><td></td></tr>'

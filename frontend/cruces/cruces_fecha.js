@@ -2932,22 +2932,21 @@ function isAndroidAppWebView(){
     const right = safeArr(visitantePlan?.individuales, INDIVIDUAL_COUNT);
 
     if (String(category || '').toLowerCase() === 'segunda') {
-      const subgroup = (title, start, count, scheduledCount = 0) => {
+      const subgroup = (title, start, count) => {
         const rows = [`<tr class="export-subgroup-row"><th colspan="5">${title}</th></tr>`];
         for (let offset = 0; offset < count; offset++) {
           const index = start + offset;
-          const time = offset < scheduledCount ? '<span class="export-time">20:30hs</span>' : '';
           rows.push(`<tr>
             <td>${escapeHtml(left[index])}</td>
             <td></td>
-            <td class="export-vs">${time}<span>VS.</span></td>
+            <td class="export-vs">VS.</td>
             <td></td>
             <td>${escapeHtml(right[index])}</td>
           </tr>`);
         }
         return rows.join('');
       };
-      return subgroup('PRIMERAS', 0, 2) + subgroup('SEGUNDAS', 2, 9, 4);
+      return subgroup('PRIMERAS', 0, 2) + subgroup('SEGUNDAS', 2, 9);
     }
 
     return left.map((name, idx) => {
