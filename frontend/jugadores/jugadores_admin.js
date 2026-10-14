@@ -476,9 +476,9 @@ function parseTeamImport(text){
   return rows;
 }
 
-async function importTeamFile(file){
+async function importTeamText(text){
   const { category, team, teamName } = selectedTeamContext();
-  const rows = parseTeamImport(await file.text());
+  const rows = parseTeamImport(text);
   const nameOnly = rows.every(row => !row.dni);
   const warning = nameOnly
     ? '\n\nEs una lista sin DNI: podrás vincular cada nombre con un jugador existente o crearlo como jugador nuevo para completar sus datos más adelante.'
@@ -502,6 +502,11 @@ async function importTeamFile(file){
   }
   toast(`Importación completa: ${data.created || 0} nuevos y ${data.updated || 0} actualizados`);
   await searchByTeam();
+}
+
+async function importTeamFile(file){
+  if (!file) throw new Error('Seleccioná un archivo para importar.');
+  return importTeamText(await file.text());
 }
 
 function reviewTeamImport(reviews){
@@ -551,16 +556,69 @@ async function handleTeamImportChange(){
   const input = $('#teamImportFile');
   const file = input?.files?.[0];
   if (!file) return;
+  await processTeamImportSource(file);
+}
+
+function showImportSourceStatus(message){
+  const status = $('#teamImportSourceStatus');
+  if (status) status.textContent = message || '';
+}
+
+function reportTeamImportError(err){
+  const conflicts = Array.isArray(err?.data?.conflicts) ? err.data.conflicts : [];
+  const detail = conflicts.length
+    ? `\n\n${conflicts.slice(0, 12).map(item => `Fila ${item.row}: ${item.message}`).join('\n')}`
+    : '';
+  alert(`${err.message || 'No se pudo importar el equipo'}${detail}`);
+}
+
+async function processTeamImportSource(source){
+  const dialog = $('#teamImportSourceDialog');
   try {
-    await importTeamFile(file);
+    showImportSourceStatus('Analizando la lista...');
+    const text = typeof source === 'string' ? source : await source.text();
+    if (!String(text || '').trim()) throw new Error('La lista está vacía.');
+    dialog?.close();
+    await importTeamText(text);
   } catch (err) {
-    const conflicts = Array.isArray(err?.data?.conflicts) ? err.data.conflicts : [];
-    const detail = conflicts.length
-      ? `\n\n${conflicts.slice(0, 12).map(item => `Fila ${item.row}: ${item.message}`).join('\n')}`
-      : '';
-    alert(`${err.message || 'No se pudo importar el equipo'}${detail}`);
+    reportTeamImportError(err);
   } finally {
-    input.value = '';
+    showImportSourceStatus('');
+    const input = $('#teamImportFile');
+    if (input) input.value = '';
+  }
+}
+
+function openTeamImportSource(){
+  try {
+    selectedTeamContext();
+    const dialog = $('#teamImportSourceDialog');
+    const fallback = $('#teamImportPasteFallback');
+    const pasteText = $('#teamImportPasteText');
+    if (fallback) fallback.hidden = true;
+    if (pasteText) pasteText.value = '';
+    showImportSourceStatus('');
+    dialog?.showModal();
+  } catch (err) {
+    toast(err.message || 'Elegí un equipo');
+  }
+}
+
+async function pasteTeamImportFromClipboard(){
+  try {
+    if (!navigator.clipboard?.readText) throw new Error('clipboard-unavailable');
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) throw new Error('El portapapeles está vacío.');
+    await processTeamImportSource(text);
+  } catch (err) {
+    if (err.message === 'El portapapeles está vacío.') {
+      showImportSourceStatus(err.message);
+      return;
+    }
+    const fallback = $('#teamImportPasteFallback');
+    if (fallback) fallback.hidden = false;
+    showImportSourceStatus('El navegador no permitió leer el portapapeles. Pegá el texto en el campo de abajo.');
+    $('#teamImportPasteText')?.focus();
   }
 }
 
@@ -796,15 +854,35 @@ $('#btnCloseHistory')?.addEventListener('click', () => $('#historyDialog')?.clos
 $('#playerCategory')?.addEventListener('change', () => refreshPlayerTeams());
 $('#teamCategory')?.addEventListener('change', () => refreshSearchTeams());
 $('#btnExportTeam')?.addEventListener('click', exportTeamPlayers);
-$('#btnImportTeam')?.addEventListener('click', () => {
-  try {
-    selectedTeamContext();
-    $('#teamImportFile')?.click();
-  } catch (err) {
-    toast(err.message || 'Elegí un equipo');
-  }
-});
+$('#btnImportTeam')?.addEventListener('click', openTeamImportSource);
+$('#btnCloseTeamImportSource')?.addEventListener('click', () => $('#teamImportSourceDialog')?.close());
+$('#btnSelectTeamImportFile')?.addEventListener('click', () => $('#teamImportFile')?.click());
+$('#btnPasteTeamImport')?.addEventListener('click', pasteTeamImportFromClipboard);
+$('#btnImportPastedText')?.addEventListener('click', () => processTeamImportSource($('#teamImportPasteText')?.value || ''));
 $('#teamImportFile')?.addEventListener('change', handleTeamImportChange);
+
+const teamImportDropZone = $('#teamImportDropZone');
+teamImportDropZone?.addEventListener('keydown', event => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  $('#teamImportFile')?.click();
+});
+teamImportDropZone?.addEventListener('dragover', event => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+  teamImportDropZone.classList.add('is-dragging');
+});
+teamImportDropZone?.addEventListener('dragleave', () => teamImportDropZone.classList.remove('is-dragging'));
+teamImportDropZone?.addEventListener('drop', event => {
+  event.preventDefault();
+  teamImportDropZone.classList.remove('is-dragging');
+  const file = event.dataTransfer?.files?.[0];
+  if (!file) {
+    showImportSourceStatus('No se detectó ningún archivo.');
+    return;
+  }
+  processTeamImportSource(file);
+});
 
 clearForm();
 refreshSearchTeams();

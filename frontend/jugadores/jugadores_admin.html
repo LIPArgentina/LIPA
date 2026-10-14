@@ -6,7 +6,7 @@
   <title>Administración de jugadores</title>
   <link rel="stylesheet" href="../admin.css">
   <link rel="stylesheet" href="../photo-cropper.css">
-  <link rel="stylesheet" href="jugadores_admin.css?v=team-import-review-4">
+  <link rel="stylesheet" href="jugadores_admin.css?v=team-import-source-1">
 </head>
 <body>
   <header class="site-header">
@@ -163,10 +163,37 @@
     </div>
   </dialog>
 
+  <dialog id="teamImportSourceDialog" class="modal">
+    <div class="modal__panel import-source-panel">
+      <div class="modal__header">
+        <h3>Importar jugadores</h3>
+      </div>
+      <div class="modal__body import-source-body">
+        <p class="import-source-intro">Podés cargar un archivo o pegar directamente una lista copiada desde WhatsApp.</p>
+        <div id="teamImportDropZone" class="import-drop-zone" role="button" tabindex="0" aria-label="Arrastrar o seleccionar un archivo">
+          <strong>Arrastrá el archivo y soltalo acá</strong>
+          <span>Formatos admitidos: TXT y CSV</span>
+          <button id="btnSelectTeamImportFile" class="btn" type="button">Seleccionar archivo</button>
+        </div>
+        <div class="import-source-separator"><span>o</span></div>
+        <button id="btnPasteTeamImport" class="btn btn-gold import-paste-button" type="button">Pegar de memoria</button>
+        <div id="teamImportPasteFallback" class="import-paste-fallback" hidden>
+          <label for="teamImportPasteText">Pegá la lista copiada</label>
+          <textarea id="teamImportPasteText" class="input" rows="7" placeholder="Pegá acá los nombres o la lista con DNI"></textarea>
+          <button id="btnImportPastedText" class="btn btn-gold" type="button">Importar texto pegado</button>
+        </div>
+        <p id="teamImportSourceStatus" class="import-source-status" role="status"></p>
+      </div>
+      <div class="modal__footer">
+        <button id="btnCloseTeamImportSource" class="btn btn-ghost" type="button">Cancelar</button>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast"></div>
 
   <script src="../config.js?v=renewable-session-1"></script>
   <script src="../photo-cropper.js"></script>
-  <script src="jugadores_admin.js?v=primera-seis-1"></script>
+  <script src="jugadores_admin.js?v=team-import-source-1"></script>
 </body>
 </html>
