@@ -13,6 +13,7 @@ const CATEGORY_KEYS = {
 const ARG_TZ_OFFSET = '-03:00';
 const AUTOMATION_RELEASE_HOUR = 18;
 const CURRENT_EDITION = 6;
+const SECOND_SPECIAL_EDITION = 7;
 const DEFAULT_HISTORIC_EDITION = 5;
 let ensureCrucesAdminStoragePromise = null;
 let ensureJugadorResultadosEditionPromise = null;
@@ -51,6 +52,12 @@ function normalizeEdition(value, options = {}) {
   return defaultEdition;
 }
 
+function getActiveEditionForCategory(category = '') {
+  return String(category || '').trim().toLowerCase() === 'segunda'
+    ? SECOND_SPECIAL_EDITION
+    : CURRENT_EDITION;
+}
+
 function getEditionLabel(edition) {
   if (edition === 'total') return 'TOTAL';
   return `${Number(edition || CURRENT_EDITION)}TA EDICIÓN`;
@@ -77,8 +84,9 @@ async function getEditionStartDate(edition = CURRENT_EDITION, category = '') {
 
 async function inferEditionFromDate(dateValue, category = '') {
   const dateKey = normalizeDateOnly(dateValue);
-  const currentEditionStart = await getEditionStartDate(CURRENT_EDITION, category);
-  if (dateKey && currentEditionStart && dateKey >= currentEditionStart) return CURRENT_EDITION;
+  const activeEdition = getActiveEditionForCategory(category);
+  const currentEditionStart = await getEditionStartDate(activeEdition, category);
+  if (dateKey && currentEditionStart && dateKey >= currentEditionStart) return activeEdition;
   return DEFAULT_HISTORIC_EDITION;
 }
 
@@ -375,9 +383,10 @@ function collectLlavesAutomationDates(node, out = []) {
 async function fetchAutomationLlavesInfo(category) {
   if (!category) return [];
   try {
+    const activeEdition = getActiveEditionForCategory(category);
     const { rows } = await pool.query(
       `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
-      [category, CURRENT_EDITION]
+      [category, activeEdition]
     );
     return collectLlavesAutomationDates(rows?.[0]?.data || null, []);
   } catch (err) {
@@ -401,6 +410,7 @@ async function fetchAutomationFixtureInfo(team) {
     };
   }
 
+  const activeEdition = getActiveEditionForCategory(category);
   const { rows } = await pool.query(
     `
       SELECT kind, data, updated_at, id
@@ -411,7 +421,7 @@ async function fetchAutomationFixtureInfo(team) {
         updated_at DESC,
         id DESC
     `,
-    [category, CURRENT_EDITION]
+    [category, activeEdition]
   );
 
   const fixtures = [];
@@ -925,13 +935,14 @@ function extractCrucesFromLlaves(data) {
 async function fetchCrucesFromDB(team) {
   const category = inferCategoryFromTeamMarker(team);
   if (!category) throw new Error('Categoría inválida');
+  const activeEdition = getActiveEditionForCategory(category);
 
   const { rows } = await pool.query(
     `SELECT DISTINCT ON (kind) kind, data
        FROM fixtures
       WHERE kind IN ('ida', 'vuelta') AND category=$1 AND edicion=$2
       ORDER BY kind, updated_at DESC, id DESC`,
-    [category, CURRENT_EDITION]
+    [category, activeEdition]
   );
 
   const fixtureMatches = rows.flatMap((row) => {
@@ -941,11 +952,11 @@ async function fetchCrucesFromDB(team) {
 
   const llavesResult = await pool.query(
     `SELECT data FROM llaves_data WHERE category=$1 AND edicion=$2 LIMIT 1`,
-    [category, CURRENT_EDITION]
+    [category, activeEdition]
   );
   const rawLlavesData = llavesResult.rows[0]?.data || null;
   const resolvedLlavesData = rawLlavesData
-    ? await buildLlavesAutoData(rawLlavesData, category, CURRENT_EDITION)
+    ? await buildLlavesAutoData(rawLlavesData, category, activeEdition)
     : null;
   const llavesMatches = extractCrucesFromLlaves(resolvedLlavesData);
   const matches = [...fixtureMatches, ...llavesMatches];

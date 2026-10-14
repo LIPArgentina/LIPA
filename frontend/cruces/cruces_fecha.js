@@ -741,7 +741,8 @@ function apiUrl(path){
     }
 
     const fetchFixtureKind = async (kind) => {
-      const data = await fetchJson(apiUrl('/api/fixture?kind=' + encodeURIComponent(kind) + '&category=' + encodeURIComponent(category)), {
+      const edition = category === 'segunda' ? 7 : 6;
+      const data = await fetchJson(apiUrl('/api/fixture?kind=' + encodeURIComponent(kind) + '&category=' + encodeURIComponent(category) + '&edition=' + encodeURIComponent(edition)), {
         cache: 'no-store',
         credentials: 'same-origin'
       });
