@@ -2345,18 +2345,36 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 (function setupModelSheetDownload(){
-  function blankIndividualRows(){
+  function blankIndividualRows(isSecond = false){
+    if (isSecond) {
+      const subgroup = (title, count, scheduledCount = 0) => {
+        const rows = [`<tr class="model-subgroup-row"><th colspan="5">${title}</th></tr>`];
+        for (let index = 0; index < count; index++) {
+          const time = index < scheduledCount ? '<span class="model-time">20:30hs</span>' : '';
+          rows.push(`<tr><td></td><td></td><td class="model-vs">${time}<span>VS.</span></td><td></td><td></td></tr>`);
+        }
+        return rows.join('');
+      };
+      return subgroup('PRIMERAS', 2) + subgroup('SEGUNDAS', 9, 4);
+    }
     return Array.from({ length: 11 }, (_, index) => index === 0
       ? '<tr><td></td><td></td><td class="model-vs" rowspan="11">VS.</td><td></td><td></td></tr>'
       : '<tr><td></td><td></td><td></td><td></td></tr>'
     ).join('');
   }
 
+  function blankSubstituteRows(isSecond = false){
+    if (!isSecond) return '<tr><td></td></tr><tr><td></td></tr>';
+    return '<tr class="model-subgroup-row"><th>PRIMERAS</th></tr><tr><td></td></tr>' +
+      '<tr class="model-subgroup-row"><th>SEGUNDAS</th></tr><tr><td></td></tr><tr><td></td></tr>';
+  }
+
   function buildModelSheet(){
+    const isSecond = LPI_isSecondTemplate();
     const sheet = document.createElement('section');
     sheet.className = 'model-a4-sheet';
     sheet.innerHTML = `
-      <div class="model-meta"><span>Categoría:</span><span>Planilla modelo</span></div>
+      <div class="model-meta"><span>Categoría: ${isSecond ? 'SEGUNDA' : ''}</span><span>Planilla modelo</span></div>
       <h1 class="model-title">L.I.P.A.</h1>
       <div class="model-bar"></div>
       <div class="model-header">
@@ -2374,7 +2392,7 @@ document.addEventListener("DOMContentLoaded", function () {
         <table class="model-individuals" aria-label="Once partidos individuales">
           <colgroup><col style="width:32.5%"><col style="width:5%"><col style="width:25%"><col style="width:5%"><col style="width:32.5%"></colgroup>
           <thead><tr><th colspan="2">NOMBRE Y APELLIDO</th><th>INDIVIDUALES</th><th colspan="2">NOMBRE Y APELLIDO</th></tr></thead>
-          <tbody>${blankIndividualRows()}</tbody>
+          <tbody>${blankIndividualRows(isSecond)}</tbody>
         </table>
       </div>
       <table class="model-result" aria-label="Resultado final">
@@ -2383,8 +2401,8 @@ document.addEventListener("DOMContentLoaded", function () {
         <tbody><tr><td></td><td></td><td></td><td></td></tr><tr><td class="model-tri-left">TRIÁNGULOS TOTALES :</td><td></td><td></td><td class="model-tri-right">: TRIÁNGULOS TOTALES</td></tr></tbody>
       </table>
       <div class="model-subs">
-        <table><thead><tr><th>SUPLENTES</th></tr></thead><tbody><tr><td></td></tr><tr><td></td></tr></tbody></table>
-        <table><thead><tr><th>SUPLENTES</th></tr></thead><tbody><tr><td></td></tr><tr><td></td></tr></tbody></table>
+        <table><thead><tr><th>SUPLENTES</th></tr></thead><tbody>${blankSubstituteRows(isSecond)}</tbody></table>
+        <table><thead><tr><th>SUPLENTES</th></tr></thead><tbody>${blankSubstituteRows(isSecond)}</tbody></table>
       </div>
       <div class="model-signatures">
         <div class="model-signature"><div class="model-signature-line"></div><div class="model-signature-label">FIRMA LOCAL</div></div>
@@ -2411,7 +2429,9 @@ document.addEventListener("DOMContentLoaded", function () {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'planilla-modelo-11-individuales.jpg';
+      link.download = LPI_isSecondTemplate()
+        ? 'planilla-modelo-segunda-mixta.jpg'
+        : 'planilla-modelo-11-individuales.jpg';
       document.body.appendChild(link);
       link.click();
       link.remove();

@@ -2926,9 +2926,28 @@ function isAndroidAppWebView(){
       .replace(/'/g, '&#39;');
   }
 
-  function buildExportIndividualRows(localPlan, visitantePlan){
+  function buildExportIndividualRows(localPlan, visitantePlan, category = ''){
     const left = safeArr(localPlan?.individuales, INDIVIDUAL_COUNT);
     const right = safeArr(visitantePlan?.individuales, INDIVIDUAL_COUNT);
+
+    if (String(category || '').toLowerCase() === 'segunda') {
+      const subgroup = (title, start, count, scheduledCount = 0) => {
+        const rows = [`<tr class="export-subgroup-row"><th colspan="5">${title}</th></tr>`];
+        for (let offset = 0; offset < count; offset++) {
+          const index = start + offset;
+          const time = offset < scheduledCount ? '<span class="export-time">20:30hs</span>' : '';
+          rows.push(`<tr>
+            <td>${escapeHtml(left[index])}</td>
+            <td></td>
+            <td class="export-vs">${time}<span>VS.</span></td>
+            <td></td>
+            <td>${escapeHtml(right[index])}</td>
+          </tr>`);
+        }
+        return rows.join('');
+      };
+      return subgroup('PRIMERAS', 0, 2) + subgroup('SEGUNDAS', 2, 9, 4);
+    }
 
     return left.map((name, idx) => {
       if (idx === 0) {
@@ -2965,8 +2984,16 @@ function isAndroidAppWebView(){
     </tr>`;
   }
 
-  function buildExportSubsRows(items){
-    return safeArr(items, getEffectiveSubstituteCount()).map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join('');
+  function buildExportSubsRows(items, category = ''){
+    const values = safeArr(items, getEffectiveSubstituteCount());
+    if (String(category || '').toLowerCase() === 'segunda') {
+      return `<tr class="export-subgroup-row"><th>PRIMERAS</th></tr>
+        <tr><td>${escapeHtml(values[0])}</td></tr>
+        <tr class="export-subgroup-row"><th>SEGUNDAS</th></tr>
+        <tr><td>${escapeHtml(values[1])}</td></tr>
+        <tr><td>${escapeHtml(values[2])}</td></tr>`;
+    }
+    return values.map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join('');
   }
 
   function buildExportSheetElement(){
@@ -2977,7 +3004,8 @@ function isAndroidAppWebView(){
     const visitante = exportData.visitante || {};
     const localPlan = exportData.localPlan || {};
     const visitantePlan = exportData.visitantePlan || {};
-    const category = String(exportData.category || '').toUpperCase();
+    const categoryKey = String(exportData.category || '').toLowerCase();
+    const category = categoryKey.toUpperCase();
     const formattedDate = formatDate(exportData.date || window.__CRUCE_FECHA_ISO || '');
 
     const wrapper = document.createElement('section');
@@ -3039,7 +3067,7 @@ function isAndroidAppWebView(){
               <th colspan="2">NOMBRE Y APELLIDO</th>
             </tr>
           </thead>
-          <tbody>${buildExportIndividualRows(localPlan, visitantePlan)}</tbody>
+          <tbody>${buildExportIndividualRows(localPlan, visitantePlan, categoryKey)}</tbody>
         </table>
       </div>
 
@@ -3102,13 +3130,13 @@ function isAndroidAppWebView(){
         <div>
           <table class="export-subs-table" aria-label="Suplentes local">
             <thead><tr><th>SUPLENTES</th></tr></thead>
-            <tbody>${buildExportSubsRows(localPlan.suplentes)}</tbody>
+            <tbody>${buildExportSubsRows(localPlan.suplentes, categoryKey)}</tbody>
           </table>
         </div>
         <div>
           <table class="export-subs-table" aria-label="Suplentes visitante">
             <thead><tr><th>SUPLENTES</th></tr></thead>
-            <tbody>${buildExportSubsRows(visitantePlan.suplentes)}</tbody>
+            <tbody>${buildExportSubsRows(visitantePlan.suplentes, categoryKey)}</tbody>
           </table>
         </div>
       </div>

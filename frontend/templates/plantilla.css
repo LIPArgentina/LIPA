@@ -319,6 +319,8 @@ dialog.modal::backdrop { background: rgba(0,0,0,.55); }
   .model-section{ margin-top:14px; }
   .model-individuals th{ height:28px; font-weight:800; text-align:center; text-transform:uppercase; letter-spacing:.3px; }
   .model-vs{ text-align:center; vertical-align:middle; font-weight:700; }
+  .model-vs .model-time{ display:block; font-size:10px; line-height:1.05; font-weight:800; }
+  .model-subgroup-row th{ height:20px; background:#e5e5e5; font-size:11px; font-weight:800; letter-spacing:.08em; text-align:center; }
   .model-result{ margin-top:18px; }
   .model-result th,.model-result td{ height:28px; }
   .model-result th{ text-align:center; text-transform:uppercase; font-weight:800; }
