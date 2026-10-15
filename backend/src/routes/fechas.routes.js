@@ -84,6 +84,23 @@ module.exports = function createFechasRouter(deps) {
       .toUpperCase();
   }
 
+  async function crucesManualesHabilitados(category) {
+    const normalizedCategory = String(category || '').trim().toLowerCase();
+    if (!['segunda', 'tercera'].includes(normalizedCategory)) return false;
+
+    const storage = await pool.query(`SELECT to_regclass('public.cruces_admin_config') AS table_name`);
+    if (!storage.rows[0]?.table_name) return false;
+
+    const result = await pool.query(
+      `SELECT manual_enabled
+         FROM cruces_admin_config
+        WHERE team = $1
+        LIMIT 1`,
+      [`__categoria_${normalizedCategory}__`]
+    );
+    return result.rows[0]?.manual_enabled === true;
+  }
+
   async function fetchPlayerIdentityMap(equipoIds) {
     const ids = (Array.isArray(equipoIds) ? equipoIds : [equipoIds]).map(Number).filter(Number.isFinite);
     const result = await pool.query(
@@ -180,15 +197,15 @@ module.exports = function createFechasRouter(deps) {
     const individuales = Array.isArray(planilla.individuales) ? planilla.individuales : [];
     const suplentes = Array.isArray(planilla.suplentes) ? planilla.suplentes : [];
     const groups = [
-      { values: individuales.slice(0, 2), label: 'Individuales - Primeras', allowed: mixedNames },
-      { values: individuales.slice(2, 11), label: 'Individuales - Segundas', allowed: secondNames },
-      { values: suplentes.slice(0, 1), label: 'Suplentes - Primeras', allowed: mixedNames },
-      { values: suplentes.slice(1, 3), label: 'Suplentes - Segundas', allowed: secondNames }
+      { values: individuales.slice(0, 2), label: 'Individuales - Primeras', allowed: mixedNames, required: true },
+      { values: individuales.slice(2, 11), label: 'Individuales - Segundas', allowed: secondNames, required: true },
+      { values: suplentes.slice(0, 1), label: 'Suplentes - Primeras', allowed: mixedNames, required: false },
+      { values: suplentes.slice(1, 3), label: 'Suplentes - Segundas', allowed: secondNames, required: false }
     ];
 
     for (const group of groups) {
       const names = group.values.map(normalizePlayerKey).filter(Boolean);
-      if (!names.length) return `La tabla ${group.label} no puede quedar completamente vacía.`;
+      if (group.required && !names.length) return `La tabla ${group.label} no puede quedar completamente vacía.`;
       const invalid = names.find((name) => !group.allowed.has(name));
       if (invalid) return `Hay un jugador que no pertenece al plantel habilitado para ${group.label}.`;
     }
@@ -418,6 +435,13 @@ module.exports = function createFechasRouter(deps) {
       const equipo = await resolveEquipoBySlug(authSlug);
       if (!equipo) {
         return res.status(404).json({ ok:false, error:'equipo_no_encontrado_en_db' });
+      }
+
+      if (await crucesManualesHabilitados(equipo.division)) {
+        return res.status(409).json({
+          ok:false,
+          error:'La carga de planilla está cerrada mientras los cruces estén habilitados.'
+        });
       }
 
       const secondSheetError = await validateSecondDivisionSheet(finalPlan, equipo);

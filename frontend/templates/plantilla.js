@@ -1355,9 +1355,7 @@ function collectPlanillaPayload(){
     if (!LPI_isSecondTemplate()) return '';
     const requirements = [
       ['individual', 'primeras', 'Individuales - Primeras'],
-      ['individual', 'segundas', 'Individuales - Segundas'],
-      ['suplentes', 'primeras', 'Suplentes - Primeras'],
-      ['suplentes', 'segundas', 'Suplentes - Segundas']
+      ['individual', 'segundas', 'Individuales - Segundas']
     ];
     for (const [group, subgroup, label] of requirements) {
       const boxes = document.querySelectorAll(`.group-container[data-group="${group}"] .yellow-box[data-subgroup="${subgroup}"]`);
