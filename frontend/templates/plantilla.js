@@ -2460,6 +2460,108 @@ document.addEventListener("DOMContentLoaded", function () {
 })();
 
 
+(function setupShareCompletedSheet(){
+  function safeFilePart(value){
+    return String(value || 'equipo')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'equipo';
+  }
+
+  function downloadBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  async function renderCompletedSheet(){
+    if (!window.html2canvas) throw new Error('No se pudo cargar el generador de imágenes.');
+    const source = document.querySelector('.extra-column');
+    if (!source) throw new Error('No se encontró la planilla para compartir.');
+
+    const teamName = String(document.getElementById('teamNameBadge')?.textContent || '').trim() || 'Equipo';
+    const capture = source.cloneNode(true);
+    capture.classList.add('share-sheet-capture');
+    capture.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
+    capture.querySelectorAll('[draggable]').forEach((element) => element.removeAttribute('draggable'));
+    capture.insertAdjacentHTML('afterbegin', `
+      <div class="share-sheet-header">
+        <img src="../logo_liga.png" alt="LIPA">
+        <div><span>PLANILLA LIGA</span><strong>${String(teamName).replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}</strong></div>
+      </div>`);
+    document.body.appendChild(capture);
+
+    try {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const canvas = await window.html2canvas(capture, {
+        backgroundColor:'#0f0f11',
+        scale:2,
+        useCORS:true,
+        logging:false,
+        width:420,
+        windowWidth:420
+      });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+      if (!blob) throw new Error('No se pudo generar la imagen de la planilla.');
+      return { blob, teamName, filename:`planilla-${safeFilePart(teamName)}.jpg` };
+    } finally {
+      capture.remove();
+    }
+  }
+
+  async function shareCompletedSheet(){
+    const { blob, teamName, filename } = await renderCompletedSheet();
+    const file = new File([blob], filename, { type:'image/jpeg' });
+    const shareData = {
+      title:`Planilla LIPA - ${teamName}`,
+      text:`Planilla LIPA de ${teamName}`,
+      files:[file]
+    };
+
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files:[file] }))) {
+      await navigator.share(shareData);
+      return;
+    }
+
+    downloadBlob(blob, filename);
+    alert('El navegador no permite adjuntar la imagen directamente. La planilla fue descargada: adjuntala en WhatsApp desde tus archivos.');
+    const whatsapp = document.createElement('a');
+    whatsapp.href = `https://wa.me/?text=${encodeURIComponent(`Planilla LIPA de ${teamName}`)}`;
+    whatsapp.target = '_blank';
+    whatsapp.rel = 'noopener';
+    document.body.appendChild(whatsapp);
+    whatsapp.click();
+    whatsapp.remove();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const button = document.getElementById('btnCompartirPlanilla');
+    if (!button) return;
+    button.addEventListener('click', async () => {
+      const originalText = button.textContent;
+      try {
+        button.disabled = true;
+        button.textContent = 'GENERANDO...';
+        await shareCompletedSheet();
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          console.error(error);
+          alert(error?.message || 'No se pudo compartir la planilla.');
+        }
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    });
+  });
+})();
+
+
 
 
 (function(){
