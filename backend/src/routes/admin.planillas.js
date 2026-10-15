@@ -106,6 +106,7 @@ router.get('/planillas', async (req, res) => {
                   e1.activo DESC, e1.id ASC
          LIMIT 1
       ) first_team ON true
+      WHERE e.activo = true
       ORDER BY e.display_name ASC
     `);
 
@@ -158,9 +159,12 @@ router.put('/planillas/:team', requireAdmin, async (req, res) => {
                      e1.activo DESC, e1.id ASC
             LIMIT 1
          ) first_team ON true
-        WHERE LOWER(slug_uid) = $1
+        WHERE (
+              LOWER(e.slug_uid) = $1
            OR LOWER(e.slug_base) = $1
            OR LOWER(e.display_name) = $1
+        )
+          AND e.activo = true
         ORDER BY CASE WHEN LOWER(e.slug_uid) = $1 THEN 0 ELSE 1 END, e.id ASC
         LIMIT 1`,
       [teamRef]
