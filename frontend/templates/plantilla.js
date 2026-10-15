@@ -2485,8 +2485,13 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!source) throw new Error('No se encontró la planilla para compartir.');
 
     const teamName = String(document.getElementById('teamNameBadge')?.textContent || '').trim() || 'Equipo';
+    const isSecond = LPI_isSecondTemplate();
+    const captureWidth = isSecond ? 350 : 300;
+    const previousBodyZoom = document.body.style.zoom;
     const capture = source.cloneNode(true);
     capture.classList.add('share-sheet-capture');
+    capture.classList.toggle('share-sheet-capture--second', isSecond);
+    capture.style.setProperty('--share-sheet-width', `${captureWidth}px`);
     capture.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
     capture.querySelectorAll('[draggable]').forEach((element) => element.removeAttribute('draggable'));
     capture.insertAdjacentHTML('afterbegin', `
@@ -2494,6 +2499,7 @@ document.addEventListener("DOMContentLoaded", function () {
         <img src="../logo_liga.png" alt="LIPA">
         <div><span>PLANILLA LIGA</span><strong>${String(teamName).replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}</strong></div>
       </div>`);
+    document.body.style.zoom = '1';
     document.body.appendChild(capture);
 
     try {
@@ -2503,14 +2509,17 @@ document.addEventListener("DOMContentLoaded", function () {
         scale:2,
         useCORS:true,
         logging:false,
-        width:420,
-        windowWidth:420
+        width:captureWidth,
+        height:capture.scrollHeight,
+        windowWidth:captureWidth,
+        windowHeight:capture.scrollHeight
       });
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
       if (!blob) throw new Error('No se pudo generar la imagen de la planilla.');
       return { blob, teamName, filename:`planilla-${safeFilePart(teamName)}.jpg` };
     } finally {
       capture.remove();
+      document.body.style.zoom = previousBodyZoom;
     }
   }
 

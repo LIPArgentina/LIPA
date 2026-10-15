@@ -1102,6 +1102,71 @@ body{
   max-width:min(92vw, 360px);
 }
 
+/* La imagen compartida conserva las proporciones de cada formato incluso
+   cuando se genera desde una pantalla angosta. */
+.extra-column.share-sheet-capture{
+  width:var(--share-sheet-width, 300px) !important;
+  min-width:var(--share-sheet-width, 300px) !important;
+  max-width:var(--share-sheet-width, 300px) !important;
+  align-items:center !important;
+  gap:6px !important;
+  padding:18px !important;
+}
+
+.share-sheet-capture .share-sheet-header{
+  width:100% !important;
+  box-sizing:border-box !important;
+}
+
+.share-sheet-capture .group-container{
+  width:250px !important;
+  min-width:250px !important;
+  max-width:250px !important;
+  align-items:center !important;
+  gap:5px !important;
+}
+
+.share-sheet-capture .fila-extra{
+  width:auto !important;
+  min-width:0 !important;
+  gap:0 !important;
+}
+
+.share-sheet-capture .white-box{
+  width:20px !important;
+  min-width:20px !important;
+  height:20px !important;
+  margin-right:5px !important;
+  font-size:12px !important;
+}
+
+.share-sheet-capture .yellow-box,
+.share-sheet-capture .yellow-box-free{
+  width:210px !important;
+  min-width:210px !important;
+  max-width:210px !important;
+  height:20px !important;
+  line-height:20px !important;
+  padding:0 5px !important;
+  font-size:12px !important;
+  box-sizing:border-box !important;
+}
+
+.share-sheet-capture .group-title{
+  font-size:12px !important;
+  line-height:1.1 !important;
+}
+
+.share-sheet-capture .plan-subtitle{
+  margin:8px 0 2px !important;
+  font-size:12px !important;
+}
+
+.share-sheet-capture--second .individual-start-time{
+  font-size:10px !important;
+  transform:translateX(calc(-100% - 5px)) !important;
+}
+
 .send-error-dialog::backdrop{
   background:rgba(0,0,0,.68);
 }
