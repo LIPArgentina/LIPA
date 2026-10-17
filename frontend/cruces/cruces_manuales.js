@@ -20,6 +20,23 @@
 
   const $ = (selector) => document.querySelector(selector);
 
+  function syncEditionForCategory(selectActiveEdition = false) {
+    const category = String($('#categoria')?.value || '').toLowerCase();
+    const editionSelect = $('#edicion');
+    const specialOption = $('#edicionEspecial');
+    if (!editionSelect || !specialOption) return;
+
+    const isSecond = category === 'segunda';
+    specialOption.hidden = !isSecond;
+    specialOption.disabled = !isSecond;
+
+    if (isSecond && selectActiveEdition) {
+      editionSelect.value = '7';
+    } else if (!isSecond && editionSelect.value === '7') {
+      editionSelect.value = '6';
+    }
+  }
+
   function editorFormat() {
     if (Number($('#edicion')?.value || 6) === 5) {
       return {
@@ -756,7 +773,10 @@
 
   function bind() {
     $('#btnVolverAdmin').href = withAdminMode($('#btnVolverAdmin').getAttribute('href'));
-    $('#categoria').addEventListener('change', loadSearchData);
+    $('#categoria').addEventListener('change', () => {
+      syncEditionForCategory(true);
+      loadSearchData();
+    });
     $('#edicion').addEventListener('change', loadSearchData);
     $('#fechaISO').addEventListener('change', refreshMatchOptions);
     $('#fixtureMatch').addEventListener('change', () => { resetEditor(); updateSelectionBadge(); });
@@ -766,6 +786,7 @@
 
   document.addEventListener('DOMContentLoaded', async () => {
     bind();
+    syncEditionForCategory(true);
     await loadSearchData();
   });
 })();
