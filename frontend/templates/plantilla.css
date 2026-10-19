@@ -240,6 +240,39 @@ body {
   cursor:wait;
 }
 
+body.share-fallback-open{ overflow:hidden; }
+.share-fallback-modal{ position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:14px; }
+.share-fallback-modal[hidden]{ display:none; }
+.share-fallback-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.82); }
+.share-fallback-card{
+  position:relative;
+  width:min(94vw,520px);
+  max-height:92vh;
+  overflow:auto;
+  padding:18px;
+  border:1px solid #b28900;
+  border-radius:14px;
+  background:#111214;
+  color:#fff;
+  box-shadow:0 18px 50px #000;
+  text-align:center;
+}
+.share-fallback-card h2{ margin:0 34px 8px; color:#ffdf57; font-size:22px; text-transform:uppercase; }
+.share-fallback-card p{ margin:0 auto 12px; max-width:410px; font-size:14px; line-height:1.35; }
+.share-fallback-card small{ display:block; margin-top:10px; color:#c7c7c7; line-height:1.35; }
+.share-fallback-close{ position:absolute; top:7px; right:9px; border:0; background:transparent; color:#fff; font-size:30px; line-height:1; cursor:pointer; }
+.share-fallback-image{ display:block; width:auto; max-width:100%; max-height:58vh; margin:0 auto; border:1px solid #444; border-radius:8px; background:#0f0f11; }
+.share-fallback-actions{ display:flex; justify-content:center; gap:9px; margin-top:13px; flex-wrap:wrap; }
+.share-fallback-actions .btn-compartir{ text-decoration:none; min-height:38px; }
+
+@media (max-width:600px){
+  .share-fallback-card{ padding:15px 10px; }
+  .share-fallback-card h2{ font-size:18px; }
+  .share-fallback-card p{ font-size:13px; }
+  .share-fallback-image{ max-height:60vh; }
+  .share-fallback-actions .btn-compartir{ flex:1 1 145px; }
+}
+
 .share-sheet-capture{
   position:fixed !important;
   left:-10000px !important;

@@ -2461,6 +2461,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 (function setupShareCompletedSheet(){
+  let fallbackShareUrl = '';
+  let fallbackShareData = null;
+
   function safeFilePart(value){
     return String(value || 'equipo')
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -2477,6 +2480,62 @@ document.addEventListener("DOMContentLoaded", function () {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function closeShareFallback(){
+    const modal = document.getElementById('shareFallbackModal');
+    if (modal) modal.hidden = true;
+    document.body.classList.remove('share-fallback-open');
+    if (fallbackShareUrl) URL.revokeObjectURL(fallbackShareUrl);
+    fallbackShareUrl = '';
+    fallbackShareData = null;
+  }
+
+  function ensureShareFallbackModal(){
+    let modal = document.getElementById('shareFallbackModal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'shareFallbackModal';
+    modal.className = 'share-fallback-modal';
+    modal.hidden = true;
+    modal.innerHTML = `
+      <div class="share-fallback-backdrop" data-share-fallback-close="1"></div>
+      <section class="share-fallback-card" role="dialog" aria-modal="true" aria-labelledby="shareFallbackTitle">
+        <button class="share-fallback-close" type="button" data-share-fallback-close="1" aria-label="Cerrar">×</button>
+        <h2 id="shareFallbackTitle">Compartir planilla</h2>
+        <p>Mantené presionada la imagen y elegí <strong>Compartir imagen</strong>; después seleccioná WhatsApp y el destinatario.</p>
+        <img class="share-fallback-image" alt="Planilla lista para compartir">
+        <div class="share-fallback-actions">
+          <button class="btn-compartir share-fallback-download" type="button">Descargar imagen</button>
+          <a class="btn-compartir share-fallback-whatsapp" href="#" target="_blank" rel="noopener">Abrir WhatsApp</a>
+        </div>
+        <small>Si tu navegador no muestra “Compartir imagen”, descargala y adjuntala desde WhatsApp.</small>
+      </section>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (event) => {
+      if (event.target.closest('[data-share-fallback-close]')) {
+        closeShareFallback();
+        return;
+      }
+      if (event.target.closest('.share-fallback-download') && fallbackShareData) {
+        downloadBlob(fallbackShareData.blob, fallbackShareData.filename);
+      }
+    });
+    return modal;
+  }
+
+  function showShareFallback(blob, filename, teamName){
+    const modal = ensureShareFallbackModal();
+    if (fallbackShareUrl) URL.revokeObjectURL(fallbackShareUrl);
+    fallbackShareUrl = URL.createObjectURL(blob);
+    fallbackShareData = { blob, filename };
+    const image = modal.querySelector('.share-fallback-image');
+    const whatsapp = modal.querySelector('.share-fallback-whatsapp');
+    image.src = fallbackShareUrl;
+    image.alt = `Planilla LIPA de ${teamName}`;
+    whatsapp.href = `https://wa.me/?text=${encodeURIComponent(`Planilla LIPA de ${teamName}`)}`;
+    modal.hidden = false;
+    document.body.classList.add('share-fallback-open');
   }
 
   async function renderCompletedSheet(){
@@ -2533,19 +2592,16 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     if (navigator.share && (!navigator.canShare || navigator.canShare({ files:[file] }))) {
-      await navigator.share(shareData);
-      return;
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') throw error;
+        console.warn('El navegador rechazó compartir el archivo; se muestra la alternativa manual.', error);
+      }
     }
 
-    downloadBlob(blob, filename);
-    alert('El navegador no permite adjuntar la imagen directamente. La planilla fue descargada: adjuntala en WhatsApp desde tus archivos.');
-    const whatsapp = document.createElement('a');
-    whatsapp.href = `https://wa.me/?text=${encodeURIComponent(`Planilla LIPA de ${teamName}`)}`;
-    whatsapp.target = '_blank';
-    whatsapp.rel = 'noopener';
-    document.body.appendChild(whatsapp);
-    whatsapp.click();
-    whatsapp.remove();
+    showShareFallback(blob, filename, teamName);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -2567,6 +2623,10 @@ document.addEventListener("DOMContentLoaded", function () {
         button.textContent = originalText;
       }
     });
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (fallbackShareUrl) URL.revokeObjectURL(fallbackShareUrl);
   });
 })();
 
