@@ -45,6 +45,7 @@
   let lastRankingMode = 'players';
   let hasSecondAccess = false;
   let lastExecutedSearch = null;
+  let lastTeamExportData = null;
   const playerPhotoCache = new Map();
 
   function createTouchSuggestions(input, className) {
@@ -221,7 +222,16 @@
 
   function editionLabel(value) {
     if (String(value || '').toLowerCase() === 'total') return 'TOTAL';
+    if (Number(value) === 7) return 'EDICIÓN ESPECIAL';
     return `${Number(value || 6)}TA EDICIÓN`;
+  }
+
+  function isSecondCategory() {
+    return String($category?.value || '').trim().toLowerCase() === 'segunda';
+  }
+
+  function activeEditionForCategory() {
+    return isSecondCategory() ? '7' : '6';
   }
 
   function setSearchEdition(value) {
@@ -233,19 +243,20 @@
   }
 
   function getTeamEdition() {
-    return currentSearchEdition === 'total' ? '6' : currentSearchEdition;
+    return currentSearchEdition === 'total' ? activeEditionForCategory() : currentSearchEdition;
   }
 
   function updateRankingEditionOptions() {
     if (!$rankingEdition) return;
     const previous = String(currentRankingEdition || $rankingEdition.value || '6').toLowerCase();
+    const specialOption = isSecondCategory() ? '<option value="7">Edición especial</option>' : '';
     $rankingEdition.innerHTML = currentRankingTab === 'teams'
-      ? '<option value="5">5ta</option><option value="6">6ta</option>'
-      : '<option value="5">5ta</option><option value="6">6ta</option><option value="total">Total</option>';
+      ? `<option value="5">5ta</option><option value="6">6ta</option>${specialOption}`
+      : `<option value="5">5ta</option><option value="6">6ta</option>${specialOption}<option value="total">Total</option>`;
     if (Array.from($rankingEdition.options).some((option) => option.value === previous)) {
       $rankingEdition.value = previous;
     } else {
-      $rankingEdition.value = '6';
+      $rankingEdition.value = activeEditionForCategory();
     }
     currentRankingEdition = $rankingEdition.value;
     currentSearchEdition = currentRankingEdition;
@@ -412,6 +423,7 @@
     $rankingButtons.forEach((btn) => btn.classList.remove('active'));
     lastRankingData = null;
     lastRankingMode = 'players';
+    lastTeamExportData = null;
   }
 
   function renderSuggestions(items = []) {
@@ -832,6 +844,7 @@
     }).join('');
     const rows = buildRows(items, { showRad: true });
     const pairRows = buildRows(rawPairItems);
+    lastTeamExportData = data;
 
     $ranking.innerHTML = `
       <div class="ranking-head">
@@ -839,6 +852,7 @@
           <h2 class="ranking-title">Jugadores de ${team.name || 'equipo'} · ${data?.editionLabel || editionLabel(getTeamEdition())}</h2>
           <p class="ranking-meta">${Number(data?.totalActivePlayers || 0)} jugadores con partidos sobre ${Number(data?.totalTeamPlayers || data?.totalRegisteredPlayers || 0)} integrantes del historial del equipo.</p>
         </div>
+        <button class="btn ranking-export-btn" type="button" data-export-team="1">Exportar</button>
       </div>
       <h3 class="team-stats-subtitle">Individuales</h3>
       <div class="ranking-table-wrap">
@@ -893,11 +907,91 @@
     `;
   }
 
+  function exportTeamQueryToExcel() {
+    const data = lastTeamExportData;
+    if (!data?.team || !Array.isArray(data?.players)) {
+      setStatus('Primero realizá una consulta por equipo.', 'error');
+      return;
+    }
+    if (!window.XLSX) {
+      setStatus('No se pudo cargar el exportador de Excel. Recargá la página e intentá nuevamente.', 'error');
+      return;
+    }
+
+    const teamName = String(data.team.name || 'Equipo').trim();
+    const categoryName = String(data.category || $category?.value || '').trim().toUpperCase();
+    const selectedEdition = data.editionLabel || editionLabel(data.edition || getTeamEdition());
+    const metadata = [
+      ['CONSULTA POR EQUIPO'],
+      ['Equipo', teamName],
+      ['Categoría', categoryName],
+      ['Edición', selectedEdition],
+      []
+    ];
+    const playerRows = data.players.map((item, index) => [
+      index + 1,
+      String(item.name || ''),
+      String(item.teamName || teamName),
+      Number(item.played || 0),
+      Number(Number(item.rad || 0).toFixed(1)),
+      Number(Number(item.effectiveness || 0).toFixed(1)) / 100,
+      Number(item.wins || 0),
+      Number(item.losses || 0),
+      Number(item.diff || 0),
+      Number(item.triangulosFavor || 0),
+      Number(item.triangulosContra || 0)
+    ]);
+    const pairRows = (Array.isArray(data.pairPlayers) ? data.pairPlayers : []).map((item, index) => [
+      index + 1,
+      String(item.name || ''),
+      String(item.teamName || teamName),
+      Number(item.played || 0),
+      Number(Number(item.effectiveness || 0).toFixed(1)) / 100,
+      Number(item.wins || 0),
+      Number(item.losses || 0),
+      Number(item.diff || 0),
+      Number(item.triangulosFavor || 0),
+      Number(item.triangulosContra || 0)
+    ]);
+    const individualSheet = window.XLSX.utils.aoa_to_sheet([
+      ...metadata,
+      ['#', 'JUGADOR', 'EQUIPO', 'PJ', 'RAD', 'EFEC', 'PG', 'PP', 'DIF', 'TF', 'TC'],
+      ...playerRows
+    ]);
+    const pairSheet = window.XLSX.utils.aoa_to_sheet([
+      ...metadata,
+      ['#', 'JUGADOR', 'EQUIPO', 'PJ', 'EFEC', 'PG', 'PP', 'DIF', 'TF', 'TC'],
+      ...pairRows
+    ]);
+    individualSheet['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 24 }, ...Array(8).fill({ wch: 10 })];
+    pairSheet['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 24 }, ...Array(7).fill({ wch: 10 })];
+    playerRows.forEach((_, index) => {
+      const cell = individualSheet[`F${index + 7}`];
+      if (cell) cell.z = '0.0%';
+    });
+    pairRows.forEach((_, index) => {
+      const cell = pairSheet[`E${index + 7}`];
+      if (cell) cell.z = '0.0%';
+    });
+
+    const workbook = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(workbook, individualSheet, 'Individuales');
+    window.XLSX.utils.book_append_sheet(workbook, pairSheet, 'Parejas');
+    const safeTeam = teamName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase() || 'equipo';
+    const safeEdition = Number(data.edition) === 7 ? 'edicion-especial' : `edicion-${data.edition || getTeamEdition()}`;
+    window.XLSX.writeFile(workbook, `consulta-${safeTeam}-${safeEdition}.xlsx`);
+  }
+
   async function searchTeam() {
     clearResults();
     clearRanking();
     setStatus('Buscando equipo…', 'info');
-    if (currentSearchEdition === 'total') setSearchEdition('6');
+    if (currentSearchEdition === 'total') setSearchEdition(activeEditionForCategory());
 
     const q = String($team?.value || '').trim();
     const category = String($category?.value || '').trim();
@@ -950,7 +1044,9 @@
       const endpoint = currentRankingTab === 'teams' ? '/api/cruces/team-ranking' : '/api/cruces/player-ranking';
       const requestedLimit = Number(limit || 10);
       const fetchLimit = requestedLimit;
-      const edition = currentRankingTab === 'teams' && currentRankingEdition === 'total' ? '6' : currentRankingEdition;
+      const edition = currentRankingTab === 'teams' && currentRankingEdition === 'total'
+        ? activeEditionForCategory()
+        : currentRankingEdition;
       const sortParams = currentRankingTab === 'players'
         ? '&sort=' + encodeURIComponent(currentRankingSort) + '&order=' + encodeURIComponent(currentRankingOrder)
         : '';
@@ -1078,6 +1174,8 @@
     window.setTimeout(() => closeTouchSuggestions($team, $teamTouchSuggestions), 180);
   });
   $category?.addEventListener('change', () => {
+    updateRankingEditionOptions();
+    setSearchEdition(activeEditionForCategory());
     renderSuggestions([]);
     renderTeamSuggestions([]);
     clearRanking();
@@ -1120,6 +1218,11 @@
     if (ev.target === $radModal) closeRadModal();
   });
   $ranking?.addEventListener('click', (ev) => {
+    const exportButton = ev.target.closest('[data-export-team]');
+    if (exportButton) {
+      exportTeamQueryToExcel();
+      return;
+    }
     const sortButton = ev.target.closest('[data-ranking-sort]');
     if (sortButton) {
       currentRankingSort = String(sortButton.dataset.rankingSort || 'rad');

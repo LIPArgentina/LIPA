@@ -129,6 +129,7 @@ header img{ height:34px; width:auto; display:block; }
 
 .ranking-box{ background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 5px 12px #0006; margin:12px 0; padding:10px 12px; }
 .ranking-head{ display:flex; justify-content:space-between; gap:10px; align-items:end; margin-bottom:8px; }
+.ranking-export-btn{ flex:0 0 auto; min-width:132px; background:linear-gradient(180deg,#ffd966 0%, #ffcc00 60%, #e5b300 100%); color:#1b1600; }
 .ranking-title{ margin:0; color:var(--gold); font-size:16px; font-weight:900; text-transform:uppercase; }
 .ranking-meta{ margin:2px 0 0; color:var(--muted); font-size:11px; }
 .ranking-table-wrap{ overflow-x:auto; }
@@ -236,6 +237,7 @@ header img{ height:34px; width:auto; display:block; }
   .ranking-actions{ justify-content:stretch; padding-top:0; }
   .ranking-btn{ flex:1; }
   .ranking-head{ display:block; }
+  .ranking-export-btn{ width:100%; margin-top:9px; }
 }
 
 

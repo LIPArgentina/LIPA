@@ -60,6 +60,7 @@ function getActiveEditionForCategory(category = '') {
 
 function getEditionLabel(edition) {
   if (edition === 'total') return 'TOTAL';
+  if (Number(edition) === SECOND_SPECIAL_EDITION) return 'EDICIÓN ESPECIAL';
   return `${Number(edition || CURRENT_EDITION)}TA EDICIÓN`;
 }
 
@@ -92,11 +93,12 @@ async function inferEditionFromDate(dateValue, category = '') {
 
 async function filterItemsByEdition(items = [], edition = CURRENT_EDITION, category = '') {
   if (edition === 'total') return items;
-  const currentEditionStart = await getEditionStartDate(CURRENT_EDITION, category);
+  const activeEdition = getActiveEditionForCategory(category);
+  const currentEditionStart = await getEditionStartDate(activeEdition, category);
   return items.filter((item) => {
     const dateKey = normalizeDateOnly(item?.fechaISO || item?.fecha_iso || item?.date);
     const itemEdition = dateKey && currentEditionStart && dateKey >= currentEditionStart
-      ? CURRENT_EDITION
+      ? activeEdition
       : DEFAULT_HISTORIC_EDITION;
     return itemEdition === Number(edition);
   });
@@ -3666,7 +3668,7 @@ router.get('/player-query', requireAdminForPrivateCategory, async (req, res) => 
       findJugadorResultadoSuggestionsByCategory(category, q, edition)
     ]);
     const mergeOptions = { hideTeam: edition === 'total' };
-    const suggestions = Number(edition) === CURRENT_EDITION
+    const suggestions = Number(edition) === getActiveEditionForCategory(category)
       ? mergePlayerSuggestions(registeredSuggestions, resultadoSuggestions, mergeOptions)
       : mergePlayerSuggestions(resultadoSuggestions, registeredSuggestions, mergeOptions);
     if (suggestOnly) {
@@ -4980,8 +4982,9 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions: [], team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
     }
 
+    const activeEdition = getActiveEditionForCategory(category);
     const teams = await findTeamsByCategory(category, {
-      includeInactive: Number(edition) !== CURRENT_EDITION
+      includeInactive: Number(edition) !== activeEdition
     });
     const suggestions = teams
       .filter((team) => (
@@ -5008,7 +5011,7 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
       return res.json({ ok: true, category, q, edition, editionLabel: getEditionLabel(edition), suggestions, team: null, players: [], totalRegisteredPlayers: 0, totalActivePlayers: 0 });
     }
 
-    const includeHistoricRoster = Number(edition) !== CURRENT_EDITION;
+    const includeHistoricRoster = Number(edition) !== activeEdition;
     const [registeredPlayers, rankingData, pairStats] = await Promise.all([
       getRegisteredPlayersForTeam(exactTeam.id, { includeInactive: includeHistoricRoster }),
       buildRadRankingForCategory(category, edition),
