@@ -26,6 +26,8 @@ module.exports = function createEquiposRouter() {
       ALTER TABLE jugador_equipos
       ADD COLUMN IF NOT EXISTS inactivado_por_equipo BOOLEAN NOT NULL DEFAULT false
     `);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS hasta DATE`);
+    await client.query(`ALTER TABLE jugador_equipos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`);
   }
 
   async function deactivatePlayersFromInactiveTeams(client, { teamId = null, division = null } = {}) {
@@ -54,9 +56,14 @@ module.exports = function createEquiposRouter() {
            FROM jugador_equipos
           WHERE activo = true
           GROUP BY equipo_id, categoria
-       ), candidates AS (
+       ), identity_candidates AS (
          SELECT je.id,
-                ROW_NUMBER() OVER (PARTITION BY je.equipo_id, je.categoria ORDER BY je.id) AS position,
+                je.equipo_id,
+                je.categoria,
+                ROW_NUMBER() OVER (
+                  PARTITION BY je.jugador_id, je.categoria
+                  ORDER BY je.desde DESC NULLS LAST, je.id DESC
+                ) AS identity_position,
                 GREATEST(0, 20 - COALESCE(ac.total, 0)) AS available_slots
            FROM jugador_equipos je
            JOIN equipos e ON e.id = je.equipo_id
@@ -74,8 +81,13 @@ module.exports = function createEquiposRouter() {
                WHERE other.jugador_id = je.jugador_id
                  AND other.categoria = je.categoria
                  AND other.activo = true
-                 AND other.equipo_id <> je.equipo_id
             )
+       ), candidates AS (
+         SELECT id,
+                ROW_NUMBER() OVER (PARTITION BY equipo_id, categoria ORDER BY id) AS position,
+                available_slots
+           FROM identity_candidates
+          WHERE identity_position = 1
        )
        UPDATE jugador_equipos je
           SET activo = true,

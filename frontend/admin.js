@@ -411,7 +411,7 @@ async function saveTeams(){
     await loadDivision(_activeDiv);
   }catch(e){
     console.warn('save-teams', e);
-    toast('No se pudo guardar');
+    toast(`No se pudo guardar: ${e?.message || 'error desconocido'}`);
   }
 }
 
