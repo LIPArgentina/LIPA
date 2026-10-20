@@ -242,8 +242,9 @@ function applyAutomaticFinals(data, category) {
   setSeriesTeams(getRound(data, 'third'), s1.loser, s2.loser);
 }
 
-async function fetchLlaves(category) {
-  const response = await fetch(`${getApiBase()}/llaves?category=${encodeURIComponent(category)}`, {
+async function fetchLlaves(category, edition = 6) {
+  const params = new URLSearchParams({ category, edition: String(edition) });
+  const response = await fetch(`${getApiBase()}/llaves?${params.toString()}`, {
     cache: 'no-store',
     credentials: 'include'
   });
@@ -273,11 +274,11 @@ function buildResult(category, data) {
   };
 }
 
-export async function loadPodiumResult(category) {
+export async function loadPodiumResult(category, edition = 6) {
   if (!CATEGORY_CONFIG[category]) return null;
 
   const data = getDefaultData(category);
-  const saved = await fetchLlaves(category);
+  const saved = await fetchLlaves(category, edition);
   mergeSavedData(data, saved);
 
   const savedResult = buildResult(category, data);

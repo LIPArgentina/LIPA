@@ -1,4 +1,4 @@
-import { loadPodiumResult } from './podio_superliga.js';
+import { loadPodiumResult } from './podio_superliga.js?v=20261020-ediciones-1';
 
 function debounce(fn, wait = 100){
   let t;
@@ -512,7 +512,7 @@ async function renderPodium(){
   const mount = document.getElementById('podioSuperligaMount');
   if (!mount) return;
 
-  const result = await loadPodiumResult('tercera').catch(() => null);
+  const result = await loadPodiumResult('tercera', selectedEdition).catch(() => null);
   if (!result) {
     mount.hidden = true;
     mount.innerHTML = '';
