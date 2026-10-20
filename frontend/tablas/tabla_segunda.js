@@ -53,9 +53,9 @@ function clearFixtureScores(fixture){
   return clean;
 }
 
-// La portada de Segunda siempre abre en la edición especial; los botones permiten
-// consultar las ediciones anteriores sin cambiar los datos usados por la especial.
-let selectedEdition = SPECIAL_EDITION;
+// Sin parámetro la portada abre en la edición especial; los enlaces directos
+// conservan la edición solicitada.
+let selectedEdition = normalizeEditionSelection(new URLSearchParams(window.location.search).get('edition') || SPECIAL_EDITION);
 let standingsSteps = [];
 let selectedStandingsIndex = -1;
 let podiumRefreshId = null;
@@ -445,7 +445,7 @@ async function renderPodium(){
   const mount = document.getElementById('podioSuperligaMount');
   if (!mount) return;
 
-  if (selectedEdition === SPECIAL_EDITION) {
+  if (dataEdition() !== 6) {
     mount.hidden = true;
     mount.innerHTML = '';
     return;

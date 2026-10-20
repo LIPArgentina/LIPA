@@ -110,7 +110,7 @@ function getFallbackLegDate(roundId, legIndex){
   return '';
 }
 
-function buildEncuentrosUrl(date, tipo = '', localTeam = '', visitanteTeam = ''){ const params=new URLSearchParams({category:currentCategory,date:String(date||'')}); if(tipo) params.set('tipo', String(tipo)); if(localTeam) params.set('local', normalizeTeamName(localTeam)); if(visitanteTeam) params.set('visitante', normalizeTeamName(visitanteTeam)); return `../encuentros/encuentros.html?${params.toString()}`; }
+function buildEncuentrosUrl(date, tipo = '', localTeam = '', visitanteTeam = ''){ const params=new URLSearchParams({category:currentCategory,edition:String(currentEdition),date:String(date||'')}); if(tipo) params.set('tipo', String(tipo)); if(localTeam) params.set('local', normalizeTeamName(localTeam)); if(visitanteTeam) params.set('visitante', normalizeTeamName(visitanteTeam)); return `../encuentros/encuentros.html?${params.toString()}`; }
 function createLegMarkup(roundId,legIndex,legData,totalLegs){
   const isExtra=legIndex===2;
   const label=isExtra?'Desempate':(totalLegs===1?'Partido':(legIndex===0?'Ida':'Vuelta'));
