@@ -1,4 +1,4 @@
-import { loadPodiumResult } from './podio_superliga_bola9.js';
+import { loadPodiumResult } from './podio_superliga_bola9.js?v=20261020-ediciones-1';
 
 function debounce(fn, wait = 100){
   let t;
@@ -445,13 +445,13 @@ async function renderPodium(){
   const mount = document.getElementById('podioSuperligaMount');
   if (!mount) return;
 
-  if (dataEdition() !== 6) {
+  if (![5, 6].includes(dataEdition())) {
     mount.hidden = true;
     mount.innerHTML = '';
     return;
   }
 
-  const result = await loadPodiumResult('segunda').catch(() => null);
+  const result = await loadPodiumResult('segunda', dataEdition()).catch(() => null);
   if (!result) {
     mount.hidden = true;
     mount.innerHTML = '';
