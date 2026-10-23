@@ -31,6 +31,7 @@ let selectedKind = selectedEdition >= 6 ? 'vuelta' : 'ida';
 let standingsSteps = [];
 let selectedStandingsIndex = -1;
 let podiumRefreshId = null;
+let podiumRequestId = 0;
 
 function normalizeName(s){
   return (s || '').toString().trim().replace(/\s+/g, ' ');
@@ -512,7 +513,13 @@ async function renderPodium(){
   const mount = document.getElementById('podioSuperligaMount');
   if (!mount) return;
 
-  const result = await loadPodiumResult('tercera', selectedEdition).catch(() => null);
+  const requestId = ++podiumRequestId;
+  const edition = selectedEdition;
+  mount.hidden = true;
+  mount.innerHTML = '';
+
+  const result = await loadPodiumResult('tercera', edition).catch(() => null);
+  if (requestId !== podiumRequestId || edition !== selectedEdition) return;
   if (!result) {
     mount.hidden = true;
     mount.innerHTML = '';
@@ -579,6 +586,7 @@ async function switchEdition(edition){
   cache.ida = null;
   cache.vuelta = null;
   applyEditionLayout();
+  renderPodium();
   await Promise.all([fetchFixture('ida'), fetchFixture('vuelta')]);
   selectAvailableFixture();
   buildStandingsSteps();

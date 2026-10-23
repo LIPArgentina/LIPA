@@ -72,6 +72,15 @@
   </style>
 </head>
 <body>
+  <script>
+    (() => {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('edition')) {
+        url.searchParams.set('edition', 'especial');
+        window.history.replaceState({}, '', url);
+      }
+    })();
+  </script>
   <div class="container">
     <header>
       <a class="logo-link" href="../index.html" aria-label="Ir al inicio">
@@ -154,6 +163,6 @@
   </template>
 
   <script type="module" src="llaves_public.js?v=20261019-ediciones-1"></script>
-  <script type="module" src="tabla_segunda.js?v=20261020-podio-ediciones-1" defer></script>
+  <script type="module" src="tabla_segunda.js?v=20261023-webview-especial-1" defer></script>
 </body>
 </html>
