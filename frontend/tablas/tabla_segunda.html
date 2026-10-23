@@ -75,7 +75,9 @@
   <script>
     (() => {
       const url = new URL(window.location.href);
-      if (!url.searchParams.has('edition')) {
+      const userAgent = String((window.navigator && window.navigator.userAgent) || '');
+      const isLipaAndroidWebView = !!window.AndroidBridge || /\bwv\b/i.test(userAgent);
+      if (isLipaAndroidWebView || !url.searchParams.has('edition')) {
         url.searchParams.set('edition', 'especial');
         window.history.replaceState({}, '', url);
       }
