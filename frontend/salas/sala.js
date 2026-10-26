@@ -12,6 +12,7 @@
   const $roomName = document.getElementById('roomName');
   const $locationText = document.getElementById('locationText');
   const $mapLink = document.getElementById('mapLink');
+  const $wazeLink = document.getElementById('wazeLink');
   const $mapFrame = document.getElementById('mapFrame');
   const $mapEmpty = document.getElementById('mapEmpty');
 
@@ -143,6 +144,9 @@
     match = text.match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/);
     if (match) return { lat: match[1], lng: match[2] };
 
+    match = text.match(/!3d(-?\d+(?:\.\d+))!4d(-?\d+(?:\.\d+))/);
+    if (match) return { lat: match[1], lng: match[2] };
+
     return null;
   }
 
@@ -163,6 +167,7 @@
       return {
         label: q,
         openUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+        wazeUrl: `https://www.waze.com/ul?ll=${encodeURIComponent(q)}&navigate=yes&utm_source=lipa`,
         embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=16&output=embed`
       };
     }
@@ -179,6 +184,7 @@
       return {
         label: embedQuery,
         openUrl: location,
+        wazeUrl: `https://www.waze.com/ul?q=${encodeURIComponent(fallback || embedQuery)}&navigate=yes&utm_source=lipa`,
         embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(embedQuery)}&z=16&output=embed`
       };
     }
@@ -188,6 +194,7 @@
     return {
       label: query,
       openUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
+      wazeUrl: `https://www.waze.com/ul?q=${encodeURIComponent(query)}&navigate=yes&utm_source=lipa`,
       embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=16&output=embed`
     };
   }
@@ -205,6 +212,10 @@
     if ($mapLink) {
       $mapLink.hidden = true;
       $mapLink.removeAttribute('href');
+    }
+    if ($wazeLink) {
+      $wazeLink.hidden = true;
+      $wazeLink.removeAttribute('href');
     }
   }
 
@@ -229,6 +240,10 @@
         $mapLink.href = mapData.openUrl;
         $mapLink.hidden = false;
       }
+      if ($wazeLink) {
+        $wazeLink.href = mapData.wazeUrl;
+        $wazeLink.hidden = false;
+      }
       if ($mapFrame) {
         $mapFrame.src = mapData.embedUrl;
         $mapFrame.hidden = false;
@@ -241,6 +256,10 @@
     if ($mapLink) {
       $mapLink.hidden = true;
       $mapLink.removeAttribute('href');
+    }
+    if ($wazeLink) {
+      $wazeLink.hidden = true;
+      $wazeLink.removeAttribute('href');
     }
     if ($mapFrame) {
       $mapFrame.hidden = true;

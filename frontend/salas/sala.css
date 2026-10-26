@@ -224,9 +224,24 @@ header img{
 }
 .sala-actions{
   margin-top:auto;
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
+  width:100%;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+.btn-navigation{
+  width:100%;
+  min-height:52px;
+  padding:12px 16px;
+  border-radius:12px;
+  font-size:14px;
+  font-weight:900;
+  box-shadow:0 5px 14px rgba(0,0,0,.35);
+}
+.btn-waze{
+  background:linear-gradient(180deg,#5ed9ff 0%,#31bfe9 100%);
+  border-color:#8be5ff;
+  color:#062833;
 }
 .map-card{
   min-height:430px;
