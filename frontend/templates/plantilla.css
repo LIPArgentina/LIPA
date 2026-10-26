@@ -1289,7 +1289,7 @@ body{
 }
 
 @media (min-width: 769px){
-  body{ zoom:.8; }
+  body{ zoom:1; }
 }
 
 /* Chrome en Android conserva un puntero tactil aun al pedir la version de
@@ -1298,7 +1298,7 @@ body{
 @media (min-width:769px) and (pointer:coarse){
   body{ zoom:1; }
   .main-container{
-    max-width:100% !important;
+    max-width:760px !important;
     padding-inline:10px !important;
   }
   #trash{

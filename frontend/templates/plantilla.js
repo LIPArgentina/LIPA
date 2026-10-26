@@ -153,6 +153,11 @@ async function fetchWithAuth(url, options = {}) {
     document.addEventListener('dragstart', function(event){
       const source = event.target.closest('.fila, .yellow-box, .yellow-box-free');
       if (!source) return;
+      if (source.classList.contains('yellow-box') || source.classList.contains('yellow-box-free')) {
+        event.preventDefault();
+        state = null;
+        return;
+      }
       const row = source.classList.contains('fila') ? source : null;
       const name = row ? row.querySelector('.jugador')?.textContent.trim() : String(source.dataset.player || '').trim();
       if (!name) return;
@@ -883,15 +888,8 @@ document.querySelectorAll('.fila').forEach(el => {
 
 document.querySelectorAll('.yellow-box').forEach(box => {
   box.addEventListener('dragstart', e => {
-    if(box.dataset.player) {
-      draggedPlayer = box.dataset.player;
-      draggedPlayerCategory = box.dataset.playerCategory || '';
-      draggedPlayerId = box.dataset.playerId || '';
-      originBox = box;
-      showTrashNextTo(box);
-    } else {
-      e.preventDefault();
-    }
+    // Dentro de la planilla solamente se permite seleccionar y borrar.
+    e.preventDefault();
   });
   box.addEventListener('dragend', e => {
     draggedPlayer = null;
@@ -1623,14 +1621,7 @@ document.addEventListener('DOMContentLoaded', function(){
 (function(){
   function wireFree(box){
     box.addEventListener('dragstart', function(e){
-      if (box.dataset.player) {
-        draggedPlayer = box.dataset.player;
-        draggedPlayerCategory = box.dataset.playerCategory || '';
-        draggedPlayerId = box.dataset.playerId || '';
-        originBox = box;
-        showTrashNextTo(box);
-      }
-      else { e.preventDefault(); }
+      e.preventDefault();
     });
     box.addEventListener('dragend', function(){
       draggedPlayer = null;
@@ -1733,6 +1724,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
     const t = e.target.closest('.fila, .yellow-box, .yellow-box-free');
     if (!t) return;
+    if (t.classList.contains('yellow-box') || t.classList.contains('yellow-box-free')) return;
 
     const ok = startDragFrom(t);
     if (!ok) return;
@@ -1829,9 +1821,6 @@ document.addEventListener('DOMContentLoaded', function(){
   if (window.__LPI_TAP_PLACE__) return;
   window.__LPI_TAP_PLACE__ = true;
 
-  var isTouchCapable = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-  if (!isTouchCapable) return;
-
   var selectedPlayer = null;
   var selectedOrigin = null;
   var selectedPlayerCategory = '';
@@ -1872,10 +1861,14 @@ document.addEventListener('DOMContentLoaded', function(){
     if (!p) return false;
     selectedPlayer = p;
     el.classList.add('tap-selecting');
-    showTrash(true, el);
-    document.querySelectorAll('.yellow-box, .yellow-box-free').forEach(function(b){
-      b.classList.add('tap-hint');
-    });
+    if (selectedOrigin) {
+      showTrash(true, el);
+    } else {
+      showTrash(false);
+      document.querySelectorAll('.yellow-box, .yellow-box-free').forEach(function(b){
+        b.classList.add('tap-hint');
+      });
+    }
     return true;
   }
 
@@ -1963,6 +1956,10 @@ document.addEventListener('DOMContentLoaded', function(){
         }
         endSelection();
         e.preventDefault();
+        return;
+      }
+      if (selectedOrigin) {
+        endSelection();
         return;
       }
       var dest = e.target.closest && e.target.closest('.yellow-box, .yellow-box-free');
