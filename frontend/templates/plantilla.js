@@ -784,6 +784,59 @@ let draggedPlayerCategory = '';
 let draggedPlayerId = '';
 const trash = document.getElementById('trash');
 
+function positionTrashNextTo(target){
+  if (!trash || !target) return;
+  const nameBox = target.classList?.contains('fila')
+    ? target.querySelector('.jugador')
+    : target;
+  if (!nameBox) return;
+  const rect = nameBox.getBoundingClientRect();
+  const trashSize = 30;
+  const gap = 5;
+  const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+  let left = rect.right + gap;
+  if (left + trashSize > viewportWidth - 4) {
+    left = Math.max(4, rect.right - trashSize - 4);
+  }
+  const top = Math.max(4, Math.min(
+    (window.innerHeight || document.documentElement.clientHeight) - trashSize - 4,
+    rect.top + (rect.height - trashSize) / 2
+  ));
+  const bodyZoom = Number.parseFloat(window.getComputedStyle(document.body).zoom) || 1;
+  trash.style.left = `${Math.round(left / bodyZoom)}px`;
+  trash.style.top = `${Math.round(top / bodyZoom)}px`;
+  trash.style.zoom = String(1 / bodyZoom);
+  trash.style.right = 'auto';
+  trash.style.bottom = 'auto';
+  trash.classList.add('is-contextual');
+  trash._lpiAnchor = nameBox;
+}
+
+function showTrashNextTo(target){
+  if (!trash) return;
+  trash.style.display = 'flex';
+  positionTrashNextTo(target);
+}
+
+function hideContextualTrash(){
+  if (!trash) return;
+  trash.style.display = 'none';
+  trash.classList.remove('is-contextual');
+  trash._lpiAnchor = null;
+  trash.style.zoom = '';
+}
+
+window.LPI_showTrashNextTo = showTrashNextTo;
+window.LPI_hideContextualTrash = hideContextualTrash;
+
+['scroll', 'resize'].forEach(function(eventName){
+  window.addEventListener(eventName, function(){
+    if (trash?._lpiAnchor && trash.style.display !== 'none') {
+      positionTrashNextTo(trash._lpiAnchor);
+    }
+  }, { passive:true });
+});
+
 function computeCountsExcludingOrigin() {
   const allBoxes = Array.from(document.querySelectorAll('.yellow-box'));
   const players = allBoxes.map(b => b.dataset.player).filter(p => p);
@@ -816,14 +869,14 @@ document.querySelectorAll('.fila').forEach(el => {
     draggedPlayerCategory = el.dataset.playerCategory || '';
     draggedPlayerId = el.dataset.playerId || '';
     originBox = null;
-    trash.style.display = 'flex';
+    showTrashNextTo(el);
   });
   el.addEventListener('dragend', e => {
     draggedPlayer = null;
     draggedPlayerCategory = '';
     draggedPlayerId = '';
     originBox = null;
-    trash.style.display = 'none';
+    hideContextualTrash();
   });
 });
 
@@ -835,7 +888,7 @@ document.querySelectorAll('.yellow-box').forEach(box => {
       draggedPlayerCategory = box.dataset.playerCategory || '';
       draggedPlayerId = box.dataset.playerId || '';
       originBox = box;
-      trash.style.display = 'flex';
+      showTrashNextTo(box);
     } else {
       e.preventDefault();
     }
@@ -845,7 +898,7 @@ document.querySelectorAll('.yellow-box').forEach(box => {
     draggedPlayerCategory = '';
     draggedPlayerId = '';
     originBox = null;
-    trash.style.display = 'none';
+    hideContextualTrash();
     box.classList.remove('valid','invalid','over');
   });
 
@@ -954,7 +1007,7 @@ trash.addEventListener('drop', e => {
   draggedPlayer = null;
   draggedPlayerCategory = '';
   draggedPlayerId = '';
-  trash.style.display = 'none';
+  hideContextualTrash();
 });
 
 
@@ -1575,7 +1628,7 @@ document.addEventListener('DOMContentLoaded', function(){
         draggedPlayerCategory = box.dataset.playerCategory || '';
         draggedPlayerId = box.dataset.playerId || '';
         originBox = box;
-        trash.style.display='flex';
+        showTrashNextTo(box);
       }
       else { e.preventDefault(); }
     });
@@ -1584,7 +1637,7 @@ document.addEventListener('DOMContentLoaded', function(){
       draggedPlayerCategory = '';
       draggedPlayerId = '';
       originBox = null;
-      trash.style.display='none';
+      hideContextualTrash();
     });
     box.addEventListener('dragover', function(e){ e.preventDefault(); });
     box.addEventListener('drop', function(e){
@@ -1671,8 +1724,7 @@ document.addEventListener('DOMContentLoaded', function(){
       originBox = window.originBox;
       draggedPlayerCategory = el.dataset?.playerCategory || '';
       draggedPlayerId = el.dataset?.playerId || '';
-      const trashEl = document.getElementById('trash');
-      if (trashEl) trashEl.style.display = 'flex';
+      if (typeof window.LPI_showTrashNextTo === 'function') window.LPI_showTrashNextTo(el);
     } catch(_) {}
     return true;
   }
@@ -1720,8 +1772,7 @@ document.addEventListener('DOMContentLoaded', function(){
   function cleanup(){
     document.querySelectorAll('.yellow-box.over, .yellow-box.valid, .yellow-box.invalid, #trash.over')
       .forEach(b => b.classList.remove('over','valid','invalid'));
-    const trashEl = document.getElementById('trash');
-    if (trashEl) trashEl.style.display = 'none';
+    if (typeof window.LPI_hideContextualTrash === 'function') window.LPI_hideContextualTrash();
     try { window.draggedPlayer = null; window.originBox = null; } catch(_){}
     draggedPlayer = null;
     originBox = null;
@@ -1791,9 +1842,16 @@ document.addEventListener('DOMContentLoaded', function(){
       n.classList.remove('tap-hint','tap-selecting');
     });
   }
-  function showTrash(show){
+  function showTrash(show, anchor){
     var t = document.getElementById('trash');
-    if (t) t.style.display = show ? 'flex' : 'none';
+    if (!t) return;
+    if (show && typeof window.LPI_showTrashNextTo === 'function') {
+      window.LPI_showTrashNextTo(anchor);
+    } else if (!show && typeof window.LPI_hideContextualTrash === 'function') {
+      window.LPI_hideContextualTrash();
+    } else {
+      t.style.display = show ? 'flex' : 'none';
+    }
   }
 
   function startSelectionFromElement(el){
@@ -1814,7 +1872,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if (!p) return false;
     selectedPlayer = p;
     el.classList.add('tap-selecting');
-    showTrash(true);
+    showTrash(true, el);
     document.querySelectorAll('.yellow-box, .yellow-box-free').forEach(function(b){
       b.classList.add('tap-hint');
     });

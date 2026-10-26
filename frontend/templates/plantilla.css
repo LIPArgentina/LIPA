@@ -200,6 +200,15 @@ body {
     font-size: 24px;
     transition: transform .12s, box-shadow .12s;
   }
+  #trash.is-contextual{
+    width:30px;
+    height:30px;
+    right:auto !important;
+    bottom:auto !important;
+    font-size:16px;
+    box-shadow:0 3px 10px rgba(0,0,0,.65);
+    transform:none;
+  }
   #trash.over { transform: scale(1.1); box-shadow: 0 0 10px #fff; }
 
 
@@ -743,6 +752,11 @@ dialog.modal { padding: 0 !important; }
     transform-origin: bottom right;
     right: 8px !important;
     bottom: 8px !important;
+  }
+  #trash.is-contextual{
+    transform:none;
+    right:auto !important;
+    bottom:auto !important;
   }
 }
 
@@ -1291,4 +1305,10 @@ body{
     right:12px !important;
     bottom:12px !important;
   }
+}
+
+#trash.is-contextual{
+  right:auto !important;
+  bottom:auto !important;
+  transform:none !important;
 }
