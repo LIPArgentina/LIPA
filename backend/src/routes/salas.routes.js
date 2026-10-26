@@ -259,18 +259,6 @@ module.exports = function createSalasRouter(deps = {}) {
       ADD COLUMN IF NOT EXISTS estilo TEXT DEFAULT ''
     `);
 
-    // Reparación puntual: este torneo fue guardado antes de distinguir USD de ARS.
-    await pool.query(`
-      UPDATE sala_torneos
-         SET valor = 100,
-             categorias = jsonb_set(categorias, '{0,valor}', '100'::jsonb, false),
-             updated_at = NOW()
-       WHERE sala_id = 12
-         AND slot = 1
-         AND moneda = 'USD'
-         AND valor = 100000
-    `);
-
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_sala_torneos_fecha_hora
       ON sala_torneos (fecha_hora ASC)
