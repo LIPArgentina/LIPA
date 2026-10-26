@@ -89,17 +89,20 @@ async function fetchWithAuth(url, options = {}) {
           <div class="fila fila-capitan" draggable="true"><div class="numero">C2</div><div class="jugador"></div></div>
         </section>`);
     }
-    const makeSlots = (count, allowed, subgroup, scheduledCount = 0) => Array.from({ length: count }, (_, index) => {
-      const startTime = index < scheduledCount
-        ? '<span class="individual-start-time">20:30hs</span>'
-        : '';
-      return `<div class="fila-extra${startTime ? ' fila-extra--scheduled' : ''}">${startTime}<div class="white-box">${index + 1}</div><div class="yellow-box" data-player="" data-player-id="" data-player-category="" data-allowed-category="${allowed}" data-subgroup="${subgroup}" draggable="true"></div></div>`;
+    const makeSlots = (count, allowed, subgroup, startIndex = 0) => Array.from({ length: count }, (_, index) => {
+      const slotNumber = startIndex + index + 1;
+      return `<div class="fila-extra"><div class="white-box">${slotNumber}</div><div class="yellow-box" data-player="" data-player-id="" data-player-category="" data-allowed-category="${allowed}" data-subgroup="${subgroup}" draggable="true"></div></div>`;
     }).join('');
     const individual = document.querySelector('.group-container[data-group="individual"]');
     if (individual) individual.innerHTML = `
       <div class="group-title">INDIVIDUALES</div>
       <div class="plan-subtitle">PRIMERAS</div>${makeSlots(2, 'mixed', 'primeras')}
-      <div class="plan-subtitle">SEGUNDAS</div>${makeSlots(9, 'segunda', 'segundas', 4)}`;
+      <div class="plan-subtitle">SEGUNDAS</div>
+      <div class="scheduled-match-block" aria-label="Primeras cuatro partidas a las 20:30 horas">
+        <div class="scheduled-match-title">20:30hs</div>
+        ${makeSlots(4, 'segunda', 'segundas')}
+      </div>
+      ${makeSlots(5, 'segunda', 'segundas', 4)}`;
     const substitutes = document.querySelector('.group-container[data-group="suplentes"]');
     if (substitutes) {
       substitutes.dataset.free = 'false';
@@ -1366,6 +1369,7 @@ function collectPlanillaPayload(){
 
   function clearPlanillaFields(){
     document.querySelectorAll('.yellow-box, .yellow-box-free').forEach(function(box){
+      if (box.closest('.group-container[data-group="capitan"]')) return;
       box.dataset.player = '';
       box.dataset.playerId = '';
       box.dataset.playerCategory = '';
@@ -2584,6 +2588,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
   async function shareCompletedSheet(){
     const { blob, teamName, filename } = await renderCompletedSheet();
+    if (window.AndroidBridge && typeof window.AndroidBridge.shareBase64File === 'function') {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('No se pudo preparar la imagen para compartir.'));
+        reader.readAsDataURL(blob);
+      });
+      window.AndroidBridge.shareBase64File(
+        dataUrl,
+        filename,
+        'image/jpeg',
+        `Planilla LIPA de ${teamName}`
+      );
+      return;
+    }
     const file = new File([blob], filename, { type:'image/jpeg' });
     const shareData = {
       title:`Planilla LIPA - ${teamName}`,

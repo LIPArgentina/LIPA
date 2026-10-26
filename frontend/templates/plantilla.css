@@ -78,20 +78,30 @@ body {
   .extra-column { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .group-container { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 250px; }
   .fila-extra { display: flex; align-items: center; margin-bottom: 1px; }
-  .fila-extra--scheduled {
+  .scheduled-match-block {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-sizing: border-box;
+    padding: 13px 5px 5px;
+    margin: 1px 0 2px;
+    border: 1px solid rgba(255, 239, 94, .65);
+    border-radius: 8px;
     position: relative;
   }
-  .individual-start-time {
+  .scheduled-match-title {
     position: absolute;
-    left: 0;
-    width: auto;
+    top: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0 6px;
+    background: #0f0f11;
     color: #ffef5e;
     font-size: 11px;
     font-weight: 900;
     line-height: 1;
-    text-align: right;
     white-space: nowrap;
-    transform: translateX(calc(-100% - 5px));
     pointer-events: none;
   }
   .white-box { width: 20px; height: 20px; background-color: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-right: 5px; color: black; }
@@ -767,9 +777,8 @@ dialog.modal { padding: 0 !important; }
     font-size: 9px !important;
   }
 
-  .individual-start-time{
+  .scheduled-match-title{
     font-size: 8px;
-    transform: translateX(calc(-100% - 3px));
   }
 
   .jugador,
@@ -1195,9 +1204,14 @@ body{
   font-size:12px !important;
 }
 
-.share-sheet-capture--second .individual-start-time{
+.share-sheet-capture--second .scheduled-match-block{
+  width:250px !important;
+  gap:5px !important;
+  padding:14px 6px 6px !important;
+}
+
+.share-sheet-capture--second .scheduled-match-title{
   font-size:10px !important;
-  transform:translateX(calc(-100% - 5px)) !important;
 }
 
 .send-error-dialog::backdrop{
@@ -1262,4 +1276,19 @@ body{
 
 @media (min-width: 769px){
   body{ zoom:.8; }
+}
+
+/* Chrome en Android conserva un puntero tactil aun al pedir la version de
+   escritorio. En ese caso usamos todo el ancho y evitamos reducir tambien
+   los elementos flotantes. */
+@media (min-width:769px) and (pointer:coarse){
+  body{ zoom:1; }
+  .main-container{
+    max-width:100% !important;
+    padding-inline:10px !important;
+  }
+  #trash{
+    right:12px !important;
+    bottom:12px !important;
+  }
 }
