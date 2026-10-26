@@ -85,11 +85,16 @@ module.exports = function createSalasRouter(deps = {}) {
     return v === 'USD' ? 'USD' : 'ARS';
   }
 
-  function normalizeValor(value) {
-    const clean = String(value ?? '').trim().replace(/\./g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+  function normalizeValor(value, moneda = 'ARS') {
+    const currency = normalizeCurrency(moneda);
+    const raw = String(value ?? '').trim();
+    const clean = currency === 'USD'
+      ? raw.replace(',', '.').replace(/[^0-9.]/g, '')
+      : raw.replace(/\./g, '').replace(',', '.').replace(/[^0-9.]/g, '');
     if (!clean) return null;
     const parsed = Number(clean);
     if (!Number.isFinite(parsed) || parsed < 0) return null;
+    if (currency === 'USD') return Math.round(parsed);
     return Math.round(parsed > 0 && parsed < 1000 ? parsed * 1000 : parsed);
   }
 
@@ -101,12 +106,15 @@ module.exports = function createSalasRouter(deps = {}) {
     if (!Array.isArray(raw)) return [];
     const allowed = new Set(['1ra', '2da', '3ra']);
     return raw
-      .map((item) => ({
-        categoria: String(item?.categoria || '').trim().toLowerCase(),
-        hora: String(item?.hora || '').trim(),
-        valor: normalizeValor(item?.valor),
-        moneda: normalizeCurrency(item?.moneda || monedaFallback)
-      }))
+      .map((item) => {
+        const moneda = normalizeCurrency(item?.moneda || monedaFallback);
+        return {
+          categoria: String(item?.categoria || '').trim().toLowerCase(),
+          hora: String(item?.hora || '').trim(),
+          valor: normalizeValor(item?.valor, moneda),
+          moneda
+        };
+      })
       .filter((item) => allowed.has(item.categoria) && /^\d{2}:\d{2}$/.test(item.hora) && item.valor !== null);
   }
 
@@ -915,8 +923,8 @@ module.exports = function createSalasRouter(deps = {}) {
       const categorias = normalizeCategorias(req.body?.categorias, moneda);
       const fecha = String(req.body?.fecha || '').trim();
       const fechaHora = normalizeDateTime(req.body?.fechaHora || req.body?.fecha_hora || (fecha && categorias[0] ? `${fecha}T${categorias[0].hora}` : ''));
-      const valor = categorias[0]?.valor ?? normalizeValor(req.body?.valor);
-      const valorMesa = normalizeValor(req.body?.valorMesa ?? req.body?.valor_mesa);
+      const valor = categorias[0]?.valor ?? normalizeValor(req.body?.valor, moneda);
+      const valorMesa = normalizeValor(req.body?.valorMesa ?? req.body?.valor_mesa, moneda);
 
       if (!categoria) return res.status(400).json({ ok: false, error: 'Falta categoría' });
       if (!fechaHora) return res.status(400).json({ ok: false, error: 'Falta fecha y hora del torneo' });
@@ -1006,8 +1014,8 @@ module.exports = function createSalasRouter(deps = {}) {
       const categorias = normalizeCategorias(req.body?.categorias, moneda);
       const fecha = String(req.body?.fecha || '').trim();
       const fechaHora = normalizeDateTime(req.body?.fechaHora || req.body?.fecha_hora || (fecha && categorias[0] ? `${fecha}T${categorias[0].hora}` : ''));
-      const valor = categorias[0]?.valor ?? normalizeValor(req.body?.valor);
-      const valorMesa = normalizeValor(req.body?.valorMesa ?? req.body?.valor_mesa);
+      const valor = categorias[0]?.valor ?? normalizeValor(req.body?.valor, moneda);
+      const valorMesa = normalizeValor(req.body?.valorMesa ?? req.body?.valor_mesa, moneda);
 
       const torneos = await saveTorneoForSala({
         salaId,

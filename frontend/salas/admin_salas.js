@@ -112,16 +112,25 @@
   }
 
   function formatDateForInput(value){ return formatForInput(value).slice(0, 10); }
-  function normalizeDisplayValue(value){
+  function normalizeDisplayValue(value, moneda = 'ARS'){
     const n = Number(String(value || '').replace(',', '.'));
     if (!Number.isFinite(n) || n < 0) return '';
+    if (moneda === 'USD') return String(Math.round(n));
     return String(Math.round(n > 0 && n < 1000 ? n * 1000 : n));
   }
   function divisionRowsHtml(categorias = []){
     return categorias.map((item) => `<div class="division-detail" data-division="${escapeAttr(item.categoria)}"><strong>${escapeAttr(item.categoria)}</strong><label>Hora<input class="js-division-hora" type="time" value="${escapeAttr(item.hora || '')}"></label><label>Valor<input class="js-division-valor" type="number" min="0" step="any" inputmode="decimal" value="${item.valor ?? ''}" placeholder="10 = 10.000"></label></div>`).join('');
   }
   function selectedCategorias(card){
-    return [...card.querySelectorAll('.division-detail')].map(row => ({ categoria:row.dataset.division, hora:row.querySelector('.js-division-hora')?.value || '', valor:normalizeDisplayValue(row.querySelector('.js-division-valor')?.value), moneda:card.querySelector('.js-moneda')?.value || 'ARS' }));
+    const moneda = card.querySelector('.js-moneda')?.value || 'ARS';
+    return [...card.querySelectorAll('.division-detail')].map(row => ({ categoria:row.dataset.division, hora:row.querySelector('.js-division-hora')?.value || '', valor:normalizeDisplayValue(row.querySelector('.js-division-valor')?.value, moneda), moneda }));
+  }
+  function updateValuePlaceholders(card){
+    if (!card) return;
+    const placeholder = card.querySelector('.js-moneda')?.value === 'USD' ? 'Ej: 100' : '10 = 10.000';
+    card.querySelectorAll('.js-division-valor, .js-valor-mesa').forEach(input => {
+      input.placeholder = placeholder;
+    });
   }
 
   function renderSlots(){
@@ -167,6 +176,7 @@
         const current = new Map(selectedCategorias(card).map(item => [item.categoria, item]));
         const next = [...card.querySelectorAll('.js-division:checked')].map(el => current.get(el.value) || { categoria:el.value, hora:'', valor:'' });
         card.querySelector('.division-details').innerHTML = divisionRowsHtml(next);
+        updateValuePlaceholders(card);
       }));
 
       fileInput.addEventListener('change', () => {
@@ -179,6 +189,7 @@
       saveBtn.addEventListener('click', () => saveSlot(slot, card));
       deleteBtn.addEventListener('click', () => deleteSlot(slot));
       grid.appendChild(card);
+      updateValuePlaceholders(card);
     }
   }
 
@@ -222,9 +233,9 @@
       const categoria = card.querySelector('.js-categoria')?.value.trim() || '';
       const estilo = card.querySelector('.js-estilo')?.value.trim() || '';
       const fecha = card.querySelector('.js-fecha')?.value || '';
-      const categorias = selectedCategorias(card);
-      const valorMesa = normalizeDisplayValue(card.querySelector('.js-valor-mesa')?.value);
       const moneda = card.querySelector('.js-moneda')?.value || 'ARS';
+      const categorias = selectedCategorias(card);
+      const valorMesa = normalizeDisplayValue(card.querySelector('.js-valor-mesa')?.value, moneda);
 
       const faltantes = [];
       if (!categoria) faltantes.push('modalidad');
@@ -295,10 +306,9 @@
     wirePasswordToggles();
     renderSlots();
     loadTorneos();
-    grid?.addEventListener('focusout', (ev) => {
-      if (!ev.target.matches('.js-division-valor, .js-valor-mesa')) return;
-      const normalized = normalizeDisplayValue(ev.target.value);
-      if (normalized) ev.target.value = normalized;
+    grid?.addEventListener('change', (ev) => {
+      if (!ev.target.matches('.js-moneda')) return;
+      updateValuePlaceholders(ev.target.closest('.torneo-slot'));
     });
     $('#btnChangePassword')?.addEventListener('click', openPassModal);
     $('#btnCancelPass')?.addEventListener('click', () => $('#passModal')?.close());

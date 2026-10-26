@@ -27,29 +27,39 @@
 
   function apiUrl(path){ return `${API_BASE}${path}`; }
 
-  function normalizeDisplayValue(value){
+  function normalizeDisplayValue(value, moneda = 'ARS'){
     const n = Number(String(value || '').replace(',', '.'));
     if (!Number.isFinite(n) || n < 0) return '';
+    if (moneda === 'USD') return String(Math.round(n));
     return String(Math.round(n > 0 && n < 1000 ? n * 1000 : n));
   }
 
   function renderDivisionDetails(){
     const selected = [...document.querySelectorAll('.js-division:checked')].map(el => el.value);
+    const valuePlaceholder = monedaSelect.value === 'USD' ? 'Ej: 100' : '10 = 10.000';
     divisionDetails.innerHTML = selected.map((division) => `
       <div class="division-detail" data-division="${division}">
         <strong>${division}</strong>
         <label>Hora<input class="js-division-hora" type="time" aria-label="Hora ${division}"></label>
-        <label>Valor<input class="js-division-valor" type="number" min="0" step="any" inputmode="decimal" placeholder="10 = 10.000" aria-label="Valor ${division}"></label>
+        <label>Valor<input class="js-division-valor" type="number" min="0" step="any" inputmode="decimal" placeholder="${valuePlaceholder}" aria-label="Valor ${division}"></label>
       </div>`).join('');
   }
 
   function collectCategorias(){
+    const moneda = monedaSelect.value || 'ARS';
     return [...divisionDetails.querySelectorAll('.division-detail')].map((row) => ({
       categoria: row.dataset.division,
       hora: row.querySelector('.js-division-hora')?.value || '',
-      valor: normalizeDisplayValue(row.querySelector('.js-division-valor')?.value),
-      moneda: monedaSelect.value || 'ARS'
+      valor: normalizeDisplayValue(row.querySelector('.js-division-valor')?.value, moneda),
+      moneda
     }));
+  }
+
+  function updateValuePlaceholders(){
+    const placeholder = monedaSelect.value === 'USD' ? 'Ej: 100' : '10 = 10.000';
+    document.querySelectorAll('.js-division-valor, #valorMesaInput').forEach(input => {
+      input.placeholder = placeholder;
+    });
   }
 
   function readSession(){
@@ -255,9 +265,9 @@
     const categoria = categoriaInput.value.trim();
     const estilo = estiloInput.value.trim();
     const fecha = fechaInput.value;
-    const categorias = collectCategorias();
-    const valorMesa = normalizeDisplayValue(valorMesaInput.value);
     const moneda = monedaSelect.value || 'ARS';
+    const categorias = collectCategorias();
+    const valorMesa = normalizeDisplayValue(valorMesaInput.value, moneda);
 
     if (!categoria || !estilo || !fecha || !categorias.length || categorias.some(item => !item.hora || !item.valor) || !valorMesa) {
       setStatus('Completá modalidad, categorías LIPA, fecha, hora, valores y valor mesa.', 'error');
@@ -307,6 +317,7 @@
       monedaSelect.value = 'ARS';
       document.querySelectorAll('.js-division').forEach(el => { el.checked = false; });
       renderDivisionDetails();
+      updateValuePlaceholders();
     } catch (err) {
       console.error(err);
       setStatus(err?.message || 'No se pudo guardar la carga manual.', 'error');
@@ -324,11 +335,8 @@
 
     salaSelect.addEventListener('change', loadSalaTorneos);
     document.querySelectorAll('.js-division').forEach(el => el.addEventListener('change', renderDivisionDetails));
-    document.addEventListener('focusout', (ev) => {
-      if (!ev.target.matches('.js-division-valor, #valorMesaInput')) return;
-      const normalized = normalizeDisplayValue(ev.target.value);
-      if (normalized) ev.target.value = normalized;
-    });
+    monedaSelect.addEventListener('change', updateValuePlaceholders);
+    updateValuePlaceholders();
     imageInput.addEventListener('change', () => {
       state.file = imageInput.files?.[0] || null;
       renderPreview();
