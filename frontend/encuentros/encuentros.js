@@ -240,12 +240,16 @@
     });
     playerProfileFrame.src = `../consultas/consultas.html?${params.toString()}`;
     playerProfileModal.hidden = false;
+    document.body.classList.add('player-profile-open');
+    window.requestAnimationFrame(() => btnClosePlayerProfile?.focus());
   }
 
   function closePlayerProfile(){
     if (!playerProfileModal || !playerProfileFrame) return;
     playerProfileModal.hidden = true;
     playerProfileFrame.src = 'about:blank';
+    document.body.classList.remove('player-profile-open');
+    playerProfileButton?.focus();
   }
 
   function wirePlayerPhotoSlots(container, teamRef){
@@ -752,9 +756,18 @@
     photosPrev?.addEventListener('click', () => movePhoto(-1));
     photosNext?.addEventListener('click', () => movePhoto(1));
     document.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape' && photosModal && !photosModal.hidden) closePhotosModal();
-      if (ev.key === 'Escape' && playerPhotoModal && !playerPhotoModal.hidden) closePlayerPhoto();
-      if (ev.key === 'Escape' && playerProfileModal && !playerProfileModal.hidden) closePlayerProfile();
+      if (ev.key === 'Escape' && playerProfileModal && !playerProfileModal.hidden) {
+        closePlayerProfile();
+        return;
+      }
+      if (ev.key === 'Escape' && playerPhotoModal && !playerPhotoModal.hidden) {
+        closePlayerPhoto();
+        return;
+      }
+      if (ev.key === 'Escape' && photosModal && !photosModal.hidden) {
+        closePhotosModal();
+        return;
+      }
       if (!photosModal || photosModal.hidden) return;
       if (ev.key === 'ArrowLeft') movePhoto(-1);
       if (ev.key === 'ArrowRight') movePhoto(1);

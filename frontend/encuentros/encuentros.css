@@ -293,6 +293,7 @@
 body.photos-open{ overflow:hidden; }
 
 body.player-photo-open{ overflow:hidden; }
+body.player-profile-open{ overflow:hidden; }
 
 .player-photo-modal[hidden]{ display:none !important; }
 .player-photo-modal{
@@ -387,7 +388,7 @@ body.player-photo-open{ overflow:hidden; }
 .player-profile-modal{
   position:fixed;
   inset:0;
-  z-index:1100;
+  z-index:1500;
   display:grid;
   place-items:center;
   padding:14px;
