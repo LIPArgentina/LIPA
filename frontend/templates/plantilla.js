@@ -874,7 +874,6 @@ document.querySelectorAll('.fila').forEach(el => {
     draggedPlayerCategory = el.dataset.playerCategory || '';
     draggedPlayerId = el.dataset.playerId || '';
     originBox = null;
-    showTrashNextTo(el);
   });
   el.addEventListener('dragend', e => {
     draggedPlayer = null;
@@ -1715,7 +1714,6 @@ document.addEventListener('DOMContentLoaded', function(){
       originBox = window.originBox;
       draggedPlayerCategory = el.dataset?.playerCategory || '';
       draggedPlayerId = el.dataset?.playerId || '';
-      if (typeof window.LPI_showTrashNextTo === 'function') window.LPI_showTrashNextTo(el);
     } catch(_) {}
     return true;
   }
