@@ -5,7 +5,7 @@
   <meta content="width=device-width, initial-scale=1" name="viewport"/>
   <title>CONSULTAS | Liga de Pool Independiente</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="consultas.css?v=rad-proporcional-2"/>
+  <link rel="stylesheet" href="consultas.css?v=rad-detalle-1"/>
 </head>
 <body>
 <div class="container">
@@ -91,6 +91,14 @@
     </div>
   </div>
 
+  <div id="radCalculationModal" class="modal-overlay" hidden>
+    <div class="modal-card rad-calculation-card" role="dialog" aria-modal="true" aria-labelledby="radCalculationTitle">
+      <button id="btnRadCalculationClose" class="modal-close" type="button" aria-label="Cerrar">×</button>
+      <h2 id="radCalculationTitle">Cálculo RAD</h2>
+      <div id="radCalculationBody" class="formula-box rad-calculation-body"></div>
+    </div>
+  </div>
+
   <div id="playerPhotoModal" class="player-photo-modal" hidden>
     <div class="player-photo-backdrop" data-close-player-photo="1"></div>
     <div class="player-photo-dialog" role="dialog" aria-modal="true" aria-labelledby="playerPhotoName">
@@ -107,6 +115,6 @@
 
 <script src="../config.js?v=renewable-session-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-<script src="consultas.js?v=rad-proporcional-2" defer></script>
+<script src="consultas.js?v=rad-detalle-1" defer></script>
 </body>
 </html>

@@ -323,6 +323,23 @@ header img{ height:34px; width:auto; display:block; }
   border-left:1px solid rgba(60,207,78,.28);
   border-right:1px solid rgba(60,207,78,.28);
 }
+.rad-detail-button{
+  min-width:42px;
+  padding:4px 6px;
+  border:1px solid transparent;
+  border-radius:7px;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  font-weight:900;
+  cursor:pointer;
+}
+.rad-detail-button:hover,
+.rad-detail-button:focus-visible{
+  border-color:rgba(60,207,78,.65);
+  background:rgba(60,207,78,.16);
+  outline:none;
+}
 body.modal-open{
   overflow:hidden;
 }
@@ -473,6 +490,25 @@ body.player-photo-open{ overflow:hidden; }
 .modal-close:hover{
   filter:brightness(1.2);
 }
+.rad-calculation-card{
+  width:min(540px,100%);
+}
+.rad-calculation-body p{
+  padding-bottom:8px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.rad-calculation-body p:last-child{
+  margin-bottom:0;
+  padding-bottom:0;
+  border-bottom:0;
+}
+.rad-calculation-body b{
+  color:var(--ok);
+}
+.rad-calculation-result{
+  color:var(--gold) !important;
+  font-size:14px !important;
+}
 
 @media (max-width:760px){
   .header-center{ gap:5px; }
@@ -524,6 +560,10 @@ body.player-photo-open{ overflow:hidden; }
 
 .summary-rad strong{
   color:var(--ok);
+}
+.summary-rad .rad-detail-button{
+  font-size:inherit;
+  line-height:1;
 }
 
 .summary-eff strong,

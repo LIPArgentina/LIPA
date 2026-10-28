@@ -20,6 +20,10 @@
   const $radInfo = document.getElementById('btnRadInfo');
   const $radModal = document.getElementById('radModal');
   const $radClose = document.getElementById('btnRadClose');
+  const $radCalculationModal = document.getElementById('radCalculationModal');
+  const $radCalculationTitle = document.getElementById('radCalculationTitle');
+  const $radCalculationBody = document.getElementById('radCalculationBody');
+  const $radCalculationClose = document.getElementById('btnRadCalculationClose');
   const $playerPhotoModal = document.getElementById('playerPhotoModal');
   const $playerPhotoName = document.getElementById('playerPhotoName');
   const $playerPhotoImage = document.getElementById('playerPhotoImage');
@@ -146,6 +150,39 @@
         data-team-name="${escapeAttribute(name)}"
         data-team-edition="${escapeAttribute(edition)}"
         title="Consultar a ${escapeAttribute(name)}">${name}</button>`;
+  }
+
+  function radCalculationPayload(item = {}, context = null) {
+    const played = toNumber(item.played);
+    const wins = toNumber(item.wins);
+    const maxPlayed = toNumber(context?.maxPlayed);
+    const avgPlayed = context?.avgPlayedExact !== undefined
+      ? toNumber(context.avgPlayedExact)
+      : toNumber(context?.avgPlayed);
+    const spread = context?.spreadExact !== undefined
+      ? toNumber(context.spreadExact)
+      : (maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0);
+    const confidenceExponent = context?.confidenceExponent !== undefined
+      ? toNumber(context.confidenceExponent)
+      : Math.max(spread, 0.6);
+    const effectiveness = played > 0 ? (wins / played) * 100 : 0;
+    const penalty = item.radPenaltyExact !== undefined
+      ? toNumber(item.radPenaltyExact)
+      : (maxPlayed > 0 && played > 0 ? Math.pow(maxPlayed / played, confidenceExponent) : 1);
+    const rad = item.rad !== undefined ? toNumber(item.rad) : (penalty > 0 ? effectiveness / penalty : 0);
+    return {
+      name: String(item.name || 'Jugador'), played, wins, maxPlayed, avgPlayed,
+      spread, confidenceExponent, effectiveness, penalty, rad
+    };
+  }
+
+  function radDetailButtonMarkup(item = {}, context = null) {
+    const detail = encodeURIComponent(JSON.stringify(radCalculationPayload(item, context)));
+    const name = String(item.name || 'jugador');
+    return `<button class="rad-detail-button" type="button"
+      data-rad-calculation="${escapeAttribute(detail)}"
+      aria-label="Ver cálculo RAD de ${escapeAttribute(name)}"
+      title="Ver cálculo del RAD">${toNumber(item.rad).toFixed(1)}</button>`;
   }
 
   function closePlayerPhoto() {
@@ -389,6 +426,40 @@
     document.body.classList.remove('modal-open');
   }
 
+  function formatRadNumber(value, decimals = 4) {
+    return toNumber(value).toLocaleString('es-AR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: decimals
+    });
+  }
+
+  function openRadCalculation(button) {
+    if (!$radCalculationModal || !$radCalculationBody) return;
+    let detail;
+    try {
+      detail = JSON.parse(decodeURIComponent(button?.dataset?.radCalculation || ''));
+    } catch (_) {
+      return;
+    }
+    if ($radCalculationTitle) $radCalculationTitle.textContent = `Cálculo RAD · ${detail.name}`;
+    $radCalculationBody.innerHTML = `
+      <p><strong>EFEC</strong> = (${detail.wins} PG / ${detail.played} PJ) × 100 = <b>${formatRadNumber(detail.effectiveness, 2)}%</b></p>
+      <p><strong>SPREAD</strong> = (${formatRadNumber(detail.maxPlayed)} PJ máx. − ${formatRadNumber(detail.avgPlayed)} PJ prom.) / ${formatRadNumber(detail.maxPlayed)} = <b>${formatRadNumber(detail.spread)}</b></p>
+      <p><strong>EXPONENTE</strong> = mayor entre ${formatRadNumber(detail.spread)} y 0,6 = <b>${formatRadNumber(detail.confidenceExponent)}</b></p>
+      <p><strong>PENALIZACIÓN</strong> = (${formatRadNumber(detail.maxPlayed)} / ${detail.played})<sup>${formatRadNumber(detail.confidenceExponent)}</sup> = <b>${formatRadNumber(detail.penalty)}</b></p>
+      <p class="rad-calculation-result"><strong>RAD</strong> = ${formatRadNumber(detail.effectiveness, 2)} / ${formatRadNumber(detail.penalty)} = <b>${formatRadNumber(detail.rad, 1)}</b></p>
+    `;
+    $radCalculationModal.hidden = false;
+    document.body.classList.add('modal-open');
+    $radCalculationClose?.focus();
+  }
+
+  function closeRadCalculation() {
+    if (!$radCalculationModal) return;
+    $radCalculationModal.hidden = true;
+    if ($radModal?.hidden !== false) document.body.classList.remove('modal-open');
+  }
+
   function formatDate(iso) {
     const raw = String(iso || '').trim();
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
@@ -585,7 +656,7 @@
           <span>efectividad</span>
         </div>
         <div class="summary-count summary-rad">
-          <strong>${Number(radValue || 0).toFixed(1)}</strong>
+          <strong>${radDetailButtonMarkup({ ...player, name: player.name, played, wins: ganados, rad: radValue }, data?.radContext || null)}</strong>
           <span>RAD</span>
         </div>
       </div>
@@ -692,7 +763,7 @@
           <td class="player-name">${playerSearchButtonMarkup(item, '', currentRankingEdition)}</td>
           <td class="team-name">${teamSearchButtonMarkup(item.teamName, currentRankingEdition)}</td>
           <td class="num">${Number(item.played || 0)}</td>
-          <td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>
+          <td class="num rad-score">${radDetailButtonMarkup(item, data?.radContext || null)}</td>
           <td class="num">${Number(item.effectiveness || 0).toFixed(1)}%</td>
           <td class="num ok">${Number(item.wins || 0)}</td>
           <td class="num bad">${Number(item.losses || 0)}</td>
@@ -834,7 +905,7 @@
           <td class="player-name">${playerSearchButtonMarkup(item, team.name, getTeamEdition())}</td>
           <td class="team-name">${teamSearchButtonMarkup(item.teamName || team.name, getTeamEdition())}</td>
           <td class="num">${Number(item.played || 0)}</td>
-          ${showRad ? `<td class="num rad-score" title="Rendimiento Ajustado Dinámico">${Number(item.rad || 0).toFixed(1)}</td>` : ''}
+          ${showRad ? `<td class="num rad-score">${radDetailButtonMarkup(item, data?.radContext || null)}</td>` : ''}
           <td class="num">${Number(item.effectiveness || 0).toFixed(1)}%</td>
           <td class="num ok">${Number(item.wins || 0)}</td>
           <td class="num bad">${Number(item.losses || 0)}</td>
@@ -1219,7 +1290,16 @@
   $radModal?.addEventListener('click', (ev) => {
     if (ev.target === $radModal) closeRadModal();
   });
+  $radCalculationClose?.addEventListener('click', closeRadCalculation);
+  $radCalculationModal?.addEventListener('click', (ev) => {
+    if (ev.target === $radCalculationModal) closeRadCalculation();
+  });
   $ranking?.addEventListener('click', (ev) => {
+    const radButton = ev.target.closest('[data-rad-calculation]');
+    if (radButton) {
+      openRadCalculation(radButton);
+      return;
+    }
     const exportButton = ev.target.closest('[data-export-team]');
     if (exportButton) {
       exportTeamQueryToExcel();
@@ -1271,6 +1351,11 @@
     });
   });
   $summary?.addEventListener('click', (ev) => {
+    const radButton = ev.target.closest('[data-rad-calculation]');
+    if (radButton) {
+      openRadCalculation(radButton);
+      return;
+    }
     const photoButton = ev.target.closest('[data-player-photo]');
     if (photoButton) {
       openPlayerPhoto(photoButton).catch(() => {
@@ -1291,6 +1376,10 @@
   });
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Escape') return;
+    if ($radCalculationModal?.hidden === false) {
+      closeRadCalculation();
+      return;
+    }
     closeRadModal();
     closePlayerPhoto();
   });
