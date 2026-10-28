@@ -351,8 +351,9 @@
     const maxPlayed = toNumber(context?.maxPlayed);
     const avgPlayed = toNumber(context?.avgPlayed);
     const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
+    const confidenceExponent = Math.max(spread, 0.6);
     const penalty = maxPlayed > 0 && played > 0
-      ? Math.pow(maxPlayed / played, spread)
+      ? Math.pow(maxPlayed / played, confidenceExponent)
       : 1;
     const rad = penalty > 0 ? effectiveness / penalty : 0;
 

@@ -5,7 +5,7 @@
   <meta content="width=device-width, initial-scale=1" name="viewport"/>
   <title>CONSULTAS | Liga de Pool Independiente</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="consultas.css?v=rad-proporcional-1"/>
+  <link rel="stylesheet" href="consultas.css?v=rad-proporcional-2"/>
 </head>
 <body>
 <div class="container">
@@ -78,7 +78,8 @@
       <div class="formula-box">
         <p><strong>EFEC</strong> = (Partidos Ganados / Partidos Jugados) × 100</p>
         <p><strong>SPREAD</strong> = (Máximo PJ de la categoría - Promedio PJ de la categoría) / Máximo PJ de la categoría</p>
-        <p><strong>PENALIZACIÓN</strong> = (Máximo PJ / PJ del jugador) elevado al SPREAD</p>
+        <p><strong>EXPONENTE DE CONFIANZA</strong> = el mayor valor entre SPREAD y 0,6</p>
+        <p><strong>PENALIZACIÓN</strong> = (Máximo PJ / PJ del jugador) elevado al EXPONENTE DE CONFIANZA</p>
         <p><strong>RAD</strong> = EFEC / PENALIZACIÓN</p>
       </div>
 
@@ -106,6 +107,6 @@
 
 <script src="../config.js?v=renewable-session-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-<script src="consultas.js?v=rad-proporcional-1" defer></script>
+<script src="consultas.js?v=rad-proporcional-2" defer></script>
 </body>
 </html>
