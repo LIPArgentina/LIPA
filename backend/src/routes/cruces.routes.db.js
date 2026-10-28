@@ -3879,10 +3879,8 @@ function applyRadToPlayerRow(item = {}, context = null) {
   const maxPlayed = radNumber(context?.maxPlayed);
   const avgPlayed = radNumber(context?.avgPlayed);
   const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
-  const force = 1 + spread;
-
   const penalty = maxPlayed > 0 && played > 0
-    ? 1 + ((maxPlayed - played) / maxPlayed) * force
+    ? Math.pow(maxPlayed / played, spread)
     : 1;
 
   const rad = penalty > 0 ? effectiveness / penalty : 0;
