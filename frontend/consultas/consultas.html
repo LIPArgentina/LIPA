@@ -5,7 +5,7 @@
   <meta content="width=device-width, initial-scale=1" name="viewport"/>
   <title>CONSULTAS | Liga de Pool Independiente</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="consultas.css?v=rad-detalle-1"/>
+  <link rel="stylesheet" href="consultas.css?v=rad-participacion-1"/>
 </head>
 <body>
 <div class="container">
@@ -71,16 +71,14 @@
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="radModalTitle">
       <button id="btnRadClose" class="modal-close" type="button" aria-label="Cerrar">×</button>
       <h2 id="radModalTitle">Sistema LIPA de Rendimiento — RAD</h2>
-      <p><strong>RAD</strong> significa <strong>Rendimiento Ajustado Dinámico</strong>. Es el sistema oficial de ranking de LIPA para calcular el rendimiento competitivo de cada jugador ajustando su efectividad según la cantidad de partidos disputados dentro de su categoría.</p>
-      <p>El sistema prioriza consistencia, rendimiento sostenido y confiabilidad estadística, evitando distorsiones generadas por muestras pequeñas.</p>
+      <p><strong>RAD</strong> significa <strong>Rendimiento Ajustado Dinámico</strong>. Combina la efectividad del jugador con su participación respecto de quien más partidos disputó en la misma categoría y edición.</p>
+      <p>La media armónica exige equilibrio: para alcanzar un RAD alto es necesario ganar y también sostener ese rendimiento en una cantidad representativa de partidos.</p>
 
       <h3>Cálculo del rendimiento</h3>
       <div class="formula-box">
-        <p><strong>EFEC</strong> = (Partidos Ganados / Partidos Jugados) × 100</p>
-        <p><strong>SPREAD</strong> = (Máximo PJ de la categoría - Promedio PJ de la categoría) / Máximo PJ de la categoría</p>
-        <p><strong>EXPONENTE DE CONFIANZA</strong> = el mayor valor entre SPREAD y 0,6</p>
-        <p><strong>PENALIZACIÓN</strong> = (Máximo PJ / PJ del jugador) elevado al EXPONENTE DE CONFIANZA</p>
-        <p><strong>RAD</strong> = EFEC / PENALIZACIÓN</p>
+        <p><strong>EFEC</strong> = Partidos Ganados / Partidos Jugados</p>
+        <p><strong>PARTICIPACIÓN</strong> = PJ del jugador / Máximo PJ de la categoría</p>
+        <p><strong>RAD</strong> = [2 × EFEC × PARTICIPACIÓN / (EFEC + PARTICIPACIÓN)] × 100</p>
       </div>
 
       <h3>Desempates</h3>
@@ -115,6 +113,6 @@
 
 <script src="../config.js?v=renewable-session-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-<script src="consultas.js?v=rad-detalle-1" defer></script>
+<script src="consultas.js?v=rad-participacion-1" defer></script>
 </body>
 </html>

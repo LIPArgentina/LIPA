@@ -3881,14 +3881,13 @@ function applyRadToPlayerRow(item = {}, context = null) {
   const effectiveness = played > 0 ? (wins / played) * 100 : 0;
 
   const maxPlayed = radNumber(context?.maxPlayed);
-  const avgPlayed = radNumber(context?.avgPlayed);
-  const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
-  const confidenceExponent = Math.max(spread, 0.6);
-  const penalty = maxPlayed > 0 && played > 0
-    ? Math.pow(maxPlayed / played, confidenceExponent)
-    : 1;
-
-  const rad = penalty > 0 ? effectiveness / penalty : 0;
+  const effectivenessRatio = played > 0 ? wins / played : 0;
+  const participation = maxPlayed > 0 ? played / maxPlayed : 0;
+  const harmonicDenominator = effectivenessRatio + participation;
+  const rad = harmonicDenominator > 0
+    ? ((2 * effectivenessRatio * participation) / harmonicDenominator) * 100
+    : 0;
+  const adjustmentFactor = rad > 0 ? effectiveness / rad : 0;
 
   return {
     ...item,
@@ -3897,8 +3896,9 @@ function applyRadToPlayerRow(item = {}, context = null) {
     diff: triangulosFavor - triangulosContra,
     effectiveness: radRound1(effectiveness),
     rad: radRound1(rad),
-    radPenalty: radRound1(penalty),
-    radPenaltyExact: radRound4(penalty)
+    radPenalty: radRound1(adjustmentFactor),
+    radPenaltyExact: radRound4(adjustmentFactor),
+    radParticipation: radRound4(participation)
   };
 }
 
@@ -4028,9 +4028,7 @@ function buildRadRankingFromPlayerRows(baseRows = []) {
       avgPlayed: radRound1(rawContext.avgPlayed),
       spread: radRound1(rawContext.spread),
       force: radRound1(rawContext.force),
-      avgPlayedExact: radRound4(rawContext.avgPlayed),
-      spreadExact: radRound4(rawContext.spread),
-      confidenceExponent: radRound4(Math.max(rawContext.spread, 0.6))
+      avgPlayedExact: radRound4(rawContext.avgPlayed)
     }
   };
 }

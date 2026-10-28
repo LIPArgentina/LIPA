@@ -156,23 +156,17 @@
     const played = toNumber(item.played);
     const wins = toNumber(item.wins);
     const maxPlayed = toNumber(context?.maxPlayed);
-    const avgPlayed = context?.avgPlayedExact !== undefined
-      ? toNumber(context.avgPlayedExact)
-      : toNumber(context?.avgPlayed);
-    const spread = context?.spreadExact !== undefined
-      ? toNumber(context.spreadExact)
-      : (maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0);
-    const confidenceExponent = context?.confidenceExponent !== undefined
-      ? toNumber(context.confidenceExponent)
-      : Math.max(spread, 0.6);
-    const effectiveness = played > 0 ? (wins / played) * 100 : 0;
-    const penalty = item.radPenaltyExact !== undefined
-      ? toNumber(item.radPenaltyExact)
-      : (maxPlayed > 0 && played > 0 ? Math.pow(maxPlayed / played, confidenceExponent) : 1);
-    const rad = item.rad !== undefined ? toNumber(item.rad) : (penalty > 0 ? effectiveness / penalty : 0);
+    const effectiveness = played > 0 ? wins / played : 0;
+    const participation = item.radParticipation !== undefined
+      ? toNumber(item.radParticipation)
+      : (maxPlayed > 0 ? played / maxPlayed : 0);
+    const denominator = effectiveness + participation;
+    const rad = item.rad !== undefined
+      ? toNumber(item.rad)
+      : (denominator > 0 ? ((2 * effectiveness * participation) / denominator) * 100 : 0);
     return {
-      name: String(item.name || 'Jugador'), played, wins, maxPlayed, avgPlayed,
-      spread, confidenceExponent, effectiveness, penalty, rad
+      name: String(item.name || 'Jugador'), played, wins, maxPlayed,
+      effectiveness, participation, rad
     };
   }
 
@@ -364,13 +358,7 @@
       .filter((played) => played > 0);
 
     const maxPlayed = playedValues.length ? Math.max(...playedValues) : 0;
-    const avgPlayed = playedValues.length
-      ? playedValues.reduce((acc, played) => acc + played, 0) / playedValues.length
-      : 0;
-    const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
-    const force = 1 + spread;
-
-    return { maxPlayed, avgPlayed, spread, force };
+    return { maxPlayed };
   }
 
   function calculateRad(item, context) {
@@ -380,25 +368,27 @@
         effectiveness: round1(item.effectiveness),
         rad: round1(item.rad),
         radPenalty: round1(item.radPenalty || 1),
+        radParticipation: toNumber(item.radParticipation),
       };
     }
     const played = toNumber(item?.played);
     const wins = toNumber(item?.wins);
     const effectiveness = played > 0 ? (wins / played) * 100 : 0;
+    const effectivenessRatio = effectiveness / 100;
     const maxPlayed = toNumber(context?.maxPlayed);
-    const avgPlayed = toNumber(context?.avgPlayed);
-    const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
-    const confidenceExponent = Math.max(spread, 0.6);
-    const penalty = maxPlayed > 0 && played > 0
-      ? Math.pow(maxPlayed / played, confidenceExponent)
-      : 1;
-    const rad = penalty > 0 ? effectiveness / penalty : 0;
+    const participation = maxPlayed > 0 ? played / maxPlayed : 0;
+    const denominator = effectivenessRatio + participation;
+    const rad = denominator > 0
+      ? ((2 * effectivenessRatio * participation) / denominator) * 100
+      : 0;
+    const adjustmentFactor = rad > 0 ? effectiveness / rad : 0;
 
     return {
       ...item,
       effectiveness: round1(effectiveness),
       rad: round1(rad),
-      radPenalty: round1(penalty),
+      radPenalty: round1(adjustmentFactor),
+      radParticipation: participation,
     };
   }
 
@@ -443,11 +433,9 @@
     }
     if ($radCalculationTitle) $radCalculationTitle.textContent = `Cálculo RAD · ${detail.name}`;
     $radCalculationBody.innerHTML = `
-      <p><strong>EFEC</strong> = (${detail.wins} PG / ${detail.played} PJ) × 100 = <b>${formatRadNumber(detail.effectiveness, 2)}%</b></p>
-      <p><strong>SPREAD</strong> = (${formatRadNumber(detail.maxPlayed)} PJ máx. − ${formatRadNumber(detail.avgPlayed)} PJ prom.) / ${formatRadNumber(detail.maxPlayed)} = <b>${formatRadNumber(detail.spread)}</b></p>
-      <p><strong>EXPONENTE</strong> = mayor entre ${formatRadNumber(detail.spread)} y 0,6 = <b>${formatRadNumber(detail.confidenceExponent)}</b></p>
-      <p><strong>PENALIZACIÓN</strong> = (${formatRadNumber(detail.maxPlayed)} / ${detail.played})<sup>${formatRadNumber(detail.confidenceExponent)}</sup> = <b>${formatRadNumber(detail.penalty)}</b></p>
-      <p class="rad-calculation-result"><strong>RAD</strong> = ${formatRadNumber(detail.effectiveness, 2)} / ${formatRadNumber(detail.penalty)} = <b>${formatRadNumber(detail.rad, 1)}</b></p>
+      <p><strong>EFEC</strong> = ${detail.wins} PG / ${detail.played} PJ = <b>${formatRadNumber(detail.effectiveness)} (${formatRadNumber(detail.effectiveness * 100, 2)}%)</b></p>
+      <p><strong>PARTICIPACIÓN</strong> = ${detail.played} PJ / ${formatRadNumber(detail.maxPlayed)} PJ máx. = <b>${formatRadNumber(detail.participation)} (${formatRadNumber(detail.participation * 100, 2)}%)</b></p>
+      <p class="rad-calculation-result"><strong>RAD</strong> = [2 × ${formatRadNumber(detail.effectiveness)} × ${formatRadNumber(detail.participation)} / (${formatRadNumber(detail.effectiveness)} + ${formatRadNumber(detail.participation)})] × 100 = <b>${formatRadNumber(detail.rad, 1)}</b></p>
     `;
     $radCalculationModal.hidden = false;
     document.body.classList.add('modal-open');
