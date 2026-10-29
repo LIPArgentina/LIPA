@@ -4,6 +4,47 @@ const pool = require('../../db');
 const { requireAdmin } = require('../middleware/auth');
 
 const EDITABLE_SECTIONS = ['capitan', 'individuales', 'pareja1', 'pareja2', 'suplentes'];
+const PLANILLA_ACCESS_ACTIONS = new Set(['view', 'edit']);
+let accessLogSchemaPromise = null;
+
+function ensureAccessLogSchema() {
+  if (!accessLogSchemaPromise) {
+    accessLogSchemaPromise = pool.query(`
+      CREATE TABLE IF NOT EXISTS planilla_access_logs (
+        id BIGSERIAL PRIMARY KEY,
+        planilla_id BIGINT NOT NULL,
+        equipo_id BIGINT NOT NULL,
+        action TEXT NOT NULL CHECK (action IN ('view', 'edit')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS planilla_access_logs_equipo_created_idx
+        ON planilla_access_logs(equipo_id, created_at DESC);
+    `).catch((error) => {
+      accessLogSchemaPromise = null;
+      throw error;
+    });
+  }
+  return accessLogSchemaPromise;
+}
+
+function maskPlanillaNames(planilla) {
+  const source = planilla && typeof planilla === 'object' ? planilla : {};
+  const masked = { ...source };
+  EDITABLE_SECTIONS.forEach((section) => {
+    const values = Array.isArray(source[section]) ? source[section] : [];
+    masked[section] = values.map((value) => String(value || '').trim() ? '********' : '');
+  });
+  delete masked.jugadorIds;
+  return masked;
+}
+
+function accessEvent(row) {
+  if (!row?.access_action || !row?.access_created_at) return null;
+  return {
+    action: row.access_action,
+    at: row.access_created_at
+  };
+}
 
 function normalizePlayerKey(value) {
   return String(value || '')
@@ -72,9 +113,21 @@ async function enrichPlanillaWithPlayerIds(planilla, equipoId, additionalTeamIds
   };
 }
 
-router.get('/planillas', async (req, res) => {
-  try {
-    const result = await pool.query(`
+async function listPlanillas({ masked = false } = {}) {
+  if (masked) await ensureAccessLogSchema();
+  const auditSelect = masked
+    ? `, access_log.action AS access_action, access_log.created_at AS access_created_at`
+    : '';
+  const auditJoin = masked
+    ? `LEFT JOIN LATERAL (
+         SELECT pal.action, pal.created_at
+           FROM planilla_access_logs pal
+          WHERE pal.equipo_id = e.id
+          ORDER BY pal.created_at DESC, pal.id DESC
+          LIMIT 1
+       ) access_log ON true`
+    : '';
+  const result = await pool.query(`
       SELECT
         e.id AS equipo_id,
         e.slug_uid AS team,
@@ -91,6 +144,7 @@ router.get('/planillas', async (req, res) => {
           p.updated_at AT TIME ZONE 'America/Argentina/Buenos_Aires',
           'YYYY-MM-DD HH24:MI'
         ) AS received_at_local
+        ${auditSelect}
       FROM planillas p
       JOIN equipos e ON e.id = p.equipo_id
       LEFT JOIN LATERAL (
@@ -106,27 +160,144 @@ router.get('/planillas', async (req, res) => {
                   e1.activo DESC, e1.id ASC
          LIMIT 1
       ) first_team ON true
+      ${auditJoin}
       WHERE e.activo = true
       ORDER BY e.display_name ASC
     `);
 
-    const out = await Promise.all(result.rows.map(async (r) => ({
+  return Promise.all(result.rows.map(async (r) => {
+    const planilla = masked
+      ? maskPlanillaNames(r.datos)
+      : await enrichPlanillaWithPlayerIds(r.datos, r.equipo_id, r.first_team_id ? [r.first_team_id] : []);
+    return {
       team: r.team,
       team_base: r.team_base,
       slug_uid: r.slug_uid,
       teamName: r.display_name,
       division: r.division,
       category: r.division,
-      planilla: await enrichPlanillaWithPlayerIds(r.datos, r.equipo_id, r.first_team_id ? [r.first_team_id] : []),
-      sourceCaptains: [r.first_captain, r.first_subcaptain].filter(Boolean),
+      planilla,
+      sourceCaptains: masked ? [] : [r.first_captain, r.first_subcaptain].filter(Boolean),
       updatedAt: r.updated_at,
-      receivedAtLocal: r.received_at_local
-    })));
+      receivedAtLocal: r.received_at_local,
+      lastAccess: masked ? accessEvent(r) : null
+    };
+  }));
+}
 
-    res.json(out);
+router.get('/planillas', async (req, res) => {
+  try {
+    res.json(await listPlanillas());
   } catch (err) {
     console.error('Error admin planillas:', err);
     res.status(500).json({ ok: false, error: 'error leyendo planillas' });
+  }
+});
+
+router.get('/planillas-secure', requireAdmin, async (req, res) => {
+  try {
+    return res.json(await listPlanillas({ masked: true }));
+  } catch (err) {
+    console.error('Error leyendo planillas protegidas:', err);
+    return res.status(500).json({ ok: false, error: 'No se pudieron cargar las planillas protegidas.' });
+  }
+});
+
+router.post('/planillas/:team/access', requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const teamRef = String(req.params.team || '').trim().toLowerCase();
+    const action = String(req.body?.action || '').trim().toLowerCase();
+    if (!teamRef || !PLANILLA_ACCESS_ACTIONS.has(action)) {
+      return res.status(400).json({ ok: false, error: 'Solicitud de acceso inválida.' });
+    }
+    await ensureAccessLogSchema();
+    await client.query('BEGIN');
+    const result = await client.query(
+      `SELECT e.id AS equipo_id, e.slug_uid, e.slug_base, e.display_name, e.division,
+              p.id AS planilla_id, p.datos,
+              first_team.id AS first_team_id,
+              first_team.captain AS first_captain,
+              first_team.subcaptain AS first_subcaptain
+         FROM equipos e
+         JOIN LATERAL (
+           SELECT p1.id, p1.datos
+             FROM planillas p1
+            WHERE p1.equipo_id = e.id
+            ORDER BY p1.updated_at DESC, p1.id DESC
+            LIMIT 1
+         ) p ON true
+         LEFT JOIN LATERAL (
+           SELECT e1.id, e1.captain, e1.subcaptain
+             FROM equipos e1
+            WHERE e.division = 'segunda'
+              AND e1.division = 'primera'
+              AND (LOWER(e1.slug_base) = LOWER(e.slug_base) OR LOWER(e1.display_name) = LOWER(e.display_name))
+            ORDER BY CASE WHEN LOWER(e1.slug_base) = LOWER(e.slug_base) THEN 0 ELSE 1 END,
+                     e1.activo DESC, e1.id ASC
+            LIMIT 1
+         ) first_team ON true
+        WHERE (LOWER(e.slug_uid) = $1 OR LOWER(e.slug_base) = $1 OR LOWER(e.display_name) = $1)
+          AND e.activo = true
+        ORDER BY CASE WHEN LOWER(e.slug_uid) = $1 THEN 0 ELSE 1 END, e.id ASC
+        LIMIT 1`,
+      [teamRef]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'Planilla no encontrada.' });
+    }
+    const inserted = await client.query(
+      `INSERT INTO planilla_access_logs(planilla_id, equipo_id, action)
+       VALUES ($1, $2, $3)
+       RETURNING action, created_at`,
+      [row.planilla_id, row.equipo_id, action]
+    );
+    await client.query('COMMIT');
+    const planilla = await enrichPlanillaWithPlayerIds(
+      row.datos,
+      row.equipo_id,
+      row.first_team_id ? [row.first_team_id] : []
+    );
+    return res.json({
+      ok: true,
+      planilla,
+      sourceCaptains: [row.first_captain, row.first_subcaptain].filter(Boolean),
+      access: {
+        action: inserted.rows[0].action,
+        at: inserted.rows[0].created_at
+      }
+    });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    console.error('Error registrando acceso a planilla:', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo registrar el acceso a la planilla.' });
+  } finally {
+    client.release();
+  }
+});
+
+router.get('/planillas/:team/access-log', requireAdmin, async (req, res) => {
+  try {
+    const teamRef = String(req.params.team || '').trim().toLowerCase();
+    await ensureAccessLogSchema();
+    const result = await pool.query(
+      `SELECT pal.action, pal.created_at
+         FROM planilla_access_logs pal
+         JOIN equipos e ON e.id = pal.equipo_id
+        WHERE (LOWER(e.slug_uid) = $1 OR LOWER(e.slug_base) = $1 OR LOWER(e.display_name) = $1)
+        ORDER BY pal.created_at DESC, pal.id DESC
+        LIMIT 200`,
+      [teamRef]
+    );
+    return res.json({
+      ok: true,
+      events: result.rows.map((row) => ({ action: row.action, at: row.created_at }))
+    });
+  } catch (err) {
+    console.error('Error leyendo historial de accesos:', err);
+    return res.status(500).json({ ok: false, error: 'No se pudo cargar el historial.' });
   }
 });
 

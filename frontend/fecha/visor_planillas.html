@@ -196,6 +196,7 @@
     display:flex;
     justify-content:center;
     gap:8px;
+    flex-wrap:wrap;
     margin:8px 2px 2px;
   }
   .planilla-edit-actions .btn-gold{
@@ -359,6 +360,58 @@
     text-transform:uppercase;
     background:rgba(255,217,102,.08);
   }
+  .card-audit-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    min-height:28px;
+  }
+  .card-audit-head .category-pill{ margin:0; flex:0 0 auto; }
+  .last-access-label{
+    color:#f2d56b;
+    font-size:9px;
+    font-weight:700;
+    line-height:1.2;
+    text-align:right;
+  }
+  .audit-modal[hidden]{ display:none !important; }
+  .audit-modal{
+    position:fixed;
+    inset:0;
+    z-index:3000;
+    display:grid;
+    place-items:center;
+    padding:16px;
+    background:rgba(0,0,0,.78);
+    backdrop-filter:blur(3px);
+  }
+  .audit-dialog{
+    width:min(460px,100%);
+    max-height:86vh;
+    overflow:auto;
+    border:1px solid #9d7614;
+    border-radius:16px;
+    padding:20px;
+    background:#121316;
+    box-shadow:0 20px 55px rgba(0,0,0,.65);
+  }
+  .audit-dialog h2{ margin:0 0 12px; color:var(--gold); font-size:19px; }
+  .audit-dialog p{ margin:8px 0; color:#fff; font-size:14px; line-height:1.45; }
+  .audit-dialog-actions{ display:flex; justify-content:flex-end; gap:9px; margin-top:18px; }
+  .audit-history-list{ display:grid; gap:7px; margin-top:12px; }
+  .audit-history-row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:9px 10px;
+    border:1px solid #ffffff20;
+    border-radius:9px;
+    background:#090a0c;
+    font-size:12px;
+  }
+  .audit-history-row strong{ color:var(--gold); }
+  .audit-history-empty{ padding:18px 4px; color:#ccc; text-align:center; font-size:13px; }
 
   @media (max-width: 1240px){
     header.site-header{
@@ -531,7 +584,27 @@
 </section>
 </main>
 </div>
+<div id="auditConfirmModal" class="audit-modal" hidden>
+  <div class="audit-dialog" role="dialog" aria-modal="true" aria-labelledby="auditConfirmTitle">
+    <h2 id="auditConfirmTitle">REGISTRO DE ACCESO</h2>
+    <p><strong>Se va a generar un registro de este evento.</strong></p>
+    <p id="auditConfirmDetail"></p>
+    <div class="audit-dialog-actions">
+      <button type="button" class="btn" id="auditConfirmCancel">CANCELAR</button>
+      <button type="button" class="btn-gold" id="auditConfirmContinue">CONTINUAR</button>
+    </div>
+  </div>
+</div>
+<div id="auditHistoryModal" class="audit-modal" hidden>
+  <div class="audit-dialog" role="dialog" aria-modal="true" aria-labelledby="auditHistoryTitle">
+    <h2 id="auditHistoryTitle">HISTORIAL</h2>
+    <div id="auditHistoryList" class="audit-history-list"></div>
+    <div class="audit-dialog-actions">
+      <button type="button" class="btn-gold" id="auditHistoryClose">CERRAR</button>
+    </div>
+  </div>
+</div>
   <script src="../match-format.js"></script>
-  <script src="visor_planillas.js?v=20261009-segunda-mixta-1"></script>
+  <script src="visor_planillas.js?v=20261029-planillas-auditadas-1"></script>
 </body>
 </html>

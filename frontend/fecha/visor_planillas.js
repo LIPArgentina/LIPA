@@ -44,6 +44,7 @@ function authHeaders(extra = {}){
     allFiles: [],
     activeCategory: null,
     rosterCache: new Map(),
+    revealTimers: new Map(),
     categories: {
       tercera: new Set(),
       segunda: new Set()
@@ -254,6 +255,156 @@ function authHeaders(extra = {}){
     return planilla;
   }
 
+  function teamKey(item){
+    return String(item?.slug_uid || item?.team || '').trim();
+  }
+
+  function maskPlanilla(planilla){
+    const masked = { ...(planilla || {}) };
+    ['capitan','individuales','pareja1','pareja2','suplentes'].forEach(section => {
+      const values = Array.isArray(planilla?.[section]) ? planilla[section] : [];
+      masked[section] = values.map(value => String(value || '').trim() ? '********' : '');
+    });
+    delete masked.jugadorIds;
+    return masked;
+  }
+
+  function clearRevealTimer(item){
+    const key = teamKey(item);
+    const timer = state.revealTimers.get(key);
+    if(timer) clearTimeout(timer);
+    state.revealTimers.delete(key);
+  }
+
+  function hideRevealedPlan(item, { render = true } = {}){
+    clearRevealTimer(item);
+    item.__revealedPlan = null;
+    if(render) renderBoards();
+  }
+
+  function revealPlanTemporarily(item, planilla){
+    clearRevealTimer(item);
+    item.__revealedPlan = planilla;
+    renderBoards();
+    const key = teamKey(item);
+    state.revealTimers.set(key, setTimeout(() => {
+      item.__revealedPlan = null;
+      state.revealTimers.delete(key);
+      renderBoards();
+    }, 30000));
+  }
+
+  function requestAuditConfirmation(action){
+    const modal = document.getElementById('auditConfirmModal');
+    const detail = document.getElementById('auditConfirmDetail');
+    const continueButton = document.getElementById('auditConfirmContinue');
+    const cancelButton = document.getElementById('auditConfirmCancel');
+    if(!modal || !continueButton || !cancelButton){
+      return Promise.resolve(window.confirm('Se va a generar un registro de este evento. ¿Continuar?'));
+    }
+    detail.textContent = action === 'edit'
+      ? 'La apertura para editar quedará registrada con fecha y hora.'
+      : 'La visualización quedará registrada con fecha y hora y durará 30 segundos.';
+    modal.hidden = false;
+    return new Promise(resolve => {
+      const finish = value => {
+        modal.hidden = true;
+        continueButton.removeEventListener('click', accept);
+        cancelButton.removeEventListener('click', cancel);
+        modal.removeEventListener('click', backdrop);
+        document.removeEventListener('keydown', escape);
+        resolve(value);
+      };
+      const accept = () => finish(true);
+      const cancel = () => finish(false);
+      const backdrop = event => { if(event.target === modal) cancel(); };
+      const escape = event => { if(event.key === 'Escape') cancel(); };
+      continueButton.addEventListener('click', accept);
+      cancelButton.addEventListener('click', cancel);
+      modal.addEventListener('click', backdrop);
+      document.addEventListener('keydown', escape);
+      cancelButton.focus();
+    });
+  }
+
+  async function registerPlanillaAccess(item, action){
+    const confirmed = await requestAuditConfirmation(action);
+    if(!confirmed) return null;
+    const data = await fetchJson(`/api/admin/planillas/${encodeURIComponent(teamKey(item))}/access`, {
+      method:'POST',
+      body:JSON.stringify({ action })
+    });
+    item.lastAccess = data.access || null;
+    if(Array.isArray(data.sourceCaptains)) item.sourceCaptains = data.sourceCaptains;
+    return data;
+  }
+
+  async function showAccessHistory(item){
+    const modal = document.getElementById('auditHistoryModal');
+    const title = document.getElementById('auditHistoryTitle');
+    const list = document.getElementById('auditHistoryList');
+    if(!modal || !list) return;
+    title.textContent = `HISTORIAL · ${String(item.teamName || item.team || '').toUpperCase()}`;
+    list.innerHTML = '<div class="audit-history-empty">Cargando…</div>';
+    modal.hidden = false;
+    try{
+      const data = await fetchJson(`/api/admin/planillas/${encodeURIComponent(teamKey(item))}/access-log`);
+      const events = Array.isArray(data.events) ? data.events : [];
+      list.innerHTML = '';
+      if(!events.length){
+        list.innerHTML = '<div class="audit-history-empty">Todavía no hay visualizaciones ni ediciones registradas.</div>';
+        return;
+      }
+      events.forEach(event => {
+        const row = document.createElement('div');
+        row.className = 'audit-history-row';
+        const action = document.createElement('strong');
+        action.textContent = event.action === 'edit' ? 'EDITADA' : 'VISTA';
+        const time = document.createElement('span');
+        time.textContent = formatDateTime(event.at);
+        row.append(action, time);
+        list.appendChild(row);
+      });
+    }catch(error){
+      list.innerHTML = `<div class="audit-history-empty">${error.message || 'No se pudo cargar el historial.'}</div>`;
+    }
+  }
+
+  function setupEditorActions(card, item, planilla, actions){
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'btn-gold planilla-save-button';
+    save.textContent = 'GUARDAR CAMBIOS';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn planilla-cancel-button';
+    cancel.textContent = 'CANCELAR';
+    actions.replaceChildren(save, cancel);
+    cancel.addEventListener('click', () => hideRevealedPlan(item));
+    save.addEventListener('click', async () => {
+      save.disabled = true;
+      cancel.disabled = true;
+      save.textContent = 'GUARDANDO…';
+      try{
+        const editedPlanilla = collectEditedPlanilla(card, planilla);
+        const data = await fetchJson(`/api/admin/planillas/${encodeURIComponent(teamKey(item))}`, {
+          method:'PUT', body:JSON.stringify({ planilla:editedPlanilla })
+        });
+        item.planilla = maskPlanilla(data.planilla);
+        item.__revealedPlan = null;
+        item.updatedAt = data.updatedAt || new Date().toISOString();
+        item.receivedAtLocal = null;
+        showAlert('Planilla actualizada correctamente.');
+        renderBoards();
+      }catch(error){
+        showAlert(error.message || 'No se pudo guardar la planilla.');
+        save.disabled = false;
+        cancel.disabled = false;
+        save.textContent = 'GUARDAR CAMBIOS';
+      }
+    });
+  }
+
   function appendEditActions(card, item){
     const actions = document.createElement('div');
     actions.className = 'planilla-edit-actions';
@@ -261,49 +412,53 @@ function authHeaders(extra = {}){
     edit.type = 'button';
     edit.className = 'btn-gold planilla-edit-button';
     edit.textContent = 'EDITAR PLANILLA';
-    actions.appendChild(edit);
+    const view = document.createElement('button');
+    view.type = 'button';
+    view.className = 'btn-gold planilla-view-button';
+    view.textContent = 'VER PLANILLA';
+    const history = document.createElement('button');
+    history.type = 'button';
+    history.className = 'btn planilla-history-button';
+    history.textContent = 'HISTORIAL';
+    actions.append(edit, view, history);
     card.appendChild(actions);
+
+    view.addEventListener('click', async () => {
+      view.disabled = true;
+      try{
+        const data = await registerPlanillaAccess(item, 'view');
+        if(data) revealPlanTemporarily(item, data.planilla);
+      }catch(error){
+        showAlert(error.message || 'No se pudo mostrar la planilla.');
+      }finally{
+        view.disabled = false;
+      }
+    });
+
+    history.addEventListener('click', () => showAccessHistory(item));
 
     edit.addEventListener('click', async () => {
       edit.disabled = true;
       edit.textContent = 'CARGANDO…';
       try{
+        const data = await registerPlanillaAccess(item, 'edit');
+        if(!data){
+          edit.disabled = false;
+          edit.textContent = 'EDITAR PLANILLA';
+          return;
+        }
+        clearRevealTimer(item);
+        item.__revealedPlan = data.planilla;
         const players = await loadRoster(item);
-        enablePlanillaEditor(card, players);
-        actions.replaceChildren();
-        const save = document.createElement('button');
-        save.type = 'button';
-        save.className = 'btn-gold planilla-save-button';
-        save.textContent = 'GUARDAR CAMBIOS';
-        const cancel = document.createElement('button');
-        cancel.type = 'button';
-        cancel.className = 'btn planilla-cancel-button';
-        cancel.textContent = 'CANCELAR';
-        actions.append(save, cancel);
-        cancel.addEventListener('click', renderBoards);
-        save.addEventListener('click', async () => {
-          save.disabled = true;
-          cancel.disabled = true;
-          save.textContent = 'GUARDANDO…';
-          try{
-            const planilla = collectEditedPlanilla(card, item.planilla || item.plan || {});
-            const data = await fetchJson(`/api/admin/planillas/${encodeURIComponent(item.slug_uid || item.team)}`, {
-              method:'PUT', body:JSON.stringify({ planilla })
-            });
-            item.planilla = data.planilla;
-            item.updatedAt = data.updatedAt || new Date().toISOString();
-            item.receivedAtLocal = null;
-            showAlert('Planilla actualizada correctamente.');
-            renderBoards();
-          }catch(error){
-            showAlert(error.message || 'No se pudo guardar la planilla.');
-            save.disabled = false;
-            cancel.disabled = false;
-            save.textContent = 'GUARDAR CAMBIOS';
-          }
-        });
+        renderBoards();
+        const freshCard = document.querySelector(`.card[data-team-key="${CSS.escape(teamKey(item))}"]`);
+        const freshActions = freshCard?.querySelector('.planilla-edit-actions');
+        if(!freshCard || !freshActions) throw new Error('No se pudo abrir el editor de la planilla.');
+        enablePlanillaEditor(freshCard, players);
+        setupEditorActions(freshCard, item, data.planilla, freshActions);
       }catch(error){
         showAlert(error.message || 'No se pudo cargar el plantel.');
+        item.__revealedPlan = null;
         edit.disabled = false;
         edit.textContent = 'EDITAR PLANILLA';
       }
@@ -645,19 +800,28 @@ function authHeaders(extra = {}){
 
     for(const item of visibleFiles){
       const team = item.teamName || item.team || 'equipo';
-      const plan = item.planilla || item.plan || {};
+      const plan = item.__revealedPlan || item.planilla || item.plan || {};
       const updatedAt = item.receivedAtLocal || item.updatedAt || null;
 
       const card = document.createElement('article');
       card.className = 'card';
       card.dataset.category = item.__category || 'sin-categoria';
+      card.dataset.teamKey = teamKey(item);
 
+      const auditHead = document.createElement('div');
+      auditHead.className = 'card-audit-head';
       const categoryPill = document.createElement('div');
       categoryPill.className = 'category-pill';
       categoryPill.textContent = item.__category === 'segunda'
         ? 'SEGUNDA'
         : (item.__category === 'tercera' ? 'TERCERA' : 'SIN CATEGORÍA');
-      card.appendChild(categoryPill);
+      const lastAccess = document.createElement('div');
+      lastAccess.className = 'last-access-label';
+      lastAccess.textContent = item.lastAccess
+        ? `${item.lastAccess.action === 'edit' ? 'Editada' : 'Vista'}: ${formatDateTime(item.lastAccess.at)}`
+        : 'Sin lecturas registradas';
+      auditHead.append(categoryPill, lastAccess);
+      card.appendChild(auditHead);
 
       const h2 = document.createElement('h2');
       h2.textContent = String(team).toUpperCase();
@@ -732,6 +896,19 @@ function authHeaders(extra = {}){
     });
   }
 
+  function setupAuditModals(){
+    const modal = document.getElementById('auditHistoryModal');
+    const close = document.getElementById('auditHistoryClose');
+    const closeHistory = () => { if(modal) modal.hidden = true; };
+    close?.addEventListener('click', closeHistory);
+    modal?.addEventListener('click', event => {
+      if(event.target === modal) closeHistory();
+    });
+    document.addEventListener('keydown', event => {
+      if(event.key === 'Escape' && modal?.hidden === false) closeHistory();
+    });
+  }
+
   async function init(){
     try{
       const boards = document.getElementById('boards');
@@ -742,11 +919,15 @@ function authHeaders(extra = {}){
 
       setupCategoryFilters();
       setupGenerateCruces();
+      setupAuditModals();
       resetCategoryHeaderIndicators();
 
       const [_, planillasResponse] = await Promise.all([
         loadCategoryMaps(),
-        fetch(`${API_BASE}/api/admin/planillas`, { cache:'no-store' })
+        fetch(`${API_BASE}/api/admin/planillas-secure`, {
+          cache:'no-store',
+          headers:authHeaders()
+        })
       ]);
 
       if(!planillasResponse.ok){
