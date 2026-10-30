@@ -10,7 +10,8 @@
   const COUNTS = {
     capitan: Number(FORMAT.captainCount || 2),
     individuales: Number(FORMAT.individualCount || 11),
-    suplentes: Number(FORMAT.substituteCount || 2)
+    suplentes: Number(FORMAT.substituteCount || 2),
+    suplentesSegunda: 3
   };
   const state = {
     category: 'tercera',
@@ -164,7 +165,8 @@
       const sources = [item?.slug_uid, item?.team, item?.teamName, plan?.team];
       const normalizedPlan = {
         ...plan,
-        teamRef: item?.slug_uid || item?.team || item?.teamName || ''
+        teamRef: item?.slug_uid || item?.team || item?.teamName || '',
+        teamBase: item?.team_base || item?.slug_base || item?.team || item?.teamName || ''
       };
       for (const source of sources) {
         for (const key of aliases(source)) {
@@ -196,18 +198,23 @@
     document.body.style.overflow = '';
   }
 
-  async function loadPlayers(teamRef) {
-    const key = `${state.category}:${normalize(teamRef)}`;
+  async function loadPlayers(teamRef, teamBase = '') {
+    const key = `${state.category}:${normalize(teamRef)}:${normalize(teamBase)}`;
     if (!state.players.has(key)) {
-      const params = new URLSearchParams({ category: state.category, team: teamRef });
-      state.players.set(key, fetchJson(`/api/players-public/by-team?${params}`).then(data => (
-        Array.isArray(data?.players) ? data.players : []
+      const requests = [
+        fetchJson(`/api/players-public/by-team?${new URLSearchParams({ category: state.category, team: teamRef })}`)
+      ];
+      if (state.category === 'segunda') {
+        requests.push(fetchJson(`/api/players-public/by-team?${new URLSearchParams({ category: 'primera', team: teamBase || teamRef })}`));
+      }
+      state.players.set(key, Promise.all(requests).then(results => (
+        results.flatMap(data => Array.isArray(data?.players) ? data.players : [])
       )).catch(() => []));
     }
     return state.players.get(key);
   }
 
-  async function showPhoto(entry, teamRef) {
+  async function showPhoto(entry, teamRef, teamBase = '') {
     const modal = document.getElementById('playerPhotoModal');
     const title = document.getElementById('playerPhotoName');
     const image = document.getElementById('playerPhotoImage');
@@ -223,7 +230,7 @@
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
 
-    const players = await loadPlayers(teamRef);
+    const players = await loadPlayers(teamRef, teamBase);
     const player = players.find(item => entry.id && Number(item?.id) === entry.id)
       || players.find(item => normalize(item?.nombre || item?.name) === normalize(entry.name));
     if (!player) {
@@ -257,37 +264,53 @@
     frame.src = 'about:blank';
   }
 
-  function createSection(title, entries, teamRef) {
+  function createPlayerRow(entry, index, teamRef, teamBase = '') {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    const number = document.createElement('div');
+    number.className = 'player-number';
+    number.textContent = String(index + 1);
+    const slot = document.createElement('div');
+    slot.className = `player-slot${entry.name ? '' : ' empty'}`;
+    const name = document.createElement('span');
+    name.className = 'player-name';
+    name.textContent = entry.name;
+    slot.appendChild(name);
+    if (entry.name) {
+      const photo = document.createElement('button');
+      photo.type = 'button';
+      photo.className = 'photo-button';
+      photo.textContent = '📷';
+      photo.setAttribute('aria-label', `Ver foto de ${entry.name}`);
+      photo.addEventListener('click', () => showPhoto(entry, teamRef, teamBase));
+      slot.appendChild(photo);
+    }
+    row.append(number, slot);
+    return row;
+  }
+
+  function createSection(title, entries, teamRef, teamBase = '', subgroups = []) {
     const section = document.createElement('section');
     section.className = 'players-section';
     const heading = document.createElement('h3');
     heading.textContent = title;
     section.appendChild(heading);
 
-    entries.forEach((entry, index) => {
-      const row = document.createElement('div');
-      row.className = 'player-row';
-      const number = document.createElement('div');
-      number.className = 'player-number';
-      number.textContent = String(index + 1);
-      const slot = document.createElement('div');
-      slot.className = `player-slot${entry.name ? '' : ' empty'}`;
-      const name = document.createElement('span');
-      name.className = 'player-name';
-      name.textContent = entry.name;
-      slot.appendChild(name);
-      if (entry.name) {
-        const photo = document.createElement('button');
-        photo.type = 'button';
-        photo.className = 'photo-button';
-        photo.textContent = '📷';
-        photo.setAttribute('aria-label', `Ver foto de ${entry.name}`);
-        photo.addEventListener('click', () => showPhoto(entry, teamRef));
-        slot.appendChild(photo);
-      }
-      row.append(number, slot);
-      section.appendChild(row);
-    });
+    if (subgroups.length) {
+      subgroups.forEach(group => {
+        const subgroupTitle = document.createElement('h4');
+        subgroupTitle.className = 'players-subgroup-title';
+        subgroupTitle.textContent = group.title;
+        section.appendChild(subgroupTitle);
+        entries.slice(group.start, group.start + group.count).forEach((entry, index) => {
+          section.appendChild(createPlayerRow(entry, index, teamRef, teamBase));
+        });
+      });
+    } else {
+      entries.forEach((entry, index) => {
+        section.appendChild(createPlayerRow(entry, index, teamRef, teamBase));
+      });
+    }
     return section;
   }
 
@@ -300,20 +323,40 @@
     name.className = 'team-name';
     name.textContent = teamName;
     root.append(roleNode, name);
+    const teamRef = plan.teamRef || teamName;
+    const teamBase = plan.teamBase || teamName;
     root.appendChild(createSection(
       'CAPITÁN',
       planEntries(plan, 'capitan', COUNTS.capitan),
-      plan.teamRef || teamName
+      teamRef,
+      teamBase
     ));
+    const individualSubgroups = state.category === 'segunda'
+      ? [
+          { title:'PRIMERAS', start:0, count:2 },
+          { title:'SEGUNDAS', start:2, count:9 }
+        ]
+      : [];
     root.appendChild(createSection(
       'INDIVIDUALES',
       planEntries(plan, 'individuales', COUNTS.individuales),
-      plan.teamRef || teamName
+      teamRef,
+      teamBase,
+      individualSubgroups
     ));
+    const substituteCount = state.category === 'segunda' ? COUNTS.suplentesSegunda : COUNTS.suplentes;
+    const substituteSubgroups = state.category === 'segunda'
+      ? [
+          { title:'PRIMERAS', start:0, count:1 },
+          { title:'SEGUNDAS', start:1, count:2 }
+        ]
+      : [];
     root.appendChild(createSection(
       'SUPLENTES',
-      planEntries(plan, 'suplentes', COUNTS.suplentes),
-      plan.teamRef || teamName
+      planEntries(plan, 'suplentes', substituteCount),
+      teamRef,
+      teamBase,
+      substituteSubgroups
     ));
   }
 
