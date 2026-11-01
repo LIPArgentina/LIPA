@@ -292,8 +292,8 @@ module.exports = function createTorneosPrivadosRouter() {
       const dni = cleanDni(req.body?.dni);
       const whatsapp = cleanWhatsapp(req.body?.whatsapp);
       const estadoPago = req.body?.estadoPago === 'total' ? 'total' : req.body?.estadoPago === '50' ? '50' : '';
-      if (!nombre || dni.length < 6 || !whatsapp || !estadoPago) {
-        return res.status(400).json({ ok: false, error: 'Nombre, DNI, WhatsApp y estado de pago son obligatorios' });
+      if (!nombre || dni.length < 6 || !estadoPago) {
+        return res.status(400).json({ ok: false, error: 'Nombre, DNI y estado de pago son obligatorios' });
       }
       const found = await pool.query(`
         SELECT id, nombre FROM jugadores
@@ -331,6 +331,21 @@ module.exports = function createTorneosPrivadosRouter() {
     } catch (error) {
       console.error('PATCH pago inscripción', error);
       res.status(500).json({ ok: false, error: 'No se pudo actualizar el pago' });
+    }
+  });
+
+  router.patch('/torneo-organizador/inscripciones/:id/contacto', requireTorneoOrganizador, async (req, res) => {
+    try {
+      const whatsapp = cleanWhatsapp(req.body?.whatsapp);
+      const result = await pool.query(`
+        UPDATE torneo_inscripciones SET whatsapp=$1, updated_at=NOW()
+         WHERE id=$2 AND torneo_organizador_id=$3 RETURNING *
+      `, [whatsapp, Number(req.params.id), req.user.torneoOrganizadorId]);
+      if (!result.rowCount) return res.status(404).json({ ok: false, error: 'Inscripción no encontrada' });
+      res.json({ ok: true, inscripcion: result.rows[0] });
+    } catch (error) {
+      console.error('PATCH contacto inscripción', error);
+      res.status(500).json({ ok: false, error: 'No se pudo actualizar el contacto' });
     }
   });
 

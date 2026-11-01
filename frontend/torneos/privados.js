@@ -76,7 +76,7 @@
       const tr = document.createElement('tr');
       const name = verified ? entry.nombre_oficial : entry.nombre_ingresado;
       tr.innerHTML = `<td><strong>${escapeHtml(name)}</strong></td><td>${escapeHtml(entry.dni)}</td>
-        <td><a href="${whatsappHref(entry.whatsapp)}" target="_blank" rel="noopener">${escapeHtml(entry.whatsapp)}</a></td>
+        <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp"><button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
         <td><button class="delete-button" data-delete="${entry.id}">Quitar</button></td>`;
       target.appendChild(tr);
@@ -163,6 +163,21 @@
     } catch (error) { alert(error.message); await load(); }
   });
   document.addEventListener('click', async event => {
+    const contactButton = event.target.closest('[data-save-contact]');
+    if (contactButton) {
+      const row = contactButton.closest('tr');
+      const input = row?.querySelector('.contact-input');
+      try {
+        await api(`/torneo-organizador/inscripciones/${contactButton.dataset.saveContact}/contacto`, {
+          method:'PATCH', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ whatsapp:input?.value || '' })
+        });
+        contactButton.textContent = 'Guardado';
+        setTimeout(() => { contactButton.textContent = 'Guardar'; }, 1200);
+        await load();
+      } catch (error) { alert(error.message); }
+      return;
+    }
     const button = event.target.closest('[data-delete]');
     if (!button || !confirm('¿Quitar esta inscripción?')) return;
     try { await api(`/torneo-organizador/inscripciones/${button.dataset.delete}`, { method:'DELETE' }); await load(); }

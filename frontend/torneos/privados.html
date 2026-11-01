@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=3">
+  <link rel="stylesheet" href="./privados.css?v=4">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -30,7 +30,7 @@
       <form id="registrationForm">
         <label>Nombre y apellido<input id="playerName" required autocomplete="name" placeholder="Nombre completo"></label>
         <label>DNI<input id="playerDni" required inputmode="numeric" autocomplete="off" placeholder="Sólo números"></label>
-        <label><span class="label-with-action">WhatsApp del inscripto <button id="pasteWhatsapp" class="paste-button" type="button">Pegar</button></span><input id="playerWhatsapp" required inputmode="tel" autocomplete="tel" placeholder="Ej.: 5491112345678"></label>
+        <label><span class="label-with-action">WhatsApp del inscripto <button id="pasteWhatsapp" class="paste-button" type="button">Pegar</button></span><input id="playerWhatsapp" inputmode="tel" autocomplete="tel" placeholder="Opcional; se puede agregar después"></label>
         <fieldset>
           <legend>Pago realizado</legend>
           <label class="radio"><input type="radio" name="payment" value="total" required> Total</label>
@@ -82,6 +82,6 @@
   </dialog>
 
   <script src="../config.js?v=renewable-session-1"></script>
-  <script src="./privados.js?v=3" defer></script>
+  <script src="./privados.js?v=4" defer></script>
 </body>
 </html>
