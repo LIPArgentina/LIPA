@@ -61,7 +61,9 @@
     return digits ? `https://wa.me/${digits}` : '#';
   }
   function paymentSelect(entry) {
-    return `<select class="payment-select ${entry.estado_pago === 'total' ? 'payment-total' : 'payment-half'}" data-id="${entry.id}">
+    const paymentClass = entry.estado_pago === 'total' ? 'payment-total' : entry.estado_pago === '50' ? 'payment-half' : 'payment-none';
+    return `<select class="payment-select ${paymentClass}" data-id="${entry.id}">
+      <option value="sin_sena" ${entry.estado_pago === 'sin_sena' ? 'selected' : ''}>Sin seña</option>
       <option value="50" ${entry.estado_pago === '50' ? 'selected' : ''}>50% de seña</option>
       <option value="total" ${entry.estado_pago === 'total' ? 'selected' : ''}>Pago total</option>
     </select>`;

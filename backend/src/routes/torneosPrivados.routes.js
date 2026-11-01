@@ -60,6 +60,12 @@ module.exports = function createTorneosPrivadosRouter() {
 
         CREATE INDEX IF NOT EXISTS torneo_inscripciones_organizador_idx
           ON torneo_inscripciones(torneo_organizador_id, corroborado, created_at DESC);
+
+        ALTER TABLE torneo_inscripciones
+          DROP CONSTRAINT IF EXISTS torneo_inscripciones_estado_pago_check;
+        ALTER TABLE torneo_inscripciones
+          ADD CONSTRAINT torneo_inscripciones_estado_pago_check
+          CHECK (estado_pago IN ('total', '50', 'sin_sena'));
       `).catch((error) => {
         schemaPromise = null;
         throw error;
@@ -291,7 +297,7 @@ module.exports = function createTorneosPrivadosRouter() {
       const nombre = String(req.body?.nombre || '').trim().replace(/\s+/g, ' ');
       const dni = cleanDni(req.body?.dni);
       const whatsapp = cleanWhatsapp(req.body?.whatsapp);
-      const estadoPago = req.body?.estadoPago === 'total' ? 'total' : req.body?.estadoPago === '50' ? '50' : '';
+      const estadoPago = ['total', '50', 'sin_sena'].includes(req.body?.estadoPago) ? req.body.estadoPago : '';
       if (!nombre || dni.length < 6 || !estadoPago) {
         return res.status(400).json({ ok: false, error: 'Nombre, DNI y estado de pago son obligatorios' });
       }
@@ -320,7 +326,7 @@ module.exports = function createTorneosPrivadosRouter() {
 
   router.patch('/torneo-organizador/inscripciones/:id/pago', requireTorneoOrganizador, async (req, res) => {
     try {
-      const estado = req.body?.estadoPago === 'total' ? 'total' : req.body?.estadoPago === '50' ? '50' : '';
+      const estado = ['total', '50', 'sin_sena'].includes(req.body?.estadoPago) ? req.body.estadoPago : '';
       if (!estado) return res.status(400).json({ ok: false, error: 'Estado de pago inválido' });
       const result = await pool.query(`
         UPDATE torneo_inscripciones SET estado_pago=$1, updated_at=NOW()

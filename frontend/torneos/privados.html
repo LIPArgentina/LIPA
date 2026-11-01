@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=4">
+  <link rel="stylesheet" href="./privados.css?v=5">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -35,6 +35,7 @@
           <legend>Pago realizado</legend>
           <label class="radio"><input type="radio" name="payment" value="total" required> Total</label>
           <label class="radio"><input type="radio" name="payment" value="50" required> 50% de seña</label>
+          <label class="radio"><input type="radio" name="payment" value="sin_sena" required> Sin seña</label>
         </fieldset>
         <button class="primary" type="submit">Aceptar inscripción</button>
         <div id="candidateBox" class="candidate-box" hidden aria-live="polite"></div>
@@ -47,6 +48,7 @@
       <button class="filter active" data-payment="all">Todos</button>
       <button class="filter" data-payment="total">Pago total</button>
       <button class="filter" data-payment="50">Seña 50%</button>
+      <button class="filter" data-payment="sin_sena">Sin seña</button>
     </section>
 
     <section class="list-card verified-card">
@@ -82,6 +84,6 @@
   </dialog>
 
   <script src="../config.js?v=renewable-session-1"></script>
-  <script src="./privados.js?v=4" defer></script>
+  <script src="./privados.js?v=5" defer></script>
 </body>
 </html>
