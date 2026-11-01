@@ -21,6 +21,14 @@ function cleanWhatsapp(value) {
   return String(value || '').replace(/[^\d+]/g, '');
 }
 
+function normalizeCategoria(value) {
+  const category = String(value || '').trim().toLowerCase();
+  if (['primera', '1ra', '1era'].includes(category)) return 'primera';
+  if (['segunda', '2da'].includes(category)) return 'segunda';
+  if (['tercera', '3ra'].includes(category)) return 'tercera';
+  return null;
+}
+
 module.exports = function createTorneosPrivadosRouter() {
   const router = express.Router();
   let schemaPromise = null;
@@ -307,17 +315,23 @@ module.exports = function createTorneosPrivadosRouter() {
       const nombre = String(req.body?.nombre || '').trim().replace(/\s+/g, ' ');
       const dni = cleanDni(req.body?.dni);
       const whatsapp = cleanWhatsapp(req.body?.whatsapp);
-      const categoria = ['primera', 'segunda', 'tercera'].includes(req.body?.categoria) ? req.body.categoria : '';
       const estadoPago = ['total', '50', 'sin_sena'].includes(req.body?.estadoPago) ? req.body.estadoPago : '';
-      if (!nombre || dni.length < 6 || !categoria || !estadoPago) {
-        return res.status(400).json({ ok: false, error: 'Nombre, DNI, categoría y estado de pago son obligatorios' });
+      if (!nombre || dni.length < 6 || !estadoPago) {
+        return res.status(400).json({ ok: false, error: 'Nombre, DNI y estado de pago son obligatorios' });
       }
       const found = await pool.query(`
-        SELECT id, nombre FROM jugadores
-         WHERE regexp_replace(COALESCE(dni,''), '[^0-9]', '', 'g')=$1
-         ORDER BY id ASC LIMIT 1
+        SELECT j.id, j.nombre,
+               COALESCE(NULLIF(j.categoria_actual, ''), (
+                 SELECT je.categoria FROM jugador_equipos je
+                  WHERE je.jugador_id=j.id AND je.activo=true
+                  ORDER BY je.desde DESC NULLS LAST, je.id DESC LIMIT 1
+               )) AS categoria_actual
+          FROM jugadores j
+         WHERE regexp_replace(COALESCE(j.dni,''), '[^0-9]', '', 'g')=$1
+         ORDER BY j.id ASC LIMIT 1
       `, [dni]);
       const player = found.rows[0] || null;
+      const categoria = normalizeCategoria(player?.categoria_actual);
       if (!player && req.body?.confirmProvisional !== true) {
         return res.json({ ok: true, corroborado: false, requiresConfirmation: true });
       }

@@ -140,7 +140,7 @@
   $('#registrationForm').addEventListener('submit', event => {
     event.preventDefault();
     const payment = new FormData(event.currentTarget).get('payment');
-    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, categoria: $('#playerCategory').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment });
+    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment });
   });
   $('#playerName').addEventListener('input', scheduleCandidateSearch);
   $('#playerDni').addEventListener('input', scheduleCandidateSearch);
