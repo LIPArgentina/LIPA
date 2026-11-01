@@ -124,6 +124,19 @@
   });
   $('#playerName').addEventListener('input', scheduleCandidateSearch);
   $('#playerDni').addEventListener('input', scheduleCandidateSearch);
+  $('#pasteWhatsapp').addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const trimmed = String(text || '').trim();
+      const normalized = `${trimmed.startsWith('+') ? '+' : ''}${trimmed.replace(/\D/g, '')}`;
+      if (!normalized || normalized === '+') throw new Error('El portapapeles no contiene un número.');
+      $('#playerWhatsapp').value = normalized;
+      $('#playerWhatsapp').focus();
+      setMessage('WhatsApp pegado.', true);
+    } catch (error) {
+      setMessage(error?.message || 'El navegador no permitió leer el portapapeles.');
+    }
+  });
   $('#candidateBox').addEventListener('click', event => {
     const button = event.target.closest('[data-candidate-id]');
     if (!button) return;
