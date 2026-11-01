@@ -75,6 +75,22 @@ function requireSala(req, res, next) {
   }
 }
 
+function requireTorneoOrganizador(req, res, next) {
+  try {
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ ok: false, code: 'AUTH_MISSING', msg: 'no autenticade' });
+
+    const payload = jwt.verify(token, getJwtSecret());
+    if (payload.role !== 'torneo' || !payload.torneoOrganizadorId) {
+      return res.status(403).json({ ok: false, msg: 'sin permisos' });
+    }
+    req.user = payload;
+    return next();
+  } catch (err) {
+    return authFailure(res, err);
+  }
+}
+
 function requireAdmin(req, res, next) {
   try {
     const token = getToken(req);
@@ -94,6 +110,7 @@ function requireAdmin(req, res, next) {
 module.exports = {
   requireTeam,
   requireSala,
+  requireTorneoOrganizador,
   requireAdmin,
   requireSecondCategoryAccess,
   readOptionalUser,

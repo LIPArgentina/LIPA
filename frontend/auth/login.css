@@ -243,6 +243,11 @@ select.field-control optgroup {
   background: rgba(250, 204, 21, 0.12);
   border-color: rgba(250, 204, 21, 0.38);
 }
+.category-btn--torneos {
+  background: rgba(255, 196, 0, 0.18);
+  border-color: rgba(255, 196, 0, 0.55);
+  color: #ffeb9b;
+}
 
 @media (min-width: 769px){
   body{ zoom:.8; }

@@ -40,6 +40,7 @@
         <button class="sw" data-div="segunda" aria-pressed="false">segunda</button>
         <button class="sw" data-div="tercera" aria-pressed="false">tercera</button>
         <button class="sw" data-div="salas" aria-pressed="false">salas</button>
+        <button class="sw" data-div="torneos" aria-pressed="false">torneos</button>
       </div>
     </div>
 
@@ -94,6 +95,22 @@
         <button id="btnSaveSalas" class="btn" type="button">Guardar</button>
       </div>
     </div>
+
+    <div id="torneosAdminView" class="card salas-admin-card" hidden>
+      <div class="card-header"><h2 class="title">Organizadores de torneos</h2></div>
+      <div class="table-wrap">
+        <table aria-label="Tabla de organizadores de torneos">
+          <thead><tr>
+            <th class="col-idx">#</th><th>Nombre promocional</th><th>Organizador</th>
+            <th>WhatsApp</th><th>Ubicación de la sala</th><th>Activo</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="tbodyTorneos"></tbody>
+        </table>
+      </div>
+      <div class="footer table-tools">
+        <button id="btnSaveTorneos" class="btn" type="button">Guardar</button>
+      </div>
+    </div>
   </div>
 
   <input id="tableImportFile" type="file" accept="application/json,.json" hidden>
@@ -101,7 +118,7 @@
   <div class="toast" id="toast"></div>
 
   <script src="config.js?v=renewable-session-1"></script>
-  <script src="admin.js?v=team-save-fix-1"></script>
+  <script src="admin.js?v=torneos-privados-1"></script>
 
   <dialog class="modal" id="passModal">
     <form autocomplete="off" class="modal__panel" id="passForm" method="dialog" style="min-width:320px;">

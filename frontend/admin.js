@@ -27,8 +27,9 @@
 
 
 const DIVISIONES = ['primera', 'segunda', 'tercera'];
-const ADMIN_TABS = ['primera', 'segunda', 'tercera', 'salas'];
+const ADMIN_TABS = ['primera', 'segunda', 'tercera', 'salas', 'torneos'];
 const SALAS_SLOTS = 30;
+const TORNEOS_SLOTS = 30;
 const SLOTS = 20;
 const LS_KEY = 'lpi_admin_roster_v1';
 const API_BASE = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
@@ -870,10 +871,101 @@ async function saveSalas(){
   }
 }
 
+function normalizeTorneo(item = {}) {
+  return {
+    id: item.id || null,
+    nombrePromocional: item.nombre_promocional || item.nombrePromocional || '',
+    nombreOrganizador: item.nombre_organizador || item.nombreOrganizador || '',
+    whatsapp: item.whatsapp || '', ubicacion: item.ubicacion || '', activo: item.activo !== false
+  };
+}
+
+function renderTorneosRows(items = []) {
+  const tbody = $('#tbodyTorneos');
+  if (!tbody) return;
+  const rows = items.map(normalizeTorneo).slice(0, TORNEOS_SLOTS);
+  tbody.innerHTML = '';
+  for (let i = 0; i < TORNEOS_SLOTS; i++) {
+    const item = rows[i] || normalizeTorneo();
+    const tr = document.createElement('tr');
+    if (item.id) tr.dataset.id = String(item.id);
+    tr.innerHTML = `
+      <td class="col-idx">${i + 1}</td>
+      <td><input class="input torneo-promocional" value="${escapeHtml(item.nombrePromocional)}" placeholder="Nombre para el login"></td>
+      <td><input class="input torneo-organizador" value="${escapeHtml(item.nombreOrganizador)}" placeholder="Nombre del organizador"></td>
+      <td><input class="input torneo-whatsapp" value="${escapeHtml(item.whatsapp)}" placeholder="WhatsApp"></td>
+      <td><input class="input torneo-ubicacion" type="url" value="${escapeHtml(item.ubicacion)}" placeholder="Link de Google Maps"></td>
+      <td><input class="torneo-activo" type="checkbox" ${item.activo ? 'checked' : ''} aria-label="Organizador activo"></td>
+      <td class="team-actions-cell">
+        <button class="btn-reset-pass btn-enter-torneo" type="button" title="Ingresar temporalmente" ${item.id ? '' : 'disabled'}>🚪</button>
+        <button class="btn-reset-pass btn-reset-torneo" type="button" title="Restablecer contraseña a 1234" ${item.id ? '' : 'disabled'}>🔑</button>
+        <button class="btn-del-torneo" type="button">Eliminar</button>
+      </td>`;
+    tr.querySelector('.btn-del-torneo')?.addEventListener('click', () => {
+      tr.querySelectorAll('input').forEach(input => { input.type === 'checkbox' ? input.checked = false : input.value = ''; });
+      delete tr.dataset.id;
+      tr.querySelectorAll('button:not(.btn-del-torneo)').forEach(button => { button.disabled = true; });
+    });
+    tr.querySelector('.btn-reset-torneo')?.addEventListener('click', async () => {
+      const id = Number(tr.dataset.id);
+      if (!id || !confirm('¿Restablecer la contraseña de este organizador a 1234?')) return;
+      const response = await fetch(`${API_BASE}/api/admin/reset-torneo-password/${id}`, { method: 'POST', credentials: 'include', headers: authHeaders() });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return alert(data.error || 'No se pudo restablecer la contraseña');
+      alert('La contraseña temporal es 1234. Deberá cambiarla al ingresar.');
+    });
+    tr.querySelector('.btn-enter-torneo')?.addEventListener('click', async () => {
+      const id = Number(tr.dataset.id);
+      if (!id) return;
+      const response = await fetch(`${API_BASE}/api/admin/impersonate-torneo`, { method: 'POST', credentials: 'include', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ id }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.session) return alert(data.error || 'No se pudo ingresar');
+      const previous = localStorage.getItem('lpi.session');
+      if (previous) localStorage.setItem('lpi.admin.session.backup', previous);
+      localStorage.setItem('lpi.session', JSON.stringify(data.session));
+      window.open('/torneos/privados.html', '_blank');
+    });
+    tbody.appendChild(tr);
+  }
+}
+
+function collectTorneosRows() {
+  return $$('#tbodyTorneos tr').map(tr => ({
+    id: tr.dataset.id || null,
+    nombrePromocional: tr.querySelector('.torneo-promocional')?.value.trim() || '',
+    nombreOrganizador: tr.querySelector('.torneo-organizador')?.value.trim() || '',
+    whatsapp: tr.querySelector('.torneo-whatsapp')?.value.trim() || '',
+    ubicacion: tr.querySelector('.torneo-ubicacion')?.value.trim() || '',
+    activo: Boolean(tr.querySelector('.torneo-activo')?.checked)
+  })).filter(item => item.nombrePromocional || item.nombreOrganizador || item.whatsapp || item.ubicacion);
+}
+
+async function loadTorneosAdmin() {
+  try {
+    const response = await fetch(`${API_BASE}/api/admin/torneo-organizadores`, { cache: 'no-store', credentials: 'include', headers: authHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    renderTorneosRows(data.organizadores || []);
+  } catch (error) {
+    console.error(error); renderTorneosRows([]); toast('No se pudieron cargar los organizadores');
+  }
+}
+
+async function saveTorneosAdmin() {
+  try {
+    const response = await fetch(`${API_BASE}/api/admin/save-torneo-organizadores`, { method: 'POST', credentials: 'include', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ organizadores: collectTorneosRows() }) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    toast('Organizadores guardados'); await loadTorneosAdmin();
+  } catch (error) { console.error(error); alert(error.message || 'No se pudieron guardar los organizadores'); }
+}
+
 function showAdminTab(tab){
   const isSalas = tab === 'salas';
-  $('#teamsAdminView')?.toggleAttribute('hidden', isSalas);
+  const isTorneos = tab === 'torneos';
+  $('#teamsAdminView')?.toggleAttribute('hidden', isSalas || isTorneos);
   $('#salasAdminView')?.toggleAttribute('hidden', !isSalas);
+  $('#torneosAdminView')?.toggleAttribute('hidden', !isTorneos);
 }
 
 
@@ -1013,6 +1105,10 @@ async function loadDivision(div){
     await loadSalas();
     return;
   }
+  if (div === 'torneos') {
+    await loadTorneosAdmin();
+    return;
+  }
 
   if (!DIVISIONES.includes(div)) {
     renderRows([]);
@@ -1057,6 +1153,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnSaveSalas')?.addEventListener('click', saveSalas);
   $('#btnExportSalas')?.addEventListener('click', exportSalasTable);
   $('#btnImportSalas')?.addEventListener('click', () => openImportDialog('salas'));
+  $('#btnSaveTorneos')?.addEventListener('click', saveTorneosAdmin);
   $('#tableImportFile')?.addEventListener('change', handleTableImportFile);
   $('#teamSelect')?.addEventListener('change', changeTeam);
 

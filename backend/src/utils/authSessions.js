@@ -8,6 +8,7 @@ const REFRESH_DAYS = {
   admin: 7,
   team: 60,
   sala: 60,
+  torneo: 60,
 };
 
 let schemaPromise = null;

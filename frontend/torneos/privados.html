@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inscripciones de torneo | LIPA</title>
+  <link rel="icon" href="../logo_liga.png">
+  <link rel="stylesheet" href="./privados.css?v=1">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="private-header">
+    <img src="../logo_liga.png" alt="LIPA">
+    <div><small>TORNEOS</small><h1 id="promotionalName">Inscripciones</h1></div>
+    <div class="header-actions">
+      <button id="btnPassword" type="button">Cambiar contraseña</button>
+      <button id="btnLogout" type="button">Salir</button>
+    </div>
+  </header>
+
+  <main class="private-main">
+    <section class="organizer-card">
+      <div><span>Organizador</span><strong id="organizerName">—</strong></div>
+      <a id="organizerWhatsapp" href="#" target="_blank" rel="noopener">WhatsApp</a>
+      <a id="organizerLocation" href="#" target="_blank" rel="noopener">Abrir ubicación</a>
+    </section>
+
+    <section class="registration-card">
+      <h2>Inscribir jugador</h2>
+      <form id="registrationForm">
+        <label>Nombre y apellido<input id="playerName" required autocomplete="name" placeholder="Nombre completo"></label>
+        <label>DNI<input id="playerDni" required inputmode="numeric" autocomplete="off" placeholder="Sólo números"></label>
+        <label>WhatsApp del inscripto<input id="playerWhatsapp" required inputmode="tel" autocomplete="tel" placeholder="Ej.: 5491112345678"></label>
+        <fieldset>
+          <legend>Pago realizado</legend>
+          <label class="radio"><input type="radio" name="payment" value="total" required> Total</label>
+          <label class="radio"><input type="radio" name="payment" value="50" required> 50% de seña</label>
+        </fieldset>
+        <button class="primary" type="submit">Aceptar inscripción</button>
+      </form>
+      <p id="formMessage" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="filters" aria-label="Filtrar por pago">
+      <strong>Mostrar:</strong>
+      <button class="filter active" data-payment="all">Todos</button>
+      <button class="filter" data-payment="total">Pago total</button>
+      <button class="filter" data-payment="50">Seña 50%</button>
+    </section>
+
+    <section class="list-card verified-card">
+      <div class="list-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><strong id="verifiedCount">0</strong></div>
+      <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>DNI</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="verifiedBody"></tbody></table></div>
+    </section>
+
+    <section class="list-card pending-card">
+      <div class="list-heading"><div><span>PENDIENTES DE REVISIÓN</span><h2>DNI no encontrado en la base</h2></div><strong id="pendingCount">0</strong></div>
+      <p class="pending-note">Se conserva el nombre ingresado hasta que un administrador pueda corroborarlo.</p>
+      <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>DNI</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
+    </section>
+  </main>
+
+  <dialog id="passwordModal">
+    <form id="passwordForm" method="dialog">
+      <h2>Cambiar contraseña</h2>
+      <p id="passwordRequirement" hidden>Por seguridad, cambiá la contraseña temporal antes de continuar.</p>
+      <label>Contraseña actual<input id="oldPassword" type="password" required></label>
+      <label>Nueva contraseña<input id="newPassword" type="password" minlength="4" required></label>
+      <label>Repetir nueva contraseña<input id="repeatPassword" type="password" minlength="4" required></label>
+      <p id="passwordMessage" class="message"></p>
+      <div class="modal-actions"><button id="cancelPassword" type="button">Cancelar</button><button class="primary" type="submit">Guardar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="pendingModal">
+    <div class="confirmation">
+      <h2>DNI no encontrado</h2>
+      <p>Este DNI no figura en la base de jugadores. La inscripción se guardará en la lista provisoria para su posterior revisión.</p>
+      <div class="modal-actions"><button id="cancelPending">Cancelar</button><button id="confirmPending" class="primary">Guardar igualmente</button></div>
+    </div>
+  </dialog>
+
+  <script src="../config.js?v=renewable-session-1"></script>
+  <script src="./privados.js?v=1" defer></script>
+</body>
+</html>

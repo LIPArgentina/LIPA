@@ -6,6 +6,7 @@ const sessionKey = "lpi.session";
 const categoryGrid = document.getElementById("categoryGrid");
 const teamForm = document.getElementById("teamForm");
 const salaForm = document.getElementById("salaForm");
+const torneoForm = document.getElementById("torneoForm");
 const adminForm = document.getElementById("adminForm");
 
 const teamFormTitle = document.getElementById("teamFormTitle");
@@ -18,6 +19,10 @@ const salaSelect = document.getElementById("salaSelect");
 const salaPass = document.getElementById("salaPass");
 const toggleSalaPass = document.getElementById("toggleSalaPass");
 const salaError = document.getElementById("salaError");
+const torneoSelect = document.getElementById("torneoSelect");
+const torneoPass = document.getElementById("torneoPass");
+const toggleTorneoPass = document.getElementById("toggleTorneoPass");
+const torneoError = document.getElementById("torneoError");
 
 const adminPass = document.getElementById("adminPass");
 const toggleAdminPass = document.getElementById("toggleAdminPass");
@@ -25,11 +30,13 @@ const adminError = document.getElementById("adminError");
 
 const backFromTeam = document.getElementById("backFromTeam");
 const backFromSala = document.getElementById("backFromSala");
+const backFromTorneo = document.getElementById("backFromTorneo");
 const backFromAdmin = document.getElementById("backFromAdmin");
 
 let currentCategory = null;
 let currentUsers = [];
 let currentSalas = [];
+let currentTorneos = [];
 
 const BACKEND_URL = (window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
 
@@ -135,17 +142,65 @@ async function loadSalas() {
   return [];
 }
 
+async function loadTorneos() {
+  try {
+    const resp = await fetch(`${BACKEND_URL}/api/torneo-organizadores`, { cache: "no-store", credentials: "omit" });
+    const data = await resp.json().catch(() => ({}));
+    const rows = Array.isArray(data?.organizadores) ? data.organizadores : [];
+    return rows.map(item => ({
+      id: item.id,
+      nombre: item.nombre_promocional || item.nombrePromocional || '',
+      slug: item.slug || slugify(item.nombre_promocional || item.nombrePromocional || '')
+    })).filter(item => item.nombre && item.slug);
+  } catch (e) {
+    console.debug('No se pudieron leer organizadores:', e?.message || e);
+    return [];
+  }
+}
+
 function showCategoryGrid() {
   categoryGrid.classList.remove("hidden");
   teamForm.classList.add("hidden");
   salaForm.classList.add("hidden");
+  torneoForm.classList.add("hidden");
   adminForm.classList.add("hidden");
   teamError.classList.add("hidden");
   salaError.classList.add("hidden");
+  torneoError.classList.add("hidden");
   adminError.classList.add("hidden");
   passwordInput.value = "";
   salaPass.value = "";
+  torneoPass.value = "";
   adminPass.value = "";
+}
+
+async function openTorneos() {
+  currentCategory = 'torneos';
+  currentTorneos = await loadTorneos();
+  currentTorneos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  torneoSelect.innerHTML = '';
+  for (const item of currentTorneos) {
+    const option = document.createElement('option');
+    option.value = item.slug;
+    option.textContent = item.nombre;
+    option.dataset.id = String(item.id || '');
+    torneoSelect.appendChild(option);
+  }
+  const last = localStorage.getItem('lpi.lastTorneoSlug');
+  if (last && currentTorneos.some(item => item.slug === last)) torneoSelect.value = last;
+  torneoError.classList.add('hidden');
+  torneoPass.value = '';
+  toggleTorneoPass.checked = false;
+  torneoPass.type = 'password';
+  categoryGrid.classList.add('hidden');
+  teamForm.classList.add('hidden');
+  salaForm.classList.add('hidden');
+  adminForm.classList.add('hidden');
+  torneoForm.classList.remove('hidden');
+  if (!currentTorneos.length) {
+    torneoError.textContent = 'No hay organizadores habilitados';
+    torneoError.classList.remove('hidden');
+  }
 }
 
 async function openTeamCategory(category) {
@@ -178,6 +233,7 @@ async function openTeamCategory(category) {
 
   categoryGrid.classList.add("hidden");
   salaForm.classList.add("hidden");
+  torneoForm.classList.add("hidden");
   adminForm.classList.add("hidden");
   teamForm.classList.remove("hidden");
 }
@@ -210,6 +266,7 @@ async function openSalas() {
 
   categoryGrid.classList.add("hidden");
   teamForm.classList.add("hidden");
+  torneoForm.classList.add("hidden");
   adminForm.classList.add("hidden");
   salaForm.classList.remove("hidden");
 
@@ -228,10 +285,11 @@ function openAdmin() {
   categoryGrid.classList.add("hidden");
   teamForm.classList.add("hidden");
   salaForm.classList.add("hidden");
+  torneoForm.classList.add("hidden");
   adminForm.classList.remove("hidden");
 }
 
-function establishSession({ role, displayName, slug, category, token, refreshToken, sessionExpiresAt, salaId }) {
+function establishSession({ role, displayName, slug, category, token, refreshToken, sessionExpiresAt, salaId, torneoOrganizadorId }) {
   const sess = {
     role,
     displayName,
@@ -241,6 +299,7 @@ function establishSession({ role, displayName, slug, category, token, refreshTok
     refreshToken: refreshToken || '',
     sessionExpiresAt: sessionExpiresAt || '',
     salaId: salaId || null,
+    torneoOrganizadorId: torneoOrganizadorId || null,
     ts: Date.now()
   };
   localStorage.setItem(sessionKey, JSON.stringify(sess));
@@ -278,6 +337,11 @@ function redirectAfterLogin(sess) {
     if (slug) params.set("sala", slug);
     if (token) params.set("token", token);
     window.location.href = `../salas/admin_salas.html${params.toString() ? "?" + params.toString() : ""}`;
+    return;
+  }
+
+  if (role === 'torneo') {
+    window.location.href = '../torneos/privados.html';
     return;
   }
 
@@ -408,6 +472,41 @@ async function submitSalaLogin(ev) {
   }
 }
 
+async function submitTorneoLogin(ev) {
+  ev.preventDefault();
+  const selected = currentTorneos.find(item => item.slug === torneoSelect.value);
+  if (!selected) {
+    torneoError.textContent = 'Seleccioná un organizador válido';
+    torneoError.classList.remove('hidden');
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/torneo-organizador/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: selected.id, slug: selected.slug, password: torneoPass.value })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      torneoError.textContent = data.error || data.msg || 'Organizador o contraseña incorrecta';
+      torneoError.classList.remove('hidden');
+      return;
+    }
+    localStorage.setItem('lpi.lastTorneoSlug', data.slug || selected.slug);
+    const sess = establishSession({
+      role: 'torneo', displayName: data.displayName || selected.nombre,
+      slug: data.slug || selected.slug, category: 'torneos', token: data.token || '',
+      refreshToken: data.refreshToken || '', sessionExpiresAt: data.sessionExpiresAt || '',
+      torneoOrganizadorId: data.torneoOrganizadorId
+    });
+    sess.mustChangePassword = Boolean(data.mustChangePassword);
+    localStorage.setItem(sessionKey, JSON.stringify(sess));
+    finishLogin(sess);
+  } catch {
+    torneoError.textContent = 'No se pudo iniciar sesión';
+    torneoError.classList.remove('hidden');
+  }
+}
+
 async function submitAdminLogin(ev) {
   ev.preventDefault();
 
@@ -462,12 +561,17 @@ categoryGrid.addEventListener("click", async (e) => {
     await openSalas();
     return;
   }
+  if (category === 'torneos') {
+    await openTorneos();
+    return;
+  }
 
   await openTeamCategory(category);
 });
 
 teamForm.addEventListener("submit", submitTeamLogin);
 salaForm.addEventListener("submit", submitSalaLogin);
+torneoForm.addEventListener('submit', submitTorneoLogin);
 adminForm.addEventListener("submit", submitAdminLogin);
 
 if (new URLSearchParams(window.location.search).get('reason') === 'expired') {
@@ -482,6 +586,9 @@ togglePass.addEventListener("change", () => {
 toggleSalaPass.addEventListener("change", () => {
   salaPass.type = toggleSalaPass.checked ? "text" : "password";
 });
+toggleTorneoPass.addEventListener('change', () => {
+  torneoPass.type = toggleTorneoPass.checked ? 'text' : 'password';
+});
 
 toggleAdminPass.addEventListener("change", () => {
   adminPass.type = toggleAdminPass.checked ? "text" : "password";
@@ -489,6 +596,7 @@ toggleAdminPass.addEventListener("change", () => {
 
 backFromTeam.addEventListener("click", showCategoryGrid);
 backFromSala.addEventListener("click", showCategoryGrid);
+backFromTorneo.addEventListener('click', showCategoryGrid);
 backFromAdmin.addEventListener("click", showCategoryGrid);
 
 document.addEventListener("DOMContentLoaded", showCategoryGrid);

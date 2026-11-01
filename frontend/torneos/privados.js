@@ -1,0 +1,146 @@
+(() => {
+  'use strict';
+  const API = String(window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
+  let session = window.LPI_AUTH?.readSession?.();
+  if (!session || session.role !== 'torneo') {
+    location.replace(`/auth/login.html?return=${encodeURIComponent(location.pathname)}`);
+    return;
+  }
+
+  const $ = selector => document.querySelector(selector);
+  let entries = [];
+  let paymentFilter = 'all';
+  let pendingSubmit = null;
+  const dateFormatter = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+  }
+  function setMessage(text, ok = false) {
+    const node = $('#formMessage'); node.textContent = text || ''; node.classList.toggle('ok', ok);
+  }
+  async function api(path, options = {}) {
+    const response = await fetch(`${API}/api${path}`, { credentials: 'include', ...options });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw Object.assign(new Error(data.error || data.msg || `HTTP ${response.status}`), { status: response.status });
+    return data;
+  }
+  function whatsappHref(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    return digits ? `https://wa.me/${digits}` : '#';
+  }
+  function paymentSelect(entry) {
+    return `<select class="payment-select ${entry.estado_pago === 'total' ? 'payment-total' : 'payment-half'}" data-id="${entry.id}">
+      <option value="50" ${entry.estado_pago === '50' ? 'selected' : ''}>50% de seña</option>
+      <option value="total" ${entry.estado_pago === 'total' ? 'selected' : ''}>Pago total</option>
+    </select>`;
+  }
+  function renderBody(target, rows, verified) {
+    target.innerHTML = '';
+    if (!rows.length) {
+      target.innerHTML = '<tr><td class="empty" colspan="6">No hay inscripciones para mostrar.</td></tr>';
+      return;
+    }
+    for (const entry of rows) {
+      const tr = document.createElement('tr');
+      const name = verified ? entry.nombre_oficial : entry.nombre_ingresado;
+      tr.innerHTML = `<td><strong>${escapeHtml(name)}</strong></td><td>${escapeHtml(entry.dni)}</td>
+        <td><a href="${whatsappHref(entry.whatsapp)}" target="_blank" rel="noopener">${escapeHtml(entry.whatsapp)}</a></td>
+        <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
+        <td><button class="delete-button" data-delete="${entry.id}">Quitar</button></td>`;
+      target.appendChild(tr);
+    }
+  }
+  function render() {
+    const filtered = entries.filter(item => paymentFilter === 'all' || item.estado_pago === paymentFilter);
+    const verified = filtered.filter(item => item.corroborado);
+    const pending = filtered.filter(item => !item.corroborado);
+    renderBody($('#verifiedBody'), verified, true);
+    renderBody($('#pendingBody'), pending, false);
+    $('#verifiedCount').textContent = String(verified.length);
+    $('#pendingCount').textContent = String(pending.length);
+  }
+  async function load() {
+    const data = await api('/torneo-organizador/inscripciones');
+    entries = data.inscripciones || [];
+    const info = data.organizador || {};
+    $('#promotionalName').textContent = info.nombrePromocional || session.displayName || 'Inscripciones';
+    $('#organizerName').textContent = info.nombreOrganizador || '—';
+    $('#organizerWhatsapp').href = whatsappHref(info.whatsapp);
+    $('#organizerWhatsapp').hidden = !info.whatsapp;
+    $('#organizerLocation').href = info.ubicacion || '#';
+    $('#organizerLocation').hidden = !info.ubicacion;
+    render();
+    if (info.mustChangePassword || session.mustChangePassword) openPassword(true);
+  }
+  async function saveRegistration(payload, confirmed = false) {
+    try {
+      const data = await api('/torneo-organizador/inscripciones', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+      if (data.requiresConfirmation && !confirmed) {
+        pendingSubmit = payload;
+        $('#pendingModal').showModal();
+        return;
+      }
+      $('#registrationForm').reset();
+      setMessage(data.corroborado ? `Inscripción confirmada como ${data.inscripcion.nombre_oficial}.` : 'Inscripción guardada en la lista provisoria.', true);
+      await load();
+    } catch (error) { setMessage(error.message); }
+  }
+  $('#registrationForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const payment = new FormData(event.currentTarget).get('payment');
+    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment });
+  });
+  $('#confirmPending').addEventListener('click', async () => {
+    $('#pendingModal').close();
+    const payload = pendingSubmit; pendingSubmit = null;
+    if (payload) await saveRegistration({ ...payload, confirmProvisional: true }, true);
+  });
+  $('#cancelPending').addEventListener('click', () => { pendingSubmit = null; $('#pendingModal').close(); });
+  document.addEventListener('change', async event => {
+    const select = event.target.closest('.payment-select');
+    if (!select) return;
+    try {
+      await api(`/torneo-organizador/inscripciones/${select.dataset.id}/pago`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ estadoPago:select.value }) });
+      await load();
+    } catch (error) { alert(error.message); await load(); }
+  });
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('[data-delete]');
+    if (!button || !confirm('¿Quitar esta inscripción?')) return;
+    try { await api(`/torneo-organizador/inscripciones/${button.dataset.delete}`, { method:'DELETE' }); await load(); }
+    catch (error) { alert(error.message); }
+  });
+  document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
+    paymentFilter = button.dataset.payment;
+    document.querySelectorAll('.filter').forEach(item => item.classList.toggle('active', item === button));
+    render();
+  }));
+
+  const passwordModal = $('#passwordModal');
+  let passwordRequired = false;
+  function openPassword(required = false) {
+    passwordRequired = required;
+    $('#passwordRequirement').hidden = !required;
+    $('#cancelPassword').hidden = required;
+    $('#passwordMessage').textContent = '';
+    passwordModal.showModal();
+  }
+  $('#btnPassword').addEventListener('click', () => openPassword(false));
+  $('#cancelPassword').addEventListener('click', () => { if (!passwordRequired) passwordModal.close(); });
+  $('#passwordForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const next = $('#newPassword').value;
+    if (next !== $('#repeatPassword').value) { $('#passwordMessage').textContent = 'Las contraseñas no coinciden.'; return; }
+    try {
+      await api('/torneo-organizador/change-password', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ oldPassword:$('#oldPassword').value, newPassword:next }) });
+      const updated = { ...session, mustChangePassword:false };
+      session = updated;
+      localStorage.setItem('lpi.session', JSON.stringify(updated));
+      passwordRequired = false; passwordModal.close();
+    } catch (error) { $('#passwordMessage').textContent = error.message; }
+  });
+  passwordModal.addEventListener('cancel', event => { if (passwordRequired) event.preventDefault(); });
+  $('#btnLogout').addEventListener('click', () => window.LPI_AUTH?.logout?.({ redirect:true }));
+  load().catch(error => { setMessage(error.message); });
+})();

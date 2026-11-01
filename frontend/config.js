@@ -82,7 +82,7 @@ window.APP_CONFIG = (() => {
     try {
       const raw = typeof input === 'string' ? input : input?.url;
       const pathname = new URL(raw, window.location.href).pathname;
-      return /\/(admin|team|sala)\/login$/.test(pathname)
+      return /\/(admin|team|sala|torneo-organizador)\/login$/.test(pathname)
         || /\/auth\/refresh$/.test(pathname)
         || /\/logout$/.test(pathname);
     } catch (_) {

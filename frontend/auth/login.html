@@ -30,6 +30,7 @@
       <button type="button" class="category-btn" data-category="segunda">Segunda</button>
       <button type="button" class="category-btn" data-category="tercera">Tercera</button>
       <button type="button" class="category-btn category-btn--salas" data-category="salas">Salas</button>
+      <button type="button" class="category-btn category-btn--torneos" data-category="torneos">Torneos</button>
       <button type="button" class="category-btn category-btn--admin" data-category="admin">Admin</button>
     </div>
 
@@ -55,6 +56,27 @@
       <div class="form-actions">
         <button type="submit" class="btn-primary">Ingresar</button>
       </div>
+    </form>
+
+    <form id="torneoForm" class="auth-form hidden" autocomplete="on">
+      <div class="form-head">
+        <button type="button" class="back-btn" id="backFromTorneo">← Volver</button>
+        <h2>Ingreso Torneos</h2>
+      </div>
+
+      <label class="field-label" for="torneoSelect">Seleccioná organizador</label>
+      <select id="torneoSelect" name="torneo" class="field-control" autocomplete="username"></select>
+
+      <label class="field-label" for="torneoPass">Contraseña</label>
+      <input id="torneoPass" name="password" type="password" class="field-control" autocomplete="current-password" />
+
+      <label class="check-row">
+        <input id="toggleTorneoPass" type="checkbox" />
+        <span>Mostrar contraseña</span>
+      </label>
+
+      <p id="torneoError" class="error hidden">Organizador o contraseña incorrecta</p>
+      <div class="form-actions"><button type="submit" class="btn-primary">Ingresar</button></div>
     </form>
 
     <form id="salaForm" class="auth-form hidden" autocomplete="on">
@@ -107,7 +129,7 @@
 </main>
 
 <script src="../config.js?v=renewable-session-1"></script>
-<script type="module" src="./login.js?v=renewable-session-1"></script>
+  <script type="module" src="./login.js?v=torneos-privados-1"></script>
 
 </body>
 </html>
