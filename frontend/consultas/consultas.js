@@ -349,10 +349,9 @@
     const wins = toNumber(item?.wins);
     const effectiveness = played > 0 ? (wins / played) * 100 : 0;
     const maxPlayed = toNumber(context?.maxPlayed);
-    const avgPlayed = toNumber(context?.avgPlayed);
-    const spread = maxPlayed > 0 ? (maxPlayed - avgPlayed) / maxPlayed : 0;
+    const force = toNumber(context?.force) || 1;
     const penalty = maxPlayed > 0 && played > 0
-      ? Math.pow(maxPlayed / played, spread)
+      ? 1 + ((maxPlayed - played) / maxPlayed) * force
       : 1;
     const rad = penalty > 0 ? effectiveness / penalty : 0;
 
