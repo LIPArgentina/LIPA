@@ -1,0 +1,9 @@
+{
+  "minimumVersionCode": 23,
+  "updateUrl": "https://play.google.com/store/apps/details?id=com.lipa.app",
+  "announcement": {
+    "enabled": true,
+    "type": "video",
+    "url": "https://lipa.ar/assets/lipa-rodry-baygo.mp4"
+  }
+}
