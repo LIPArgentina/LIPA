@@ -933,6 +933,29 @@
   }
 }
 
+@media (max-width: 768px) {
+  #btnAdminEquipos.btn-admin-torneo::after {
+    content: "Administrar torneo";
+  }
+
+  .actions.actions--torneo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .actions.actions--torneo #btnAdminEquipos {
+    width: min(210px, calc(100% - 12px));
+    flex: 0 1 210px;
+  }
+}
+
+@media (max-width: 430px) {
+  #btnAdminEquipos.btn-admin-torneo::after {
+    font-size: 8.5px;
+  }
+}
+
 .promo-video-popup{
   width: min(430px, calc(100vw - 24px));
   max-width: none;

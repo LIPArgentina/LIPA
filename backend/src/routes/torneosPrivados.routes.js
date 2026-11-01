@@ -241,10 +241,12 @@ module.exports = function createTorneosPrivadosRouter() {
       await ensureSchema();
       const organizador = await findOrganizador({ id: req.user.torneoOrganizadorId, includeInactive: true });
       const { rows } = await pool.query(`
-        SELECT id, jugador_id, nombre_ingresado, nombre_oficial, dni, whatsapp,
-               estado_pago, corroborado, created_at, updated_at
-          FROM torneo_inscripciones
-         WHERE torneo_organizador_id=$1 ORDER BY created_at DESC, id DESC
+        SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp,
+               i.estado_pago, i.corroborado, i.created_at, i.updated_at,
+               COALESCE(j.foto_path, '') AS foto_path
+          FROM torneo_inscripciones i
+          LEFT JOIN jugadores j ON j.id = i.jugador_id
+         WHERE i.torneo_organizador_id=$1 ORDER BY i.created_at DESC, i.id DESC
       `, [req.user.torneoOrganizadorId]);
       res.json({ ok: true, organizador: {
         nombrePromocional: organizador.nombre_promocional,

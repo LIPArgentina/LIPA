@@ -68,6 +68,10 @@
       <option value="total" ${entry.estado_pago === 'total' ? 'selected' : ''}>Pago total</option>
     </select>`;
   }
+  function playerPhotoButton(entry, name) {
+    const hasPhoto = Boolean(entry.foto_path);
+    return `<button class="photo-icon" type="button" data-photo-name="${escapeHtml(name)}" data-photo-path="${escapeHtml(entry.foto_path || '')}" aria-label="${hasPhoto ? 'Ver' : 'Sin'} foto de ${escapeHtml(name)}" title="${hasPhoto ? 'Ver foto' : 'Sin foto cargada'}" ${hasPhoto ? '' : 'disabled'}>📷</button>`;
+  }
   function renderBody(target, rows, verified) {
     target.innerHTML = '';
     if (!rows.length) {
@@ -77,7 +81,7 @@
     for (const entry of rows) {
       const tr = document.createElement('tr');
       const name = verified ? entry.nombre_oficial : entry.nombre_ingresado;
-      tr.innerHTML = `<td><strong>${escapeHtml(name)}</strong></td><td>${escapeHtml(entry.dni)}</td>
+      tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td>${escapeHtml(entry.dni)}</td>
         <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp"><button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
         <td><button class="delete-button" data-delete="${entry.id}">Quitar</button></td>`;
@@ -165,6 +169,14 @@
     } catch (error) { alert(error.message); await load(); }
   });
   document.addEventListener('click', async event => {
+    const photoButton = event.target.closest('[data-photo-path]');
+    if (photoButton && photoButton.dataset.photoPath) {
+      $('#photoName').textContent = photoButton.dataset.photoName || 'Foto del jugador';
+      $('#playerPhoto').src = `${API}/api/players-admin/photo/${encodeURIComponent(photoButton.dataset.photoPath)}`;
+      $('#playerPhoto').alt = `Foto de ${photoButton.dataset.photoName || 'jugador'}`;
+      $('#photoModal').showModal();
+      return;
+    }
     const contactButton = event.target.closest('[data-save-contact]');
     if (contactButton) {
       const row = contactButton.closest('tr');
@@ -216,5 +228,7 @@
   });
   passwordModal.addEventListener('cancel', event => { if (passwordRequired) event.preventDefault(); });
   $('#btnLogout').addEventListener('click', () => window.LPI_AUTH?.logout?.({ redirect:true }));
+  $('#closePhoto').addEventListener('click', () => $('#photoModal').close());
+  $('#photoModal').addEventListener('click', event => { if (event.target === $('#photoModal')) $('#photoModal').close(); });
   load().catch(error => { setMessage(error.message); });
 })();

@@ -90,6 +90,7 @@ function renderSession(sess) {
   if (!box) return;
 
   if (!sess) {
+    document.querySelector(".actions")?.classList.remove("actions--torneo");
     box.innerHTML = `
       <button id="btnIngresar" class="btn btn-primary">Ingresar</button>
     `;
@@ -111,10 +112,12 @@ function renderSession(sess) {
   `;
 
   const role = (sess.role || "").toLowerCase();
+  document.querySelector(".actions")?.classList.toggle("actions--torneo", role === "torneo" || sess.category === "torneos");
 
   if (btnAdminEquipos) {
     btnAdminEquipos.classList.remove("btn-admin-salas");
     btnAdminEquipos.classList.remove("btn-admin-team");
+    btnAdminEquipos.classList.remove("btn-admin-torneo");
   }
 
   if (role === "admin") {
@@ -153,7 +156,7 @@ function renderSession(sess) {
     if (btnAdminEquipos) {
       btnAdminEquipos.textContent = "Administrar torneo";
       btnAdminEquipos.href = "./torneos/privados.html";
-      btnAdminEquipos.classList.add("btn-admin-team");
+      btnAdminEquipos.classList.add("btn-admin-torneo");
       btnAdminEquipos.classList.remove("hidden");
     }
     if (btnBanner) btnBanner.classList.add("hidden");

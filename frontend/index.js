@@ -48,6 +48,8 @@ function ensureManageTeamButton() {
 
   btn.classList.remove("btn-admin-salas");
   btn.classList.remove("btn-admin-team");
+  btn.classList.remove("btn-admin-torneo");
+  actions.classList.toggle("actions--torneo", role === "torneo" || sess?.category === "torneos");
 
   if (role === "admin") {
     btn.textContent = "Administrar equipos";
@@ -73,7 +75,7 @@ function ensureManageTeamButton() {
   if (role === "torneo" || sess?.category === "torneos") {
     btn.textContent = "Administrar torneo";
     btn.href = "./torneos/privados.html";
-    btn.classList.add("btn-admin-team");
+    btn.classList.add("btn-admin-torneo");
     btn.classList.remove("hidden");
     return;
   }

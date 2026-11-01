@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=5">
+  <link rel="stylesheet" href="./privados.css?v=6">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -83,7 +83,15 @@
     </div>
   </dialog>
 
+  <dialog id="photoModal" class="photo-modal">
+    <div class="photo-modal-content">
+      <button id="closePhoto" class="photo-close" type="button" aria-label="Cerrar foto">×</button>
+      <h2 id="photoName">Foto del jugador</h2>
+      <img id="playerPhoto" src="../logo_liga.png" alt="Foto del jugador">
+    </div>
+  </dialog>
+
   <script src="../config.js?v=renewable-session-1"></script>
-  <script src="./privados.js?v=5" defer></script>
+  <script src="./privados.js?v=6" defer></script>
 </body>
 </html>
