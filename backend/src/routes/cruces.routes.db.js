@@ -3854,10 +3854,6 @@ function radRound1(value) {
   return Math.round(radNumber(value) * 10) / 10;
 }
 
-function radRound4(value) {
-  return Math.round(radNumber(value) * 10000) / 10000;
-}
-
 function buildRadContextFromRows(rows = []) {
   const playedValues = rows
     .map((item) => radNumber(item.played))
@@ -3897,8 +3893,7 @@ function applyRadToPlayerRow(item = {}, context = null) {
     diff: triangulosFavor - triangulosContra,
     effectiveness: radRound1(effectiveness),
     rad: radRound1(rad),
-    radPenalty: radRound1(penalty),
-    radPenaltyExact: radRound4(penalty)
+    radPenalty: radRound1(penalty)
   };
 }
 
@@ -4027,10 +4022,7 @@ function buildRadRankingFromPlayerRows(baseRows = []) {
       maxPlayed: radRound1(rawContext.maxPlayed),
       avgPlayed: radRound1(rawContext.avgPlayed),
       spread: radRound1(rawContext.spread),
-      force: radRound1(rawContext.force),
-      avgPlayedExact: radRound4(rawContext.avgPlayed),
-      spreadExact: radRound4(rawContext.spread),
-      confidenceExponent: radRound4(Math.max(rawContext.spread, 0.6))
+      force: radRound1(rawContext.force)
     }
   };
 }
