@@ -70,6 +70,14 @@ function ensureManageTeamButton() {
     return;
   }
 
+  if (role === "torneo") {
+    btn.textContent = "Administrar torneo";
+    btn.href = "./torneos/privados.html";
+    btn.classList.add("btn-admin-team");
+    btn.classList.remove("hidden");
+    return;
+  }
+
   if (sess?.slug) {
     const slug = String(sess.slug);
     btn.textContent = "Administrar equipo";
@@ -128,6 +136,11 @@ function redirectAfterLogin() {
     params.set("sala", slug);
     if (sess?.token) params.set("token", String(sess.token));
     location.href = `./salas/admin_salas.html?${params.toString()}`;
+    return;
+  }
+
+  if (role === "torneo") {
+    location.href = "./torneos/privados.html";
     return;
   }
 

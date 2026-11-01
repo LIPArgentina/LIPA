@@ -149,6 +149,16 @@ function renderSession(sess) {
     if (btnBanner) btnBanner.classList.add("hidden");
     if (btnSorteoAdmin) btnSorteoAdmin.classList.add("hidden");
     if (brandCta) brandCta.textContent = `Hola, ${sess.displayName || "Sala"}!`;
+  } else if (role === "torneo") {
+    if (btnAdminEquipos) {
+      btnAdminEquipos.textContent = "Administrar torneo";
+      btnAdminEquipos.href = "./torneos/privados.html";
+      btnAdminEquipos.classList.add("btn-admin-team");
+      btnAdminEquipos.classList.remove("hidden");
+    }
+    if (btnBanner) btnBanner.classList.add("hidden");
+    if (btnSorteoAdmin) btnSorteoAdmin.classList.add("hidden");
+    if (brandCta) brandCta.textContent = `Hola, ${sess.displayName || "Organizador"}!`;
   } else {
     const slug =
       sess.slug ||
