@@ -50,6 +50,31 @@ function authHeaders(extra = {}){
   return sess?.token ? { ...extra, Authorization: `Bearer ${sess.token}` } : extra;
 }
 
+function openIsolatedSessionTab() {
+  const tab = window.open('about:blank', '_blank');
+  if (!tab) {
+    alert('El navegador bloqueó la pestaña nueva. Habilitá las ventanas emergentes para LIPA y volvé a intentar.');
+    return null;
+  }
+  try {
+    tab.document.title = 'Abriendo sesión de prueba…';
+    tab.document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Abriendo sesión aislada…</p>';
+  } catch (_) {}
+  return tab;
+}
+
+function launchIsolatedSessionTab(tab, url, session, extraSessionValues = {}) {
+  if (!tab || tab.closed) throw new Error('La pestaña de prueba fue cerrada.');
+  const serialized = JSON.stringify({ ...session, isTestSession: true });
+  tab.sessionStorage.setItem('lpi.isolatedSession', '1');
+  tab.sessionStorage.setItem('lpi.session', serialized);
+  if (session.role === 'team') tab.sessionStorage.setItem('lpi_team_session', serialized);
+  Object.entries(extraSessionValues).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') tab.sessionStorage.setItem(key, String(value));
+  });
+  tab.location.replace(new URL(url, location.href).href);
+}
+
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -184,6 +209,8 @@ async function impersonateTeam(team, target){
 
   const ok = confirm(`Vas a ingresar como "${name}".\n\nLos cambios que hagas se van a guardar como si los hiciera ese capitán. ¿Continuar?`);
   if (!ok) return;
+  const isolatedTab = openIsolatedSessionTab();
+  if (!isolatedTab) return;
 
   try {
     const payload = {};
@@ -202,23 +229,8 @@ async function impersonateTeam(team, target){
       throw new Error(data.error || data.msg || `HTTP ${resp.status}`);
     }
 
-    const previousSession = localStorage.getItem('lpi.session');
-    if (previousSession) localStorage.setItem('lpi.admin.session.backup', previousSession);
-
     const session = data.session;
-    localStorage.setItem('lpi.session', JSON.stringify(session));
-    sessionStorage.setItem('lpi.session', JSON.stringify(session));
-    localStorage.setItem('lpi_team_session', JSON.stringify(session));
-    sessionStorage.setItem('lpi_team_session', JSON.stringify(session));
-    if (session.slug || session.team) {
-      const sessionSlug = session.slug || session.team;
-      localStorage.setItem('teamSlug', sessionSlug);
-      sessionStorage.setItem('teamSlug', sessionSlug);
-      sessionStorage.setItem('lpi_cruces_team', sessionSlug);
-    }
-    if (session.category || category) {
-      localStorage.setItem('lpi.lastCategory', session.category || category);
-    }
+    const rawSessionSlug = session.slug || session.team || slug;
 
     const sessionSlug = encodeURIComponent(session.slug || session.team || slug);
     const sessionCategory = encodeURIComponent(session.category || category || 'primera');
@@ -226,9 +238,14 @@ async function impersonateTeam(team, target){
       ? `cruces/cruces_fecha.html?cat=${sessionCategory}&team=${sessionSlug}`
       : `templates/plantilla.html?team=${sessionSlug}`;
 
-    window.open(url, '_blank');
-    toast(`Sesión generada: ${name}`);
+    launchIsolatedSessionTab(isolatedTab, url, session, {
+      teamSlug: rawSessionSlug,
+      lpi_cruces_team: rawSessionSlug,
+      'lpi.lastCategory': session.category || category
+    });
+    toast(`Sesión aislada generada: ${name}`);
   } catch (err) {
+    try { isolatedTab.close(); } catch (_) {}
     console.error('impersonate-team', err);
     alert(err?.message || 'No se pudo ingresar como ese capitán');
   }
@@ -696,6 +713,8 @@ async function impersonateSala(salaId, salaName){
 
   const ok = confirm(`Vas a ingresar como la sala "${salaName}".\n\nLos cambios que hagas se guardarán como si los hiciera esa sala. ¿Continuar?`);
   if (!ok) return;
+  const isolatedTab = openIsolatedSessionTab();
+  if (!isolatedTab) return;
 
   try {
     const resp = await fetch(`${API_BASE}/api/admin/impersonate-sala`, {
@@ -709,22 +728,20 @@ async function impersonateSala(salaId, salaName){
       throw new Error(data.error || data.msg || `HTTP ${resp.status}`);
     }
 
-    const previousSession = localStorage.getItem('lpi.session');
-    if (previousSession) localStorage.setItem('lpi.admin.session.backup', previousSession);
-
     const session = data.session;
-    localStorage.setItem('lpi.session', JSON.stringify(session));
-    sessionStorage.setItem('lpi.session', JSON.stringify(session));
-    localStorage.setItem('lpi.lastCategory', 'salas');
 
     const params = new URLSearchParams({
       sala: session.slug,
       salaId: String(session.salaId),
       token: session.token
     });
-    window.open(`salas/admin_salas.html?${params.toString()}`, '_blank');
-    toast(`Sesión temporal generada: ${salaName}`);
+    launchIsolatedSessionTab(isolatedTab, `salas/admin_salas.html?${params.toString()}`, session, {
+      'lpi.lastCategory': 'salas',
+      'lpi.lastSalaSlug': session.slug
+    });
+    toast(`Sesión aislada generada: ${salaName}`);
   } catch (err) {
+    try { isolatedTab.close(); } catch (_) {}
     console.error('impersonate-sala', err);
     alert(err?.message || 'No se pudo ingresar como esa sala');
   }
@@ -917,13 +934,20 @@ function renderTorneosRows(items = []) {
     tr.querySelector('.btn-enter-torneo')?.addEventListener('click', async () => {
       const id = Number(tr.dataset.id);
       if (!id) return;
-      const response = await fetch(`${API_BASE}/api/admin/impersonate-torneo`, { method: 'POST', credentials: 'include', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ id }) });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.session) return alert(data.error || 'No se pudo ingresar');
-      const previous = localStorage.getItem('lpi.session');
-      if (previous) localStorage.setItem('lpi.admin.session.backup', previous);
-      localStorage.setItem('lpi.session', JSON.stringify(data.session));
-      window.open('/torneos/privados.html', '_blank');
+      const isolatedTab = openIsolatedSessionTab();
+      if (!isolatedTab) return;
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/impersonate-torneo`, { method: 'POST', credentials: 'include', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ id }) });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.session) throw new Error(data.error || 'No se pudo ingresar');
+        launchIsolatedSessionTab(isolatedTab, '/torneos/privados.html', data.session, {
+          'lpi.lastCategory': 'torneos',
+          'lpi.lastTorneoSlug': data.session.slug
+        });
+      } catch (error) {
+        try { isolatedTab.close(); } catch (_) {}
+        alert(error?.message || 'No se pudo ingresar');
+      }
     });
     tbody.appendChild(tr);
   }

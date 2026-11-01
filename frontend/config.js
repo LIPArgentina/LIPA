@@ -1,3 +1,35 @@
+(() => {
+  const ISOLATED_FLAG = 'lpi.isolatedSession';
+  const ISOLATED_KEYS = new Set([
+    'lpi.session', 'lpi_team_session', 'teamSlug', 'lpi.lastCategory',
+    'lpi.lastSalaSlug', 'lpi.lastTorneoSlug', 'lpi_cruces_team'
+  ]);
+  try {
+    if (sessionStorage.getItem(ISOLATED_FLAG) !== '1') return;
+    const nativeGet = Storage.prototype.getItem;
+    const nativeSet = Storage.prototype.setItem;
+    const nativeRemove = Storage.prototype.removeItem;
+    Storage.prototype.getItem = function isolatedGetItem(key) {
+      if (this === localStorage && ISOLATED_KEYS.has(String(key))) {
+        return nativeGet.call(sessionStorage, key);
+      }
+      return nativeGet.call(this, key);
+    };
+    Storage.prototype.setItem = function isolatedSetItem(key, value) {
+      if (this === localStorage && ISOLATED_KEYS.has(String(key))) {
+        return nativeSet.call(sessionStorage, key, value);
+      }
+      return nativeSet.call(this, key, value);
+    };
+    Storage.prototype.removeItem = function isolatedRemoveItem(key) {
+      if (this === localStorage && ISOLATED_KEYS.has(String(key))) {
+        return nativeRemove.call(sessionStorage, key);
+      }
+      return nativeRemove.call(this, key);
+    };
+  } catch (_) {}
+})();
+
 window.APP_CONFIG = (() => {
   const host = String(location.hostname || '').toLowerCase();
   const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
