@@ -29,6 +29,14 @@ function normalizeCategoria(value) {
   return null;
 }
 
+function categoriaMasBaja(...values) {
+  const categories = values.flat(Infinity).map(normalizeCategoria).filter(Boolean);
+  if (categories.includes('tercera')) return 'tercera';
+  if (categories.includes('segunda')) return 'segunda';
+  if (categories.includes('primera')) return 'primera';
+  return null;
+}
+
 module.exports = function createTorneosPrivadosRouter() {
   const router = express.Router();
   let schemaPromise = null;
@@ -320,18 +328,18 @@ module.exports = function createTorneosPrivadosRouter() {
         return res.status(400).json({ ok: false, error: 'Nombre, DNI y estado de pago son obligatorios' });
       }
       const found = await pool.query(`
-        SELECT j.id, j.nombre,
-               COALESCE(NULLIF(j.categoria_actual, ''), (
+        SELECT j.id, j.nombre, j.categoria_actual,
+               ARRAY(
                  SELECT je.categoria FROM jugador_equipos je
                   WHERE je.jugador_id=j.id AND je.activo=true
-                  ORDER BY je.desde DESC NULLS LAST, je.id DESC LIMIT 1
-               )) AS categoria_actual
+                  ORDER BY je.desde DESC NULLS LAST, je.id DESC
+               ) AS categorias_activas
           FROM jugadores j
          WHERE regexp_replace(COALESCE(j.dni,''), '[^0-9]', '', 'g')=$1
          ORDER BY j.id ASC LIMIT 1
       `, [dni]);
       const player = found.rows[0] || null;
-      const categoria = normalizeCategoria(player?.categoria_actual);
+      const categoria = categoriaMasBaja(player?.categoria_actual, player?.categorias_activas || []);
       if (!player && req.body?.confirmProvisional !== true) {
         return res.json({ ok: true, corroborado: false, requiresConfirmation: true });
       }
