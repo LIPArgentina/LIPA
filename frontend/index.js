@@ -70,7 +70,7 @@ function ensureManageTeamButton() {
     return;
   }
 
-  if (role === "torneo") {
+  if (role === "torneo" || sess?.category === "torneos") {
     btn.textContent = "Administrar torneo";
     btn.href = "./torneos/privados.html";
     btn.classList.add("btn-admin-team");
@@ -139,7 +139,7 @@ function redirectAfterLogin() {
     return;
   }
 
-  if (role === "torneo") {
+  if (role === "torneo" || sess?.category === "torneos") {
     location.href = "./torneos/privados.html";
     return;
   }

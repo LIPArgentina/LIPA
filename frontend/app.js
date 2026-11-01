@@ -149,7 +149,7 @@ function renderSession(sess) {
     if (btnBanner) btnBanner.classList.add("hidden");
     if (btnSorteoAdmin) btnSorteoAdmin.classList.add("hidden");
     if (brandCta) brandCta.textContent = `Hola, ${sess.displayName || "Sala"}!`;
-  } else if (role === "torneo") {
+  } else if (role === "torneo" || sess.category === "torneos") {
     if (btnAdminEquipos) {
       btnAdminEquipos.textContent = "Administrar torneo";
       btnAdminEquipos.href = "./torneos/privados.html";

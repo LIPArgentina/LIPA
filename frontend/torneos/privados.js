@@ -11,6 +11,8 @@
   let entries = [];
   let paymentFilter = 'all';
   let pendingSubmit = null;
+  let candidateTimer = null;
+  let candidateRequest = 0;
   const dateFormatter = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 
   function escapeHtml(value) {
@@ -18,6 +20,35 @@
   }
   function setMessage(text, ok = false) {
     const node = $('#formMessage'); node.textContent = text || ''; node.classList.toggle('ok', ok);
+  }
+  function hideCandidates() {
+    const box = $('#candidateBox');
+    box.hidden = true;
+    box.innerHTML = '';
+  }
+  function renderCandidates(players) {
+    const box = $('#candidateBox');
+    if (!players.length) { hideCandidates(); return; }
+    box.innerHTML = `<div class="candidate-help">Coincidencias en la base. Elegir una es opcional.</div>` + players.map(player =>
+      `<button class="candidate-button" type="button" data-candidate-id="${player.id}" data-name="${escapeHtml(player.nombre)}" data-dni="${escapeHtml(player.dni)}"><strong>${escapeHtml(player.nombre)}</strong><span>DNI ${escapeHtml(player.dni)}</span></button>`
+    ).join('');
+    box.hidden = false;
+  }
+  function scheduleCandidateSearch() {
+    clearTimeout(candidateTimer);
+    const name = $('#playerName').value.trim();
+    const dni = $('#playerDni').value.replace(/\D/g, '');
+    const query = dni.length >= 2 ? dni : name;
+    if (query.length < 2) { hideCandidates(); return; }
+    candidateTimer = setTimeout(async () => {
+      const request = ++candidateRequest;
+      try {
+        const data = await api(`/torneo-organizador/jugadores?q=${encodeURIComponent(query)}`);
+        if (request === candidateRequest) renderCandidates(data.jugadores || []);
+      } catch (_) {
+        if (request === candidateRequest) hideCandidates();
+      }
+    }, 220);
   }
   async function api(path, options = {}) {
     const response = await fetch(`${API}/api${path}`, { credentials: 'include', ...options });
@@ -90,6 +121,19 @@
     event.preventDefault();
     const payment = new FormData(event.currentTarget).get('payment');
     saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment });
+  });
+  $('#playerName').addEventListener('input', scheduleCandidateSearch);
+  $('#playerDni').addEventListener('input', scheduleCandidateSearch);
+  $('#candidateBox').addEventListener('click', event => {
+    const button = event.target.closest('[data-candidate-id]');
+    if (!button) return;
+    $('#playerName').value = button.dataset.name || '';
+    $('#playerDni').value = button.dataset.dni || '';
+    hideCandidates();
+    $('#playerWhatsapp').focus();
+  });
+  document.addEventListener('click', event => {
+    if (!event.target.closest('#candidateBox, #playerName, #playerDni')) hideCandidates();
   });
   $('#confirmPending').addEventListener('click', async () => {
     $('#pendingModal').close();

@@ -252,6 +252,39 @@ module.exports = function createTorneosPrivadosRouter() {
     }
   });
 
+  router.get('/torneo-organizador/jugadores', requireTorneoOrganizador, async (req, res) => {
+    try {
+      const query = String(req.query?.q || '').trim();
+      const dni = cleanDni(query);
+      if (query.length < 2 && dni.length < 2) return res.json({ ok: true, jugadores: [] });
+      const words = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
+      const values = [];
+      const clauses = [];
+      if (dni) {
+        values.push(`${dni}%`);
+        clauses.push(`regexp_replace(COALESCE(dni,''), '[^0-9]', '', 'g') LIKE $${values.length}`);
+      }
+      if (words.length) {
+        const wordClauses = words.map(word => {
+          values.push(`%${word}%`);
+          return `LOWER(COALESCE(nombre_normalizado, nombre, '')) LIKE $${values.length}`;
+        });
+        clauses.push(`(${wordClauses.join(' AND ')})`);
+      }
+      if (!clauses.length) return res.json({ ok: true, jugadores: [] });
+      const result = await pool.query(`
+        SELECT id, nombre, COALESCE(dni,'') AS dni FROM jugadores
+         WHERE (${clauses.join(' OR ')}) AND COALESCE(dni,'') <> ''
+         ORDER BY nombre ASC, id ASC LIMIT 10
+      `, values);
+      res.json({ ok: true, jugadores: result.rows });
+    } catch (error) {
+      console.error('GET /torneo-organizador/jugadores', error);
+      res.status(500).json({ ok: false, error: 'No se pudieron buscar jugadores' });
+    }
+  });
+
   router.post('/torneo-organizador/inscripciones', requireTorneoOrganizador, async (req, res) => {
     try {
       await ensureSchema();
