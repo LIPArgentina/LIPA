@@ -812,9 +812,14 @@ function setupBannerPopupLinks() {
 function setupPromoSorteoModal() {
   const modal = document.getElementById('promoSorteoModal');
   const closeButton = document.getElementById('closePromoSorteo');
+  const player = document.getElementById('promoSorteoPlayer');
   if (!modal || !closeButton) return;
 
   const close = () => {
+    if (player instanceof HTMLMediaElement) {
+      player.pause();
+      player.currentTime = 0;
+    }
     modal.close();
   };
 
@@ -827,6 +832,9 @@ function setupPromoSorteoModal() {
     close();
   });
   modal.showModal();
+  if (player instanceof HTMLMediaElement) {
+    player.play().catch(() => {});
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {

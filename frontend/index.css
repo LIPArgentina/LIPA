@@ -984,19 +984,19 @@
 }
 .promo-video-popup__video{
   position: relative;
-  width: min(100%, 315px);
+  width: min(100%, 390px);
   margin: 0 auto;
-  aspect-ratio: 9 / 16;
   overflow: hidden;
   border-radius: 12px;
   background: #000;
 }
-.promo-video-popup__video iframe{
-  position: absolute;
-  inset: 0;
+.promo-video-popup__video video{
+  display: block;
   width: 100%;
-  height: 100%;
+  max-height: calc(100vh - 130px);
+  height: auto;
   border: 0;
+  object-fit: contain;
 }
 .promo-video-popup__flyer{
   width:min(100%, 390px);

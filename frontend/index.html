@@ -134,21 +134,20 @@
 
   <dialog id="promoSorteoModal" class="promo-video-popup" aria-labelledby="promoSorteoTitle">
     <div class="promo-video-popup__panel">
-      <button id="closePromoSorteo" class="promo-video-popup__close" type="button" aria-label="Cerrar flyer">&times;</button>
-      <h2 id="promoSorteoTitle">Torneo Argentino Femenino</h2>
-      <div class="promo-video-popup__flyer">
-        <img
+      <button id="closePromoSorteo" class="promo-video-popup__close" type="button" aria-label="Cerrar video">&times;</button>
+      <h2 id="promoSorteoTitle">LIPA junto a Rodry Baygo</h2>
+      <div class="promo-video-popup__video">
+        <video
           id="promoSorteoPlayer"
-          src="./assets/torneo-argentino-femenino-heaven.jpg"
-          alt="Torneo Argentino Femenino de Segunda y Tercera categoría en Heaven"
-        />
+          src="./assets/lipa-rodry-baygo.mp4"
+          controls
+          autoplay
+          muted
+          playsinline
+          preload="metadata"
+          aria-label="Video promocional de LIPA junto a Rodry Baygo"
+        ></video>
       </div>
-      <a
-        class="promo-video-popup__action"
-        href="https://wa.me/5491156654539?text=hola%20vengo%20de%20LIPA%20para%20consultar%20por%20el%20torneo%20argentino%20femenino"
-        target="_blank"
-        rel="noopener noreferrer"
-      >CONSULTAS</a>
     </div>
   </dialog>
 
