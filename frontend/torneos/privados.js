@@ -10,6 +10,7 @@
   const $ = selector => document.querySelector(selector);
   let entries = [];
   let paymentFilter = 'all';
+  let categoryFilter = 'all';
   let pendingSubmit = null;
   let candidateTimer = null;
   let candidateRequest = 0;
@@ -68,6 +69,14 @@
       <option value="total" ${entry.estado_pago === 'total' ? 'selected' : ''}>Pago total</option>
     </select>`;
   }
+  function categorySelect(entry) {
+    return `<select class="category-select ${entry.categoria ? '' : 'category-missing'}" data-category-id="${entry.id}">
+      <option value="" ${entry.categoria ? '' : 'selected'} disabled>Definir categoría</option>
+      <option value="primera" ${entry.categoria === 'primera' ? 'selected' : ''}>Primera</option>
+      <option value="segunda" ${entry.categoria === 'segunda' ? 'selected' : ''}>Segunda</option>
+      <option value="tercera" ${entry.categoria === 'tercera' ? 'selected' : ''}>Tercera</option>
+    </select>`;
+  }
   function playerPhotoButton(entry, name) {
     const hasPhoto = Boolean(entry.foto_path);
     return `<button class="photo-icon" type="button" data-photo-name="${escapeHtml(name)}" data-photo-path="${escapeHtml(entry.foto_path || '')}" aria-label="${hasPhoto ? 'Ver' : 'Sin'} foto de ${escapeHtml(name)}" title="${hasPhoto ? 'Ver foto' : 'Sin foto cargada'}" ${hasPhoto ? '' : 'disabled'}>📷</button>`;
@@ -75,13 +84,13 @@
   function renderBody(target, rows, verified) {
     target.innerHTML = '';
     if (!rows.length) {
-      target.innerHTML = '<tr><td class="empty" colspan="6">No hay inscripciones para mostrar.</td></tr>';
+      target.innerHTML = '<tr><td class="empty" colspan="7">No hay inscripciones para mostrar.</td></tr>';
       return;
     }
     for (const entry of rows) {
       const tr = document.createElement('tr');
       const name = verified ? entry.nombre_oficial : entry.nombre_ingresado;
-      tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td>${escapeHtml(entry.dni)}</td>
+      tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
         <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp"><button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
         <td><button class="delete-button" data-delete="${entry.id}">Quitar</button></td>`;
@@ -89,7 +98,12 @@
     }
   }
   function render() {
-    const filtered = entries.filter(item => paymentFilter === 'all' || item.estado_pago === paymentFilter);
+    const filtered = entries.filter(item => {
+      const paymentMatches = paymentFilter === 'all' || item.estado_pago === paymentFilter;
+      const categoryMatches = categoryFilter === 'all'
+        || (categoryFilter === 'sin_definir' ? !item.categoria : item.categoria === categoryFilter);
+      return paymentMatches && categoryMatches;
+    });
     const verified = filtered.filter(item => item.corroborado);
     const pending = filtered.filter(item => !item.corroborado);
     renderBody($('#verifiedBody'), verified, true);
@@ -126,7 +140,7 @@
   $('#registrationForm').addEventListener('submit', event => {
     event.preventDefault();
     const payment = new FormData(event.currentTarget).get('payment');
-    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment });
+    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, categoria: $('#playerCategory').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment });
   });
   $('#playerName').addEventListener('input', scheduleCandidateSearch);
   $('#playerDni').addEventListener('input', scheduleCandidateSearch);
@@ -161,6 +175,14 @@
   });
   $('#cancelPending').addEventListener('click', () => { pendingSubmit = null; $('#pendingModal').close(); });
   document.addEventListener('change', async event => {
+    const category = event.target.closest('.category-select');
+    if (category) {
+      try {
+        await api(`/torneo-organizador/inscripciones/${category.dataset.categoryId}/categoria`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ categoria:category.value }) });
+        await load();
+      } catch (error) { alert(error.message); await load(); }
+      return;
+    }
     const select = event.target.closest('.payment-select');
     if (!select) return;
     try {
@@ -202,6 +224,10 @@
     document.querySelectorAll('.filter').forEach(item => item.classList.toggle('active', item === button));
     render();
   }));
+  $('#categoryFilter').addEventListener('change', event => {
+    categoryFilter = event.target.value;
+    render();
+  });
 
   const passwordModal = $('#passwordModal');
   let passwordRequired = false;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=6">
+  <link rel="stylesheet" href="./privados.css?v=7">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -30,6 +30,7 @@
       <form id="registrationForm">
         <label>Nombre y apellido<input id="playerName" required autocomplete="name" placeholder="Nombre completo"></label>
         <label>DNI<input id="playerDni" required inputmode="numeric" autocomplete="off" placeholder="Sólo números"></label>
+        <label>Categoría<select id="playerCategory" required><option value="">Seleccionar</option><option value="primera">Primera</option><option value="segunda">Segunda</option><option value="tercera">Tercera</option></select></label>
         <label><span class="label-with-action">WhatsApp del inscripto <button id="pasteWhatsapp" class="paste-button" type="button">Pegar</button></span><input id="playerWhatsapp" inputmode="tel" autocomplete="tel" placeholder="Opcional; se puede agregar después"></label>
         <fieldset>
           <legend>Pago realizado</legend>
@@ -43,23 +44,25 @@
       <p id="formMessage" class="message" aria-live="polite"></p>
     </section>
 
-    <section class="filters" aria-label="Filtrar por pago">
-      <strong>Mostrar:</strong>
-      <button class="filter active" data-payment="all">Todos</button>
-      <button class="filter" data-payment="total">Pago total</button>
-      <button class="filter" data-payment="50">Seña 50%</button>
-      <button class="filter" data-payment="sin_sena">Sin seña</button>
+    <section class="filters" aria-label="Filtros de inscripciones">
+      <div class="filter-group"><strong>Pago:</strong>
+        <button class="filter active" data-payment="all">Todos</button>
+        <button class="filter" data-payment="total">Pago total</button>
+        <button class="filter" data-payment="50">Seña 50%</button>
+        <button class="filter" data-payment="sin_sena">Sin seña</button>
+      </div>
+      <label class="category-filter-label">Categoría:<select id="categoryFilter"><option value="all">Todas</option><option value="primera">Primera</option><option value="segunda">Segunda</option><option value="tercera">Tercera</option><option value="sin_definir">Sin definir</option></select></label>
     </section>
 
     <section class="list-card verified-card">
       <div class="list-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><strong id="verifiedCount">0</strong></div>
-      <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>DNI</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="verifiedBody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="verifiedBody"></tbody></table></div>
     </section>
 
     <section class="list-card pending-card">
       <div class="list-heading"><div><span>PENDIENTES DE REVISIÓN</span><h2>DNI no encontrado en la base</h2></div><strong id="pendingCount">0</strong></div>
       <p class="pending-note">Se conserva el nombre ingresado hasta que un administrador pueda corroborarlo.</p>
-      <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>DNI</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
     </section>
   </main>
 
@@ -92,6 +95,6 @@
   </dialog>
 
   <script src="../config.js?v=renewable-session-1"></script>
-  <script src="./privados.js?v=6" defer></script>
+  <script src="./privados.js?v=7" defer></script>
 </body>
 </html>

@@ -51,6 +51,7 @@ module.exports = function createTorneosPrivadosRouter() {
           nombre_oficial TEXT NOT NULL,
           dni TEXT NOT NULL,
           whatsapp TEXT NOT NULL,
+          categoria TEXT,
           estado_pago TEXT NOT NULL CHECK (estado_pago IN ('total', '50')),
           corroborado BOOLEAN NOT NULL DEFAULT false,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -62,10 +63,17 @@ module.exports = function createTorneosPrivadosRouter() {
           ON torneo_inscripciones(torneo_organizador_id, corroborado, created_at DESC);
 
         ALTER TABLE torneo_inscripciones
+          ADD COLUMN IF NOT EXISTS categoria TEXT;
+        ALTER TABLE torneo_inscripciones
           DROP CONSTRAINT IF EXISTS torneo_inscripciones_estado_pago_check;
         ALTER TABLE torneo_inscripciones
           ADD CONSTRAINT torneo_inscripciones_estado_pago_check
           CHECK (estado_pago IN ('total', '50', 'sin_sena'));
+        ALTER TABLE torneo_inscripciones
+          DROP CONSTRAINT IF EXISTS torneo_inscripciones_categoria_check;
+        ALTER TABLE torneo_inscripciones
+          ADD CONSTRAINT torneo_inscripciones_categoria_check
+          CHECK (categoria IS NULL OR categoria IN ('primera', 'segunda', 'tercera'));
       `).catch((error) => {
         schemaPromise = null;
         throw error;
@@ -241,7 +249,7 @@ module.exports = function createTorneosPrivadosRouter() {
       await ensureSchema();
       const organizador = await findOrganizador({ id: req.user.torneoOrganizadorId, includeInactive: true });
       const { rows } = await pool.query(`
-        SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp,
+        SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp, i.categoria,
                i.estado_pago, i.corroborado, i.created_at, i.updated_at,
                COALESCE(j.foto_path, '') AS foto_path
           FROM torneo_inscripciones i
@@ -299,9 +307,10 @@ module.exports = function createTorneosPrivadosRouter() {
       const nombre = String(req.body?.nombre || '').trim().replace(/\s+/g, ' ');
       const dni = cleanDni(req.body?.dni);
       const whatsapp = cleanWhatsapp(req.body?.whatsapp);
+      const categoria = ['primera', 'segunda', 'tercera'].includes(req.body?.categoria) ? req.body.categoria : '';
       const estadoPago = ['total', '50', 'sin_sena'].includes(req.body?.estadoPago) ? req.body.estadoPago : '';
-      if (!nombre || dni.length < 6 || !estadoPago) {
-        return res.status(400).json({ ok: false, error: 'Nombre, DNI y estado de pago son obligatorios' });
+      if (!nombre || dni.length < 6 || !categoria || !estadoPago) {
+        return res.status(400).json({ ok: false, error: 'Nombre, DNI, categoría y estado de pago son obligatorios' });
       }
       const found = await pool.query(`
         SELECT id, nombre FROM jugadores
@@ -314,10 +323,10 @@ module.exports = function createTorneosPrivadosRouter() {
       }
       const result = await pool.query(`
         INSERT INTO torneo_inscripciones
-          (torneo_organizador_id, jugador_id, nombre_ingresado, nombre_oficial, dni, whatsapp, estado_pago, corroborado)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          (torneo_organizador_id, jugador_id, nombre_ingresado, nombre_oficial, dni, whatsapp, categoria, estado_pago, corroborado)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
         RETURNING *
-      `, [req.user.torneoOrganizadorId, player?.id || null, nombre, player?.nombre || nombre, dni, whatsapp, estadoPago, Boolean(player)]);
+      `, [req.user.torneoOrganizadorId, player?.id || null, nombre, player?.nombre || nombre, dni, whatsapp, categoria, estadoPago, Boolean(player)]);
       res.status(201).json({ ok: true, corroborado: Boolean(player), inscripcion: result.rows[0] });
     } catch (error) {
       if (error?.code === '23505') return res.status(409).json({ ok: false, error: 'Ese DNI ya está inscripto en este torneo' });
@@ -354,6 +363,22 @@ module.exports = function createTorneosPrivadosRouter() {
     } catch (error) {
       console.error('PATCH contacto inscripción', error);
       res.status(500).json({ ok: false, error: 'No se pudo actualizar el contacto' });
+    }
+  });
+
+  router.patch('/torneo-organizador/inscripciones/:id/categoria', requireTorneoOrganizador, async (req, res) => {
+    try {
+      const categoria = ['primera', 'segunda', 'tercera'].includes(req.body?.categoria) ? req.body.categoria : '';
+      if (!categoria) return res.status(400).json({ ok: false, error: 'Categoría inválida' });
+      const result = await pool.query(`
+        UPDATE torneo_inscripciones SET categoria=$1, updated_at=NOW()
+         WHERE id=$2 AND torneo_organizador_id=$3 RETURNING *
+      `, [categoria, Number(req.params.id), req.user.torneoOrganizadorId]);
+      if (!result.rowCount) return res.status(404).json({ ok: false, error: 'Inscripción no encontrada' });
+      res.json({ ok: true, inscripcion: result.rows[0] });
+    } catch (error) {
+      console.error('PATCH categoría inscripción', error);
+      res.status(500).json({ ok: false, error: 'No se pudo actualizar la categoría' });
     }
   });
 
