@@ -1,0 +1,175 @@
+:root{
+  --bg:#0a0a0a;
+  --panel:#16171a;
+  --ink:#fff;
+  --muted:#a8abb3;
+  --gold:#ffcc00;
+  --gold-soft:#ffd966;
+  --line:#ffffff22;
+  --ok:#4ee07b;
+  --bad:#ff6675;
+}
+*{ box-sizing:border-box; }
+html{ color-scheme:dark; }
+body{
+  margin:0;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:Inter,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+.container{ max-width:2000px; margin:0 auto; padding:18px 16px 44px; }
+header{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:14px;
+  border-bottom:1px solid var(--line);
+}
+.logo-link{ display:inline-block; line-height:0; }
+.liga-logo{ width:60px; height:60px; object-fit:contain; }
+.title{
+  color:var(--gold);
+  font-size:clamp(22px,4.3vw,34px);
+  font-weight:900;
+  letter-spacing:.06em;
+  text-align:center;
+}
+.actions{ margin-left:auto; display:flex; }
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:5px;
+  border:1px solid #b28900;
+  border-radius:10px;
+  background:transparent;
+  color:var(--gold);
+  font-weight:800;
+  text-decoration:none;
+}
+.ranking-page{ width:min(1180px,100%); margin:24px auto 0; }
+.ranking-hero{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:14px;
+  padding:18px 20px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:linear-gradient(135deg,#18191c,#0e0f11);
+  box-shadow:0 10px 25px #0007;
+}
+.eyebrow{ color:var(--gold); font-size:11px; font-weight:900; letter-spacing:.1em; }
+.ranking-hero h1{ margin:3px 0 4px; color:var(--gold); font-size:clamp(24px,4vw,38px); text-transform:uppercase; }
+.ranking-hero p{ margin:0; color:var(--muted); font-size:13px; }
+.rad-badge{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:auto auto auto;
+  gap:4px;
+  align-items:center;
+  padding:8px 12px;
+  border:1px solid #168b3d;
+  border-radius:10px;
+  color:#57e67c;
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.rad-badge strong{ color:#fff; font-size:16px; }
+.ranking-panel{
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--panel);
+  box-shadow:0 10px 25px #0007;
+}
+.ranking-status{ padding:24px; color:var(--gold-soft); font-weight:800; text-align:center; }
+.ranking-status.error{ color:var(--bad); }
+.ranking-table-wrap{ overflow-x:auto; }
+.ranking-table{ width:100%; min-width:960px; border-collapse:collapse; font-size:12px; }
+.ranking-table th,
+.ranking-table td{ padding:9px 10px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+.ranking-table th{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#0e0f11;
+  color:var(--gold);
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+}
+.ranking-table tbody tr{ transition:background .15s ease; }
+.ranking-table tbody tr:hover{ background:#ffffff08; }
+.ranking-table tbody tr:last-child td{ border-bottom:0; }
+.ranking-table .num{ text-align:right; }
+.position-col{ width:50px; }
+.photo-col{ width:52px; }
+.rank-position{ color:var(--gold-soft); font-weight:900; }
+.player-avatar-button,
+.player-name-button{
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  cursor:pointer;
+}
+.player-avatar-button{
+  display:block;
+  width:36px;
+  height:36px;
+  overflow:hidden;
+  border:1px solid #b28900;
+  border-radius:50%;
+}
+.player-avatar-button img{ display:block; width:100%; height:100%; object-fit:cover; }
+.player-name-button{ color:#fff; font-weight:900; text-align:left; text-transform:uppercase; }
+.player-name-button:hover,
+.player-name-button:focus-visible{ color:var(--gold-soft); text-decoration:underline; }
+.team-name{ color:#d3d5dc; font-weight:700; text-transform:uppercase; }
+.rad-score{ color:#67ec88; background:#0d2b1766; font-size:13px; font-weight:900; }
+.positive{ color:var(--ok); font-weight:900; }
+.negative{ color:var(--bad); font-weight:900; }
+.ranking-help{ margin:10px 4px 0; color:var(--muted); font-size:11px; }
+.player-profile-modal[hidden]{ display:none !important; }
+.player-profile-modal{ position:fixed; inset:0; z-index:5000; display:grid; place-items:center; padding:18px; }
+.player-profile-backdrop{ position:absolute; inset:0; background:#000d; backdrop-filter:blur(3px); }
+.player-profile-dialog{
+  position:relative;
+  display:grid;
+  grid-template-rows:auto 1fr;
+  width:min(1100px,96vw);
+  height:min(880px,94vh);
+  overflow:hidden;
+  border:1px solid #b28900;
+  border-radius:16px;
+  background:#0b0c0e;
+  box-shadow:0 25px 80px #000;
+}
+.player-profile-header{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); }
+.player-profile-header h2{ margin:0; color:var(--gold); font-size:16px; text-transform:uppercase; }
+.player-profile-close{ width:38px; height:38px; border:1px solid #b28900; border-radius:10px; background:#151515; color:var(--gold); font-size:25px; cursor:pointer; }
+.player-profile-dialog iframe{ width:100%; height:100%; border:0; background:#0a0a0a; }
+body.profile-open{ overflow:hidden; }
+@media (max-width:640px){
+  .container{ padding:10px 8px 30px; }
+  header{ gap:8px; }
+  .liga-logo{ width:48px; height:48px; }
+  .title{ font-size:clamp(15px,5vw,22px); line-height:1.05; }
+  .btn{ font-size:11px; }
+  .ranking-page{ margin-top:14px; }
+  .ranking-hero{ align-items:flex-start; padding:14px; }
+  .ranking-hero h1{ font-size:21px; }
+  .ranking-hero p{ font-size:11px; }
+  .rad-badge{ grid-template-columns:1fr; gap:0; padding:6px 9px; text-align:center; }
+  .rad-badge strong{ font-size:14px; }
+  .ranking-table{ min-width:860px; }
+  .ranking-table th,.ranking-table td{ padding:8px 7px; }
+  .player-profile-modal{ padding:6px; }
+  .player-profile-dialog{ width:100%; height:96vh; border-radius:12px; }
+}

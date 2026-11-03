@@ -1,64 +1,77 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Primera División - Liga de Pool Independiente</title>
-  <style>
-    :root{--bg:#0f0f12;--text:#eaeaf0;--gold:#ffcc00;}
-    body{
-      margin:0;
-      font-family:Inter,system-ui,sans-serif;
-      background:linear-gradient(135deg,#0b0b10 0%,#14141a 60%,#0b0b10 100%);
-      color:var(--text);
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-    }
-    header{
-      position:fixed;
-      top:0;left:0;width:100%;
-      background:rgba(0,0,0,.85);
-      border-bottom:1px solid rgba(255,255,255,.05);
-      display:flex;
-      align-items:center;
-      padding:20px;
-      z-index:1000;
-    }
-    .logo-link img{height:84px;}
-    main{margin-top:160px;text-align:center;padding:20px;}
-    h1{
-      color:var(--gold);
-      font-size:36px;
-      text-transform:uppercase;
-      text-shadow:0 2px 8px rgba(0,0,0,.5);
-    }
-
-    .mensaje{
-      margin-top:20px;
-      font-size:22px;
-      color:#ffffff;
-      letter-spacing:2px;
-      animation:blinkGlow 1.5s infinite alternate;
-      text-shadow:0 0 6px #fff,0 0 12px #ffcc00,0 0 18px #ffcc00;
-    }
-
-    @keyframes blinkGlow{
-      from{opacity:0.35; transform:scale(0.98);}
-      to{opacity:1; transform:scale(1);}
-    }
-  </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>PRIMERA | Ranking LIPA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="primera.css?v=ranking-primera-1">
 </head>
 <body>
-  <header>
-    <a href="index.html" class="logo-link">
-      <img src="logo_liga.png" alt="Logo LPI">
-    </a>
-  </header>
+  <div class="container">
+    <header>
+      <a class="logo-link" href="./index.html" aria-label="Ir al inicio">
+        <img class="liga-logo" src="./logo_liga.png" alt="Logo de la liga" width="60" height="60">
+      </a>
+      <div class="title">RANKING LIPA · PRIMERA</div>
+      <nav class="actions"><a class="btn" href="./index.html">VOLVER</a></nav>
+    </header>
 
-  <main>
-    <h1>Primera División</h1>
-    <div class="mensaje">PROXIMAMENTE</div>
-  </main>
+    <main class="ranking-page">
+      <section class="ranking-hero" aria-labelledby="rankingTitle">
+        <div>
+          <span class="eyebrow">PRIMERA DIVISIÓN</span>
+          <h1 id="rankingTitle">Ranking de Primera</h1>
+          <p id="rankingMeta">Jugadores con al menos un partido disputado.</p>
+        </div>
+        <div class="rad-badge" title="Rendimiento Ajustado Dinámico">
+          <span>SISTEMA</span><strong>RAD</strong><span>LIPA</span>
+        </div>
+      </section>
+
+      <section class="ranking-panel" aria-live="polite">
+        <div id="rankingStatus" class="ranking-status">Cargando ranking…</div>
+        <div id="rankingTableWrap" class="ranking-table-wrap" hidden>
+          <table class="ranking-table">
+            <thead>
+              <tr>
+                <th class="position-col">#</th>
+                <th class="photo-col" aria-label="Foto"></th>
+                <th>Jugador</th>
+                <th>Equipo</th>
+                <th class="num" title="Partidos jugados">PJ</th>
+                <th class="num rad-head" title="Rendimiento Ajustado Dinámico">RAD</th>
+                <th class="num" title="Efectividad">EFEC</th>
+                <th class="num" title="Partidos ganados">PG</th>
+                <th class="num" title="Partidos perdidos">PP</th>
+                <th class="num" title="Diferencia de triángulos">DIF</th>
+                <th class="num" title="Triángulos a favor">TF</th>
+                <th class="num" title="Triángulos en contra">TC</th>
+              </tr>
+            </thead>
+            <tbody id="rankingRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <p class="ranking-help">Tocá la foto o el nombre para abrir la ficha completa del jugador.</p>
+    </main>
+  </div>
+
+  <div id="playerProfileModal" class="player-profile-modal" hidden>
+    <div class="player-profile-backdrop" data-close-profile="1"></div>
+    <div class="player-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="playerProfileTitle">
+      <div class="player-profile-header">
+        <h2 id="playerProfileTitle">Ficha del jugador</h2>
+        <button id="btnCloseProfile" class="player-profile-close" type="button" aria-label="Cerrar ficha">×</button>
+      </div>
+      <iframe id="playerProfileFrame" title="Ficha completa del jugador"></iframe>
+    </div>
+  </div>
+
+  <script src="./config.js?v=isolated-sessions-1"></script>
+  <script src="./primera.js?v=ranking-primera-1" defer></script>
 </body>
 </html>

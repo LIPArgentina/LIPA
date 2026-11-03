@@ -26,7 +26,7 @@ window.addEventListener('load', () => {
 
 const GROUPS = ['A', 'B'];
 const cache = { ida: null, vuelta: null };
-let selectedKind = 'ida';
+let selectedKind = 'vuelta';
 const SPECIAL_EDITION = 'especial';
 
 function normalizeEditionSelection(value){
@@ -507,7 +507,7 @@ async function switchEdition(edition){
 
 async function init(){
   applyEditionState();
-  selectedKind = 'ida';
+  selectedKind = 'vuelta';
   window.dispatchEvent(new CustomEvent('tournament:edition-changed', {
     detail: { edition: dataEdition(), bracketEdition: dataEdition(), editionSelection: selectedEdition }
   }));

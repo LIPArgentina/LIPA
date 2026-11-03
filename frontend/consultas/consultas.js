@@ -1304,7 +1304,7 @@
     if (params.get('auto') !== '1') return;
     const category = String(params.get('category') || '').trim().toLowerCase();
     const player = String(params.get('player') || '').trim();
-    if (!['segunda', 'tercera'].includes(category) || (category === 'segunda' && !hasSecondAccess) || player.length < 2) return;
+    if (!['primera', 'segunda', 'tercera'].includes(category) || (category === 'segunda' && !hasSecondAccess) || player.length < 2) return;
     if ($category) $category.value = category;
     setConsultMode('individual');
     if ($player) $player.value = player;

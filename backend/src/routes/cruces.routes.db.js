@@ -4567,7 +4567,9 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
   try {
     const category = String(req.query.category || '').trim().toLowerCase();
     const rawLimit = Number(req.query.limit || 10);
-    const limit = [10, 20, 50].includes(rawLimit) ? rawLimit : 10;
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(Math.trunc(rawLimit), 1), 500)
+      : 10;
     const edition = normalizeEdition(req.query.edition, { allowTotal: true, defaultEdition: 'total' });
     const sort = PLAYER_RANKING_SORT_FIELDS[String(req.query.sort || '').toLowerCase()] || 'rad';
     const order = String(req.query.order || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
@@ -4591,6 +4593,28 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
 
     const totalActivePlayers = fullRanking.filter((item) => Number(item.played || 0) > 0).length;
     const ranking = sortPlayerRankingRows(fullRanking, sort, order).slice(0, limit);
+    const playerIds = ranking
+      .map((item) => Number(item.id || item.playerId || 0))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    const photoByPlayerId = new Map();
+
+    if (playerIds.length) {
+      const { rows: photoRows } = await pool.query(
+        `SELECT id, foto_path FROM jugadores WHERE id = ANY($1::int[])`,
+        [Array.from(new Set(playerIds))]
+      );
+      photoRows.forEach((row) => {
+        const photoPath = String(row.foto_path || '').trim();
+        if (photoPath) {
+          photoByPlayerId.set(Number(row.id), `/api/players-admin/photo/${encodeURIComponent(photoPath)}`);
+        }
+      });
+    }
+
+    const rankingWithPhotos = ranking.map((item) => ({
+      ...item,
+      fotoUrl: photoByPlayerId.get(Number(item.id || item.playerId || 0)) || ''
+    }));
 
     return res.json({
       ok: true,
@@ -4605,7 +4629,7 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
       totalActivePlayers,
       promotedPlayersExcluded,
       radContext,
-      ranking
+      ranking: rankingWithPhotos
     });
   } catch (err) {
     console.error('GET /player-ranking', err);
