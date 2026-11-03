@@ -33,7 +33,7 @@
       .filter((item) => Number(item?.played || 0) > 0);
 
     if (!players.length) {
-      statusBox.textContent = 'Todavía no hay partidos de Primera validados para armar el ranking.';
+      statusBox.textContent = 'Todavía no hay partidos de Primera validados en la Edición Especial.';
       statusBox.classList.remove('error');
       tableWrap.hidden = true;
       return;
@@ -73,7 +73,7 @@
     });
 
     const total = Number(data?.totalActivePlayers || players.length);
-    metaBox.textContent = `${total} ${total === 1 ? 'jugador con al menos un partido disputado' : 'jugadores con al menos un partido disputado'}.`;
+    metaBox.textContent = `${total} ${total === 1 ? 'jugador con al menos un partido disputado' : 'jugadores con al menos un partido disputado'} en la Edición Especial.`;
     statusBox.hidden = true;
     tableWrap.hidden = false;
   }
@@ -87,7 +87,7 @@
     try {
       const params = new URLSearchParams({
         category: 'primera',
-        edition: 'total',
+        edition: '7',
         limit: '500',
         sort: 'rad',
         order: 'desc',
@@ -116,7 +116,7 @@
       category: 'primera',
       player: playerName,
       auto: '1',
-      edition: 'total'
+      edition: '7'
     });
     profileTitle.textContent = `Ficha de ${playerName}`;
     profileFrame.src = `./consultas/consultas.html?${params.toString()}`;

@@ -93,8 +93,14 @@ async function inferEditionFromDate(dateValue, category = '') {
 
 async function filterItemsByEdition(items = [], edition = CURRENT_EDITION, category = '') {
   if (edition === 'total') return items;
-  const activeEdition = getActiveEditionForCategory(category);
-  const currentEditionStart = await getEditionStartDate(activeEdition, category);
+  const normalizedCategory = String(category || '').trim().toLowerCase();
+  // Primera se disputa dentro de las planillas de Segunda. Para su ranking de
+  // la Edición Especial, el corte de fechas debe salir del fixture de Segunda.
+  const editionCategory = normalizedCategory === 'primera' && Number(edition) === SECOND_SPECIAL_EDITION
+    ? 'segunda'
+    : normalizedCategory;
+  const activeEdition = getActiveEditionForCategory(editionCategory);
+  const currentEditionStart = await getEditionStartDate(activeEdition, editionCategory);
   return items.filter((item) => {
     const dateKey = normalizeDateOnly(item?.fechaISO || item?.fecha_iso || item?.date);
     const itemEdition = dateKey && currentEditionStart && dateKey >= currentEditionStart
