@@ -91,7 +91,8 @@
         limit: '500',
         sort: 'rad',
         order: 'desc',
-        currentCategoryOnly: '1'
+        currentCategoryOnly: '1',
+        radFormula: 'participation'
       });
       const response = await fetch(apiUrl(`/api/cruces/player-ranking?${params.toString()}`), {
         cache: 'no-store',

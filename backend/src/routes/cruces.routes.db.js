@@ -4028,6 +4028,47 @@ function buildRadRankingFromPlayerRows(baseRows = []) {
   };
 }
 
+function applyParticipationRadToPlayerRow(item = {}, context = null) {
+  const played = radNumber(item.played);
+  const wins = radNumber(item.wins);
+  const triangulosFavor = radNumber(item.triangulosFavor);
+  const triangulosContra = radNumber(item.triangulosContra);
+  const effectivenessRatio = played > 0 ? wins / played : 0;
+  const effectiveness = effectivenessRatio * 100;
+  const maxPlayed = radNumber(context?.maxPlayed);
+  const participation = maxPlayed > 0 ? played / maxPlayed : 0;
+  const harmonicDenominator = effectivenessRatio + participation;
+  const rad = harmonicDenominator > 0
+    ? ((2 * effectivenessRatio * participation) / harmonicDenominator) * 100
+    : 0;
+
+  return {
+    ...item,
+    triangulosFavor,
+    triangulosContra,
+    diff: triangulosFavor - triangulosContra,
+    effectiveness: radRound1(effectiveness),
+    rad: radRound1(rad),
+    radParticipation: Math.round(participation * 10000) / 10000
+  };
+}
+
+function buildParticipationRadRankingFromPlayerRows(baseRows = []) {
+  const activeRows = baseRows.filter((item) => radNumber(item.played) > 0);
+  const rawContext = buildRadContextFromRows(activeRows);
+  const ranking = baseRows
+    .map((item) => applyParticipationRadToPlayerRow(item, rawContext))
+    .sort(sortPlayerRadRows);
+
+  return {
+    ranking,
+    radContext: {
+      formula: 'effectiveness_participation_harmonic',
+      maxPlayed: radRound1(rawContext.maxPlayed)
+    }
+  };
+}
+
 function buildRadRankingFromResults(results = [], options = {}) {
   return buildRadRankingFromPlayerRows(buildPlayerRowsFromResults(results, options));
 }
@@ -4606,6 +4647,7 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
     const sort = PLAYER_RANKING_SORT_FIELDS[String(req.query.sort || '').toLowerCase()] || 'rad';
     const order = String(req.query.order || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
     const currentCategoryOnly = ['1', 'true', 'yes', 'si'].includes(String(req.query.currentCategoryOnly || '').trim().toLowerCase());
+    const requestedRadFormula = String(req.query.radFormula || '').trim().toLowerCase();
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
@@ -4629,6 +4671,13 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
       const eligibleRows = filterRankingByPlayerKeys(fullRanking, activePlayerKeys);
       totalRegisteredPlayers = activePlayerKeys.ids.size;
       ({ ranking: fullRanking, radContext } = buildRadRankingFromPlayerRows(eligibleRows));
+    }
+
+    const useParticipationRad = category === 'primera'
+      && currentCategoryOnly
+      && ['participation', 'participacion'].includes(requestedRadFormula);
+    if (useParticipationRad) {
+      ({ ranking: fullRanking, radContext } = buildParticipationRadRankingFromPlayerRows(fullRanking));
     }
 
     const totalActivePlayers = fullRanking.filter((item) => Number(item.played || 0) > 0).length;
@@ -4665,6 +4714,7 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
       sort,
       order,
       currentCategoryOnly,
+      radFormula: useParticipationRad ? 'participation' : 'standard',
       total: ranking.length,
       totalRegisteredPlayers,
       totalActivePlayers,
