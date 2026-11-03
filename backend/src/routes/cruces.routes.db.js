@@ -4562,6 +4562,38 @@ async function countRegisteredIndividualPlayersByCategory(category = '') {
   return Number(rows?.[0]?.total || 0);
 }
 
+async function getActivePlayerKeysByCategory(category = '') {
+  const division = String(category || '').trim().toLowerCase();
+  if (!division) return { ids: new Set(), names: new Set() };
+
+  const { rows } = await pool.query(
+    `
+    SELECT DISTINCT j.id, j.nombre
+    FROM jugadores j
+    INNER JOIN jugador_equipos je ON je.jugador_id = j.id
+    WHERE je.activo = true
+      AND LOWER(je.categoria) = $1
+      AND TRIM(COALESCE(j.nombre, '')) <> ''
+    `,
+    [division]
+  );
+
+  return {
+    ids: new Set(rows.map((row) => Number(row.id || 0)).filter((id) => id > 0)),
+    names: new Set(rows.map((row) => normalizeText(row.nombre)).filter(Boolean))
+  };
+}
+
+function filterRankingByPlayerKeys(rows = [], keys = {}) {
+  const ids = keys?.ids instanceof Set ? keys.ids : new Set();
+  const names = keys?.names instanceof Set ? keys.names : new Set();
+  return rows.filter((row) => {
+    const id = Number(row?.id || row?.playerId || 0);
+    if (id > 0) return ids.has(id);
+    return names.has(normalizeText(row?.name || ''));
+  });
+}
+
 router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) => {
   setNoCache(res);
   try {
@@ -4573,6 +4605,7 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
     const edition = normalizeEdition(req.query.edition, { allowTotal: true, defaultEdition: 'total' });
     const sort = PLAYER_RANKING_SORT_FIELDS[String(req.query.sort || '').toLowerCase()] || 'rad';
     const order = String(req.query.order || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
+    const currentCategoryOnly = ['1', 'true', 'yes', 'si'].includes(String(req.query.currentCategoryOnly || '').trim().toLowerCase());
 
     if (!category) {
       return res.status(400).json({ ok: false, error: 'Seleccioná una categoría.' });
@@ -4588,6 +4621,13 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
       const promoted = await getPromotedPlayerKeys(category);
       const eligibleRows = excludePromotedPlayers(fullRanking, promoted);
       promotedPlayersExcluded = fullRanking.length - eligibleRows.length;
+      ({ ranking: fullRanking, radContext } = buildRadRankingFromPlayerRows(eligibleRows));
+    }
+
+    if (currentCategoryOnly) {
+      const activePlayerKeys = await getActivePlayerKeysByCategory(category);
+      const eligibleRows = filterRankingByPlayerKeys(fullRanking, activePlayerKeys);
+      totalRegisteredPlayers = activePlayerKeys.ids.size;
       ({ ranking: fullRanking, radContext } = buildRadRankingFromPlayerRows(eligibleRows));
     }
 
@@ -4624,6 +4664,7 @@ router.get('/player-ranking', requireAdminForPrivateCategory, async (req, res) =
       limit,
       sort,
       order,
+      currentCategoryOnly,
       total: ranking.length,
       totalRegisteredPlayers,
       totalActivePlayers,

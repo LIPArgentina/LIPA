@@ -90,7 +90,8 @@
         edition: 'total',
         limit: '500',
         sort: 'rad',
-        order: 'desc'
+        order: 'desc',
+        currentCategoryOnly: '1'
       });
       const response = await fetch(apiUrl(`/api/cruces/player-ranking?${params.toString()}`), {
         cache: 'no-store',
