@@ -30,8 +30,8 @@
   function renderCandidates(players) {
     const box = $('#candidateBox');
     if (!players.length) { hideCandidates(); return; }
-    box.innerHTML = `<div class="candidate-help">Coincidencias en la base. Elegir una es opcional.</div>` + players.map(player =>
-      `<button class="candidate-button" type="button" data-candidate-id="${player.id}" data-name="${escapeHtml(player.nombre)}" data-dni="${escapeHtml(player.dni)}"><strong>${escapeHtml(player.nombre)}</strong><span>DNI ${escapeHtml(player.dni)}</span></button>`
+    box.innerHTML = `<div class="candidate-help">Coincidencias en toda la base. Elegir una es opcional.</div>` + players.map(player =>
+      `<button class="candidate-button" type="button" data-candidate-id="${player.id}" data-name="${escapeHtml(player.nombre)}" data-dni="${escapeHtml(player.dni)}"><strong>${escapeHtml(player.nombre)}</strong><span>${player.dni ? `DNI ${escapeHtml(player.dni)}` : 'DNI sin cargar'} · ${player.activo ? 'Activo' : 'Histórico'}</span></button>`
     ).join('');
     box.hidden = false;
   }
@@ -161,7 +161,7 @@
     const button = event.target.closest('[data-candidate-id]');
     if (!button) return;
     $('#playerName').value = button.dataset.name || '';
-    $('#playerDni').value = button.dataset.dni || '';
+    if (button.dataset.dni) $('#playerDni').value = button.dataset.dni;
     hideCandidates();
     $('#playerWhatsapp').focus();
   });

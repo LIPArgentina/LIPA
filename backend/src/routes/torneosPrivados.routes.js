@@ -295,20 +295,31 @@ module.exports = function createTorneosPrivadosRouter() {
       const clauses = [];
       if (dni) {
         values.push(`${dni}%`);
-        clauses.push(`regexp_replace(COALESCE(dni,''), '[^0-9]', '', 'g') LIKE $${values.length}`);
+        clauses.push(`regexp_replace(COALESCE(j.dni,''), '[^0-9]', '', 'g') LIKE $${values.length}`);
       }
       if (words.length) {
         const wordClauses = words.map(word => {
           values.push(`%${word}%`);
-          return `LOWER(COALESCE(nombre_normalizado, nombre, '')) LIKE $${values.length}`;
+          return `LOWER(COALESCE(NULLIF(j.nombre_normalizado, ''), j.nombre, '')) LIKE $${values.length}`;
         });
         clauses.push(`(${wordClauses.join(' AND ')})`);
       }
       if (!clauses.length) return res.json({ ok: true, jugadores: [] });
       const result = await pool.query(`
-        SELECT id, nombre, COALESCE(dni,'') AS dni FROM jugadores
-         WHERE (${clauses.join(' OR ')}) AND COALESCE(dni,'') <> ''
-         ORDER BY nombre ASC, id ASC LIMIT 10
+        SELECT
+          j.id,
+          j.nombre,
+          COALESCE(j.dni, '') AS dni,
+          EXISTS (
+            SELECT 1
+              FROM jugador_equipos je
+             WHERE je.jugador_id = j.id
+               AND je.activo = true
+          ) AS activo
+          FROM jugadores j
+         WHERE (${clauses.join(' OR ')})
+         ORDER BY j.nombre ASC, j.id ASC
+         LIMIT 30
       `, values);
       res.json({ ok: true, jugadores: result.rows });
     } catch (error) {
