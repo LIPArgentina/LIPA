@@ -1,0 +1,5 @@
+.sala-login-card{max-width:520px}
+.session-check{padding:18px;text-align:center;color:#ffd24d;font-weight:800}
+.sala-login-back{display:block;margin-top:18px;text-align:center;color:#ffd24d;font-weight:800;text-decoration:none}
+.sala-login-back:hover{text-decoration:underline}
+body.app-mode .sala-login-back{display:none}

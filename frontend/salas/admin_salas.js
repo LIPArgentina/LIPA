@@ -22,6 +22,13 @@
   function authHeaders(){ const token = getToken(); return token ? { Authorization: `Bearer ${token}` } : {}; }
   function apiUrl(path){ return `${API_BASE}${path}`; }
 
+  function closeSalaSession(){
+    localStorage.removeItem(sessionKey);
+    sessionStorage.removeItem(sessionKey);
+    localStorage.removeItem('lpi.lastSalaSlug');
+    location.replace('./login_sala.html' + (getParams().get('app') === 'true' ? '?app=true' : ''));
+  }
+
   function setSalaName(){
     const sess = readSession();
     const label = sess.displayName || getSalaSlug() || 'Sala';
@@ -210,6 +217,10 @@
         headers: authHeaders()
       });
       const data = await resp.json().catch(() => ({}));
+      if (resp.status === 401 || resp.status === 403) {
+        closeSalaSession();
+        return;
+      }
       if (!resp.ok || data.ok === false) throw new Error(data.error || data.msg || `HTTP ${resp.status}`);
       state.torneos = Array.isArray(data.torneos) ? data.torneos : [];
       state.selectedFiles.clear();
@@ -311,6 +322,7 @@
       updateValuePlaceholders(ev.target.closest('.torneo-slot'));
     });
     $('#btnChangePassword')?.addEventListener('click', openPassModal);
+    $('#btnLogoutSala')?.addEventListener('click', closeSalaSession);
     $('#btnCancelPass')?.addEventListener('click', () => $('#passModal')?.close());
     $('#passForm')?.addEventListener('submit', submitPassword);
   });

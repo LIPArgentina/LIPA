@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ingreso de salas | LIPA</title>
+  <link rel="icon" href="../logo_liga.png">
+  <link rel="stylesheet" href="../auth/login.css?v=sala-directa-1">
+  <link rel="stylesheet" href="./login_sala.css?v=1">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="auth-card sala-login-card">
+      <div class="auth-brand">
+        <img src="../logo_liga.png" alt="Liga Independiente de Pool" class="auth-logo">
+        <h1>Cargar torneo</h1>
+        <p>Ingresá con los datos de tu sala</p>
+      </div>
+
+      <div id="checkingSession" class="session-check">Verificando sesión…</div>
+
+      <form id="salaLoginForm" class="auth-form hidden" autocomplete="on">
+        <label class="field-label" for="salaSelect">Seleccioná sala</label>
+        <select id="salaSelect" name="sala" class="field-control" autocomplete="username" required></select>
+
+        <label class="field-label" for="salaPass">Contraseña</label>
+        <input id="salaPass" name="password" type="password" class="field-control" autocomplete="current-password" required>
+
+        <label class="check-row">
+          <input id="toggleSalaPass" type="checkbox">
+          <span>Mostrar contraseña</span>
+        </label>
+
+        <p id="salaError" class="error hidden">Sala o contraseña incorrecta</p>
+        <div class="form-actions"><button type="submit" class="btn-primary">Ingresar</button></div>
+      </form>
+
+      <a class="sala-login-back" href="../torneos/torneos.html">Volver a torneos</a>
+    </section>
+  </main>
+
+  <script src="../config.js?v=isolated-sessions-1"></script>
+  <script src="./login_sala.js?v=1" defer></script>
+</body>
+</html>
