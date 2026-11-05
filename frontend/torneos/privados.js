@@ -64,13 +64,16 @@
   function paymentState(entry) {
     return entry?.estado_pago === '50' ? 'sena' : String(entry?.estado_pago || 'sin_sena');
   }
-  function validDepositPercent(value) {
-    const percentage = Number(value);
-    return Number.isInteger(percentage) && percentage >= 1 && percentage <= 99 ? percentage : null;
+  function depositAmountFromThousands(value) {
+    const thousands = Number(value);
+    return Number.isInteger(thousands) && thousands >= 1 && thousands <= 99999 ? thousands * 1000 : null;
   }
   function paymentSelect(entry) {
     const state = paymentState(entry);
-    const percentage = validDepositPercent(entry.porcentaje_sena) || (entry.estado_pago === '50' ? 50 : '');
+    const storedAmount = Number(entry.monto_sena || 0);
+    const thousands = storedAmount >= 1000 && storedAmount % 1000 === 0
+      ? storedAmount / 1000
+      : (entry.estado_pago === '50' ? 50 : '');
     const paymentClass = state === 'total' ? 'payment-total' : state === 'sena' ? 'payment-deposit' : 'payment-none';
     return `<div class="payment-editor">
       <select class="payment-select ${paymentClass}" data-id="${entry.id}">
@@ -78,7 +81,7 @@
         <option value="sena" ${state === 'sena' ? 'selected' : ''}>Seña</option>
         <option value="total" ${state === 'total' ? 'selected' : ''}>Pago total</option>
       </select>
-      <label class="table-deposit-percent"><input class="payment-percent" data-id="${entry.id}" type="text" inputmode="numeric" maxlength="2" value="${percentage}" aria-label="Porcentaje de seña" ${state === 'sena' ? '' : 'disabled'}><span>%</span></label>
+      <label class="table-deposit-amount"><span>$</span><input class="payment-amount" data-id="${entry.id}" type="text" inputmode="numeric" maxlength="5" value="${thousands}" aria-label="Monto de seña en miles de pesos" ${state === 'sena' ? '' : 'disabled'}><span>.000</span></label>
     </div>`;
   }
   function categorySelect(entry) {
@@ -163,7 +166,7 @@
         return;
       }
       $('#registrationForm').reset();
-      syncDepositPercent();
+      syncDepositAmount();
       setMessage(data.corroborado ? `Inscripción confirmada como ${data.inscripcion.nombre_oficial}.` : 'Inscripción guardada en la lista provisoria.', true);
       await load();
     } catch (error) { setMessage(error.message); }
@@ -171,27 +174,27 @@
   $('#registrationForm').addEventListener('submit', event => {
     event.preventDefault();
     const payment = new FormData(event.currentTarget).get('payment');
-    const porcentajeSena = payment === 'sena' ? validDepositPercent($('#depositPercent').value) : null;
-    if (payment === 'sena' && porcentajeSena === null) {
-      setMessage('Ingresá un porcentaje de seña entre 1 y 99.');
-      $('#depositPercent').focus();
+    const montoSena = payment === 'sena' ? depositAmountFromThousands($('#depositAmount').value) : null;
+    if (payment === 'sena' && montoSena === null) {
+      setMessage('Ingresá el monto en miles. Por ejemplo, 10 equivale a $10.000.');
+      $('#depositAmount').focus();
       return;
     }
-    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment, porcentajeSena });
+    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment, montoSena });
   });
-  function syncDepositPercent() {
+  function syncDepositAmount() {
     const selected = document.querySelector('input[name="payment"]:checked')?.value;
-    const input = $('#depositPercent');
+    const input = $('#depositAmount');
     input.disabled = selected !== 'sena';
     if (input.disabled) input.value = '';
   }
   document.querySelectorAll('input[name="payment"]').forEach(radio => radio.addEventListener('change', () => {
-    syncDepositPercent();
-    if (radio.checked && radio.value === 'sena') $('#depositPercent').focus();
+    syncDepositAmount();
+    if (radio.checked && radio.value === 'sena') $('#depositAmount').focus();
   }));
   document.addEventListener('input', event => {
-    if (!event.target.matches('#depositPercent, .payment-percent')) return;
-    event.target.value = String(event.target.value || '').replace(/\D/g, '').slice(0, 2);
+    if (!event.target.matches('#depositAmount, .payment-amount')) return;
+    event.target.value = String(event.target.value || '').replace(/\D/g, '').slice(0, 5);
   });
   $('#playerName').addEventListener('input', scheduleCandidateSearch);
   $('#playerDni').addEventListener('input', scheduleCandidateSearch);
@@ -234,24 +237,24 @@
       } catch (error) { alert(error.message); await load(); }
       return;
     }
-    const paymentControl = event.target.closest('.payment-select, .payment-percent');
+    const paymentControl = event.target.closest('.payment-select, .payment-amount');
     if (!paymentControl) return;
     const editor = paymentControl.closest('.payment-editor');
     const select = editor.querySelector('.payment-select');
-    const percentageInput = editor.querySelector('.payment-percent');
+    const amountInput = editor.querySelector('.payment-amount');
     if (paymentControl.matches('.payment-select') && select.value === 'sena') {
-      percentageInput.disabled = false;
-      percentageInput.focus();
+      amountInput.disabled = false;
+      amountInput.focus();
       return;
     }
-    const porcentajeSena = select.value === 'sena' ? validDepositPercent(percentageInput.value) : null;
-    if (select.value === 'sena' && porcentajeSena === null) {
-      alert('Ingresá un porcentaje de seña entre 1 y 99.');
-      percentageInput.focus();
+    const montoSena = select.value === 'sena' ? depositAmountFromThousands(amountInput.value) : null;
+    if (select.value === 'sena' && montoSena === null) {
+      alert('Ingresá el monto en miles. Por ejemplo, 10 equivale a $10.000.');
+      amountInput.focus();
       return;
     }
     try {
-      await api(`/torneo-organizador/inscripciones/${select.dataset.id}/pago`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ estadoPago:select.value, porcentajeSena }) });
+      await api(`/torneo-organizador/inscripciones/${select.dataset.id}/pago`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ estadoPago:select.value, montoSena }) });
       await load();
     } catch (error) { alert(error.message); await load(); }
   });

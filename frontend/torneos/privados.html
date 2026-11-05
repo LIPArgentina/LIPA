@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=10">
+  <link rel="stylesheet" href="./privados.css?v=11">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -34,7 +34,7 @@
         <fieldset>
           <legend>Pago realizado</legend>
           <label class="radio"><input type="radio" name="payment" value="total" required> Total</label>
-          <label class="radio deposit-radio"><input type="radio" name="payment" value="sena" required> Seña <span class="deposit-percent"><input id="depositPercent" type="text" inputmode="numeric" maxlength="2" placeholder="%" aria-label="Porcentaje de seña" disabled><span>%</span></span></label>
+          <label class="radio deposit-radio"><input type="radio" name="payment" value="sena" required> Seña <span class="deposit-amount"><span>$</span><input id="depositAmount" type="text" inputmode="numeric" maxlength="5" placeholder="10" aria-label="Monto de seña en miles de pesos" disabled><span>.000</span></span></label>
           <label class="radio"><input type="radio" name="payment" value="sin_sena" required> Sin seña</label>
         </fieldset>
         <button class="primary" type="submit">Aceptar inscripción</button>
@@ -94,6 +94,6 @@
   </dialog>
 
   <script src="../config.js?v=isolated-sessions-1"></script>
-  <script src="./privados.js?v=11" defer></script>
+  <script src="./privados.js?v=12" defer></script>
 </body>
 </html>
