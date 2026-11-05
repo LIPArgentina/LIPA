@@ -98,6 +98,63 @@ module.exports = function createTorneosPrivadosRouter() {
     return schemaPromise;
   }
 
+  async function reconcilePendingRegistrations(organizerId) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query(`
+        SELECT
+          i.id AS inscripcion_id,
+          j.id AS jugador_id,
+          j.nombre,
+          j.categoria_actual,
+          ARRAY(
+            SELECT je.categoria
+              FROM jugador_equipos je
+             WHERE je.jugador_id = j.id
+               AND je.activo = true
+             ORDER BY je.desde DESC NULLS LAST, je.id DESC
+          ) AS categorias_activas
+          FROM torneo_inscripciones i
+          JOIN LATERAL (
+            SELECT candidate.id, candidate.nombre, candidate.categoria_actual
+              FROM jugadores candidate
+             WHERE regexp_replace(COALESCE(candidate.dni, ''), '[^0-9]', '', 'g') =
+                   regexp_replace(COALESCE(i.dni, ''), '[^0-9]', '', 'g')
+               AND regexp_replace(COALESCE(candidate.dni, ''), '[^0-9]', '', 'g') <> ''
+             ORDER BY candidate.id ASC
+             LIMIT 1
+          ) j ON true
+         WHERE i.torneo_organizador_id = $1
+           AND i.corroborado = false
+         FOR UPDATE OF i
+      `, [organizerId]);
+
+      for (const row of rows) {
+        const categoria = categoriaMasBaja(row.categoria_actual, row.categorias_activas || []);
+        await client.query(`
+          UPDATE torneo_inscripciones
+             SET jugador_id = $1,
+                 nombre_oficial = $2,
+                 categoria = COALESCE($3, categoria),
+                 corroborado = true,
+                 updated_at = NOW()
+           WHERE id = $4
+             AND torneo_organizador_id = $5
+             AND corroborado = false
+        `, [row.jugador_id, row.nombre, categoria, row.inscripcion_id, organizerId]);
+      }
+
+      await client.query('COMMIT');
+      return rows.length;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async function findOrganizador({ id, slug, includeInactive = false }) {
     await ensureSchema();
     const values = [];
@@ -263,6 +320,7 @@ module.exports = function createTorneosPrivadosRouter() {
   router.get('/torneo-organizador/inscripciones', requireTorneoOrganizador, async (req, res) => {
     try {
       await ensureSchema();
+      const actualizadas = await reconcilePendingRegistrations(req.user.torneoOrganizadorId);
       const organizador = await findOrganizador({ id: req.user.torneoOrganizadorId, includeInactive: true });
       const { rows } = await pool.query(`
         SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp, i.categoria,
@@ -277,10 +335,21 @@ module.exports = function createTorneosPrivadosRouter() {
         nombreOrganizador: organizador.nombre_organizador,
         whatsapp: organizador.whatsapp, ubicacion: organizador.ubicacion,
         mustChangePassword: organizador.must_change_password
-      }, inscripciones: rows });
+      }, inscripciones: rows, pendientesActualizadas: actualizadas });
     } catch (error) {
       console.error('GET /torneo-organizador/inscripciones', error);
       res.status(500).json({ ok: false, error: 'No se pudieron cargar las inscripciones' });
+    }
+  });
+
+  router.post('/torneo-organizador/inscripciones/revisar-pendientes', requireTorneoOrganizador, async (req, res) => {
+    try {
+      await ensureSchema();
+      const actualizadas = await reconcilePendingRegistrations(req.user.torneoOrganizadorId);
+      res.json({ ok: true, actualizadas });
+    } catch (error) {
+      console.error('POST /torneo-organizador/inscripciones/revisar-pendientes', error);
+      res.status(500).json({ ok: false, error: 'No se pudieron revisar las inscripciones pendientes' });
     }
   });
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=8">
+  <link rel="stylesheet" href="./privados.css?v=9">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -59,8 +59,8 @@
     </section>
 
     <section class="list-card pending-card">
-      <div class="list-heading"><div><span>PENDIENTES DE REVISIÓN</span><h2>DNI no encontrado en la base</h2></div><strong id="pendingCount">0</strong></div>
-      <p class="pending-note">Se conserva el nombre ingresado hasta que un administrador pueda corroborarlo.</p>
+      <div class="list-heading"><div><span>PENDIENTES DE REVISIÓN</span><h2>DNI no encontrado en la base</h2></div><div class="pending-heading-actions"><button id="refreshPending" type="button">Revisar pendientes</button><strong id="pendingCount">0</strong></div></div>
+      <p class="pending-note">Después de cargar o corregir el DNI en la base, usá “Revisar pendientes” para corroborarlo.</p>
       <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
     </section>
   </main>
@@ -94,6 +94,6 @@
   </dialog>
 
   <script src="../config.js?v=isolated-sessions-1"></script>
-  <script src="./privados.js?v=9" defer></script>
+  <script src="./privados.js?v=10" defer></script>
 </body>
 </html>

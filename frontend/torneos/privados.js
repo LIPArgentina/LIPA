@@ -124,6 +124,24 @@
     render();
     if (info.mustChangePassword || session.mustChangePassword) openPassword(true);
   }
+  $('#refreshPending').addEventListener('click', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Revisando…';
+    try {
+      const data = await api('/torneo-organizador/inscripciones/revisar-pendientes', { method: 'POST' });
+      const count = Number(data.actualizadas || 0);
+      setMessage(count
+        ? `${count} ${count === 1 ? 'inscripción actualizada' : 'inscripciones actualizadas'} desde la base.`
+        : 'No se encontraron nuevas coincidencias por DNI.', true);
+      await load();
+    } catch (error) {
+      setMessage(error.message || 'No se pudieron revisar los pendientes.');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Revisar pendientes';
+    }
+  });
   async function saveRegistration(payload, confirmed = false) {
     try {
       const data = await api('/torneo-organizador/inscripciones', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
