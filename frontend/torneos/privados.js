@@ -61,13 +61,25 @@
     const digits = String(value || '').replace(/\D/g, '');
     return digits ? `https://wa.me/${digits}` : '#';
   }
+  function paymentState(entry) {
+    return entry?.estado_pago === '50' ? 'sena' : String(entry?.estado_pago || 'sin_sena');
+  }
+  function validDepositPercent(value) {
+    const percentage = Number(value);
+    return Number.isInteger(percentage) && percentage >= 1 && percentage <= 99 ? percentage : null;
+  }
   function paymentSelect(entry) {
-    const paymentClass = entry.estado_pago === 'total' ? 'payment-total' : entry.estado_pago === '50' ? 'payment-half' : 'payment-none';
-    return `<select class="payment-select ${paymentClass}" data-id="${entry.id}">
-      <option value="sin_sena" ${entry.estado_pago === 'sin_sena' ? 'selected' : ''}>Sin seña</option>
-      <option value="50" ${entry.estado_pago === '50' ? 'selected' : ''}>50% de seña</option>
-      <option value="total" ${entry.estado_pago === 'total' ? 'selected' : ''}>Pago total</option>
-    </select>`;
+    const state = paymentState(entry);
+    const percentage = validDepositPercent(entry.porcentaje_sena) || (entry.estado_pago === '50' ? 50 : '');
+    const paymentClass = state === 'total' ? 'payment-total' : state === 'sena' ? 'payment-deposit' : 'payment-none';
+    return `<div class="payment-editor">
+      <select class="payment-select ${paymentClass}" data-id="${entry.id}">
+        <option value="sin_sena" ${state === 'sin_sena' ? 'selected' : ''}>Sin seña</option>
+        <option value="sena" ${state === 'sena' ? 'selected' : ''}>Seña</option>
+        <option value="total" ${state === 'total' ? 'selected' : ''}>Pago total</option>
+      </select>
+      <label class="table-deposit-percent"><input class="payment-percent" data-id="${entry.id}" type="text" inputmode="numeric" maxlength="2" value="${percentage}" aria-label="Porcentaje de seña" ${state === 'sena' ? '' : 'disabled'}><span>%</span></label>
+    </div>`;
   }
   function categorySelect(entry) {
     return `<select class="category-select ${entry.categoria ? '' : 'category-missing'}" data-category-id="${entry.id}">
@@ -99,7 +111,7 @@
   }
   function render() {
     const filtered = entries.filter(item => {
-      const paymentMatches = paymentFilter === 'all' || item.estado_pago === paymentFilter;
+      const paymentMatches = paymentFilter === 'all' || paymentState(item) === paymentFilter;
       const categoryMatches = categoryFilter === 'all'
         || (categoryFilter === 'sin_definir' ? !item.categoria : item.categoria === categoryFilter);
       return paymentMatches && categoryMatches;
@@ -151,6 +163,7 @@
         return;
       }
       $('#registrationForm').reset();
+      syncDepositPercent();
       setMessage(data.corroborado ? `Inscripción confirmada como ${data.inscripcion.nombre_oficial}.` : 'Inscripción guardada en la lista provisoria.', true);
       await load();
     } catch (error) { setMessage(error.message); }
@@ -158,7 +171,27 @@
   $('#registrationForm').addEventListener('submit', event => {
     event.preventDefault();
     const payment = new FormData(event.currentTarget).get('payment');
-    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment });
+    const porcentajeSena = payment === 'sena' ? validDepositPercent($('#depositPercent').value) : null;
+    if (payment === 'sena' && porcentajeSena === null) {
+      setMessage('Ingresá un porcentaje de seña entre 1 y 99.');
+      $('#depositPercent').focus();
+      return;
+    }
+    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment, porcentajeSena });
+  });
+  function syncDepositPercent() {
+    const selected = document.querySelector('input[name="payment"]:checked')?.value;
+    const input = $('#depositPercent');
+    input.disabled = selected !== 'sena';
+    if (input.disabled) input.value = '';
+  }
+  document.querySelectorAll('input[name="payment"]').forEach(radio => radio.addEventListener('change', () => {
+    syncDepositPercent();
+    if (radio.checked && radio.value === 'sena') $('#depositPercent').focus();
+  }));
+  document.addEventListener('input', event => {
+    if (!event.target.matches('#depositPercent, .payment-percent')) return;
+    event.target.value = String(event.target.value || '').replace(/\D/g, '').slice(0, 2);
   });
   $('#playerName').addEventListener('input', scheduleCandidateSearch);
   $('#playerDni').addEventListener('input', scheduleCandidateSearch);
@@ -201,10 +234,24 @@
       } catch (error) { alert(error.message); await load(); }
       return;
     }
-    const select = event.target.closest('.payment-select');
-    if (!select) return;
+    const paymentControl = event.target.closest('.payment-select, .payment-percent');
+    if (!paymentControl) return;
+    const editor = paymentControl.closest('.payment-editor');
+    const select = editor.querySelector('.payment-select');
+    const percentageInput = editor.querySelector('.payment-percent');
+    if (paymentControl.matches('.payment-select') && select.value === 'sena') {
+      percentageInput.disabled = false;
+      percentageInput.focus();
+      return;
+    }
+    const porcentajeSena = select.value === 'sena' ? validDepositPercent(percentageInput.value) : null;
+    if (select.value === 'sena' && porcentajeSena === null) {
+      alert('Ingresá un porcentaje de seña entre 1 y 99.');
+      percentageInput.focus();
+      return;
+    }
     try {
-      await api(`/torneo-organizador/inscripciones/${select.dataset.id}/pago`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ estadoPago:select.value }) });
+      await api(`/torneo-organizador/inscripciones/${select.dataset.id}/pago`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ estadoPago:select.value, porcentajeSena }) });
       await load();
     } catch (error) { alert(error.message); await load(); }
   });

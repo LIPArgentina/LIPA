@@ -68,7 +68,8 @@ module.exports = function createTorneosPrivadosRouter() {
           dni TEXT NOT NULL,
           whatsapp TEXT NOT NULL,
           categoria TEXT,
-          estado_pago TEXT NOT NULL CHECK (estado_pago IN ('total', '50')),
+          estado_pago TEXT NOT NULL CHECK (estado_pago IN ('total', 'sena', 'sin_sena')),
+          porcentaje_sena SMALLINT,
           corroborado BOOLEAN NOT NULL DEFAULT false,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -81,10 +82,33 @@ module.exports = function createTorneosPrivadosRouter() {
         ALTER TABLE torneo_inscripciones
           ADD COLUMN IF NOT EXISTS categoria TEXT;
         ALTER TABLE torneo_inscripciones
+          ADD COLUMN IF NOT EXISTS porcentaje_sena SMALLINT;
+        ALTER TABLE torneo_inscripciones
           DROP CONSTRAINT IF EXISTS torneo_inscripciones_estado_pago_check;
+        UPDATE torneo_inscripciones
+           SET porcentaje_sena = 50
+         WHERE estado_pago = '50'
+           AND porcentaje_sena IS NULL;
+        UPDATE torneo_inscripciones
+           SET estado_pago = 'sena'
+         WHERE estado_pago = '50';
+        UPDATE torneo_inscripciones
+           SET porcentaje_sena = COALESCE(porcentaje_sena, 50)
+         WHERE estado_pago = 'sena';
+        UPDATE torneo_inscripciones
+           SET porcentaje_sena = NULL
+         WHERE estado_pago <> 'sena';
         ALTER TABLE torneo_inscripciones
           ADD CONSTRAINT torneo_inscripciones_estado_pago_check
-          CHECK (estado_pago IN ('total', '50', 'sin_sena'));
+          CHECK (estado_pago IN ('total', 'sena', 'sin_sena'));
+        ALTER TABLE torneo_inscripciones
+          DROP CONSTRAINT IF EXISTS torneo_inscripciones_porcentaje_sena_check;
+        ALTER TABLE torneo_inscripciones
+          ADD CONSTRAINT torneo_inscripciones_porcentaje_sena_check
+          CHECK (
+            (estado_pago = 'sena' AND porcentaje_sena BETWEEN 1 AND 99)
+            OR (estado_pago IN ('total', 'sin_sena') AND porcentaje_sena IS NULL)
+          );
         ALTER TABLE torneo_inscripciones
           DROP CONSTRAINT IF EXISTS torneo_inscripciones_categoria_check;
         ALTER TABLE torneo_inscripciones
@@ -324,7 +348,7 @@ module.exports = function createTorneosPrivadosRouter() {
       const organizador = await findOrganizador({ id: req.user.torneoOrganizadorId, includeInactive: true });
       const { rows } = await pool.query(`
         SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp, i.categoria,
-               i.estado_pago, i.corroborado, i.created_at, i.updated_at,
+               i.estado_pago, i.porcentaje_sena, i.corroborado, i.created_at, i.updated_at,
                COALESCE(j.foto_path, '') AS foto_path
           FROM torneo_inscripciones i
           LEFT JOIN jugadores j ON j.id = i.jugador_id
@@ -403,9 +427,17 @@ module.exports = function createTorneosPrivadosRouter() {
       const nombre = String(req.body?.nombre || '').trim().replace(/\s+/g, ' ');
       const dni = cleanDni(req.body?.dni);
       const whatsapp = cleanWhatsapp(req.body?.whatsapp);
-      const estadoPago = ['total', '50', 'sin_sena'].includes(req.body?.estadoPago) ? req.body.estadoPago : '';
-      if (!nombre || dni.length < 6 || !estadoPago) {
+      const requestedPayment = String(req.body?.estadoPago || '').trim().toLowerCase();
+      const estadoPago = requestedPayment === '50' ? 'sena' : requestedPayment;
+      const rawPercentage = Number(req.body?.porcentajeSena ?? (requestedPayment === '50' ? 50 : NaN));
+      const porcentajeSena = estadoPago === 'sena' && Number.isInteger(rawPercentage) && rawPercentage >= 1 && rawPercentage <= 99
+        ? rawPercentage
+        : null;
+      if (!nombre || dni.length < 6 || !['total', 'sena', 'sin_sena'].includes(estadoPago)) {
         return res.status(400).json({ ok: false, error: 'Nombre, DNI y estado de pago son obligatorios' });
+      }
+      if (estadoPago === 'sena' && porcentajeSena === null) {
+        return res.status(400).json({ ok: false, error: 'Ingresá un porcentaje de seña entre 1 y 99' });
       }
       const found = await pool.query(`
         SELECT j.id, j.nombre, j.categoria_actual,
@@ -425,10 +457,10 @@ module.exports = function createTorneosPrivadosRouter() {
       }
       const result = await pool.query(`
         INSERT INTO torneo_inscripciones
-          (torneo_organizador_id, jugador_id, nombre_ingresado, nombre_oficial, dni, whatsapp, categoria, estado_pago, corroborado)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          (torneo_organizador_id, jugador_id, nombre_ingresado, nombre_oficial, dni, whatsapp, categoria, estado_pago, porcentaje_sena, corroborado)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
         RETURNING *
-      `, [req.user.torneoOrganizadorId, player?.id || null, nombre, player?.nombre || nombre, dni, whatsapp, categoria, estadoPago, Boolean(player)]);
+      `, [req.user.torneoOrganizadorId, player?.id || null, nombre, player?.nombre || nombre, dni, whatsapp, categoria, estadoPago, porcentajeSena, Boolean(player)]);
       res.status(201).json({ ok: true, corroborado: Boolean(player), inscripcion: result.rows[0] });
     } catch (error) {
       if (error?.code === '23505') return res.status(409).json({ ok: false, error: 'Ese DNI ya está inscripto en este torneo' });
@@ -439,12 +471,19 @@ module.exports = function createTorneosPrivadosRouter() {
 
   router.patch('/torneo-organizador/inscripciones/:id/pago', requireTorneoOrganizador, async (req, res) => {
     try {
-      const estado = ['total', '50', 'sin_sena'].includes(req.body?.estadoPago) ? req.body.estadoPago : '';
-      if (!estado) return res.status(400).json({ ok: false, error: 'Estado de pago inválido' });
+      const requestedPayment = String(req.body?.estadoPago || '').trim().toLowerCase();
+      const estado = requestedPayment === '50' ? 'sena' : requestedPayment;
+      const rawPercentage = Number(req.body?.porcentajeSena ?? (requestedPayment === '50' ? 50 : NaN));
+      const porcentajeSena = estado === 'sena' && Number.isInteger(rawPercentage) && rawPercentage >= 1 && rawPercentage <= 99
+        ? rawPercentage
+        : null;
+      if (!['total', 'sena', 'sin_sena'].includes(estado)) return res.status(400).json({ ok: false, error: 'Estado de pago inválido' });
+      if (estado === 'sena' && porcentajeSena === null) return res.status(400).json({ ok: false, error: 'Ingresá un porcentaje de seña entre 1 y 99' });
       const result = await pool.query(`
-        UPDATE torneo_inscripciones SET estado_pago=$1, updated_at=NOW()
-         WHERE id=$2 AND torneo_organizador_id=$3 RETURNING *
-      `, [estado, Number(req.params.id), req.user.torneoOrganizadorId]);
+        UPDATE torneo_inscripciones
+           SET estado_pago=$1, porcentaje_sena=$2, updated_at=NOW()
+         WHERE id=$3 AND torneo_organizador_id=$4 RETURNING *
+      `, [estado, porcentajeSena, Number(req.params.id), req.user.torneoOrganizadorId]);
       if (!result.rowCount) return res.status(404).json({ ok: false, error: 'Inscripción no encontrada' });
       res.json({ ok: true, inscripcion: result.rows[0] });
     } catch (error) {
