@@ -21,6 +21,15 @@ function cleanWhatsapp(value) {
   return String(value || '').replace(/[^\d+]/g, '');
 }
 
+function normalizePesoAmount(value) {
+  const raw = String(value ?? '').trim();
+  const clean = raw.replace(/\./g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+  if (!clean) return null;
+  const parsed = Number(clean);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed < 1000 ? parsed * 1000 : parsed);
+}
+
 function normalizeCategoria(value) {
   const category = String(value || '').trim().toLowerCase();
   if (['primera', '1ra', '1era'].includes(category)) return 'primera';
@@ -111,7 +120,7 @@ module.exports = function createTorneosPrivadosRouter() {
         ALTER TABLE torneo_inscripciones
           ADD CONSTRAINT torneo_inscripciones_monto_sena_check
           CHECK (
-            (estado_pago = 'sena' AND monto_sena BETWEEN 1000 AND 99999000 AND monto_sena % 1000 = 0)
+            (estado_pago = 'sena' AND monto_sena BETWEEN 1000 AND 99999000)
             OR (estado_pago IN ('total', 'sin_sena') AND monto_sena IS NULL)
           );
         ALTER TABLE torneo_inscripciones
@@ -434,16 +443,16 @@ module.exports = function createTorneosPrivadosRouter() {
       const whatsapp = cleanWhatsapp(req.body?.whatsapp);
       const requestedPayment = String(req.body?.estadoPago || '').trim().toLowerCase();
       const estadoPago = requestedPayment === '50' ? 'sena' : requestedPayment;
-      const legacyPercentage = Number(req.body?.porcentajeSena ?? (requestedPayment === '50' ? 50 : NaN));
-      const rawAmount = Number(req.body?.montoSena ?? (Number.isInteger(legacyPercentage) ? legacyPercentage * 1000 : NaN));
-      const montoSena = estadoPago === 'sena' && Number.isInteger(rawAmount) && rawAmount >= 1000 && rawAmount <= 99999000 && rawAmount % 1000 === 0
-        ? rawAmount
+      const rawAmount = req.body?.montoSena ?? req.body?.porcentajeSena ?? (requestedPayment === '50' ? 50 : null);
+      const normalizedAmount = normalizePesoAmount(rawAmount);
+      const montoSena = estadoPago === 'sena' && normalizedAmount !== null && normalizedAmount <= 99999000
+        ? normalizedAmount
         : null;
       if (!nombre || dni.length < 6 || !['total', 'sena', 'sin_sena'].includes(estadoPago)) {
         return res.status(400).json({ ok: false, error: 'Nombre, DNI y estado de pago son obligatorios' });
       }
       if (estadoPago === 'sena' && montoSena === null) {
-        return res.status(400).json({ ok: false, error: 'Ingresá el monto de seña en miles de pesos' });
+        return res.status(400).json({ ok: false, error: 'Ingresá un monto de seña válido' });
       }
       const found = await pool.query(`
         SELECT j.id, j.nombre, j.categoria_actual,
@@ -479,13 +488,13 @@ module.exports = function createTorneosPrivadosRouter() {
     try {
       const requestedPayment = String(req.body?.estadoPago || '').trim().toLowerCase();
       const estado = requestedPayment === '50' ? 'sena' : requestedPayment;
-      const legacyPercentage = Number(req.body?.porcentajeSena ?? (requestedPayment === '50' ? 50 : NaN));
-      const rawAmount = Number(req.body?.montoSena ?? (Number.isInteger(legacyPercentage) ? legacyPercentage * 1000 : NaN));
-      const montoSena = estado === 'sena' && Number.isInteger(rawAmount) && rawAmount >= 1000 && rawAmount <= 99999000 && rawAmount % 1000 === 0
-        ? rawAmount
+      const rawAmount = req.body?.montoSena ?? req.body?.porcentajeSena ?? (requestedPayment === '50' ? 50 : null);
+      const normalizedAmount = normalizePesoAmount(rawAmount);
+      const montoSena = estado === 'sena' && normalizedAmount !== null && normalizedAmount <= 99999000
+        ? normalizedAmount
         : null;
       if (!['total', 'sena', 'sin_sena'].includes(estado)) return res.status(400).json({ ok: false, error: 'Estado de pago inválido' });
-      if (estado === 'sena' && montoSena === null) return res.status(400).json({ ok: false, error: 'Ingresá el monto de seña en miles de pesos' });
+      if (estado === 'sena' && montoSena === null) return res.status(400).json({ ok: false, error: 'Ingresá un monto de seña válido' });
       const result = await pool.query(`
         UPDATE torneo_inscripciones
            SET estado_pago=$1, monto_sena=$2, updated_at=NOW()

@@ -34,7 +34,7 @@
         <fieldset>
           <legend>Pago realizado</legend>
           <label class="radio"><input type="radio" name="payment" value="total" required> Total</label>
-          <label class="radio deposit-radio"><input type="radio" name="payment" value="sena" required> Seña <span class="deposit-amount"><span>$</span><input id="depositAmount" type="text" inputmode="numeric" maxlength="5" placeholder="10" aria-label="Monto de seña en miles de pesos" disabled><span>.000</span></span></label>
+          <label class="radio deposit-radio"><input type="radio" name="payment" value="sena" required> Seña <span class="deposit-amount"><span>$</span><input id="depositAmount" type="text" inputmode="numeric" maxlength="5" placeholder="10000" aria-label="Monto de seña en pesos" disabled></span></label>
           <label class="radio"><input type="radio" name="payment" value="sin_sena" required> Sin seña</label>
         </fieldset>
         <button class="primary" type="submit">Aceptar inscripción</button>
@@ -94,6 +94,6 @@
   </dialog>
 
   <script src="../config.js?v=isolated-sessions-1"></script>
-  <script src="./privados.js?v=12" defer></script>
+  <script src="./privados.js?v=13" defer></script>
 </body>
 </html>

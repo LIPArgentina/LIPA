@@ -64,16 +64,15 @@
   function paymentState(entry) {
     return entry?.estado_pago === '50' ? 'sena' : String(entry?.estado_pago || 'sin_sena');
   }
-  function depositAmountFromThousands(value) {
-    const thousands = Number(value);
-    return Number.isInteger(thousands) && thousands >= 1 && thousands <= 99999 ? thousands * 1000 : null;
+  function normalizeDepositAmount(value) {
+    const amount = Number(String(value || '').replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    const normalized = Math.round(amount < 1000 ? amount * 1000 : amount);
+    return normalized <= 99999000 ? normalized : null;
   }
   function paymentSelect(entry) {
     const state = paymentState(entry);
-    const storedAmount = Number(entry.monto_sena || 0);
-    const thousands = storedAmount >= 1000 && storedAmount % 1000 === 0
-      ? storedAmount / 1000
-      : (entry.estado_pago === '50' ? 50 : '');
+    const storedAmount = Number(entry.monto_sena || 0) || (entry.estado_pago === '50' ? 50000 : '');
     const paymentClass = state === 'total' ? 'payment-total' : state === 'sena' ? 'payment-deposit' : 'payment-none';
     return `<div class="payment-editor">
       <select class="payment-select ${paymentClass}" data-id="${entry.id}">
@@ -81,7 +80,7 @@
         <option value="sena" ${state === 'sena' ? 'selected' : ''}>Seña</option>
         <option value="total" ${state === 'total' ? 'selected' : ''}>Pago total</option>
       </select>
-      <label class="table-deposit-amount"><span>$</span><input class="payment-amount" data-id="${entry.id}" type="text" inputmode="numeric" maxlength="5" value="${thousands}" aria-label="Monto de seña en miles de pesos" ${state === 'sena' ? '' : 'disabled'}><span>.000</span></label>
+      <label class="table-deposit-amount"><span>$</span><input class="payment-amount" data-id="${entry.id}" type="text" inputmode="numeric" maxlength="5" value="${storedAmount}" aria-label="Monto de seña en pesos" ${state === 'sena' ? '' : 'disabled'}></label>
     </div>`;
   }
   function categorySelect(entry) {
@@ -174,9 +173,9 @@
   $('#registrationForm').addEventListener('submit', event => {
     event.preventDefault();
     const payment = new FormData(event.currentTarget).get('payment');
-    const montoSena = payment === 'sena' ? depositAmountFromThousands($('#depositAmount').value) : null;
+    const montoSena = payment === 'sena' ? normalizeDepositAmount($('#depositAmount').value) : null;
     if (payment === 'sena' && montoSena === null) {
-      setMessage('Ingresá el monto en miles. Por ejemplo, 10 equivale a $10.000.');
+      setMessage('Ingresá el monto. Podés escribir 10000 o usar el atajo 10 para $10.000.');
       $('#depositAmount').focus();
       return;
     }
@@ -247,9 +246,9 @@
       amountInput.focus();
       return;
     }
-    const montoSena = select.value === 'sena' ? depositAmountFromThousands(amountInput.value) : null;
+    const montoSena = select.value === 'sena' ? normalizeDepositAmount(amountInput.value) : null;
     if (select.value === 'sena' && montoSena === null) {
-      alert('Ingresá el monto en miles. Por ejemplo, 10 equivale a $10.000.');
+      alert('Ingresá el monto. Podés escribir 10000 o usar el atajo 10 para $10.000.');
       amountInput.focus();
       return;
     }
