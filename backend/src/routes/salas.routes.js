@@ -18,6 +18,7 @@ const ALLOWED_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
 module.exports = function createSalasRouter(deps = {}) {
   const router = express.Router();
+  const googleMapsResolutionCache = new Map();
   const picturesRoot = deps.PICTURES_DIR || path.resolve(__dirname, '../../data/pictures');
   const torneosRoot = path.join(picturesRoot, 'torneos');
   const EXPIRED_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
@@ -30,6 +31,84 @@ module.exports = function createSalasRouter(deps = {}) {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]/g, '');
+  }
+
+  function sanitizeGoogleMapsUrl(value = '') {
+    const text = String(value || '').trim();
+    const match = text.match(/https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[^/\s]+\/maps)[^\s\])}]*/i);
+    return match ? match[0] : text;
+  }
+
+  function isAllowedGoogleMapsUrl(value = '') {
+    try {
+      const url = new URL(value);
+      const host = url.hostname.toLowerCase();
+      return url.protocol === 'https:' && (
+        host === 'maps.app.goo.gl' ||
+        host === 'goo.gl' ||
+        host === 'google.com' ||
+        host === 'www.google.com' ||
+        host === 'maps.google.com' ||
+        /^www\.google\.[a-z.]+$/.test(host)
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function extractGoogleMapsCoordinates(value = '') {
+    const text = String(value || '');
+    const patterns = [
+      /!3d(-?\d+(?:\.\d+))!4d(-?\d+(?:\.\d+))/,
+      /[?&](?:query|q|ll)=(-?\d+(?:\.\d+)),\s*(-?\d+(?:\.\d+))/,
+      /@(-?\d+(?:\.\d+)),\s*(-?\d+(?:\.\d+))/,
+      /(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (!match) continue;
+      const lat = Number(match[1]);
+      const lng = Number(match[2]);
+      if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        return { lat, lng };
+      }
+    }
+    return null;
+  }
+
+  async function resolveGoogleMapsCoordinates(rawUrl = '') {
+    const cleanUrl = sanitizeGoogleMapsUrl(rawUrl);
+    if (!isAllowedGoogleMapsUrl(cleanUrl)) throw new Error('Enlace de Google Maps inválido');
+
+    const cached = googleMapsResolutionCache.get(cleanUrl);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+    let resolvedUrl = cleanUrl;
+    let coords = extractGoogleMapsCoordinates(cleanUrl);
+
+    if (!coords) {
+      const response = await fetch(cleanUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': 'Mozilla/5.0 LIPA Maps Resolver' }
+      });
+      resolvedUrl = response.url || cleanUrl;
+      if (!response.ok || !isAllowedGoogleMapsUrl(resolvedUrl)) {
+        throw new Error('No se pudo resolver el enlace de Google Maps');
+      }
+      coords = extractGoogleMapsCoordinates(resolvedUrl);
+    }
+
+    if (!coords) throw new Error('El enlace no contiene coordenadas reconocibles');
+
+    const value = { ...coords, sourceUrl: cleanUrl, resolvedUrl };
+    googleMapsResolutionCache.set(cleanUrl, {
+      value,
+      expiresAt: Date.now() + (24 * 60 * 60 * 1000)
+    });
+    return value;
   }
 
   function safeName(value = '') {
@@ -643,6 +722,18 @@ module.exports = function createSalasRouter(deps = {}) {
       });
     });
   }
+
+
+  router.get('/map-coordinates', async (req, res) => {
+    try {
+      const coordinates = await resolveGoogleMapsCoordinates(req.query?.url || '');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.json({ ok: true, ...coordinates });
+    } catch (err) {
+      console.warn('GET /api/map-coordinates', err?.message || err);
+      return res.status(422).json({ ok: false, error: err?.message || 'No se pudo obtener la ubicación' });
+    }
+  });
 
 
   router.get('/salas', async (_req, res) => {

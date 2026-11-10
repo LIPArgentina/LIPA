@@ -17,6 +17,7 @@
   const $mapEmpty = document.getElementById('mapEmpty');
 
   let currentTeams = [];
+  let renderRequestId = 0;
 
   function apiUrl(path){
     return API_BASE + path;
@@ -132,35 +133,52 @@
   function extractCoords(value){
     const text = String(value || '').trim();
 
-    let match = text.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+    let match = text.match(/!3d(-?\d+(?:\.\d+))!4d(-?\d+(?:\.\d+))/);
     if (match) return { lat: match[1], lng: match[2] };
 
-    match = text.match(/[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+    match = text.match(/[?&](?:query|q|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
     if (match) return { lat: match[1], lng: match[2] };
 
-    match = text.match(/[?&]ll=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+    match = text.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
     if (match) return { lat: match[1], lng: match[2] };
 
     match = text.match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/);
     if (match) return { lat: match[1], lng: match[2] };
 
-    match = text.match(/!3d(-?\d+(?:\.\d+))!4d(-?\d+(?:\.\d+))/);
-    if (match) return { lat: match[1], lng: match[2] };
-
     return null;
+  }
+
+  function sanitizeMapsLocation(value){
+    const text = String(value || '').trim();
+    const match = text.match(/https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[^/\s]+\/maps)[^\s\])}]*/i);
+    return match ? match[0] : text;
   }
 
   function isLikelyUrl(value){
     return /^https?:\/\//i.test(String(value || '').trim());
   }
 
-  function buildMapData(rawLocation, fallbackQuery = ''){
-    const location = String(rawLocation || '').trim();
+  async function resolveShortGoogleMapsCoords(location){
+    if (!/^(?:https:\/\/)?(?:maps\.app\.goo\.gl|goo\.gl\/maps)\//i.test(location)) return null;
+    try {
+      const data = await fetchJson(apiUrl('/api/map-coordinates?url=' + encodeURIComponent(location)));
+      const lat = Number(data?.lat);
+      const lng = Number(data?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return { lat: String(lat), lng: String(lng) };
+    } catch (err) {
+      console.warn('No se pudo resolver el enlace corto de Google Maps:', err);
+      return null;
+    }
+  }
+
+  async function buildMapData(rawLocation, fallbackQuery = ''){
+    const location = sanitizeMapsLocation(rawLocation);
     const fallback = String(fallbackQuery || '').trim();
 
     if (!location && !fallback) return null;
 
-    const coords = extractCoords(location);
+    const coords = extractCoords(location) || await resolveShortGoogleMapsCoords(location);
 
     if (coords) {
       const q = `${coords.lat},${coords.lng}`;
@@ -219,7 +237,8 @@
     }
   }
 
-  function renderTeam(team){
+  async function renderTeam(team){
+    const requestId = ++renderRequestId;
     if (!team) {
       hideResult();
       setStatus('Seleccioná un equipo.', 'error');
@@ -228,7 +247,9 @@
 
     const sala = team.sala || 'Sin sala cargada';
     const ubicacion = team.ubicacion || '';
-    const mapData = buildMapData(ubicacion, sala);
+    setStatus('Preparando enlaces de navegación…', 'info');
+    const mapData = await buildMapData(ubicacion, sala);
+    if (requestId !== renderRequestId) return;
 
     if ($result) $result.hidden = false;
     if ($teamName) $teamName.textContent = team.name || 'Equipo';
