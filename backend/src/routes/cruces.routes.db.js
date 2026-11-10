@@ -5279,6 +5279,13 @@ router.get('/team-query', requireAdminForPrivateCategory, async (req, res) => {
 
 
 module.exports = router;
+// Same Total/RAD ranking used by Consultas, without the display limit.
+module.exports.getTournamentRanking = async function (category) {
+  const { ranking } = await buildRadRankingForCategory(category, 'total');
+  const promoted = await getPromotedPlayerKeys(category);
+  const eligible = excludePromotedPlayers(ranking, promoted);
+  return sortPlayerRankingRows(buildRadRankingFromPlayerRows(eligible).ranking, 'rad', 'desc');
+};
 module.exports.__test = {
   mergePlayerSuggestions,
   playerSuggestionTeamsMatch,

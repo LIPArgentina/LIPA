@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const pool = require('../../db');
 const { requireAdmin, requireTorneoOrganizador } = require('../middleware/auth');
 const { createRenewableSession, setAccessCookie } = require('../utils/authSessions');
+const { getTournamentRanking } = require('./cruces.routes.db');
+const mountGrillaRoutes = require('./torneosGrilla.routes');
 
 const DEFAULT_PASSWORD = '1234';
 const MAX_ORGANIZADORES = 30;
@@ -90,6 +92,17 @@ module.exports = function createTorneosPrivadosRouter() {
           categoria TEXT NOT NULL CHECK (categoria IN ('primera', 'segunda', 'tercera')),
           orden JSONB NOT NULL,
           revision INTEGER NOT NULL DEFAULT 1,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (torneo_organizador_id, categoria)
+        );
+
+        CREATE TABLE IF NOT EXISTS torneo_grillas (
+          torneo_organizador_id INTEGER NOT NULL REFERENCES torneo_organizadores(id) ON DELETE CASCADE,
+          categoria TEXT NOT NULL CHECK (categoria IN ('primera','segunda','tercera')),
+          sorteo_revision INTEGER NOT NULL,
+          jugadores JSONB NOT NULL,
+          resultados JSONB NOT NULL DEFAULT '{}'::jsonb,
+          revision INTEGER NOT NULL DEFAULT 0,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           PRIMARY KEY (torneo_organizador_id, categoria)
         );
@@ -364,6 +377,8 @@ module.exports = function createTorneosPrivadosRouter() {
     }
   });
 
+  mountGrillaRoutes(router, { pool, ensureSchema, requireTorneoOrganizador, getTournamentRanking });
+
   router.get('/torneo-organizador/sorteos', requireTorneoOrganizador, async (req, res) => {
     try {
       await ensureSchema();
@@ -374,7 +389,10 @@ module.exports = function createTorneosPrivadosRouter() {
         WHERE torneo_organizador_id=$1 AND corroborado=true
         ORDER BY nombre_oficial, id`, [id]);
       const { rows: sorteos } = await pool.query(
-        'SELECT categoria, orden, revision, updated_at FROM torneo_sorteos WHERE torneo_organizador_id=$1', [id]);
+        `SELECT s.categoria, s.orden, s.revision, s.updated_at,
+          EXISTS (SELECT 1 FROM torneo_grillas g WHERE g.torneo_organizador_id=s.torneo_organizador_id
+            AND g.categoria=s.categoria AND g.resultados <> '{}'::jsonb) AS tiene_resultados
+          FROM torneo_sorteos s WHERE s.torneo_organizador_id=$1`, [id]);
       res.json({ jugadores, sorteos, nombre: organizador?.nombre_promocional || 'Torneo' });
     } catch (error) {
       console.error('GET /torneo-organizador/sorteos', error);
@@ -414,6 +432,13 @@ module.exports = function createTorneosPrivadosRouter() {
         await client.query('ROLLBACK');
         return res.status(409).json({ error: 'El sorteo se modificó en otra ventana. Recargá la página antes de continuar.' });
       }
+      const { rows: played } = await client.query(`SELECT 1 FROM torneo_grillas
+        WHERE torneo_organizador_id=$1 AND categoria=$2 AND resultados <> '{}'::jsonb`, [req.user.torneoOrganizadorId, categoria]);
+      if (played.length && req.body.resetResults !== true) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'La categoría tiene resultados. Confirmá un nuevo sorteo para reiniciar la grilla.' });
+      }
+      await client.query('DELETE FROM torneo_grillas WHERE torneo_organizador_id=$1 AND categoria=$2', [req.user.torneoOrganizadorId, categoria]);
       const { rows: result } = await client.query(`INSERT INTO torneo_sorteos
         (torneo_organizador_id, categoria, orden) VALUES ($1,$2,$3::jsonb)
         ON CONFLICT (torneo_organizador_id, categoria) DO UPDATE

@@ -3,11 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Grilla | LIPA</title>
+  <title>Grilla del torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <style>html{min-height:100%;background:#080a0d;color-scheme:dark}</style>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./grilla.css?v=1">
   <script src="../config.js?v=isolated-sessions-1"></script>
-  <script>if(window.LPI_AUTH?.readSession?.()?.role!=='torneo')location.replace('/auth/login.html?return='+encodeURIComponent(location.pathname));</script>
+  <script src="./grilla-engine.js?v=1" defer></script>
+  <script src="./grilla.js?v=1" defer></script>
 </head>
-<body></body>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./privados.html"><img src="../logo_liga.png" alt="LIPA"><span><small>DESARROLLO DEL TORNEO</small><h1>Grilla del torneo</h1></span></a>
+    <nav aria-label="Torneo"><a href="./privados.html">Inscripciones</a><a href="./sorteo.html">Sorteo</a></nav>
+  </header>
+  <main>
+    <div class="toolbar">
+      <div class="tabs" role="tablist" aria-label="Categorías">
+        <button type="button" role="tab" id="tab-primera" aria-controls="bracketPanel" aria-selected="true" data-category="primera">PRIMERA</button>
+        <button type="button" role="tab" id="tab-segunda" aria-controls="bracketPanel" aria-selected="false" data-category="segunda">SEGUNDA</button>
+        <button type="button" role="tab" id="tab-tercera" aria-controls="bracketPanel" aria-selected="false" data-category="tercera">TERCERA</button>
+      </div>
+      <div class="view-controls"><button type="button" id="viewToggle">VISUALIZACIÓN · DOBLE</button><button type="button" id="fitView">AJUSTAR</button><label for="zoom">Zoom <input id="zoom" type="range" min="35" max="120" value="100"><output id="zoomValue">100%</output></label></div>
+    </div>
+    <div class="savebar"><span id="saveStatus" role="status">Cargando grilla…</span><button id="retrySave" type="button" hidden>Reintentar guardado</button><button id="reload" type="button" hidden>Recargar</button></div>
+    <section id="bracketPanel" role="tabpanel" aria-labelledby="tab-primera">
+      <div id="emptyState" hidden></div>
+      <section id="mainSection" class="bracket-section" hidden><div class="section-heading"><div><small>CAMINO AL TÍTULO</small><h2>Grilla principal</h2></div><span class="badge">30 jugadores + repechaje</span></div><div class="board-scroll"><div id="mainFrame" class="board-frame"><div id="mainBoard" class="board"></div></div></div></section>
+      <section id="repSection" class="bracket-section repechage" hidden><div class="section-heading"><div><small>SEGUNDA OPORTUNIDAD</small><h2>Repechaje</h2></div><span class="badge">1 clasificado a octavos</span></div><p id="byeNote" class="bye-note"></p><div class="board-scroll"><div id="repFrame" class="board-frame"><div id="repBoard" class="board"></div></div></div></section>
+    </section>
+  </main>
+  <dialog id="correctionDialog"><h2>¿Confirmar la corrección?</h2><p>El nuevo resultado cambia los cruces. Se borrarán los resultados posteriores afectados; los otros partidos se conservarán.</p><div class="dialog-actions"><button id="cancelCorrection" type="button">Cancelar</button><button id="confirmCorrection" type="button">Corregir resultado</button></div></dialog>
+</body>
 </html>

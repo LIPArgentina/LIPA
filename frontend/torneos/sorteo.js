@@ -74,11 +74,12 @@
     try {
       const data = await api(`/${state.category}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orden: state.players.map(player => String(player.id)), revision: state.revision })
+        body: JSON.stringify({ orden: state.players.map(player => String(player.id)), revision: state.revision, resetResults: state.resetResults === true })
       });
       state.revision = data.revision;
       state.dirty = false;
       state.drawn = true;
+      state.hasResults = false;
       state.button.textContent = 'SORTEAR POSICIÓN';
       message(state, 'Orden guardado. Podés continuar a la grilla.', 'saved');
     } catch (error) {
@@ -99,7 +100,8 @@
       await save(state); return;
     }
     if (state.dirty) { await save(state); return; }
-    if (state.drawn && !confirm(`Ya hay un sorteo de ${state.label}. Se va a repetir y el nuevo orden reemplazará al anterior al detenerlo. ¿Continuar?`)) return;
+    if (state.drawn && !confirm(`Ya hay un sorteo de ${state.label}. Se va a repetir y el nuevo orden reemplazará al anterior al detenerlo.${state.hasResults ? ' ATENCIÓN: se borrarán todos los resultados de la grilla de esta categoría.' : ''} ¿Continuar?`)) return;
+    state.resetResults = state.hasResults;
     state.dirty = true;
     state.card.classList.add('running');
     state.button.textContent = 'DETENER';
@@ -127,6 +129,7 @@
       document.querySelector('#categories').append(card);
       const state = { category, label, players, card, body: card.querySelector('tbody'), status: card.querySelector('.status'), button: card.querySelector('button'), revision: saved?.revision || 0, drawn: Boolean(saved), dirty: false, timer: null, saving: false };
       state.status.id = `status-${category}`;
+      state.hasResults = Boolean(saved?.tiene_resultados);
       state.button.disabled = players.length < 2;
       message(state, saved ? (valid ? 'Orden guardado recuperado.' : 'Cambiaron los participantes. Repetí el sorteo.') : 'Listo para sortear.', saved ? (valid ? 'saved' : 'error') : '');
       if (players.length < 2) message(state, 'Se necesitan al menos dos jugadores para sortear.');
