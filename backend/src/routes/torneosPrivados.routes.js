@@ -85,6 +85,15 @@ module.exports = function createTorneosPrivadosRouter() {
           UNIQUE(torneo_organizador_id, dni)
         );
 
+        CREATE TABLE IF NOT EXISTS torneo_sorteos (
+          torneo_organizador_id INTEGER NOT NULL REFERENCES torneo_organizadores(id) ON DELETE CASCADE,
+          categoria TEXT NOT NULL CHECK (categoria IN ('primera', 'segunda', 'tercera')),
+          orden JSONB NOT NULL,
+          revision INTEGER NOT NULL DEFAULT 1,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (torneo_organizador_id, categoria)
+        );
+
         CREATE INDEX IF NOT EXISTS torneo_inscripciones_organizador_idx
           ON torneo_inscripciones(torneo_organizador_id, corroborado, created_at DESC);
 
@@ -352,6 +361,72 @@ module.exports = function createTorneosPrivadosRouter() {
     } catch (error) {
       console.error('POST /torneo-organizador/change-password', error);
       res.status(500).json({ ok: false, error: 'No se pudo cambiar la contraseña' });
+    }
+  });
+
+  router.get('/torneo-organizador/sorteos', requireTorneoOrganizador, async (req, res) => {
+    try {
+      await ensureSchema();
+      const id = req.user.torneoOrganizadorId;
+      const organizador = await findOrganizador({ id, includeInactive: true });
+      const { rows: jugadores } = await pool.query(`
+        SELECT id, nombre_oficial AS nombre, categoria FROM torneo_inscripciones
+        WHERE torneo_organizador_id=$1 AND corroborado=true
+        ORDER BY nombre_oficial, id`, [id]);
+      const { rows: sorteos } = await pool.query(
+        'SELECT categoria, orden, revision, updated_at FROM torneo_sorteos WHERE torneo_organizador_id=$1', [id]);
+      res.json({ jugadores, sorteos, nombre: organizador?.nombre_promocional || 'Torneo' });
+    } catch (error) {
+      console.error('GET /torneo-organizador/sorteos', error);
+      res.status(500).json({ error: 'No se pudo cargar el sorteo.' });
+    }
+  });
+
+  router.put('/torneo-organizador/sorteos/:categoria', requireTorneoOrganizador, async (req, res) => {
+    const categoria = req.params.categoria;
+    const { orden, revision } = req.body || {};
+    if (!['primera', 'segunda', 'tercera'].includes(categoria)
+        || !Array.isArray(orden) || orden.length < 2
+        || !orden.every(id => typeof id === 'string' && /^[1-9][0-9]*$/.test(id))
+        || new Set(orden).size !== orden.length
+        || !Number.isSafeInteger(revision) || revision < 0) {
+      return res.status(400).json({ error: 'El orden del sorteo no es válido.' });
+    }
+    let client;
+    try {
+      await ensureSchema();
+      client = await pool.connect();
+      await client.query('BEGIN');
+      // Keep eligibility stable until the order is persisted.
+      await client.query('LOCK TABLE torneo_inscripciones IN SHARE MODE');
+      await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE', [req.user.torneoOrganizadorId]);
+      const { rows } = await client.query(`SELECT id FROM torneo_inscripciones
+        WHERE torneo_organizador_id=$1 AND categoria=$2 AND corroborado=true`,
+        [req.user.torneoOrganizadorId, categoria]);
+      const ids = new Set(rows.map(row => String(row.id)));
+      if (ids.size !== orden.length || !orden.every(id => ids.has(id))) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Cambiaron los participantes. Recargá la página y repetí el sorteo.' });
+      }
+      const { rows: saved } = await client.query(`SELECT revision FROM torneo_sorteos
+        WHERE torneo_organizador_id=$1 AND categoria=$2`, [req.user.torneoOrganizadorId, categoria]);
+      if ((saved[0]?.revision || 0) !== revision) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'El sorteo se modificó en otra ventana. Recargá la página antes de continuar.' });
+      }
+      const { rows: result } = await client.query(`INSERT INTO torneo_sorteos
+        (torneo_organizador_id, categoria, orden) VALUES ($1,$2,$3::jsonb)
+        ON CONFLICT (torneo_organizador_id, categoria) DO UPDATE
+        SET orden=EXCLUDED.orden, revision=torneo_sorteos.revision+1, updated_at=NOW()
+        RETURNING revision, updated_at`, [req.user.torneoOrganizadorId, categoria, JSON.stringify(orden)]);
+      await client.query('COMMIT');
+      res.json({ ok: true, ...result[0] });
+    } catch (error) {
+      if (client) await client.query('ROLLBACK').catch(() => {});
+      console.error('PUT /torneo-organizador/sorteos', error);
+      res.status(500).json({ error: 'No se pudo guardar el orden. Reintentá el guardado.' });
+    } finally {
+      client?.release();
     }
   });
 
