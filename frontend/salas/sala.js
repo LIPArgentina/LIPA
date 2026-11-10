@@ -184,7 +184,9 @@
       const q = `${coords.lat},${coords.lng}`;
       return {
         label: q,
-        openUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+        openUrl: isLikelyUrl(location)
+          ? location
+          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
         wazeUrl: `https://www.waze.com/ul?ll=${encodeURIComponent(q)}&navigate=yes&utm_source=lipa`,
         embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=16&output=embed`
       };
