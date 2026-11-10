@@ -117,7 +117,7 @@
       ? `${missing} jugador(es) confirmado(s) sin categoría: asignala en Inscripciones para incluirlos.`
       : '';
     for (const [category, label] of [['primera', 'Primera'], ['segunda', 'Segunda'], ['tercera', 'Tercera']]) {
-      let players = data.jugadores.filter(player => player.categoria === category);
+      let players = data.jugadores.filter(player => window.LipaCategories.includes(player.categoria, category));
       const saved = data.sorteos.find(draw => draw.categoria === category);
       const byId = new Map(players.map(player => [String(player.id), player]));
       const order = Array.isArray(saved?.orden) ? saved.orden.map(String) : [];

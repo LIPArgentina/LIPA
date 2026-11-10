@@ -89,6 +89,8 @@
       <option value="primera" ${entry.categoria === 'primera' ? 'selected' : ''}>Primera</option>
       <option value="segunda" ${entry.categoria === 'segunda' ? 'selected' : ''}>Segunda</option>
       <option value="tercera" ${entry.categoria === 'tercera' ? 'selected' : ''}>Tercera</option>
+      <option value="segunda_tercera" ${entry.categoria === 'segunda_tercera' ? 'selected' : ''}>Segunda + Tercera</option>
+      <option value="primera_segunda" ${entry.categoria === 'primera_segunda' ? 'selected' : ''}>Primera + Segunda</option>
     </select>`;
   }
   function playerPhotoButton(entry, name) {
@@ -115,7 +117,7 @@
     const filtered = entries.filter(item => {
       const paymentMatches = paymentFilter === 'all' || paymentState(item) === paymentFilter;
       const categoryMatches = categoryFilter === 'all'
-        || (categoryFilter === 'sin_definir' ? !item.categoria : item.categoria === categoryFilter);
+        || (categoryFilter === 'sin_definir' ? !item.categoria : window.LipaCategories.matches(item.categoria, categoryFilter));
       return paymentMatches && categoryMatches;
     });
     const verified = filtered.filter(item => item.corroborado);

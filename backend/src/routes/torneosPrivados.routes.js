@@ -6,6 +6,7 @@ const { requireAdmin, requireTorneoOrganizador } = require('../middleware/auth')
 const { createRenewableSession, setAccessCookie } = require('../utils/authSessions');
 const { getTournamentRanking } = require('./cruces.routes.db');
 const mountGrillaRoutes = require('./torneosGrilla.routes');
+const categories = require('../../../frontend/torneos/categorias');
 
 const DEFAULT_PASSWORD = '1234';
 const MAX_ORGANIZADORES = 30;
@@ -149,7 +150,7 @@ module.exports = function createTorneosPrivadosRouter() {
           DROP CONSTRAINT IF EXISTS torneo_inscripciones_categoria_check;
         ALTER TABLE torneo_inscripciones
           ADD CONSTRAINT torneo_inscripciones_categoria_check
-          CHECK (categoria IS NULL OR categoria IN ('primera', 'segunda', 'tercera'));
+          CHECK (categoria IS NULL OR categoria IN ('primera', 'segunda', 'tercera', 'primera_segunda', 'segunda_tercera'));
       `).catch((error) => {
         schemaPromise = null;
         throw error;
@@ -196,7 +197,7 @@ module.exports = function createTorneosPrivadosRouter() {
           UPDATE torneo_inscripciones
              SET jugador_id = $1,
                  nombre_oficial = $2,
-                 categoria = COALESCE($3, categoria),
+                 categoria = COALESCE(categoria, $3),
                  corroborado = true,
                  updated_at = NOW()
            WHERE id = $4
@@ -419,8 +420,8 @@ module.exports = function createTorneosPrivadosRouter() {
       await client.query('LOCK TABLE torneo_inscripciones IN SHARE MODE');
       await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE', [req.user.torneoOrganizadorId]);
       const { rows } = await client.query(`SELECT id FROM torneo_inscripciones
-        WHERE torneo_organizador_id=$1 AND categoria=$2 AND corroborado=true`,
-        [req.user.torneoOrganizadorId, categoria]);
+        WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND corroborado=true`,
+        [req.user.torneoOrganizadorId, categories.valuesFor(categoria)]);
       const ids = new Set(rows.map(row => String(row.id)));
       if (ids.size !== orden.length || !orden.every(id => ids.has(id))) {
         await client.query('ROLLBACK');
@@ -625,8 +626,9 @@ module.exports = function createTorneosPrivadosRouter() {
 
   router.patch('/torneo-organizador/inscripciones/:id/categoria', requireTorneoOrganizador, async (req, res) => {
     try {
-      const categoria = ['primera', 'segunda', 'tercera'].includes(req.body?.categoria) ? req.body.categoria : '';
+      const categoria = categories.valid(req.body?.categoria) ? req.body.categoria : '';
       if (!categoria) return res.status(400).json({ ok: false, error: 'Categoría inválida' });
+      await ensureSchema();
       const result = await pool.query(`
         UPDATE torneo_inscripciones SET categoria=$1, updated_at=NOW()
          WHERE id=$2 AND torneo_organizador_id=$3 RETURNING *

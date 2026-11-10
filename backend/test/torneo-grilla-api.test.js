@@ -3,14 +3,14 @@ const assert=require('node:assert/strict');
 const mount=require('../src/routes/torneosGrilla.routes');
 const engine=require('../../frontend/torneos/grilla-engine');
 function harness() {
-  const players=Array.from({length:30},(_,i)=>({id:String(i+1),jugador_id:i+101,nombre:`Jugador ${i+1}`,foto_path:'',ranking:i+1,position:i+1}));
+  const players=Array.from({length:30},(_,i)=>({id:String(i+1),jugador_id:i+101,nombre:`Jugador ${i+1}`,foto_path:'',ranking:i+1,position:i+1,categoria:i<2?'segunda_tercera':'tercera'}));
   let stored={jugadores:players,resultados:{},revision:0,sorteo_revision:1};
   const calls=[],routes={};let eligible=players,drawRevision=1,rankCalls=0;
   const auth=()=>{};
   const client={release(){calls.push('RELEASE');},async query(sql,args){
     calls.push(sql);
     if(sql.startsWith('SELECT orden'))return {rows:[{orden:players.map(p=>p.id),revision:drawRevision}]};
-    if(sql.includes('FROM torneo_inscripciones i')){assert.equal(args[0],77);assert.equal(args[1],'tercera');return {rows:eligible};}
+    if(sql.includes('FROM torneo_inscripciones i')){assert.equal(args[0],77);assert.deepEqual(args[1],['tercera','segunda_tercera']);assert(sql.includes('ANY($2::text[])'));return {rows:eligible.filter(p=>args[1].includes(p.categoria))};}
     if(sql.startsWith('SELECT sorteo_revision'))return {rows:stored?[{sorteo_revision:stored.sorteo_revision}]:[]};
     if(sql.startsWith('INSERT INTO torneo_grillas')){if(!stored)stored={jugadores:JSON.parse(args[3]),resultados:{},revision:0,sorteo_revision:args[2]};return {rows:[]};}
     if(sql.startsWith('SELECT * FROM torneo_grillas'))return {rows:stored?[stored]:[]};

@@ -1,7 +1,8 @@
 const bracket = require('../../../frontend/torneos/grilla-engine');
+const categories = require('../../../frontend/torneos/categorias');
 
 module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requireTorneoOrganizador, getTournamentRanking }) {
-  const categories = Object.keys(bracket.limits);
+  const divisions = Object.keys(bracket.limits);
   const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
   async function context(client, organizer, category) {
     const { rows: draws } = await client.query('SELECT orden, revision FROM torneo_sorteos WHERE torneo_organizador_id=$1 AND categoria=$2', [organizer, category]);
@@ -9,7 +10,7 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
     if (!draw) throw fail(422, 'Primero guardá el sorteo de esta categoría.');
     const { rows } = await client.query(`SELECT i.id::text AS id, i.jugador_id, i.nombre_oficial AS nombre, COALESCE(j.foto_path,'') AS foto_path
       FROM torneo_inscripciones i LEFT JOIN jugadores j ON j.id=i.jugador_id
-      WHERE i.torneo_organizador_id=$1 AND i.categoria=$2 AND i.corroborado=true`, [organizer, category]);
+      WHERE i.torneo_organizador_id=$1 AND i.categoria = ANY($2::text[]) AND i.corroborado=true`, [organizer, categories.valuesFor(category)]);
     const ids = draw.orden.map(String), players = new Map(rows.map(p => [p.id,p]));
     if (ids.length !== 30 || rows.length !== 30) throw fail(422, 'Este formato requiere exactamente 30 jugadores confirmados y sorteados en la categoría.');
     if (new Set(ids).size !== 30 || !ids.every(id => players.has(id))) throw fail(409, 'Cambiaron los participantes. Revisá las inscripciones y repetí el sorteo.');
@@ -22,7 +23,7 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
   }
   router.get('/torneo-organizador/grilla/:categoria', requireTorneoOrganizador, async (req,res) => {
     const category = req.params.categoria, organizer = req.user.torneoOrganizadorId;
-    if (!categories.includes(category)) return res.status(400).json({error:'Categoría inválida.'});
+    if (!divisions.includes(category)) return res.status(400).json({error:'Categoría inválida.'});
     let client;
     try {
       await ensureSchema();
@@ -60,7 +61,7 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
   router.patch('/torneo-organizador/grilla/:categoria', requireTorneoOrganizador, async(req,res)=>{
     const category=req.params.categoria, organizer=req.user.torneoOrganizadorId;
     const {matchId, score, revision, drawRevision, confirmCorrection}=req.body || {};
-    if(!categories.includes(category) || typeof matchId!=='string' || !Array.isArray(score) || score.length!==2
+    if(!divisions.includes(category) || typeof matchId!=='string' || !Array.isArray(score) || score.length!==2
       || !score.every(n=>n===null || (Number.isInteger(n)&&n>=0&&n<=bracket.limits[category]))
       || !Number.isSafeInteger(revision) || revision<0 || !Number.isSafeInteger(drawRevision)) {
       return res.status(400).json({error:'Resultado inválido.'});
