@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=13">
+  <link rel="stylesheet" href="./privados.css?v=14">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -38,7 +38,7 @@
           <label class="radio deposit-radio"><input type="radio" name="payment" value="sena" required> Seña <span class="deposit-amount"><span>$</span><input id="depositAmount" type="text" inputmode="numeric" maxlength="5" placeholder="10000" aria-label="Monto de seña en pesos" disabled></span></label>
           <label class="radio"><input type="radio" name="payment" value="sin_sena" required> Sin seña</label>
         </fieldset>
-        <button class="primary" type="submit">Aceptar inscripción</button>
+        <div class="registration-actions"><button class="primary" type="submit">Aceptar inscripción</button><button type="submit" id="addWaiting">Agregar a lista de espera</button></div>
         <div id="candidateBox" class="candidate-box" hidden aria-live="polite"></div>
       </form>
       <p id="formMessage" class="message" aria-live="polite"></p>
@@ -60,8 +60,8 @@
     </section>
 
     <section class="list-card pending-card">
-      <div class="list-heading"><div><span>PENDIENTES DE REVISIÓN</span><h2>DNI no encontrado en la base</h2></div><div class="pending-heading-actions"><button id="refreshPending" type="button">Revisar pendientes</button><strong id="pendingCount">0</strong></div></div>
-      <p class="pending-note">Después de cargar o corregir el DNI en la base, usá “Revisar pendientes” para corroborarlo.</p>
+      <div class="list-heading"><div><span>PENDIENTES DE REVISIÓN</span><h2>Lista de espera y DNI pendientes</h2></div><div class="pending-heading-actions"><button id="refreshPending" type="button">Revisar pendientes</button><strong id="pendingCount">0</strong></div></div>
+      <p class="pending-note">“Revisar pendientes” pasa a confirmados a los jugadores de esta lista cuyo DNI figure en la base, incluidos los de lista de espera.</p>
       <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
     </section>
   </main>
@@ -96,6 +96,6 @@
 
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./categorias.js?v=1" defer></script>
-  <script src="./privados.js?v=14" defer></script>
+  <script src="./privados.js?v=15" defer></script>
 </body>
 </html>

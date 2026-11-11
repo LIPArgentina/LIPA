@@ -112,6 +112,7 @@ module.exports = function createTorneosPrivadosRouter() {
         CREATE INDEX IF NOT EXISTS torneo_inscripciones_organizador_idx
           ON torneo_inscripciones(torneo_organizador_id, corroborado, created_at DESC);
 
+        ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS lista_espera BOOLEAN NOT NULL DEFAULT false;
         ALTER TABLE torneo_inscripciones
           ADD COLUMN IF NOT EXISTS categoria TEXT;
         ALTER TABLE torneo_inscripciones
@@ -160,7 +161,7 @@ module.exports = function createTorneosPrivadosRouter() {
     return schemaPromise;
   }
 
-  async function reconcilePendingRegistrations(organizerId) {
+  async function reconcilePendingRegistrations(organizerId, includeWaiting = false) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -188,9 +189,9 @@ module.exports = function createTorneosPrivadosRouter() {
              LIMIT 1
           ) j ON true
          WHERE i.torneo_organizador_id = $1
-           AND i.corroborado = false
+           AND i.corroborado = false AND (i.lista_espera = false OR $2::boolean)
          FOR UPDATE OF i
-      `, [organizerId]);
+      `, [organizerId, includeWaiting]);
 
       for (const row of rows) {
         const categoria = categoriaMasBaja(row.categoria_actual, row.categorias_activas || []);
@@ -199,7 +200,7 @@ module.exports = function createTorneosPrivadosRouter() {
              SET jugador_id = $1,
                  nombre_oficial = $2,
                  categoria = COALESCE(categoria, $3),
-                 corroborado = true,
+                 corroborado = true, lista_espera = false,
                  updated_at = NOW()
            WHERE id = $4
              AND torneo_organizador_id = $5
@@ -486,7 +487,7 @@ module.exports = function createTorneosPrivadosRouter() {
   router.post('/torneo-organizador/inscripciones/revisar-pendientes', requireTorneoOrganizador, async (req, res) => {
     try {
       await ensureSchema();
-      const actualizadas = await reconcilePendingRegistrations(req.user.torneoOrganizadorId);
+      const actualizadas = await reconcilePendingRegistrations(req.user.torneoOrganizadorId, true);
       res.json({ ok: true, actualizadas });
     } catch (error) {
       console.error('POST /torneo-organizador/inscripciones/revisar-pendientes', error);
@@ -570,16 +571,18 @@ module.exports = function createTorneosPrivadosRouter() {
       `, [dni]);
       const player = found.rows[0] || null;
       const categoria = categoriaMasBaja(player?.categoria_actual, player?.categorias_activas || []);
-      if (!player && req.body?.confirmProvisional !== true) {
+      const listaEspera = req.body?.listaEspera === true;
+      const corroborado = Boolean(player) && !listaEspera;
+      if (!player && !listaEspera && req.body?.confirmProvisional !== true) {
         return res.json({ ok: true, corroborado: false, requiresConfirmation: true });
       }
       const result = await pool.query(`
         INSERT INTO torneo_inscripciones
-          (torneo_organizador_id, jugador_id, nombre_ingresado, nombre_oficial, dni, whatsapp, categoria, estado_pago, monto_sena, corroborado)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          (torneo_organizador_id, jugador_id, nombre_ingresado, nombre_oficial, dni, whatsapp, categoria, estado_pago, monto_sena, corroborado, lista_espera)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
         RETURNING *
-      `, [req.user.torneoOrganizadorId, player?.id || null, nombre, player?.nombre || nombre, dni, whatsapp, categoria, estadoPago, montoSena, Boolean(player)]);
-      res.status(201).json({ ok: true, corroborado: Boolean(player), inscripcion: result.rows[0] });
+      `, [req.user.torneoOrganizadorId, player?.id || null, nombre, player?.nombre || nombre, dni, whatsapp, categoria, estadoPago, montoSena, corroborado, listaEspera]);
+      res.status(201).json({ ok: true, corroborado, inscripcion: result.rows[0] });
     } catch (error) {
       if (error?.code === '23505') return res.status(409).json({ ok: false, error: 'Ese DNI ya está inscripto en este torneo' });
       console.error('POST /torneo-organizador/inscripciones', error);

@@ -168,7 +168,7 @@
       }
       $('#registrationForm').reset();
       syncDepositAmount();
-      setMessage(data.corroborado ? `Inscripción confirmada como ${data.inscripcion.nombre_oficial}.` : 'Inscripción guardada en la lista provisoria.', true);
+      setMessage(payload.listaEspera ? 'Jugador agregado a la lista de espera, en pendientes de revisión.' : data.corroborado ? `Inscripción confirmada como ${data.inscripcion.nombre_oficial}.` : 'Inscripción guardada en la lista provisoria.', true);
       await load();
     } catch (error) { setMessage(error.message); }
   }
@@ -181,7 +181,7 @@
       $('#depositAmount').focus();
       return;
     }
-    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment, montoSena });
+    saveRegistration({ nombre: $('#playerName').value.trim(), dni: $('#playerDni').value, whatsapp: $('#playerWhatsapp').value, estadoPago: payment, montoSena, listaEspera: event.submitter?.id === 'addWaiting' });
   });
   function syncDepositAmount() {
     const selected = document.querySelector('input[name="payment"]:checked')?.value;
