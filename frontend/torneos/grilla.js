@@ -34,12 +34,43 @@
     img.src=player?.foto_path ? `${API}/api/players-admin/photo/${encodeURIComponent(player.foto_path)}` : '../logo_liga.png';
     img.addEventListener('error',()=>{img.src='../logo_liga.png';},{once:true}); return img;
   }
+  const preview=$('#playerPreview');
+  let previewPoint={x:0,y:0};
+  function placePreview() {
+    if(!preview.open)return;
+    const margin=8, width=document.documentElement.clientWidth, height=window.innerHeight;
+    const bounds=preview.getBoundingClientRect();
+    let left=previewPoint.x+8,top=previewPoint.y+8;
+    if(left+bounds.width>width-margin)left=previewPoint.x-bounds.width-8;
+    if(top+bounds.height>height-margin)top=previewPoint.y-bounds.height-8;
+    preview.style.left=`${Math.max(margin,Math.min(left,width-bounds.width-margin))}px`;
+    preview.style.top=`${Math.max(margin,Math.min(top,height-bounds.height-margin))}px`;
+  }
+  function openPreview(player,event,trigger) {
+    const bounds=trigger.getBoundingClientRect();
+    previewPoint=event.detail===0?{x:bounds.left+bounds.width/2,y:bounds.top+bounds.height/2}:{x:event.clientX,y:event.clientY};
+    $('#previewName').textContent=player.nombre;
+    const img=photo(player);img.alt=`Foto de ${player.nombre}`;img.loading='eager';
+    $('#previewPhoto').replaceChildren(img);
+    preview.showModal();placePreview();
+  }
+  function enablePreview(node,player) {
+    if(!player || player.id===null)return;
+    node.classList.add('player-peek');node.setAttribute('role','button');node.tabIndex=0;
+    node.setAttribute('aria-haspopup','dialog');node.setAttribute('aria-label',`Ampliar foto de ${player.nombre}`);
+    node.addEventListener('click',event=>openPreview(player,event,node));
+    node.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openPreview(player,{detail:0},node);}});
+  }
+  $('#closePreview').addEventListener('click',()=>preview.close());
+  preview.addEventListener('click',event=>{if(event.target===preview){const r=preview.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)preview.close();}});
+  window.addEventListener('resize',placePreview);
   function playerRow(id, match, slot, players, label) {
     const p=players.get(id), row=document.createElement('div');
     const wo=slot===0?match.woA:match.woB;
     row.className=`player ${id && id===match.winner?'winner':''} ${!p?'placeholder':''} ${wo?'wo':''}`;
     const number=document.createElement('span');number.className='position';number.textContent=p?.position || (wo && match.id.startsWith('p-')?Number(match.id.split('-')[1])*2+slot+1:'—');
     const name=document.createElement('span');name.className='name';name.textContent=p?.nombre || (wo?'WO':label || 'Por definir');
+    enablePreview(name,p);
     const select=document.createElement('select');
     select.setAttribute('aria-label',`${matchLabel(match)} · Puntos de ${p?.nombre || 'jugador por definir'}${p?'':' '+(slot+1)}`);
     select.dataset.match=match.id;select.dataset.slot=slot;
@@ -94,6 +125,7 @@
     crown.style.cssText=`left:${cx-8}px;top:${cy}px;width:${W+16}px`;
     const crownTitle=document.createElement('small');crownTitle.textContent=repechage?'CLASIFICADO A OCTAVOS':'★ CAMPEÓN ★';
     const winnerName=document.createElement('strong');winnerName.textContent=winner?.nombre || (repechage?'Un lugar entre los 16':'Esperando al campeón');
+    enablePreview(winnerName,winner);
     crown.append(crownTitle,photo(winner),winnerName);board.append(crown);
     const finalPath=document.createElementNS(svg.namespaceURI,'path');
     finalPath.setAttribute('d',dual?`M ${fp.x+W/2} ${fp.y+110} V ${cy}`:`M ${fp.x+W} ${fp.center} H ${cx}`);svg.append(finalPath);

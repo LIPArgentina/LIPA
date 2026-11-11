@@ -6,10 +6,10 @@
   <title>Grilla del torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./grilla.css?v=2">
+  <link rel="stylesheet" href="./grilla.css?v=3">
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./grilla-engine.js?v=2" defer></script>
-  <script src="./grilla.js?v=2" defer></script>
+  <script src="./grilla.js?v=3" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -33,5 +33,10 @@
     </section>
   </main>
   <dialog id="correctionDialog"><h2>¿Confirmar la corrección?</h2><p>El nuevo resultado cambia los cruces. Se borrarán los resultados posteriores afectados; los otros partidos se conservarán.</p><div class="dialog-actions"><button id="cancelCorrection" type="button">Cancelar</button><button id="confirmCorrection" type="button">Corregir resultado</button></div></dialog>
+  <dialog id="playerPreview" class="player-preview" aria-labelledby="previewName">
+    <button id="closePreview" class="preview-close" type="button" aria-label="Cerrar foto" autofocus>×</button>
+    <div id="previewPhoto" class="preview-photo"></div>
+    <h2 id="previewName"></h2>
+  </dialog>
 </body>
 </html>
