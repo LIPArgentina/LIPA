@@ -23,4 +23,4 @@ dialog{width:min(460px,calc(100% - 24px));border:1px solid #b98f00;border-radius
 .organizer-card .tournament-actions{display:flex;justify-content:center;gap:10px;flex:1}.organizer-card .tournament-actions a{text-align:center}
 @media(max-width:620px){.organizer-card .tournament-actions{flex-basis:100%;order:2}}
 
-.registration-actions{display:flex;flex-direction:column;gap:8px}.registration-actions button{width:100%}
+.registration-actions{display:flex;flex-direction:column;gap:5px}.registration-actions button{width:100%;min-height:30px;padding:5px 10px;font-size:.72rem;line-height:1.2}
