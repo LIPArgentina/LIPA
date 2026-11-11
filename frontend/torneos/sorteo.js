@@ -21,13 +21,7 @@
     return sample[0] % max;
   }
   function shuffle(state) {
-    const previous = state.players.map(player => player.id).join(',');
-    do {
-      for (let i = state.players.length - 1; i > 0; i--) {
-        const j = randomIndex(i + 1);
-        [state.players[i], state.players[j]] = [state.players[j], state.players[i]];
-      }
-    } while (state.players.map(player => player.id).join(',') === previous);
+    state.players = window.LipaSlots.shuffle(state.players, randomIndex);
     renderRows(state, true);
   }
   function fit(state) {
@@ -51,10 +45,11 @@
       const name = document.createElement('span');
       name.className = 'name';
       name.textContent = player.nombre;
+      row.classList.toggle('wo-row', player.id === null);
       cell.append(name);
       row.append(position, cell);
       state.body.append(row);
-      if (animate && !reducedMotion && cell.animate) cell.animate([{ opacity: .25 }, { opacity: 1 }], { duration: 260 });
+      if (animate && player.id !== null && !reducedMotion && cell.animate) cell.animate([{ opacity: .25 }, { opacity: 1 }], { duration: 260 });
     });
     if (!state.players.length) {
       const row = state.body.insertRow();
@@ -74,7 +69,7 @@
     try {
       const data = await api(`/${state.category}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orden: state.players.map(player => String(player.id)), revision: state.revision, resetResults: state.resetResults === true })
+        body: JSON.stringify({ orden: state.players.map(player => player.id === null ? null : String(player.id)), revision: state.revision, resetResults: state.resetResults === true })
       });
       state.revision = data.revision;
       state.dirty = false;
@@ -118,21 +113,23 @@
       : '';
     for (const [category, label] of [['primera', 'Primera'], ['segunda', 'Segunda'], ['tercera', 'Tercera']]) {
       let players = data.jugadores.filter(player => window.LipaCategories.includes(player.categoria, category));
+      const realCount = players.length;
       const saved = data.sorteos.find(draw => draw.categoria === category);
       const byId = new Map(players.map(player => [String(player.id), player]));
-      const order = Array.isArray(saved?.orden) ? saved.orden.map(String) : [];
-      const valid = Boolean(saved) && order.length === players.length && new Set(order).size === players.length && order.every(id => byId.has(id));
-      if (valid) players = order.map(id => byId.get(id));
+      const order = Array.isArray(saved?.orden) ? saved.orden.map(id=>id===null?null:String(id)) : [];
+      const valid = Boolean(saved) && window.LipaSlots.validOrder(order, [...byId.keys()], category);
+      players = valid ? order.map(id=>id===null?{id:null,nombre:'WO',wo:true}:byId.get(id)) : window.LipaSlots.fill(players,category);
       const card = document.createElement('section');
       card.className = 'category'; card.setAttribute('aria-labelledby', `heading-${category}`);
-      card.innerHTML = `<div class="category-heading"><h2 id="heading-${category}">${label.toUpperCase()}</h2><span class="count">${players.length} jugadores</span></div><div class="table-wrap"><table aria-label="Posiciones de ${label}"><thead><tr><th scope="col">N.º</th><th scope="col">Jugador</th></tr></thead><tbody></tbody></table></div><div class="category-footer"><p class="status" role="status"></p><button type="button" class="draw-button" aria-describedby="status-${category}">SORTEAR POSICIÓN</button></div>`;
+      card.innerHTML = `<div class="category-heading"><h2 id="heading-${category}">${label.toUpperCase()}</h2><span class="count">${realCount} jugadores${players.length>realCount?` · ${players.length-realCount} WO`:''}</span></div><div class="table-wrap"><table aria-label="Posiciones de ${label}"><thead><tr><th scope="col">N.º</th><th scope="col">Jugador</th></tr></thead><tbody></tbody></table></div><div class="category-footer"><p class="status" role="status"></p><button type="button" class="draw-button" aria-describedby="status-${category}">SORTEAR POSICIÓN</button></div>`;
       document.querySelector('#categories').append(card);
       const state = { category, label, players, card, body: card.querySelector('tbody'), status: card.querySelector('.status'), button: card.querySelector('button'), revision: saved?.revision || 0, drawn: Boolean(saved), dirty: false, timer: null, saving: false };
       state.status.id = `status-${category}`;
       state.hasResults = Boolean(saved?.tiene_resultados);
-      state.button.disabled = players.length < 2;
+      state.button.disabled = realCount < 2 || (window.LipaSlots.enabled(category) && realCount>30);
       message(state, saved ? (valid ? 'Orden guardado recuperado.' : 'Cambiaron los participantes. Repetí el sorteo.') : 'Listo para sortear.', saved ? (valid ? 'saved' : 'error') : '');
-      if (players.length < 2) message(state, 'Se necesitan al menos dos jugadores para sortear.');
+      if (realCount < 2) message(state, 'Se necesitan al menos dos jugadores para sortear.');
+      if (window.LipaSlots.enabled(category) && realCount>30) message(state, 'Esta grilla admite hasta 30 jugadores.', 'error');
       state.button.addEventListener('click', () => toggle(state));
       states.push(state);
       renderRows(state);

@@ -1,5 +1,6 @@
 const bracket = require('../../../frontend/torneos/grilla-engine');
 const categories = require('../../../frontend/torneos/categorias');
+const slots = require('../../../frontend/torneos/cupos');
 
 module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requireTorneoOrganizador, getTournamentRanking }) {
   const divisions = Object.keys(bracket.limits);
@@ -11,10 +12,10 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
     const { rows } = await client.query(`SELECT i.id::text AS id, i.jugador_id, i.nombre_oficial AS nombre, COALESCE(j.foto_path,'') AS foto_path
       FROM torneo_inscripciones i LEFT JOIN jugadores j ON j.id=i.jugador_id
       WHERE i.torneo_organizador_id=$1 AND i.categoria = ANY($2::text[]) AND i.corroborado=true`, [organizer, categories.valuesFor(category)]);
-    const ids = draw.orden.map(String), players = new Map(rows.map(p => [p.id,p]));
-    if (ids.length !== 30 || rows.length !== 30) throw fail(422, 'Este formato requiere exactamente 30 jugadores confirmados y sorteados en la categoría.');
-    if (new Set(ids).size !== 30 || !ids.every(id => players.has(id))) throw fail(409, 'Cambiaron los participantes. Revisá las inscripciones y repetí el sorteo.');
-    return { draw, players: ids.map(id => players.get(id)) };
+    const ids = draw.orden.map(id=>id===null?null:String(id)), players = new Map(rows.map(p => [p.id,p]));
+    if (ids.length !== 30 || (slots.enabled(category) ? rows.length<2 || rows.length>30 : rows.length!==30)) throw fail(422, slots.enabled(category)?'Esta grilla admite de 2 a 30 jugadores; completá los lugares libres con WO desde el sorteo.':'Este formato requiere exactamente 30 jugadores confirmados y sorteados en la categoría.');
+    if (!slots.validOrder(ids, [...players.keys()], category)) throw fail(409, 'Cambiaron los participantes o los WO. Revisá las inscripciones y repetí el sorteo.');
+    return { draw, players: ids.map(id => id===null?{id:null,nombre:'WO',wo:true,foto_path:''}:players.get(id)) };
   }
   async function lock(client, organizer) {
     await client.query('BEGIN');

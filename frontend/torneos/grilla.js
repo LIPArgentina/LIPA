@@ -36,9 +36,10 @@
   }
   function playerRow(id, match, slot, players, label) {
     const p=players.get(id), row=document.createElement('div');
-    row.className=`player ${id && id===match.winner?'winner':''} ${!p?'placeholder':''}`;
-    const number=document.createElement('span');number.className='position';number.textContent=p?.position || '—';
-    const name=document.createElement('span');name.className='name';name.textContent=p?.nombre || label || 'Por definir';
+    const wo=slot===0?match.woA:match.woB;
+    row.className=`player ${id && id===match.winner?'winner':''} ${!p?'placeholder':''} ${wo?'wo':''}`;
+    const number=document.createElement('span');number.className='position';number.textContent=p?.position || (wo && match.id.startsWith('p-')?Number(match.id.split('-')[1])*2+slot+1:'—');
+    const name=document.createElement('span');name.className='name';name.textContent=p?.nombre || (wo?'WO':label || 'Por definir');
     const select=document.createElement('select');
     select.setAttribute('aria-label',`${matchLabel(match)} · Puntos de ${p?.nombre || 'jugador por definir'}${p?'':' '+(slot+1)}`);
     select.dataset.match=match.id;select.dataset.slot=slot;
@@ -54,9 +55,9 @@
     node.style.cssText=`left:${pos.x}px;top:${pos.y}px;width:${pos.width}px`;
     node.dataset.matchId=match.id;
     const label=document.createElement('p');label.className='match-label';
-    label.textContent=match.id==='qualifier'?'CLASIFICADO DEL REPECHAJE':match.bye?'PASE LIBRE':isFinal?(repechage?'FINAL DEL REPECHAJE':'FINAL'):`PARTIDO ${Number(match.id.split('-')[1])+1}`;
+    label.textContent=match.id==='qualifier'?'CLASIFICADO DEL REPECHAJE':match.bye?(category==='primera'?'PASE LIBRE':'PASE AUTOMÁTICO · WO'):isFinal?(repechage?'FINAL DEL REPECHAJE':'FINAL'):`PARTIDO ${Number(match.id.split('-')[1])+1}`;
     node.append(label,playerRow(match.a,match,0,players,match.id==='qualifier'?'Ganador del repechaje':null));
-    if(!match.bye)node.append(playerRow(match.b,match,1,players));
+    if(match.id!=='qualifier' && !(category==='primera' && match.bye))node.append(playerRow(match.b,match,1,players));
     board.append(node);
   }
   function renderBoard(rounds, boardId, frameId, repechage=false) {
@@ -66,7 +67,7 @@
     const width=dual?(depth*2+1)*W+depth*2*G:(depth+2)*W+(depth+1)*G;
     const height=Math.max(rows*STEP+70,dual?560:0);
     const positions=new Map(), players=new Map(data.players.map(p=>[String(p.id),p]));
-    const titles=repechage?['Primera rueda','Cuartos','Semifinal','Final']:['Primera ronda','Octavos','Cuartos','Semifinal','Final'];
+    const titles=repechage?['Primera rueda','Cuartos','Semifinal','Final'].slice(4-rounds.length):['Primera ronda','Octavos','Cuartos','Semifinal','Final'];
     function title(text,x) {const el=document.createElement('div');el.className='round-title';el.style.cssText=`left:${x}px;width:${W}px`;el.textContent=text.toUpperCase();board.append(el);}
     rounds.forEach((round,r)=>{
       const half=round.length/2;
@@ -109,10 +110,15 @@
     $('#viewToggle').textContent=`VISUALIZACIÓN · ${view==='double'?'DOBLE':'SIMPLE'}`;
     $('#viewToggle').setAttribute('aria-label',`Visualización ${view==='double'?'doble':'simple'}. Cambiar a ${view==='double'?'simple':'doble'}`);
     renderBoard(state.main,'#mainBoard','#mainFrame');renderBoard(state.rep,'#repBoard','#repFrame',true);
-    const player=state.bye && data.players.find(p=>String(p.id)===state.bye.id);
-    $('#byeNote').textContent=player
-      ? `Pase libre: ${player.nombre} · ${state.bye.points} puntos a favor · diferencia ${state.bye.diff} · ${player.ranking ? 'ranking LIPA #'+player.ranking : 'sin posición en ranking'}.${state.rankingFallback?' Igualdad sin desempate de ranking: se conserva la prioridad del orden del sorteo.':''}`
-      : 'El pase libre se define al completar los 15 partidos de primera ronda: puntos a favor, diferencia y ranking general LIPA.';
+    const byeNames=(state.byes || []).map(bye=>{
+      const player=data.players.find(p=>String(p.id)===bye.id);
+      return `${player.nombre} (${bye.points} a favor, diferencia ${bye.diff}, ${player.ranking?'ranking #'+player.ranking:'sin ranking'})`;
+    });
+    $('#byeNote').textContent=byeNames.length
+      ? `Pase libre: ${byeNames.join('; ')}.${state.rankingFallback?' Igualdad sin desempate de ranking: se conserva la prioridad del orden del sorteo.':''}`
+      : state.firstComplete?'Repechaje formado con los perdedores de los partidos jugados.':'El pase libre se define al completar los partidos jugados de primera ronda: puntos a favor, diferencia y ranking general LIPA. Los WO no participan del repechaje.';
+    const realCount=data.players.filter(p=>p.id!==null).length;
+    $('#mainSection .badge').textContent=realCount===30?'30 jugadores + repechaje':`${realCount} jugadores · ${30-realCount} WO + repechaje`;
     applyZoom();
   }
   function confirmCorrection() {

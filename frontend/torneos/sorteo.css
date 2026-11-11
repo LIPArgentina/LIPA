@@ -9,3 +9,4 @@
 #pageMessage{margin:4px 0}
 @media(min-width:761px){.category{height:calc(100dvh - 102px)}}
 @media(max-width:760px){.category{height:calc(100dvh - 160px)}}
+.wo-row .name{color:#a89763;font-style:italic;letter-spacing:.15em}.running .wo-row .name{color:#a89763}

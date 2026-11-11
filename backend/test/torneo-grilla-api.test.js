@@ -2,14 +2,16 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const mount=require('../src/routes/torneosGrilla.routes');
 const engine=require('../../frontend/torneos/grilla-engine');
-function harness() {
-  const players=Array.from({length:30},(_,i)=>({id:String(i+1),jugador_id:i+101,nombre:`Jugador ${i+1}`,foto_path:'',ranking:i+1,position:i+1,categoria:i<2?'segunda_tercera':'tercera'}));
-  let stored={jugadores:players,resultados:{},revision:0,sorteo_revision:1};
+const slots=require('../../frontend/torneos/cupos');
+function harness(count=30) {
+  const players=Array.from({length:count},(_,i)=>({id:String(i+1),jugador_id:i+101,nombre:`Jugador ${i+1}`,foto_path:'',ranking:i+1,position:i+1,categoria:i<2?'segunda_tercera':'tercera'}));
+  const seeded=slots.fill(players,'tercera').map((p,i)=>({...p,position:i+1}));
+  let stored={jugadores:seeded,resultados:{},revision:0,sorteo_revision:1};
   const calls=[],routes={};let eligible=players,drawRevision=1,rankCalls=0;
   const auth=()=>{};
   const client={release(){calls.push('RELEASE');},async query(sql,args){
     calls.push(sql);
-    if(sql.startsWith('SELECT orden'))return {rows:[{orden:players.map(p=>p.id),revision:drawRevision}]};
+    if(sql.startsWith('SELECT orden'))return {rows:[{orden:seeded.map(p=>p.id),revision:drawRevision}]};
     if(sql.includes('FROM torneo_inscripciones i')){assert.equal(args[0],77);assert.deepEqual(args[1],['tercera','segunda_tercera']);assert(sql.includes('ANY($2::text[])'));return {rows:eligible.filter(p=>args[1].includes(p.categoria))};}
     if(sql.startsWith('SELECT sorteo_revision'))return {rows:stored?[{sorteo_revision:stored.sorteo_revision}]:[]};
     if(sql.startsWith('INSERT INTO torneo_grillas')){if(!stored)stored={jugadores:JSON.parse(args[3]),resultados:{},revision:0,sorteo_revision:args[2]};return {rows:[]};}
@@ -32,7 +34,7 @@ test('rejects invalid score, unavailable round, stale revision and changed roste
  let h=harness();let r=await h.request('patch',{matchId:'p-0',score:[6,0],revision:0,drawRevision:1});assert.equal(r.status,400);assert.equal(h.calls.length,0);
  h=harness();r=await h.request('patch',{matchId:'m4-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,400);
  h=harness();r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:1,drawRevision:1});assert.equal(r.status,409);assert.equal(r.data.code,'STALE');assert(h.calls.includes('ROLLBACK'));
- h=harness();h.eligible=h.players.slice(1);r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,422);assert.equal(h.stored.revision,0);
+ h=harness();h.eligible=h.players.slice(1);r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,409);assert.equal(h.stored.revision,0);
  h=harness();h.drawRevision=2;r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,409);
 });
 test('requires confirmation to clear downstream results and preserves other games',async()=>{
@@ -42,4 +44,10 @@ test('requires confirmation to clear downstream results and preserves other game
  h.stored.resultados=s.clean;const body={matchId:'p-0',score:[0,5],revision:0,drawRevision:1};
  let r=await h.request('patch',body);assert.equal(r.status,409);assert.equal(r.data.code,'CONFIRM_CORRECTION');assert(h.stored.resultados['m1-0']);
  r=await h.request('patch',{...body,confirmCorrection:true});assert.equal(r.status,200);assert(!h.stored.resultados['m1-0']);assert(h.stored.resultados['m1-1']);
+});
+
+test('GET restores WO and PATCH blocks scoring an automatic advance',async()=>{
+ const h=harness(20);let r=await h.request('get');assert.equal(r.status,200);assert.equal(r.data.players.length,30);assert.equal(r.data.players.filter(p=>p.id===null).length,10);assert.equal(r.data.players[2].nombre,'WO');
+ r=await h.request('patch',{matchId:'p-1',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,400);assert.equal(h.stored.revision,0);
+ r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,200);
 });

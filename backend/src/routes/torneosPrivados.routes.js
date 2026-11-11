@@ -7,6 +7,7 @@ const { createRenewableSession, setAccessCookie } = require('../utils/authSessio
 const { getTournamentRanking } = require('./cruces.routes.db');
 const mountGrillaRoutes = require('./torneosGrilla.routes');
 const categories = require('../../../frontend/torneos/categorias');
+const slots = require('../../../frontend/torneos/cupos');
 
 const DEFAULT_PASSWORD = '1234';
 const MAX_ORGANIZADORES = 30;
@@ -406,8 +407,9 @@ module.exports = function createTorneosPrivadosRouter() {
     const { orden, revision } = req.body || {};
     if (!['primera', 'segunda', 'tercera'].includes(categoria)
         || !Array.isArray(orden) || orden.length < 2
-        || !orden.every(id => typeof id === 'string' && /^[1-9][0-9]*$/.test(id))
-        || new Set(orden).size !== orden.length
+        || !orden.every(id => (slots.enabled(categoria) && id===null) || (typeof id === 'string' && /^[1-9][0-9]*$/.test(id)))
+        || orden.filter(id=>id!==null).length < 2
+        || new Set(orden.filter(id=>id!==null)).size !== orden.filter(id=>id!==null).length
         || !Number.isSafeInteger(revision) || revision < 0) {
       return res.status(400).json({ error: 'El orden del sorteo no es válido.' });
     }
@@ -423,7 +425,7 @@ module.exports = function createTorneosPrivadosRouter() {
         WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND corroborado=true`,
         [req.user.torneoOrganizadorId, categories.valuesFor(categoria)]);
       const ids = new Set(rows.map(row => String(row.id)));
-      if (ids.size !== orden.length || !orden.every(id => ids.has(id))) {
+      if (!slots.validOrder(orden, [...ids], categoria)) {
         await client.query('ROLLBACK');
         return res.status(409).json({ error: 'Cambiaron los participantes. Recargá la página y repetí el sorteo.' });
       }
