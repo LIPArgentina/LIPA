@@ -24,3 +24,6 @@ dialog{width:min(460px,calc(100% - 24px));border:1px solid #b98f00;border-radius
 @media(max-width:620px){.organizer-card .tournament-actions{flex-basis:100%;order:2}}
 
 .registration-actions{display:flex;flex-direction:column;gap:5px}.registration-actions button{width:100%;min-height:30px;padding:5px 10px;font-size:.72rem;line-height:1.2}
+
+.confirmed-heading{gap:16px;flex-wrap:wrap;margin-bottom:12px}.registered-search{flex:1;max-width:340px;min-width:180px;margin-left:auto;font-size:.7rem}.registered-search input{min-height:36px;font-size:.85rem}.confirmed-heading>strong{min-width:35px;text-align:right}
+@media(max-width:620px){.registered-search{order:3;flex-basis:100%;max-width:none;margin:0}.confirmed-heading>div{flex:1}}

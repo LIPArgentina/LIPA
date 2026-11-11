@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=15">
+  <link rel="stylesheet" href="./privados.css?v=16">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -55,7 +55,7 @@
     </section>
 
     <section class="list-card verified-card">
-      <div class="list-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><strong id="verifiedCount">0</strong></div>
+      <div class="list-heading confirmed-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><label class="registered-search" for="registeredSearch">Buscar inscripto<input id="registeredSearch" type="search" placeholder="Nombre o DNI" autocomplete="off" aria-controls="verifiedBody"></label><strong id="verifiedCount">0</strong></div>
       <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="verifiedBody"></tbody></table></div>
     </section>
 
@@ -96,6 +96,6 @@
 
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./categorias.js?v=1" defer></script>
-  <script src="./privados.js?v=15" defer></script>
+  <script src="./privados.js?v=16" defer></script>
 </body>
 </html>

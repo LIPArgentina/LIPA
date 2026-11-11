@@ -120,13 +120,23 @@
         || (categoryFilter === 'sin_definir' ? !item.categoria : window.LipaCategories.matches(item.categoria, categoryFilter));
       return paymentMatches && categoryMatches;
     });
-    const verified = filtered.filter(item => item.corroborado);
+    const normalizeSearch = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const query = normalizeSearch($('#registeredSearch').value);
+    const words = query.split(/\s+/).filter(Boolean);
+    const dniQuery = query.replace(/[.\s-]/g, '');
+    const verified = filtered.filter(item => {
+      if (!item.corroborado) return false;
+      const name = normalizeSearch(`${item.nombre_oficial || ''} ${item.nombre_ingresado || ''}`);
+      return !query || words.every(word => name.includes(word))
+        || (/^\d+$/.test(dniQuery) && String(item.dni || '').replace(/\D/g, '').includes(dniQuery));
+    });
     const pending = filtered.filter(item => !item.corroborado);
     renderBody($('#verifiedBody'), verified, true);
     renderBody($('#pendingBody'), pending, false);
     $('#verifiedCount').textContent = String(verified.length);
     $('#pendingCount').textContent = String(pending.length);
   }
+  $('#registeredSearch').addEventListener('input', render);
   async function load() {
     const data = await api('/torneo-organizador/inscripciones');
     entries = data.inscripciones || [];
