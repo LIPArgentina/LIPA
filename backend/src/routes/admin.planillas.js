@@ -283,7 +283,7 @@ router.get('/planillas/:team/access-log', requireAdmin, async (req, res) => {
     const teamRef = String(req.params.team || '').trim().toLowerCase();
     await ensureAccessLogSchema();
     const result = await pool.query(
-      `SELECT pal.id, pal.action, pal.created_at
+      `SELECT pal.action, pal.created_at
          FROM planilla_access_logs pal
          JOIN equipos e ON e.id = pal.equipo_id
         WHERE (LOWER(e.slug_uid) = $1 OR LOWER(e.slug_base) = $1 OR LOWER(e.display_name) = $1)
@@ -293,45 +293,11 @@ router.get('/planillas/:team/access-log', requireAdmin, async (req, res) => {
     );
     return res.json({
       ok: true,
-      events: result.rows.map((row) => ({ id: Number(row.id), action: row.action, at: row.created_at }))
+      events: result.rows.map((row) => ({ action: row.action, at: row.created_at }))
     });
   } catch (err) {
     console.error('Error leyendo historial de accesos:', err);
     return res.status(500).json({ ok: false, error: 'No se pudo cargar el historial.' });
-  }
-});
-
-router.delete('/planillas/:team/access-log/:eventId', requireAdmin, async (req, res) => {
-  try {
-    const teamRef = String(req.params.team || '').trim().toLowerCase();
-    const eventId = Number(req.params.eventId);
-    if (!teamRef || !Number.isSafeInteger(eventId) || eventId <= 0) {
-      return res.status(400).json({ ok: false, error: 'Registro de acceso inválido.' });
-    }
-    await ensureAccessLogSchema();
-    const result = await pool.query(
-      `DELETE FROM planilla_access_logs pal
-        USING equipos e
-        WHERE pal.id = $2
-          AND e.id = pal.equipo_id
-          AND (LOWER(e.slug_uid) = $1 OR LOWER(e.slug_base) = $1 OR LOWER(e.display_name) = $1)
-        RETURNING pal.id, pal.action, pal.created_at`,
-      [teamRef, eventId]
-    );
-    if (!result.rowCount) {
-      return res.status(404).json({ ok: false, error: 'El registro no existe o no pertenece a esta planilla.' });
-    }
-    return res.json({
-      ok: true,
-      deleted: {
-        id: Number(result.rows[0].id),
-        action: result.rows[0].action,
-        at: result.rows[0].created_at
-      }
-    });
-  } catch (err) {
-    console.error('Error eliminando historial de acceso:', err);
-    return res.status(500).json({ ok: false, error: 'No se pudo eliminar el registro.' });
   }
 });
 
