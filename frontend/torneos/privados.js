@@ -61,6 +61,13 @@
     const digits = String(value || '').replace(/\D/g, '');
     return digits ? `https://wa.me/${digits}` : '#';
   }
+  function whatsappContact(value) {
+    const href = whatsappHref(value);
+    const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l5.3-1.3A9.5 9.5 0 1 0 12 2Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.4 6.8c-.4 0-1.3.8-1.3 2 0 2.8 4.1 6.9 6.9 6.9 1.2 0 2-.9 2-1.3 0-.3-2-1.3-2.3-1.3-.3 0-.8.8-1 .8-.8 0-3.4-2.6-3.4-3.4 0-.2.8-.7.8-1 0-.3-1-2.7-1.7-2.7Z" fill="currentColor"/></svg>';
+    return href === '#'
+      ? '<span class="whatsapp-contact disabled" title="Guardá un número para abrir WhatsApp" aria-label="WhatsApp sin número">'+icon+'</span>'
+      : '<a class="whatsapp-contact" href="'+href+'" target="_blank" rel="noopener noreferrer" aria-label="Abrir chat de WhatsApp" title="Abrir WhatsApp">'+icon+'</a>';
+  }
   function paymentState(entry) {
     return entry?.estado_pago === '50' ? 'sena' : String(entry?.estado_pago || 'sin_sena');
   }
@@ -107,7 +114,7 @@
       const tr = document.createElement('tr');
       const name = verified ? entry.nombre_oficial : entry.nombre_ingresado;
       tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
-        <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp"><button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
+        <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp">${whatsappContact(entry.whatsapp)}<button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
         <td><button class="delete-button" data-delete="${entry.id}">Quitar</button></td>`;
       target.appendChild(tr);
