@@ -16,7 +16,7 @@
   </script>
 
   <link rel="stylesheet" href="/styles.css" />
-  <link rel="stylesheet" href="/index.css?v=torneos-header-4" />
+  <link rel="stylesheet" href="/index.css?v=promo-app-sorteo-1" />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -135,19 +135,26 @@
   <dialog id="promoSorteoModal" class="promo-video-popup" aria-labelledby="promoSorteoTitle">
     <div class="promo-video-popup__panel">
       <button id="closePromoSorteo" class="promo-video-popup__close" type="button" aria-label="Cerrar video">&times;</button>
-      <h2 id="promoSorteoTitle">LIPA junto a Rodry Baygo</h2>
+      <h2 id="promoSorteoTitle">Sorteo LIPA</h2>
       <div class="promo-video-popup__video">
         <video
           id="promoSorteoPlayer"
-          src="./assets/lipa-rodry-baygo.mp4"
+          src="./assets/lipa-app-sorteo.mp4"
           controls
           autoplay
           muted
           playsinline
           preload="metadata"
-          aria-label="Video promocional de LIPA junto a Rodry Baygo"
+          aria-label="Video promocional de la aplicación LIPA y su sorteo"
         ></video>
       </div>
+      <p class="promo-video-popup__message">Descargá la APP y registrate gratis, ¡falta muy poco para el sorteo!</p>
+      <a
+        class="promo-video-popup__action"
+        href="https://play.google.com/store/apps/details?id=com.lipa.app"
+        target="_blank"
+        rel="noopener noreferrer"
+      >Descargar en Google Play</a>
     </div>
   </dialog>
 
@@ -384,7 +391,7 @@
   <script src="./config.js?v=renewable-session-1"></script>
   <script type="module" src="./templates/banner.js" defer></script>
   <script type="module" src="./app.js?v=torneos-header-4" defer></script>
-  <script type="module" src="./index.js?v=torneos-header-4" defer></script>
+  <script type="module" src="./index.js?v=promo-app-sorteo-1" defer></script>
   <script src="./developer-contact.js?v=20260811-1" defer></script>
 </body>
 </html>

@@ -989,6 +989,9 @@
   font-size: .92rem;
   line-height: 1.4;
 }
+.promo-video-popup__message{
+  font-weight: 800;
+}
 .promo-video-popup__close{
   position: absolute;
   z-index: 2;
@@ -1007,7 +1010,7 @@
 }
 .promo-video-popup__video{
   position: relative;
-  width: min(100%, 390px);
+  width: min(100%, 350px);
   margin: 0 auto;
   overflow: hidden;
   border-radius: 12px;
@@ -1047,6 +1050,14 @@
   font-weight: 900;
   letter-spacing: .03em;
   text-decoration: none;
+}
+.promo-video-popup__action:hover{
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.promo-video-popup__action:focus-visible{
+  outline: 3px solid #fff;
+  outline-offset: 3px;
 }
 @media (max-height: 760px){
   .promo-video-popup__video{ width: min(100%, 250px); }
