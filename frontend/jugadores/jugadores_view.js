@@ -235,9 +235,7 @@ async function searchPlayers(ev){
     return;
   }
   try {
-    const category = $('#teamCategory')?.value || 'tercera';
-    if (category === 'segunda' && !hasSecondAccess) return;
-    const data = await fetchJson(`/api/players-public/search?category=${encodeURIComponent(category)}&q=${encodeURIComponent(q)}`);
+    const data = await fetchJson(`/api/players-public/search?scope=all&q=${encodeURIComponent(q)}`);
     renderPlayers(data.players || []);
   } catch (err) {
     renderPlayers([]);
@@ -267,8 +265,7 @@ async function showHistory(player){
   const body = $('#historyBody');
   if (!dialog || !body || !player?.id) return;
   try {
-    const category = $('#teamCategory')?.value || 'tercera';
-    const data = await fetchJson(`/api/players-public/history/${encodeURIComponent(player.id)}?category=${encodeURIComponent(category)}`);
+    const data = await fetchJson(`/api/players-public/history/${encodeURIComponent(player.id)}?scope=all`);
     const history = data.history || [];
     body.innerHTML = history.length ? `
       <table class="history-table">

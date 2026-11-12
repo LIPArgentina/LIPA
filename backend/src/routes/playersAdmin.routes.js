@@ -81,6 +81,81 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     });
   }
 
+  function normalizeFuzzySearch(value) {
+    return normalizeText(value)
+      .replace(/[bv]/g, 'b');
+  }
+
+  function allowedSearchDistance(value) {
+    const length = String(value || '').length;
+    if (length <= 3) return 0;
+    if (length <= 5) return 1;
+    if (length <= 9) return 2;
+    return 3;
+  }
+
+  function fuzzyNameScore(query, candidate) {
+    const wanted = normalizeFuzzySearch(query);
+    const name = normalizeFuzzySearch(candidate);
+    if (!wanted || !name) return null;
+    if (name === wanted) return 0;
+    if (name.startsWith(wanted)) return 1;
+    if (name.includes(wanted)) return 2;
+
+    const wantedParts = wanted.split(' ').filter(Boolean);
+    const nameParts = name.split(' ').filter(Boolean);
+    if (!wantedParts.length || !nameParts.length) return null;
+
+    let totalDistance = 0;
+    const usedIndexes = new Set();
+    for (const part of wantedParts) {
+      let bestIndex = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      nameParts.forEach((candidatePart, index) => {
+        if (usedIndexes.has(index)) return;
+        const distance = candidatePart === part
+          ? 0
+          : (candidatePart.startsWith(part) ? 0 : editDistance(part, candidatePart));
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = index;
+        }
+      });
+      if (bestIndex < 0 || bestDistance > allowedSearchDistance(part)) return null;
+      usedIndexes.add(bestIndex);
+      totalDistance += bestDistance;
+    }
+
+    return 3 + totalDistance + Math.max(0, nameParts.length - wantedParts.length) * 0.05;
+  }
+
+  function rankPlayerSearchResults(players = [], query = '') {
+    const rawQuery = String(query || '').trim();
+    const wantedDni = normalizeDni(rawQuery);
+    const isDniSearch = wantedDni.length >= 2 && /^\D*\d[\d.\s-]*$/.test(rawQuery);
+
+    return players
+      .map((player) => {
+        const playerDni = normalizeDni(player?.dni || '');
+        let score = null;
+        if (isDniSearch && playerDni) {
+          if (playerDni === wantedDni) score = 0;
+          else if (playerDni.startsWith(wantedDni)) score = 1;
+          else if (playerDni.includes(wantedDni)) score = 2;
+        } else {
+          score = fuzzyNameScore(rawQuery, player?.nombre || player?.name || '');
+        }
+        return { player, score };
+      })
+      .filter((item) => item.score !== null)
+      .sort((a, b) =>
+        a.score - b.score ||
+        String(a.player?.nombre || '').localeCompare(String(b.player?.nombre || ''), 'es', { sensitivity: 'base' })
+      )
+      .slice(0, 80)
+      .map((item) => item.player);
+  }
+
   async function getPlayerDisplayVariant(sourcePath, safeFilename) {
     const sourceStat = await fs.promises.stat(sourcePath);
     const parsed = path.parse(safeFilename);
@@ -549,6 +624,10 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
   }
 
   function requirePublicPlayerCategoryAccess(req, res, next) {
+    if (String(req.query.scope || '').trim().toLowerCase() === 'all') {
+      req.publicPlayerCategory = '';
+      return next();
+    }
     const category = normalizeCategory(req.query.category || 'tercera');
     if (!['primera', 'segunda', 'tercera'].includes(category)) {
       return res.status(400).json({ ok: false, error: 'Categoría inválida' });
@@ -799,9 +878,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     try {
       await ensureSchema();
       const q = String(req.query.q || '').trim();
-      const category = req.publicPlayerCategory;
-      const dni = normalizeDni(q);
-      const name = normalizeText(q);
+      const category = req.publicPlayerCategory || '';
       if (!q || q.length < 2) return res.json({ ok: true, players: [] });
 
       const result = await pool.query(
@@ -827,19 +904,14 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           ON je.jugador_id = j.id
          AND je.activo = true
         LEFT JOIN equipos e ON e.id = je.equipo_id
-        WHERE (
-          ($1 <> '' AND j.dni ILIKE $1 || '%')
-          OR ($2 <> '' AND j.nombre_normalizado ILIKE '%' || $2 || '%')
-          OR ($3 <> '' AND LOWER(j.nombre) ILIKE '%' || LOWER($3) || '%')
-        )
-          AND je.categoria = $4
+        WHERE ($1 = '' OR je.categoria = $1)
         ORDER BY j.nombre ASC, je.categoria ASC NULLS LAST
-        LIMIT 80
         `,
-        [dni, name, q, category]
+        [category]
       );
 
-      return res.json({ ok: true, players: canonicalizePlayerRows(result.rows) });
+      const players = canonicalizePlayerRows(result.rows);
+      return res.json({ ok: true, players: rankPlayerSearchResults(players, q) });
     } catch (err) {
       console.error('players-public/search', err);
       return res.status(500).json({ ok: false, error: err.message });
@@ -849,7 +921,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
   router.get('/players-public/by-team', requirePublicPlayerCategoryAccess, async (req, res) => {
     try {
       await ensureSchema();
-      const category = req.publicPlayerCategory;
+      const category = req.publicPlayerCategory || '';
       const rawTeam = String(req.query.team || '').trim();
       const team = await resolveTeam(rawTeam, category);
       if (!team) return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
@@ -957,7 +1029,7 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
           OR ($2 = '' AND $3 <> '' AND COALESCE(j.nombre_normalizado, '') = $3)
           OR j.id = $1
         )
-          AND je.categoria = $4
+          AND ($4 = '' OR je.categoria = $4)
         ORDER BY je.activo DESC, je.desde DESC NULLS LAST, je.id DESC
         `,
         [playerId, dni, normalizedName, category]
