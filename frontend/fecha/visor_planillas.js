@@ -358,11 +358,30 @@ function authHeaders(extra = {}){
       events.forEach(event => {
         const row = document.createElement('div');
         row.className = 'audit-history-row';
+        row.dataset.eventId = String(event.id || '');
         const action = document.createElement('strong');
         action.textContent = event.action === 'edit' ? 'EDITADA' : 'VISTA';
         const time = document.createElement('span');
         time.textContent = formatDateTime(event.at);
-        row.append(action, time);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'audit-history-delete';
+        remove.textContent = 'BORRAR';
+        remove.disabled = !event.id;
+        remove.addEventListener('click', async () => {
+          if(!window.confirm(`¿Eliminar el registro ${action.textContent.toLowerCase()} del ${time.textContent}?`)) return;
+          remove.disabled = true;
+          try{
+            await fetchJson(`/api/admin/planillas/${encodeURIComponent(teamKey(item))}/access-log/${encodeURIComponent(event.id)}`, {
+              method:'DELETE'
+            });
+            await showAccessHistory(item);
+          }catch(error){
+            remove.disabled = false;
+            showAlert(error.message || 'No se pudo eliminar el registro.');
+          }
+        });
+        row.append(action, time, remove);
         list.appendChild(row);
       });
     }catch(error){

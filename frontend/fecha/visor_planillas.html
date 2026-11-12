@@ -401,8 +401,9 @@
   .audit-dialog-actions{ display:flex; justify-content:flex-end; gap:9px; margin-top:18px; }
   .audit-history-list{ display:grid; gap:7px; margin-top:12px; }
   .audit-history-row{
-    display:flex;
-    justify-content:space-between;
+    display:grid;
+    grid-template-columns:minmax(70px, auto) 1fr auto;
+    align-items:center;
     gap:12px;
     padding:9px 10px;
     border:1px solid #ffffff20;
@@ -411,6 +412,18 @@
     font-size:12px;
   }
   .audit-history-row strong{ color:var(--gold); }
+  .audit-history-row span{ text-align:right; }
+  .audit-history-delete{
+    border:1px solid #ff4d4d;
+    border-radius:7px;
+    padding:5px 8px;
+    color:#ff6868;
+    background:#220808;
+    font:inherit;
+    font-weight:900;
+    cursor:pointer;
+  }
+  .audit-history-delete:disabled{ opacity:.45; cursor:wait; }
   .audit-history-empty{ padding:18px 4px; color:#ccc; text-align:center; font-size:13px; }
 
   @media (max-width: 1240px){
@@ -605,6 +618,6 @@
   </div>
 </div>
   <script src="../match-format.js"></script>
-  <script src="visor_planillas.js?v=20261029-planillas-auditadas-1"></script>
+  <script src="visor_planillas.js?v=20261112-borrar-auditoria-1"></script>
 </body>
 </html>
