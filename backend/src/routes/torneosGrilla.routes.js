@@ -13,7 +13,8 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
       FROM torneo_inscripciones i LEFT JOIN jugadores j ON j.id=i.jugador_id
       WHERE i.torneo_organizador_id=$1 AND i.categoria = ANY($2::text[]) AND i.corroborado=true`, [organizer, categories.valuesFor(category)]);
     const ids = draw.orden.map(id=>id===null?null:String(id)), players = new Map(rows.map(p => [p.id,p]));
-    if (ids.length !== 30 || (slots.enabled(category) ? rows.length<2 || rows.length>30 : rows.length!==30)) throw fail(422, slots.enabled(category)?'Esta grilla admite de 2 a 30 jugadores; completá los lugares libres con WO desde el sorteo.':'Este formato requiere exactamente 30 jugadores confirmados y sorteados en la categoría.');
+    const capacity=slots.capacity(category);
+    if (ids.length !== capacity || (slots.enabled(category) ? rows.length<2 || rows.length>capacity : rows.length!==30)) throw fail(422, slots.enabled(category)?`Esta grilla admite de 2 a ${capacity} jugadores; guardá un nuevo sorteo para aplicar este formato.`:'Este formato requiere exactamente 30 jugadores confirmados y sorteados en la categoría.');
     if (!slots.validOrder(ids, [...players.keys()], category)) throw fail(409, 'Cambiaron los participantes o los WO. Revisá las inscripciones y repetí el sorteo.');
     return { draw, players: ids.map(id => id===null?{id:null,nombre:'WO',wo:true,foto_path:''}:players.get(id)) };
   }

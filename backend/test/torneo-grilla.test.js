@@ -1,8 +1,9 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const engine=require('../../frontend/torneos/grilla-engine');
+const actualEngine=require('../../frontend/torneos/grilla-engine');
+const engine={...actualEngine,build:(players,stored={},category='segunda')=>actualEngine.build(players,stored,category)};
 const players=Array.from({length:30},(_,i)=>({id:String(i+1),nombre:`Jugador ${i+1}`,ranking:30-i,position:i+1}));
-function enter(state,id,a,b,roster=players,category='tercera') {
+function enter(state,id,a,b,roster=players,category='segunda') {
   const m=state.matches.find(m=>m.id===id);return engine.build(roster,{...state.clean,[id]:{a:m.a,b:m.b,score:[a,b]}},category);
 }
 function firstRound(roster=players) {
@@ -51,7 +52,7 @@ test('same winner correction preserves downstream main results',()=>{
   let s=firstRound();s=enter(s,'m1-0',5,1);s=enter(s,'p-0',4,2);assert(s.clean['m1-0']);
 });
 test('score limits and ranking absent fallback are deterministic',()=>{
-  let s=engine.build(players);s=enter(s,'p-0',6,1);assert.equal(s.main[0][0].winner,null);
+  let s=engine.build(players);s=enter(s,'p-0',7,1);assert.equal(s.main[0][0].winner,null);
   s=engine.build(players,{},'primera');s=enter(s,'p-0',7,0,players,'primera');assert.equal(s.main[0][0].winner,'1');
   const unranked=players.map(p=>({...p,ranking:null}));s=firstRound(unranked);assert.equal(s.bye.id,'2');assert(s.rankingFallback);
 });

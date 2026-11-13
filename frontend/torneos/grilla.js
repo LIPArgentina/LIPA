@@ -21,12 +21,12 @@
   }
   function status(text,error=false) { $('#saveStatus').textContent=text; $('#saveStatus').classList.toggle('error',error); }
   function matchLabel(match) {
-    if(match.id==='qualifier') return 'Clasificado del repechaje';
+    if(match.id.startsWith('qualifier')) return 'Clasificado del repechaje';
     if(match.bye) return 'Pase libre';
     const [round,index]=match.id.split('-');
     const title=round==='p'?'Primera ronda':round.startsWith('r')
-      ? 'Repechaje · '+['Primera rueda','Cuartos','Semifinal','Final'][Number(round.slice(1))]
-      : ['','Octavos','Cuartos','Semifinal','Final'][Number(round.slice(1))];
+      ? 'Repechaje · '+(category==='tercera'?['Primera rueda','Ronda de 16','Ronda de 8','Clasificación']:['Primera rueda','Cuartos','Semifinal','Final']).slice(4-(state?.rep.length || 4))[Number(round.slice(1))]
+      : (category==='tercera'?['','Dieciseisavos','Octavos','Cuartos','Semifinal','Final']:['','Octavos','Cuartos','Semifinal','Final'])[Number(round.slice(1))];
     return `${title}, partido ${Number(index)+1}`;
   }
   function photo(player) {
@@ -86,26 +86,27 @@
     node.style.cssText=`left:${pos.x}px;top:${pos.y}px;width:${pos.width}px`;
     node.dataset.matchId=match.id;
     const label=document.createElement('p');label.className='match-label';
-    label.textContent=match.id==='qualifier'?'CLASIFICADO DEL REPECHAJE':match.bye?(category==='primera'?'PASE LIBRE':'PASE AUTOMÁTICO · WO'):isFinal?(repechage?'FINAL DEL REPECHAJE':'FINAL'):`PARTIDO ${Number(match.id.split('-')[1])+1}`;
-    node.append(label,playerRow(match.a,match,0,players,match.id==='qualifier'?'Ganador del repechaje':null));
-    if(match.id!=='qualifier' && !(category==='primera' && match.bye))node.append(playerRow(match.b,match,1,players));
+    label.textContent=match.id.startsWith('qualifier')?'CLASIFICADO DEL REPECHAJE':match.bye?(category==='primera'?'PASE LIBRE':'PASE AUTOMÁTICO · WO'):isFinal?(repechage?(category==='tercera'?'PARTIDO CLASIFICATORIO':'FINAL DEL REPECHAJE'):'FINAL'):`PARTIDO ${Number(match.id.split('-')[1])+1}`;
+    node.append(label,playerRow(match.a,match,0,players,match.id.startsWith('qualifier')?'Ganador del repechaje':null));
+    if(!match.id.startsWith('qualifier') && !(category==='primera' && match.bye))node.append(playerRow(match.b,match,1,players));
     board.append(node);
   }
   function renderBoard(rounds, boardId, frameId, repechage=false) {
     const board=$(boardId),frame=$(frameId);board.replaceChildren();
-    const W=206,G=28,STEP=96,TOP=45,depth=rounds.length-1,dual=view==='double';
+    const W=206,G=28,TOP=45,depth=rounds.length-1,dual=view==='double';
     const initial=rounds[0].length, rows=dual?initial/2:initial;
+    const STEP=rounds[depth].length>1?Math.max(96,dual?768/rows:180/Math.pow(2,depth)):96;
     const width=dual?(depth*2+1)*W+depth*2*G:(depth+2)*W+(depth+1)*G;
     const height=Math.max(rows*STEP+70,dual?560:0);
     const positions=new Map(), players=new Map(data.players.map(p=>[String(p.id),p]));
-    const titles=repechage?['Primera rueda','Cuartos','Semifinal','Final'].slice(4-rounds.length):['Primera ronda','Octavos','Cuartos','Semifinal','Final'];
+    const titles=repechage?(category==='tercera'?['Primera rueda','Ronda de 16','Ronda de 8','Clasificación']:['Primera rueda','Cuartos','Semifinal','Final']).slice(4-rounds.length):(category==='tercera'?['Primera ronda','Dieciseisavos','Octavos','Cuartos','Semifinal','Final']:['Primera ronda','Octavos','Cuartos','Semifinal','Final']);
     function title(text,x) {const el=document.createElement('div');el.className='round-title';el.style.cssText=`left:${x}px;width:${W}px`;el.textContent=text.toUpperCase();board.append(el);}
     rounds.forEach((round,r)=>{
       const half=round.length/2;
       round.forEach((match,i)=>{
         let x,y;
         if(!dual) { x=r*(W+G);y=TOP+((i+.5)*Math.pow(2,r)*STEP)-42; }
-        else if(r===depth) {x=depth*(W+G);y=TOP+rows*STEP/2-54;}
+        else if(r===depth) {x=depth*(W+G);y=TOP+(i+.5)*rows*STEP/round.length-54;}
         else {const right=i>=half; x=(right?depth*2-r:r)*(W+G);y=TOP+((i%half+.5)*Math.pow(2,r)*STEP)-42;}
         positions.set(match.id,{x,y,width:W,center:y+(r===depth?56:44)});
       });
@@ -119,17 +120,21 @@
       const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',`M ${x1} ${from.center} H ${mid} V ${to.center} H ${x2}`);svg.append(path);
     }));board.append(svg);
     rounds.forEach((round,r)=>round.forEach(match=>card(match,positions.get(match.id),board,players,r===depth,repechage)));
-    const final=rounds[depth][0],fp=positions.get(final.id),winner=players.get(final.winner);
+    let boardHeight=height;
+    rounds[depth].forEach((final,index)=>{
+    const fp=positions.get(final.id),winner=players.get(final.winner);
     const crown=document.createElement('div');crown.className='champion';
     const cx=dual?fp.x:(depth+1)*(W+G),cy=dual?fp.y+145:fp.center-65;
     crown.style.cssText=`left:${cx-8}px;top:${cy}px;width:${W+16}px`;
-    const crownTitle=document.createElement('small');crownTitle.textContent=repechage?'CLASIFICADO A OCTAVOS':'★ CAMPEÓN ★';
-    const winnerName=document.createElement('strong');winnerName.textContent=winner?.nombre || (repechage?'Un lugar entre los 16':'Esperando al campeón');
+    const crownTitle=document.createElement('small');crownTitle.textContent=repechage?(category==='tercera'?`CLASIFICADO ${index+1} · RONDA DE 32`:'CLASIFICADO A OCTAVOS'):'★ CAMPEÓN ★';
+    const winnerName=document.createElement('strong');winnerName.textContent=winner?.nombre || (repechage?(category==='tercera'?'Un lugar entre los 32':'Un lugar entre los 16'):'Esperando al campeón');
     enablePreview(winnerName,winner);
     crown.append(crownTitle,photo(winner),winnerName);board.append(crown);
     const finalPath=document.createElementNS(svg.namespaceURI,'path');
     finalPath.setAttribute('d',dual?`M ${fp.x+W/2} ${fp.y+110} V ${cy}`:`M ${fp.x+W} ${fp.center} H ${cx}`);svg.append(finalPath);
-    dimensions.push({board,frame,width,height:Math.max(height,cy+145)});
+    boardHeight=Math.max(boardHeight,cy+145);
+    });
+    dimensions.push({board,frame,width,height:boardHeight});
   }
   function applyZoom() {
     dimensions.forEach(({board,frame,width,height})=>{board.style.width=`${width}px`;board.style.height=`${height}px`;board.style.transform=`scale(${zoom})`;frame.style.width=`${width*zoom}px`;frame.style.height=`${height*zoom}px`;});
@@ -150,7 +155,9 @@
       ? `Pase libre: ${byeNames.join('; ')}.${state.rankingFallback?' Igualdad sin desempate de ranking: se conserva la prioridad del orden del sorteo.':''}`
       : state.firstComplete?'Repechaje formado con los perdedores de los partidos jugados.':'El pase libre se define al completar los partidos jugados de primera ronda: puntos a favor, diferencia y ranking general LIPA. Los WO no participan del repechaje.';
     const realCount=data.players.filter(p=>p.id!==null).length;
-    $('#mainSection .badge').textContent=realCount===30?'30 jugadores + repechaje':`${realCount} jugadores · ${30-realCount} WO + repechaje`;
+    const capacity=category==='tercera'?60:30;
+    $('#mainSection .badge').textContent=realCount===capacity?`${capacity} jugadores + repechaje`:`${realCount} jugadores · ${capacity-realCount} WO + repechaje`;
+    $('#repSection .badge').textContent=category==='tercera'?'2 clasificados a la ronda de 32':'1 clasificado a octavos';
     applyZoom();
   }
   function confirmCorrection() {
