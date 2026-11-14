@@ -9,6 +9,8 @@
 
   const $ = selector => document.querySelector(selector);
   let entries = [];
+  let broadcast = window.LipaDifusion.collect([]);
+  let messageEdited = false;
   let paymentFilter = 'all';
   let categoryFilter = 'all';
   let pendingSubmit = null;
@@ -138,12 +140,59 @@
         || (/^\d+$/.test(dniQuery) && String(item.dni || '').replace(/\D/g, '').includes(dniQuery));
     });
     const pending = filtered.filter(item => !item.corroborado);
+    broadcast = window.LipaDifusion.collect(verified);
+    $('#openBroadcast').textContent = 'Difusión (' + broadcast.contacts.length + ')';
+    $('#openBroadcast').disabled = broadcast.contacts.length === 0;
     renderBody($('#verifiedBody'), verified, true);
     renderBody($('#pendingBody'), pending, false);
     $('#verifiedCount').textContent = String(verified.length);
     $('#pendingCount').textContent = String(pending.length);
   }
   $('#registeredSearch').addEventListener('input', render);
+  $('#broadcastMessage').addEventListener('input', () => { messageEdited = true; });
+  $('#openBroadcast').addEventListener('click', () => {
+    if (!broadcast.contacts.length) return;
+    const category = $('#categoryFilter').selectedOptions[0].textContent;
+    const payment = document.querySelector('.filter.active').textContent;
+    const search = $('#registeredSearch').value.trim();
+    $('#broadcastFilters').textContent = 'Confirmados · ' + category + ' · ' + payment + (search ? ' · Búsqueda: ' + search : '');
+    $('#broadcastSummary').textContent = broadcast.contacts.length + ' contactos únicos. Omitidos: ' + broadcast.missing + ' sin teléfono, ' + broadcast.duplicates + ' repetidos y ' + broadcast.invalid + ' con número incompleto o inválido.';
+    if (!messageEdited) $('#broadcastMessage').value = paymentFilter === 'sin_sena'
+      ? 'Hola, te recordamos que tenés pendiente la seña de tu inscripción al torneo. Por favor, comunicate con la organización para coordinar el pago. ¡Gracias!'
+      : 'Hola, te escribimos desde la organización del torneo. ';
+    $('#broadcastStatus').textContent = '';
+    $('#broadcastContacts').replaceChildren(...broadcast.contacts.map(contact => {
+      const item = document.createElement('li');
+      item.textContent = contact.name + ' · ' + contact.phone;
+      return item;
+    }));
+    $('#broadcastModal').showModal();
+    $('#broadcastMessage').focus();
+  });
+  $('#closeBroadcast').addEventListener('click', () => $('#broadcastModal').close());
+  async function copyBroadcast(text, success) {
+    const status = $('#broadcastStatus');
+    status.classList.remove('ok');
+    if (!text.trim()) { status.textContent = 'Escribí el mensaje antes de copiarlo.'; return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = success; status.classList.add('ok');
+    } catch (_) {
+      status.textContent = 'No se pudo copiar. Seleccioná el texto y copialo manualmente.';
+    }
+  }
+  $('#copyBroadcastMessage').addEventListener('click', () => copyBroadcast($('#broadcastMessage').value, 'Mensaje copiado. Pegalo en tu difusión de WhatsApp.'));
+  $('#copyBroadcastContacts').addEventListener('click', () => copyBroadcast(broadcast.contacts.map(contact => contact.phone).join('\n'), 'Números copiados.'));
+  $('#downloadBroadcast').addEventListener('click', () => {
+    const blob = new Blob([window.LipaDifusion.vcard(broadcast.contacts)], { type:'text/vcard;charset=utf-8' });
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url;
+    link.download = 'lipa-difusion-' + categoryFilter + '-' + paymentFilter + '.vcf';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    $('#broadcastStatus').textContent = 'Archivo preparado. Abrilo en el celular para importar los contactos.';
+    $('#broadcastStatus').classList.add('ok');
+  });
   async function load() {
     const data = await api('/torneo-organizador/inscripciones');
     entries = data.inscripciones || [];

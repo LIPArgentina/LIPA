@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=17">
+  <link rel="stylesheet" href="./privados.css?v=18">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -55,7 +55,7 @@
     </section>
 
     <section class="list-card verified-card">
-      <div class="list-heading confirmed-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><label class="registered-search" for="registeredSearch">Buscar inscripto<input id="registeredSearch" type="search" placeholder="Nombre o DNI" autocomplete="off" aria-controls="verifiedBody"></label><strong id="verifiedCount">0</strong></div>
+      <div class="list-heading confirmed-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><label class="registered-search" for="registeredSearch">Buscar inscripto<input id="registeredSearch" type="search" placeholder="Nombre o DNI" autocomplete="off" aria-controls="verifiedBody"></label><button id="openBroadcast" class="broadcast-button" type="button" disabled aria-haspopup="dialog">Difusión (0)</button><strong id="verifiedCount">0</strong></div>
       <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="verifiedBody"></tbody></table></div>
     </section>
 
@@ -65,6 +65,25 @@
       <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
     </section>
   </main>
+
+  <dialog id="broadcastModal" class="broadcast-modal" aria-labelledby="broadcastTitle">
+    <div class="broadcast-content">
+      <button id="closeBroadcast" class="photo-close" type="button" aria-label="Cerrar difusión">×</button>
+      <h2 id="broadcastTitle">Preparar difusión</h2>
+      <p id="broadcastFilters" class="broadcast-filters"></p>
+      <p id="broadcastSummary"></p>
+      <label for="broadcastMessage">Mensaje para todos los contactos<textarea id="broadcastMessage" rows="5" placeholder="Escribí el mensaje que vas a enviar…"></textarea></label>
+      <div class="broadcast-actions"><button id="copyBroadcastMessage" class="primary" type="button">Copiar mensaje</button><button id="downloadBroadcast" type="button">Descargar contactos</button><button id="copyBroadcastContacts" type="button">Copiar números</button></div>
+      <p id="broadcastStatus" class="message" role="status"></p>
+      <details><summary>Ver contactos incluidos</summary><ul id="broadcastContacts" class="broadcast-contacts"></ul></details>
+      <div class="broadcast-help">
+        <h3>Completá la difusión desde tu celular</h3>
+        <ol><li>Descargá el archivo de contactos y abrilo en el celular para importarlo. Si ya están en tu agenda, podés saltear este paso.</li><li>En WhatsApp, creá una nueva difusión y seleccioná los contactos de esta lista. Los importados aparecen con el prefijo «LIPA».</li><li>Copiá el mensaje, pegalo en la difusión y enviá desde WhatsApp.</li></ol>
+        <p>La página prepara los contactos; no crea ni actualiza una difusión dentro de WhatsApp. Los destinatarios deben tener guardado tu número para recibirla. Las listas de difusión no están disponibles en WhatsApp Web ni en la aplicación de escritorio.</p>
+        <p>Revisá los números antes de importarlos. Los números argentinos de 10 dígitos se completan con +54 9; para otros países, guardá el código internacional con +.</p>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="passwordModal">
     <form id="passwordForm" method="dialog">
@@ -96,6 +115,7 @@
 
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./categorias.js?v=1" defer></script>
-  <script src="./privados.js?v=17" defer></script>
+  <script src="./difusion.js?v=1" defer></script>
+  <script src="./privados.js?v=18" defer></script>
 </body>
 </html>
