@@ -72,6 +72,8 @@ module.exports = function createTorneosPrivadosRouter() {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
 
+        ALTER TABLE torneo_organizadores ADD COLUMN IF NOT EXISTS mensaje_difusion TEXT NOT NULL DEFAULT '';
+
         CREATE TABLE IF NOT EXISTS torneo_inscripciones (
           id BIGSERIAL PRIMARY KEY,
           torneo_organizador_id INTEGER NOT NULL REFERENCES torneo_organizadores(id) ON DELETE CASCADE,
@@ -459,6 +461,22 @@ module.exports = function createTorneosPrivadosRouter() {
     }
   });
 
+  router.put('/torneo-organizador/mensaje-difusion', requireTorneoOrganizador, async (req, res) => {
+    const mensaje = req.body?.mensaje;
+    if (typeof mensaje !== 'string' || !mensaje.trim() || mensaje.length > 4000) {
+      return res.status(400).json({ error:'Escribí un mensaje de hasta 4000 caracteres.' });
+    }
+    try {
+      await ensureSchema();
+      const result = await pool.query('UPDATE torneo_organizadores SET mensaje_difusion=$1, updated_at=NOW() WHERE id=$2 RETURNING mensaje_difusion', [mensaje, req.user.torneoOrganizadorId]);
+      if (!result.rowCount) return res.status(404).json({ error:'Organizador inexistente.' });
+      res.json({ ok:true, mensaje:result.rows[0].mensaje_difusion });
+    } catch (error) {
+      console.error('PUT mensaje de difusión', error);
+      res.status(500).json({ error:'No se pudo guardar el mensaje. Reintentá.' });
+    }
+  });
+
   router.get('/torneo-organizador/inscripciones', requireTorneoOrganizador, async (req, res) => {
     try {
       await ensureSchema();
@@ -476,6 +494,7 @@ module.exports = function createTorneosPrivadosRouter() {
         nombrePromocional: organizador.nombre_promocional,
         nombreOrganizador: organizador.nombre_organizador,
         whatsapp: organizador.whatsapp, ubicacion: organizador.ubicacion,
+        mensajeDifusion: organizador.mensaje_difusion || '',
         mustChangePassword: organizador.must_change_password
       }, inscripciones: rows, pendientesActualizadas: actualizadas });
     } catch (error) {

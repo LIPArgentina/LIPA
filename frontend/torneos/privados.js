@@ -9,8 +9,7 @@
 
   const $ = selector => document.querySelector(selector);
   let entries = [];
-  let broadcast = window.LipaDifusion.collect([]);
-  let messageEdited = false;
+  let diffusionMessage = '';
   let paymentFilter = 'all';
   let categoryFilter = 'all';
   let pendingSubmit = null;
@@ -63,9 +62,13 @@
     const digits = String(value || '').replace(/\D/g, '');
     return digits ? `https://wa.me/${digits}` : '#';
   }
-  function whatsappContact(value) {
-    const href = whatsappHref(value);
+  function whatsappContact(value, diffusion = false) {
+    const base = whatsappHref(value);
+    const href = diffusion && base !== '#' ? base + '?text=' + encodeURIComponent(diffusionMessage) : base;
     const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l5.3-1.3A9.5 9.5 0 1 0 12 2Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.4 6.8c-.4 0-1.3.8-1.3 2 0 2.8 4.1 6.9 6.9 6.9 1.2 0 2-.9 2-1.3 0-.3-2-1.3-2.3-1.3-.3 0-.8.8-1 .8-.8 0-3.4-2.6-3.4-3.4 0-.2.8-.7.8-1 0-.3-1-2.7-1.7-2.7Z" fill="currentColor"/></svg>';
+    if (diffusion) return base === '#'
+      ? '<span class="whatsapp-contact diffusion-contact disabled" title="Difusión" aria-label="Difusión sin número">'+icon+'</span>'
+      : '<a class="whatsapp-contact diffusion-contact" data-diffusion href="'+escapeHtml(href)+'" target="_blank" rel="noopener noreferrer" aria-label="Difusión" title="Difusión">'+icon+'</a>';
     return href === '#'
       ? '<span class="whatsapp-contact disabled" title="Guardá un número para abrir WhatsApp" aria-label="WhatsApp sin número">'+icon+'</span>'
       : '<a class="whatsapp-contact" href="'+href+'" target="_blank" rel="noopener noreferrer" aria-label="Abrir chat de WhatsApp" title="Abrir WhatsApp">'+icon+'</a>';
@@ -116,7 +119,7 @@
       const tr = document.createElement('tr');
       const name = verified ? entry.nombre_oficial : entry.nombre_ingresado;
       tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
-        <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp">${whatsappContact(entry.whatsapp)}<button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
+        <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp">${whatsappContact(entry.whatsapp)}${verified ? whatsappContact(entry.whatsapp, true) : ''}<button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
         <td><button class="delete-button" data-delete="${entry.id}">Quitar</button></td>`;
       target.appendChild(tr);
@@ -140,63 +143,52 @@
         || (/^\d+$/.test(dniQuery) && String(item.dni || '').replace(/\D/g, '').includes(dniQuery));
     });
     const pending = filtered.filter(item => !item.corroborado);
-    broadcast = window.LipaDifusion.collect(verified);
-    $('#openBroadcast').textContent = 'Difusión (' + broadcast.contacts.length + ')';
-    $('#openBroadcast').disabled = broadcast.contacts.length === 0;
     renderBody($('#verifiedBody'), verified, true);
     renderBody($('#pendingBody'), pending, false);
     $('#verifiedCount').textContent = String(verified.length);
     $('#pendingCount').textContent = String(pending.length);
   }
   $('#registeredSearch').addEventListener('input', render);
-  $('#broadcastMessage').addEventListener('input', () => { messageEdited = true; });
-  $('#openBroadcast').addEventListener('click', () => {
-    if (!broadcast.contacts.length) return;
-    const category = $('#categoryFilter').selectedOptions[0].textContent;
-    const payment = document.querySelector('.filter.active').textContent;
-    const search = $('#registeredSearch').value.trim();
-    $('#broadcastFilters').textContent = 'Confirmados · ' + category + ' · ' + payment + (search ? ' · Búsqueda: ' + search : '');
-    $('#broadcastSummary').textContent = broadcast.contacts.length + ' contactos únicos. Omitidos: ' + broadcast.missing + ' sin teléfono, ' + broadcast.duplicates + ' repetidos y ' + broadcast.invalid + ' con número incompleto o inválido.';
-    if (!messageEdited) $('#broadcastMessage').value = paymentFilter === 'sin_sena'
-      ? 'Hola, te recordamos que tenés pendiente la seña de tu inscripción al torneo. Por favor, comunicate con la organización para coordinar el pago. ¡Gracias!'
-      : 'Hola, te escribimos desde la organización del torneo. ';
-    $('#broadcastStatus').textContent = '';
-    $('#broadcastContacts').replaceChildren(...broadcast.contacts.map(contact => {
-      const item = document.createElement('li');
-      item.textContent = contact.name + ' · ' + contact.phone;
-      return item;
-    }));
-    $('#broadcastModal').showModal();
-    $('#broadcastMessage').focus();
-  });
-  $('#closeBroadcast').addEventListener('click', () => $('#broadcastModal').close());
-  async function copyBroadcast(text, success) {
-    const status = $('#broadcastStatus');
-    status.classList.remove('ok');
-    if (!text.trim()) { status.textContent = 'Escribí el mensaje antes de copiarlo.'; return; }
-    try {
-      await navigator.clipboard.writeText(text);
-      status.textContent = success; status.classList.add('ok');
-    } catch (_) {
-      status.textContent = 'No se pudo copiar. Seleccioná el texto y copialo manualmente.';
-    }
+  function openDiffusionMessage() {
+    $('#diffusionMessage').value = diffusionMessage;
+    $('#diffusionStatus').textContent = '';
+    $('#diffusionModal').showModal();
+    $('#diffusionMessage').focus();
   }
-  $('#copyBroadcastMessage').addEventListener('click', () => copyBroadcast($('#broadcastMessage').value, 'Mensaje copiado. Pegalo en tu difusión de WhatsApp.'));
-  $('#copyBroadcastContacts').addEventListener('click', () => copyBroadcast(broadcast.contacts.map(contact => contact.phone).join('\n'), 'Números copiados.'));
-  $('#downloadBroadcast').addEventListener('click', () => {
-    const blob = new Blob([window.LipaDifusion.vcard(broadcast.contacts)], { type:'text/vcard;charset=utf-8' });
-    const url = URL.createObjectURL(blob), link = document.createElement('a');
-    link.href = url;
-    link.download = 'lipa-difusion-' + categoryFilter + '-' + paymentFilter + '.vcf';
-    document.body.appendChild(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    $('#broadcastStatus').textContent = 'Archivo preparado. Abrilo en el celular para importar los contactos.';
-    $('#broadcastStatus').classList.add('ok');
+  $('#editDiffusion').addEventListener('click', openDiffusionMessage);
+  $('#closeDiffusion').addEventListener('click', () => $('#diffusionModal').close());
+  document.addEventListener('click', event => {
+    if (event.target.closest('[data-diffusion]') && !diffusionMessage.trim()) {
+      event.preventDefault(); openDiffusionMessage();
+      $('#diffusionStatus').textContent = 'Guardá un mensaje y luego tocá el ícono dorado del jugador.';
+    }
+    const emoji = event.target.closest('[data-emoji]');
+    if (emoji) {
+      const input = $('#diffusionMessage');
+      if (input.value.length + emoji.dataset.emoji.length > input.maxLength) return;
+      input.setRangeText(emoji.dataset.emoji, input.selectionStart, input.selectionEnd, 'end');
+      input.focus();
+    }
+  });
+  $('#diffusionForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = $('#saveDiffusion'); button.disabled = true;
+    $('#diffusionStatus').textContent = 'Guardando…';
+    try {
+      const data = await api('/torneo-organizador/mensaje-difusion', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ mensaje:$('#diffusionMessage').value })
+      });
+      diffusionMessage = data.mensaje;
+      render(); $('#diffusionModal').close();
+    } catch (error) { $('#diffusionStatus').textContent = error.message; }
+    finally { button.disabled = false; }
   });
   async function load() {
     const data = await api('/torneo-organizador/inscripciones');
     entries = data.inscripciones || [];
     const info = data.organizador || {};
+    diffusionMessage = info.mensajeDifusion || '';
     $('#promotionalName').textContent = info.nombrePromocional || session.displayName || 'Inscripciones';
     $('#organizerName').textContent = info.nombreOrganizador || '—';
     $('#organizerWhatsapp').href = whatsappHref(info.whatsapp);
