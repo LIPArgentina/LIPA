@@ -64,7 +64,8 @@
   }
   function whatsappContact(value, diffusion = false) {
     const base = whatsappHref(value);
-    const href = diffusion && base !== '#' ? base + '?text=' + encodeURIComponent(diffusionMessage) : base;
+    // wa.me redirects can replace non-BMP emojis with U+FFFD. Use the direct endpoint.
+    const href = diffusion && base !== '#' ? 'https://api.whatsapp.com/send?phone=' + String(value).replace(/\D/g, '') + '&text=' + encodeURIComponent(diffusionMessage) : base;
     const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l5.3-1.3A9.5 9.5 0 1 0 12 2Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.4 6.8c-.4 0-1.3.8-1.3 2 0 2.8 4.1 6.9 6.9 6.9 1.2 0 2-.9 2-1.3 0-.3-2-1.3-2.3-1.3-.3 0-.8.8-1 .8-.8 0-3.4-2.6-3.4-3.4 0-.2.8-.7.8-1 0-.3-1-2.7-1.7-2.7Z" fill="currentColor"/></svg>';
     if (diffusion) return base === '#'
       ? '<span class="whatsapp-contact diffusion-contact disabled" title="Difusión" aria-label="Difusión sin número">'+icon+'</span>'
@@ -156,6 +157,15 @@
     $('#diffusionMessage').focus();
   }
   $('#editDiffusion').addEventListener('click', openDiffusionMessage);
+  $('#copyDiffusion').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('#diffusionMessage').value);
+      $('#diffusionStatus').textContent = 'Mensaje copiado con emojis. Podés pegarlo en WhatsApp.';
+    } catch (_) {
+      $('#diffusionMessage').focus(); $('#diffusionMessage').select();
+      $('#diffusionStatus').textContent = 'Copiá el texto seleccionado con Ctrl+C o desde el menú del teléfono.';
+    }
+  });
   $('#closeDiffusion').addEventListener('click', () => $('#diffusionModal').close());
   document.addEventListener('click', event => {
     if (event.target.closest('[data-diffusion]') && !diffusionMessage.trim()) {
