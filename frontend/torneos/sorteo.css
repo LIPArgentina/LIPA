@@ -10,3 +10,4 @@
 @media(min-width:761px){.category{height:calc(100dvh - 102px)}}
 @media(max-width:760px){.category{height:calc(100dvh - 160px)}}
 .wo-row .name{color:#a89763;font-style:italic;letter-spacing:.15em}.running .wo-row .name{color:#a89763}
+.export-actions{display:flex;gap:6px;margin-top:7px}.export-actions button{flex:1;min-height:32px;padding:6px;border:1px solid #8d7109;border-radius:7px;background:#111318;color:#ffdc65;font:700 11px Montserrat,system-ui;cursor:pointer}.export-actions button:disabled{opacity:.4;cursor:default}.export-actions button:hover:not(:disabled){background:#332a0e}

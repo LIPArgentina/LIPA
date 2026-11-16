@@ -35,7 +35,75 @@
       if (available && name.scrollWidth > available) name.style.transform = `scaleX(${available / name.scrollWidth})`;
     });
   }
+  function updateExports(state) {
+    state.card.querySelectorAll('[data-export]').forEach(button => {
+      button.disabled = Boolean(state.dirty || state.saving || state.exporting || !state.players.some(player => player.id != null));
+      button.title = state.dirty || state.saving ? 'Detené el sorteo y guardá el orden antes de exportar.' : '';
+    });
+  }
+  function downloadFile(blob, filename) {
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = filename;
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+  async function exportPlayers(state, format) {
+    if (state.dirty || state.saving || state.exporting) return;
+    const rows = state.players.map((player, index) => ({ name: player.nombre, position:index + 1, id:player.id })).filter(player => player.id != null);
+    if (!rows.length) return;
+    const tournament = document.querySelector('#tournamentName').textContent || 'LIPA';
+    const title = state.label.toUpperCase();
+    const filename = 'lipa-inscriptos-' + state.category;
+    state.exporting = true; updateExports(state);
+    try {
+      if (format === 'text') {
+        const text = tournament + '\r\n' + title + ' · ' + rows.length + ' inscriptos\r\nPosiciones de la grilla · sin WO\r\n\r\n' + rows.map(row => row.position + '. ' + row.name).join('\r\n');
+        downloadFile(new Blob(['\uFEFF', text], {type:'text/plain;charset=utf-8'}), filename + '.txt');
+      } else {
+        await document.fonts?.ready;
+        const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+        const width = 1080, nameWidth = 870;
+        function wrap(text, font, maxWidth) {
+          ctx.font = font;
+          const lines = []; let line = '';
+          for (const char of String(text)) {
+            if (line && ctx.measureText(line + char).width > maxWidth) { lines.push(line.trimEnd()); line = ''; }
+            line += char;
+          }
+          lines.push(line.trimEnd()); return lines;
+        }
+        const nameFont = '600 28px Montserrat, sans-serif';
+        const headingLines = wrap(tournament, '800 26px Montserrat, sans-serif', 970);
+        const top = 190 + headingLines.length * 34;
+        const prepared = rows.map(row => ({...row, lines:wrap(row.name, nameFont, nameWidth)}));
+        const height = top + prepared.reduce((sum,row) => sum + Math.max(58,row.lines.length * 36 + 22),0) + 70;
+        canvas.width = width; canvas.height = height;
+        ctx.fillStyle = '#080a0d'; ctx.fillRect(0,0,width,height);
+        ctx.fillStyle = '#ffdc65'; ctx.font = '800 26px Montserrat, sans-serif';
+        headingLines.forEach((line,i) => ctx.fillText(line,48,52+i*34));
+        const headingY = 94 + headingLines.length*34;
+        ctx.fillStyle = '#ffc400'; ctx.font = '900 54px Montserrat, sans-serif'; ctx.fillText(title,48,headingY);
+        ctx.fillStyle = '#abb1bc'; ctx.font = '24px Montserrat, sans-serif'; ctx.fillText(rows.length + ' inscriptos · Posiciones de la grilla · Sin WO',48,headingY+44);
+        ctx.fillStyle = '#ffc400'; ctx.fillRect(48,top-18,984,3);
+        let y = top;
+        prepared.forEach((row,i) => {
+          const rowHeight = Math.max(58,row.lines.length*36+22);
+          ctx.fillStyle = i%2 ? '#101318' : '#17191e'; ctx.fillRect(48,y,984,rowHeight);
+          ctx.font = '600 26px Montserrat, sans-serif'; ctx.fillStyle = '#ffdc65'; ctx.fillText(String(row.position),64,y+38);
+          ctx.font = nameFont; ctx.fillStyle = '#ffffff'; row.lines.forEach((line,j) => ctx.fillText(line,145,y+38+j*36));
+          y += rowHeight;
+        });
+        ctx.fillStyle = '#abb1bc'; ctx.font = '20px Montserrat, sans-serif'; ctx.fillText('LIPA · lipa.ar',48,height-25);
+        const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/png'));
+        if (!blob) throw new Error('No se pudo generar la imagen.');
+        downloadFile(blob,filename+'.png');
+      }
+      message(state, 'Exportación preparada sin WO.', 'saved');
+    } catch (error) { message(state,error.message || 'No se pudo exportar. Reintentá.','error'); }
+    finally { state.exporting = false; updateExports(state); }
+  }
   function renderRows(state, animate = false) {
+    updateExports(state);
     state.body.replaceChildren();
     state.players.forEach((player, index) => {
       const row = document.createElement('tr');
@@ -83,11 +151,12 @@
       message(state, error.message, 'error');
     } finally {
       state.saving = false;
+      updateExports(state);
       state.button.disabled = false;
     }
   }
   async function toggle(state) {
-    if (state.saving) return;
+    if (state.saving || state.exporting) return;
     if (state.conflict) { location.reload(); return; }
     if (state.timer) {
       clearInterval(state.timer); state.timer = null;
@@ -121,9 +190,9 @@
       players = valid ? order.map(id=>id===null?{id:null,nombre:'WO',wo:true}:byId.get(id)) : window.LipaSlots.fill(players,category);
       const card = document.createElement('section');
       card.className = 'category'; card.setAttribute('aria-labelledby', `heading-${category}`);
-      card.innerHTML = `<div class="category-heading"><h2 id="heading-${category}">${label.toUpperCase()}</h2><span class="count">${realCount} jugadores${players.length>realCount?` · ${players.length-realCount} WO`:''}</span></div><div class="table-wrap"><table aria-label="Posiciones de ${label}"><thead><tr><th scope="col">N.º</th><th scope="col">Jugador</th></tr></thead><tbody></tbody></table></div><div class="category-footer"><p class="status" role="status"></p><button type="button" class="draw-button" aria-describedby="status-${category}">SORTEAR POSICIÓN</button></div>`;
+      card.innerHTML = `<div class="category-heading"><h2 id="heading-${category}">${label.toUpperCase()}</h2><span class="count">${realCount} jugadores${players.length>realCount?` · ${players.length-realCount} WO`:''}</span></div><div class="table-wrap"><table aria-label="Posiciones de ${label}"><thead><tr><th scope="col">N.º</th><th scope="col">Jugador</th></tr></thead><tbody></tbody></table></div><div class="category-footer"><p class="status" role="status"></p><button type="button" class="draw-button" aria-describedby="status-${category}">SORTEAR POSICIÓN</button><div class="export-actions" aria-label="Exportar ${label}"><button type="button" data-export="image">Exportar imagen</button><button type="button" data-export="text">Exportar texto</button></div></div>`;
       document.querySelector('#categories').append(card);
-      const state = { category, label, players, card, body: card.querySelector('tbody'), status: card.querySelector('.status'), button: card.querySelector('button'), revision: saved?.revision || 0, drawn: Boolean(saved), dirty: false, timer: null, saving: false };
+      const state = { category, label, players, card, body: card.querySelector('tbody'), status: card.querySelector('.status'), button: card.querySelector('.draw-button'), revision: saved?.revision || 0, drawn: Boolean(saved), dirty: false, timer: null, saving: false };
       state.status.id = `status-${category}`;
       state.hasResults = Boolean(saved?.tiene_resultados);
       state.button.disabled = realCount < 2 || (window.LipaSlots.enabled(category) && realCount>window.LipaSlots.capacity(category));
@@ -131,6 +200,7 @@
       if (realCount < 2) message(state, 'Se necesitan al menos dos jugadores para sortear.');
       if (window.LipaSlots.enabled(category) && realCount>window.LipaSlots.capacity(category)) message(state, `Esta grilla admite hasta ${window.LipaSlots.capacity(category)} jugadores.`, 'error');
       state.button.addEventListener('click', () => toggle(state));
+      card.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportPlayers(state, button.dataset.export)));
       states.push(state);
       renderRows(state);
       new ResizeObserver(() => fit(state)).observe(card.querySelector('.table-wrap'));
