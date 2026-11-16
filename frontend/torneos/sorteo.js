@@ -49,15 +49,14 @@
   }
   async function exportPlayers(state, format) {
     if (state.dirty || state.saving || state.exporting) return;
-    const rows = state.players.map((player, index) => ({ name: player.nombre, position:index + 1, id:player.id })).filter(player => player.id != null);
+    const rows = state.players.filter(player => player.id != null).map((player, index) => ({ name: player.nombre, position:index + 1 }));
     if (!rows.length) return;
-    const tournament = document.querySelector('#tournamentName').textContent || 'LIPA';
     const title = state.label.toUpperCase();
     const filename = 'lipa-inscriptos-' + state.category;
     state.exporting = true; updateExports(state);
     try {
       if (format === 'text') {
-        const text = tournament + '\r\n' + title + ' · ' + rows.length + ' inscriptos\r\nPosiciones de la grilla · sin WO\r\n\r\n' + rows.map(row => row.position + '. ' + row.name).join('\r\n');
+        const text = title + '\r\n\r\n' + rows.map(row => row.position + '. ' + row.name).join('\r\n');
         downloadFile(new Blob(['\uFEFF', text], {type:'text/plain;charset=utf-8'}), filename + '.txt');
       } else {
         await document.fonts?.ready;
@@ -73,17 +72,13 @@
           lines.push(line.trimEnd()); return lines;
         }
         const nameFont = '600 28px Montserrat, sans-serif';
-        const headingLines = wrap(tournament, '800 26px Montserrat, sans-serif', 970);
-        const top = 190 + headingLines.length * 34;
+        const top = 130;
         const prepared = rows.map(row => ({...row, lines:wrap(row.name, nameFont, nameWidth)}));
-        const height = top + prepared.reduce((sum,row) => sum + Math.max(58,row.lines.length * 36 + 22),0) + 70;
+        const height = top + prepared.reduce((sum,row) => sum + Math.max(58,row.lines.length * 36 + 22),0) + 48;
         canvas.width = width; canvas.height = height;
         ctx.fillStyle = '#080a0d'; ctx.fillRect(0,0,width,height);
-        ctx.fillStyle = '#ffdc65'; ctx.font = '800 26px Montserrat, sans-serif';
-        headingLines.forEach((line,i) => ctx.fillText(line,48,52+i*34));
-        const headingY = 94 + headingLines.length*34;
+        const headingY = 82;
         ctx.fillStyle = '#ffc400'; ctx.font = '900 54px Montserrat, sans-serif'; ctx.fillText(title,48,headingY);
-        ctx.fillStyle = '#abb1bc'; ctx.font = '24px Montserrat, sans-serif'; ctx.fillText(rows.length + ' inscriptos · Posiciones de la grilla · Sin WO',48,headingY+44);
         ctx.fillStyle = '#ffc400'; ctx.fillRect(48,top-18,984,3);
         let y = top;
         prepared.forEach((row,i) => {
@@ -93,7 +88,6 @@
           ctx.font = nameFont; ctx.fillStyle = '#ffffff'; row.lines.forEach((line,j) => ctx.fillText(line,145,y+38+j*36));
           y += rowHeight;
         });
-        ctx.fillStyle = '#abb1bc'; ctx.font = '20px Montserrat, sans-serif'; ctx.fillText('LIPA · lipa.ar',48,height-25);
         const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/png'));
         if (!blob) throw new Error('No se pudo generar la imagen.');
         downloadFile(blob,filename+'.png');
