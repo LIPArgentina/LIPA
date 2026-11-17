@@ -1,6 +1,13 @@
 'use strict';
 let preparing = false;
 chrome.runtime.onMessage.addListener((request, sender, respond) => {
+  if(request.type==='delay') {
+    // At most 10s, below the worker's 30s idle timeout. Only our panel can request it.
+    if(sender.id!==chrome.runtime.id || sender.url!==chrome.runtime.getURL('panel.html'))return;
+    if(!Number.isInteger(request.ms)||request.ms<0||request.ms>10000){respond({error:'Pausa inválida.'});return;}
+    setTimeout(()=>respond({ok:true}),request.ms);
+    return true;
+  }
   if(request.type !== 'prepare' || !sender.tab || !sender.url?.startsWith('https://lipa.ar/torneos/privados.html')) return;
   if(preparing) {respond({error:'Ya se está preparando una tanda.'}); return;}
   preparing = true;
