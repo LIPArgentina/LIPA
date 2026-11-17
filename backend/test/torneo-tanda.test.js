@@ -4,11 +4,11 @@ test('batch contacts deduplicate formatted/local phones and omit missing/invalid
  const rows=[{nombre_oficial:'A',whatsapp:'+54 9 11 2345-6789'},{nombre_oficial:'B',whatsapp:'1123456789'},{nombre_oficial:'C',whatsapp:'005491123456789'},{whatsapp:''},{whatsapp:'123'},{nombre_oficial:'España',whatsapp:'+34 612345678'}];
  const result=batch.collect(rows);assert.equal(result.contacts.length,2);assert.equal(result.missing,1);assert.equal(result.invalid,1);assert.equal(result.duplicates,2);assert.equal(result.contacts[1].phone,'34612345678');
 });
-function driverFixture({phone='5491123456789',message='Hola 👋\nSeña 🎱',expectedMessage='Hola 👋\nSeña 🎱',paragraphs=false,observed=true,sendIcon=true}={}){
+function driverFixture({phone='5491123456789',composerLabel='',message='Hola 👋\nSeña 🎱',expectedMessage='Hola 👋\nSeña 🎱',paragraphs=false,observed=true,sendIcon=true}={}){
  let clicks=0;const outgoing=[];const visible={getClientRects:()=>[{}]};
  const leaf=value=>({nodeType:3,nodeValue:value});
  const textEl=value=>({...visible,textContent:value,nodeName:'DIV',childNodes:paragraphs?value.split('\n').map(line=>({nodeName:'P',childNodes:line?[{nodeName:'SPAN',childNodes:[leaf(line)]}]:[{nodeName:'BR'}]})):[leaf(value)]});
- const input=textEl(message);const header={querySelectorAll:()=>[textEl('+'+phone)],querySelector:()=>null};
+ const input={...textEl(message),getAttribute:key=>key==='aria-label'?composerLabel:null};const header={querySelectorAll:()=>[textEl('+'+phone)],querySelector:()=>null};
  const send={click(){clicks++;if(observed)outgoing.push({dataset:{id:'true_'+phone+'@c.us_new'},matches:()=>true,querySelectorAll:()=>[textEl(message)]});}};
  const icon={...visible,closest:()=>send};
  const main={querySelector:q=>q==='header'?header:null,querySelectorAll(q){if(q.includes('contenteditable'))return [input];if(q.includes('data-icon'))return sendIcon?[icon]:[];if(q.includes('data-id'))return outgoing;return [];}};
@@ -32,4 +32,12 @@ test('driver refuses wrong recipient, modified text and missing send control',as
 });
 test('driver never repeats a click when outcome is unconfirmed',async()=>{
  const f=driverFixture({observed:false});const result=await f.run('send');assert.equal(result.clicked,true);assert.ok(result.error);assert.equal(f.clicks(),1);
+});
+test('saved contact is verified by exact international recipient in composer label',async()=>{
+ const f=driverFixture({phone:'saved-name',composerLabel:'Escribir un mensaje para +54 9 11 2345-6789'});
+ assert.equal((await f.run('prepare')).ready,true);assert.equal(f.clicks(),0);
+ for(const composerLabel of ['Escribir un mensaje para +54 9 11 9999-9999','Escribir un mensaje para Claudia','Escribir un mensaje para Claudia 5491123456789']){
+  const wrong=driverFixture({phone:'saved-name',composerLabel});
+  assert.equal((await wrong.run('send')).clicked,false);assert.equal(wrong.clicks(),0);
+ }
 });

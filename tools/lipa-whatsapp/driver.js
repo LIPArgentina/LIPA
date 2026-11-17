@@ -26,6 +26,13 @@ async function lipaWhatsAppStep(expected, action) {
     // Header may show a number for unsaved contacts.
     const header=main.querySelector('header');
     const numberMatches=s=>digits(s)===expected.phone;
+    // WhatsApp exposes the active recipient in the composer's accessible name,
+    // even when the header displays a saved contact name and messages use LIDs.
+    if([...main.querySelectorAll('footer [contenteditable="true"][role="textbox"]')].some(el=>{
+      const label=el.getAttribute('aria-label')||'';
+      const match=label.match(/^(?:Escribir un mensaje para|Type a message to)\s+(\+[\d\s().-]+)$/i);
+      return visible(el)&&match&&numberMatches(match[1]);
+    }))return true;
     if(header && [...header.querySelectorAll('span[title], span[dir], a[href^="tel:"]')].some(el=>visible(el)&&numberMatches(el.textContent)))return true;
     // Existing chat message IDs include the remote JID on compatible versions.
     if([...main.querySelectorAll('[data-id]')].some(el=>{
@@ -33,7 +40,7 @@ async function lipaWhatsAppStep(expected, action) {
       return match && match[1]===expected.phone;
     }))return true;
     // Newer accounts may use opaque LIDs. Verify the displayed contact info instead.
-    const headings=[...document.querySelectorAll('h1,h2,header span,header div')].filter(el=>visible(el)&&/^(Información del contacto|Info\. del contacto|Contact info)$/i.test(el.textContent.trim()));
+    const headings=[...document.querySelectorAll('h1,h2,header span,header div')].filter(el=>visible(el)&&/^(Información de(?:l)? contacto|Info\. de(?:l)? contacto|Contact info)$/i.test(el.textContent.trim()));
     if(!headings.length)return false;
     return [...document.querySelectorAll('span[dir],a[href^="tel:"]')].some(el=>visible(el)&&!el.closest('#main,#pane-side,nav')&&numberMatches(el.textContent));
   }
@@ -57,7 +64,7 @@ async function lipaWhatsAppStep(expected, action) {
       if(!last.error)return {ready:true};
       if(last.needPhone&&!openedInfo) {
         const header=last.main.querySelector('header');
-        const info=header?.querySelector('[data-testid="conversation-info-header"], [role="button"]');
+        const info=header?.querySelector('button[aria-label^="Información de contacto"], [role="button"][aria-label^="Información de contacto"], button[aria-label^="Contact info"], [data-testid="conversation-info-header"]');
         if(info){info.click();openedInfo=true;}
       }
       await sleep(500);
