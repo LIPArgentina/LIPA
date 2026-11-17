@@ -1,9 +1,45 @@
 'use strict';
 const $=id=>document.getElementById(id);
-let job, running=false, stopping=false, workTab=null, history={};
+let job, running=false, checking=false, stopping=false, workTab=null, history={};
 const labels={pending:'Pendiente',preparing:'Abriendo chat',attempting:'Envío iniciado · revisar',sent:'Enviado · no confirma entrega',review:'Revisar manualmente',duplicate:'Ya intentado anteriormente',skipped:'Omitido'};
 const persist=()=>chrome.storage.local.set({job,history});
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const browserControl=lipaBrowserControl(chrome);
+async function rawStep(tabId,contact,action) {
+  const results=await chrome.scripting.executeScript({target:{tabId},func:lipaWhatsAppStep,args:[{phone:contact.phone,message:job.message},action]});
+  if(results.length!==1||!results[0].result)throw Error('No se pudo verificar la respuesta de WhatsApp.');
+  return results[0].result;
+}
+async function prepareChat(tabId,contact,cancelled=()=>false) {
+  await browserControl.connect(tabId);
+  const interactions=new Set();let last;
+  for(let i=0;i<60;i++) {
+    if(cancelled())throw Error('Tanda detenida.');
+    last=await rawStep(tabId,contact,'prepare');
+    if(last.ready)return last;
+    if(last.interaction&&!interactions.has(last.interaction)) {
+      interactions.add(last.interaction);
+      await browserControl.click(tabId,last.target,cancelled);
+    }
+    await pause(500);
+  }
+  return {error:last?.error||'No se pudo abrir y comprobar la ficha del contacto.'};
+}
+$('diagnose').addEventListener('click',async()=>{
+  if(running||checking||!job)return;
+  checking=true;render();$('diagnostic').textContent='Comprobando mensaje, número y botón Enviar. No se enviará nada…';
+  try {
+    const contact=job.contacts.find(c=>c.status==='pending'&&c.selected!==false);
+    if(!contact)throw Error('No hay contactos pendientes seleccionados.');
+    const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});
+    if(tabs.length!==1)throw Error('Dejá una sola pestaña de WhatsApp Web abierta.');
+    const panel=await chrome.tabs.getCurrent();
+    await chrome.tabs.update(tabs[0].id,{active:true});
+    const result=await prepareChat(tabs[0].id,contact);
+    await chrome.tabs.update(panel.id,{active:true});
+    $('diagnostic').textContent=contact.name+': '+(result.ready?'Mensaje, número y botón Enviar comprobados. No se envió nada.':result.error);
+  }catch(error){$('diagnostic').textContent=error.message;}finally{await browserControl.release();checking=false;render();}
+});
 async function fingerprint(contact) {
   const raw=job.organizer+'\n'+contact.phone+'\n'+job.message;
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(n=>n.toString(16).padStart(2,'0')).join('');
@@ -17,19 +53,18 @@ function render() {
     [contact.name,'+'+contact.phone,labels[contact.status]||contact.status].forEach(value=>{const cell=document.createElement('td');cell.textContent=value;row.append(cell);});
     row.title=contact.error||'';$('rows').append(row);
   });
-  $('start').disabled=running||!$('confirm').checked||!job.contacts.some(c=>c.status==='pending');
+  $('diagnose').disabled=running||checking;
+  $('start').disabled=running||checking||!$('confirm').checked||!job.contacts.some(c=>c.status==='pending');
   $('stop').disabled=!running;$('confirm').disabled=running;
 }
 async function step(contact,action) {
-  const results=await chrome.scripting.executeScript({target:{tabId:workTab},func:lipaWhatsAppStep,args:[{phone:contact.phone,message:job.message},action]});
-  if(results.length!==1||!results[0].result)throw Error('No se pudo verificar la respuesta de WhatsApp.');
-  return results[0].result;
+  return rawStep(workTab,contact,action);
 }
 $('confirm').addEventListener('change',()=>{if(job)render();});
 $('login').addEventListener('click',async()=>{if(workTab){try{await chrome.tabs.update(workTab,{active:true});return;}catch(_){}}const tab=await chrome.tabs.create({url:'https://web.whatsapp.com/'});workTab=tab.id;});
 $('stop').addEventListener('click',()=>{stopping=true;$('status').textContent='Deteniendo. Los próximos mensajes no se enviarán.';if(workTab)chrome.tabs.remove(workTab).catch(()=>{});});
 $('start').addEventListener('click',async()=>{
-  if(running||!$('confirm').checked)return;
+  if(running||checking||!$('confirm').checked)return;
   const queue=job.contacts.filter(c=>c.status==='pending'&&c.selected!==false);
   if(!queue.length){$('status').textContent='Seleccioná al menos un contacto pendiente.';return;}
   running=true;stopping=false;render();
@@ -45,14 +80,17 @@ $('start').addEventListener('click',async()=>{
       for(let i=0;i<90&&!stopping;i++){const t=await chrome.tabs.get(workTab);if(t.status==='complete'){loaded=true;break;}await pause(500);}
       if(stopping){contact.status='pending';break;}
       if(!loaded)throw Error('WhatsApp no terminó de cargar.');
-      const ready=await step(contact,'prepare');
+      const ready=await prepareChat(workTab,contact,()=>stopping);
       if(stopping){contact.status='pending';break;}
       if(!ready.ready)throw Error(ready.error||'No se pudo preparar el chat.');
       // Persist uncertainty before the click. A crash must never lead to an automatic duplicate.
       contact.status='attempting';contact.attemptedAt=new Date().toISOString();history[contact.key]={at:contact.attemptedAt,status:'attempting'};
       await persist();render();
       if(stopping){contact.status='pending';delete history[contact.key];break;}
-      const result=await step(contact,'send');
+      const armed=await step(contact,'send');
+      if(!armed.armed)throw Error(armed.error||'No se pudo preparar el envío.');
+      await browserControl.click(workTab,armed.target,()=>stopping);
+      const result=await step(contact,'confirm');
       if(!result.sent)throw Error(result.error||'No se pudo confirmar el envío.');
       contact.status='sent';history[contact.key].status='sent';await persist();render();
       $('status').textContent='Mensaje observado en el chat de '+contact.name+'.';
@@ -63,7 +101,7 @@ $('start').addEventListener('click',async()=>{
       stopping=true;await persist();break;
     }
   }
-  running=false;await persist();render();
+  await browserControl.release();running=false;await persist();render();
   if(!stopping)$('status').textContent='Tanda finalizada. Revisá los estados de la lista.';
 });
 $('report').addEventListener('click',()=>{
@@ -72,6 +110,7 @@ $('report').addEventListener('click',()=>{
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='lipa-registro-tanda.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
 });
 window.addEventListener('beforeunload',event=>{if(running){event.preventDefault();event.returnValue='';}});
+window.addEventListener('pagehide',()=>{browserControl.release();});
 (async()=>{
   const data=await chrome.storage.local.get(['job','history']);job=data.job;history=data.history||{};
   if(!job){$('status').textContent='Abrí Inscripciones de LIPA, aplicá los filtros y tocá Preparar tanda.';return;}

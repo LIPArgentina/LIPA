@@ -44,6 +44,23 @@ async function lipaWhatsAppStep(expected, action) {
     if(!headings.length)return false;
     return [...document.querySelectorAll('span[dir],a[href^="tel:"]')].some(el=>visible(el)&&!el.closest('#main,#pane-side,nav')&&numberMatches(el.textContent));
   }
+  function headerIdentity(main) {
+    return main.querySelector('[data-testid="conversation-info-header-button"]')||main.querySelector('header');
+  }
+  function remember(main) {
+    const header=headerIdentity(main);
+    globalThis.__lipaRecipient={main,header,label:header?.textContent,phone:expected.phone,at:Date.now()};
+  }
+  function remembered(main) {
+    const proof=globalThis.__lipaRecipient,header=headerIdentity(main);
+    return proof&&Date.now()-proof.at<45000&&proof.main===main&&proof.header===header&&proof.label===header?.textContent&&proof.phone===expected.phone;
+  }
+  function point(el) {
+    if(!visible(el))return null;
+    const rect=el.getBoundingClientRect(),x=rect.x+rect.width/2,y=rect.y+rect.height/2;
+    const hit=document.elementFromPoint(x,y);
+    return hit&&(hit===el||el.contains(hit))?{x,y}:null;
+  }
   function inspect() {
     const main=document.querySelector('#main');
     if(!main)return {error:'Esperando el chat. Si aparece un QR, vinculá WhatsApp Web.'};
@@ -51,36 +68,45 @@ async function lipaWhatsAppStep(expected, action) {
     if(inputs.length!==1)return {error:'No se pudo identificar un único cuadro de mensaje.'};
     const input=inputs[0];
     if(text(input)!==normalize(expected.message))return {error:'El mensaje cargado no coincide exactamente con el revisado. Se detuvo para evitar un envío incorrecto.'};
-    if(!rightPhone(main))return {error:'No se pudo comprobar el número del chat. No se envió nada.',needPhone:true,main};
-    const sends=[...main.querySelectorAll('footer [data-icon="send"],footer [data-icon="wds-ic-send-filled"]')].filter(visible).map(el=>el.closest('button,[role="button"]')).filter(Boolean);
+    if(rightPhone(main))remember(main);
+    if(!remembered(main))return {error:'No se pudo comprobar el número del chat. No se envió nada.',needPhone:true,main};
+    const sends=[...new Set([...main.querySelectorAll('footer button[aria-label="Enviar"],footer button[aria-label="Send"],footer [data-icon="send"],footer [data-icon="wds-ic-send-filled"]')].filter(visible).map(el=>el.closest('button,[role="button"]')).filter(Boolean))];
     if(sends.length!==1)return {error:'No se pudo identificar con seguridad el botón Enviar.'};
     return {main,input,send:sends[0]};
   }
   if(location.origin!=='https://web.whatsapp.com')return {error:'La pestaña no es WhatsApp Web.'};
   if(action==='prepare') {
-    let last,openedInfo=false;
-    for(let i=0;i<90;i++) {
-      last=inspect();
-      if(!last.error)return {ready:true};
-      if(last.needPhone&&!openedInfo) {
-        const header=last.main.querySelector('header');
-        const info=header?.querySelector('button[aria-label^="Información de contacto"], [role="button"][aria-label^="Información de contacto"], button[aria-label^="Contact info"], [data-testid="conversation-info-header"]');
-        if(info){info.click();openedInfo=true;}
-      }
-      await sleep(500);
+    const current=inspect();
+    if(current.needPhone) {
+      const info=current.main.querySelector('[data-testid="conversation-info-header-button"],header button[aria-label="Información de contacto"],header button[aria-label="Contact info"]');
+      const target=point(info);
+      return target?{interaction:'contact',target}:{error:current.error};
     }
-    return {error:last?.error||'WhatsApp no terminó de cargar.'};
+    if(current.error)return {error:current.error};
+    const target=point(current.send);
+    if(target)return {ready:true};
+    const infoHeader=document.querySelector('[data-testid="contact-info-header"]');
+    const header=infoHeader?.closest('header')||infoHeader?.parentElement;
+    const close=header?.querySelector('button[aria-label="Cerrar"],button[aria-label="Close"],[role="button"][aria-label="Cerrar"],[role="button"][aria-label="Close"]');
+    const closePoint=point(close);
+    return closePoint?{interaction:'closeContact',target:closePoint}:{error:'El botón Enviar está tapado. Cerrá la ficha del contacto.'};
   }
-  if(action!=='send')return {error:'Acción desconocida.'};
-  const current=inspect();
-  if(current.error)return {error:current.error,clicked:false};
-  const ids=new Set([...current.main.querySelectorAll('[data-id]')].map(el=>el.dataset.id));
-  current.send.click();
+  if(action==='send') {
+    const current=inspect();
+    if(current.error)return {error:current.error,clicked:false};
+    const target=point(current.send);
+    if(!target)return {error:'El botón Enviar está tapado.',clicked:false};
+    globalThis.__lipaArmed={phone:expected.phone,message:expected.message,main:current.main,at:Date.now(),ids:new Set([...current.main.querySelectorAll('[data-id]')].map(el=>el.dataset.id))};
+    return {armed:true,target};
+  }
+  if(action!=='confirm')return {error:'Acción desconocida.'};
+  const armed=globalThis.__lipaArmed;
+  if(!armed||armed.phone!==expected.phone||armed.message!==expected.message||Date.now()-armed.at>30000)return {error:'No hay un envío preparado para comprobar.',clicked:true};
   for(let i=0;i<40;i++) {
     const main=document.querySelector('#main');
-    if(!main || !rightPhone(main))return {error:'El chat cambió después del clic. Revisá el envío manualmente.',clicked:true};
-    const added=[...main.querySelectorAll('.message-out [data-id], [data-id].message-out, [data-id]')].filter(el=>!ids.has(el.dataset.id)&&(el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id.startsWith('true_')));
-    if(added.some(el=>[...el.querySelectorAll('.selectable-text')].some(part=>[normalize(expected.message),renderedMessage].includes(text(part)))))return {sent:true,clicked:true};
+    if(main!==armed.main||!(rightPhone(main)||remembered(main)))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
+    const added=[...main.querySelectorAll('[data-id]')].filter(el=>!armed.ids.has(el.dataset.id)&&(el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id.startsWith('true_')));
+    if(added.some(el=>[...el.querySelectorAll('.selectable-text')].some(part=>[normalize(expected.message),renderedMessage].includes(text(part))))){delete globalThis.__lipaArmed;return {sent:true,clicked:true};}
     await sleep(500);
   }
   return {error:'Se hizo clic en Enviar, pero no se confirmó el resultado. Revisá ese chat; no se reintentará.',clicked:true};

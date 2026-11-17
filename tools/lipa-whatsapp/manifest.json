@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "LIPA · Tanda de WhatsApp",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Revisar e iniciar una tanda de hasta 30 mensajes desde los filtros de LIPA.",
-  "permissions": ["storage", "scripting", "tabs"],
+  "permissions": ["storage", "scripting", "tabs", "debugger"],
   "host_permissions": ["https://web.whatsapp.com/*"],
   "background": {"service_worker": "background.js"},
   "action": {"default_title": "Abrir tanda de LIPA"},

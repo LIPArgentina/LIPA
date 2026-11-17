@@ -1,5 +1,10 @@
 LIPA · Tanda de WhatsApp (Chrome)
 
+Versión 1.1.0: utiliza el permiso debugger de Chrome para ejecutar clics del navegador, porque los clics simulados en la página no abrieron la ficha del contacto en la prueba real. Ese permiso es amplio: permite controlar pestañas. El código de esta herramienta limita su uso a la pestaña activa de https://web.whatsapp.com y desconecta el control al terminar. Chrome muestra un aviso durante el control.
+Al actualizar, reemplazá los archivos en la misma carpeta, recargá la extensión en chrome://extensions y aceptá el permiso si Chrome lo solicita. No la desinstales: conservar la carpeta y el identificador mantiene el registro local.
+Antes de iniciar una tanda, podés usar «Comprobar chat abierto (sin enviar)» con el primer contacto pendiente seleccionado ya abierto y el mensaje preparado. Comprueba número, texto y botón; puede abrir y cerrar la ficha del contacto, pero no envía mensajes.
+Referencia del permiso: https://developer.chrome.com/docs/extensions/reference/api/debugger
+
 1. Extraé este ZIP en una carpeta permanente.
 2. Abrí chrome://extensions, activá Modo desarrollador y elegí Cargar descomprimida.
 3. Seleccioná esta carpeta (la que contiene manifest.json).
