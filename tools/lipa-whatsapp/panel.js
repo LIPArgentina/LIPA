@@ -29,7 +29,7 @@ $('diagnose').addEventListener('click',async()=>{
   if(running||checking||!job)return;
   checking=true;render();$('diagnostic').textContent='Comprobando mensaje, número y botón Enviar. No se enviará nada…';
   try {
-    const contact=job.contacts.find(c=>c.status==='pending'&&c.selected!==false);
+    const contact=job.contacts[Number($('testContact').value)];
     if(!contact)throw Error('No hay contactos pendientes seleccionados.');
     const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});
     if(tabs.length!==1)throw Error('Dejá una sola pestaña de WhatsApp Web abierta.');
@@ -40,11 +40,35 @@ $('diagnose').addEventListener('click',async()=>{
     $('diagnostic').textContent=contact.name+': '+(result.ready?'Mensaje, número y botón Enviar comprobados. No se envió nada.':result.error);
   }catch(error){$('diagnostic').textContent=error.message;}finally{await browserControl.release();checking=false;render();}
 });
+$('prepareTest').addEventListener('click',async()=>{
+  if(running||checking||!job)return;
+  const contact=job.contacts[Number($('testContact').value)];
+  if(!contact)return;
+  checking=true;render();$('diagnostic').textContent='Preparando '+contact.name+' sin enviar…';
+  const panel=await chrome.tabs.getCurrent();
+  try {
+    const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});
+    if(tabs.length>1)throw Error('Dejá una sola pestaña de WhatsApp Web abierta.');
+    const url='https://web.whatsapp.com/send?phone='+contact.phone+'&text='+encodeURIComponent(job.message);
+    const tab=tabs.length?await chrome.tabs.update(tabs[0].id,{url,active:true}):await chrome.tabs.create({url,active:true});
+    let loaded=false;
+    for(let i=0;i<90;i++){if((await chrome.tabs.get(tab.id)).status==='complete'){loaded=true;break;}await pause(500);}
+    if(!loaded)throw Error('WhatsApp no terminó de cargar.');
+    const result=await prepareChat(tab.id,contact);
+    $('diagnostic').textContent=contact.name+': '+(result.ready?'Mensaje, número y botón Enviar comprobados. No se envió nada.':result.error);
+  }catch(error){$('diagnostic').textContent=error.message;}
+  finally{await browserControl.release();await chrome.tabs.update(panel.id,{active:true}).catch(()=>{});checking=false;render();}
+});
 async function fingerprint(contact) {
   const raw=job.organizer+'\n'+contact.phone+'\n'+job.message;
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(n=>n.toString(16).padStart(2,'0')).join('');
 }
 function render() {
+  const selectedTest=$('testContact').value;
+  $('testContact').replaceChildren();
+  job.contacts.forEach((contact,i)=>{if(contact.status==='pending'&&contact.selected!==false){const option=document.createElement('option');option.value=i;option.textContent=contact.name;$('testContact').append(option);}});
+  if([...$('testContact').options].some(o=>o.value===selectedTest))$('testContact').value=selectedTest;
+  $('testContact').disabled=running||checking;$('prepareTest').disabled=running||checking||!$('testContact').options.length;
   $('rows').replaceChildren();
   job.contacts.forEach((contact,i)=>{
     const row=document.createElement('tr'),select=document.createElement('td'),check=document.createElement('input');

@@ -4,15 +4,15 @@ test('batch contacts deduplicate formatted/local phones and omit missing/invalid
  const rows=[{nombre_oficial:'A',whatsapp:'+54 9 11 2345-6789'},{nombre_oficial:'B',whatsapp:'1123456789'},{nombre_oficial:'C',whatsapp:'005491123456789'},{whatsapp:''},{whatsapp:'123'},{nombre_oficial:'España',whatsapp:'+34 612345678'}];
  const result=batch.collect(rows);assert.equal(result.contacts.length,2);assert.equal(result.missing,1);assert.equal(result.invalid,1);assert.equal(result.duplicates,2);assert.equal(result.contacts[1].phone,'34612345678');
 });
-function driverFixture({phone='5491123456789',composerLabel='',message='Hola 👋\nSeña 🎱',expectedMessage='Hola 👋\nSeña 🎱',paragraphs=false,observed=true,sendIcon=true}={}){
+function driverFixture({phone='5491123456789',composerLabel='',message='Hola 👋\nSeña 🎱',expectedMessage='Hola 👋\nSeña 🎱',paragraphs=false,observed=true,sendIcon=true,overlay='none'}={}){
  let clicks=0;const outgoing=[];const visible={getClientRects:()=>[{}]};
  const leaf=value=>({nodeType:3,nodeValue:value});
  const textEl=value=>({...visible,textContent:value,nodeName:'DIV',childNodes:paragraphs?value.split('\n').map(line=>({nodeName:'P',childNodes:line?[{nodeName:'SPAN',childNodes:[leaf(line)]}]:[{nodeName:'BR'}]})):[leaf(value)]});
  const input={...textEl(message),getAttribute:key=>key==='aria-label'?composerLabel:null};const header={querySelectorAll:()=>[textEl('+'+phone)],querySelector:()=>null};
- const send={...visible,getBoundingClientRect:()=>({x:10,y:20,width:20,height:20}),click(){clicks++;if(observed)outgoing.push({dataset:{id:'true_'+phone+'@c.us_new'},matches:()=>true,querySelectorAll:()=>[textEl(message)]});}};
+ const send={...visible,contains:()=>false,getBoundingClientRect:()=>({x:10,y:20,width:20,height:20}),click(){clicks++;if(observed)outgoing.push({dataset:{id:'true_'+phone+'@c.us_new'},matches:()=>true,querySelectorAll:()=>[textEl(message)]});}};
  const icon={...visible,closest:()=>send};
  const main={querySelector:q=>q==='header'?header:null,querySelectorAll(q){if(q.includes('contenteditable'))return [input];if(q.includes('data-icon'))return sendIcon?[icon]:[];if(q.includes('data-id'))return outgoing;return [];}};
- const context={location:{origin:'https://web.whatsapp.com'},document:{elementFromPoint:()=>send,querySelector:q=>q==='#main'?main:null,querySelectorAll:()=>[],createTextNode:s=>s},setTimeout:fn=>{fn();},Promise,Set};
+ const context={location:{origin:'https://web.whatsapp.com'},document:{elementFromPoint:x=>overlay==='full'||(overlay==='centre'&&x>=18)?{}:send,querySelector:q=>q==='#main'?main:null,querySelectorAll:()=>[],createTextNode:s=>s},setTimeout:fn=>{fn();},Promise,Set};
  vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../../tools/lipa-whatsapp/driver.js'),'utf8'),context);
  return {clicks:()=>clicks,browserClick:()=>send.click(),run:action=>context.lipaWhatsAppStep({phone:'5491123456789',message:expectedMessage},action)};
 }
@@ -40,4 +40,10 @@ test('saved contact is verified by exact international recipient in composer lab
   const wrong=driverFixture({phone:'saved-name',composerLabel});
   assert.equal((await wrong.run('send')).clicked,false);assert.equal(wrong.clicks(),0);
  }
+});
+test('partially covered send button uses exposed interior; full overlay blocks without clicking',async()=>{
+ const partial=driverFixture({overlay:'centre'});
+ assert.equal((await partial.run('prepare')).ready,true);
+ const armed=await partial.run('send');assert.equal(armed.armed,true);assert.ok(armed.target.x<18);assert.equal(partial.clicks(),0);
+ const blocked=driverFixture({overlay:'full'});assert.ok((await blocked.run('prepare')).error);assert.equal((await blocked.run('send')).clicked,false);assert.equal(blocked.clicks(),0);
 });

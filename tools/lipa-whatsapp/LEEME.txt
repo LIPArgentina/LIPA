@@ -1,5 +1,8 @@
 LIPA · Tanda de WhatsApp (Chrome)
 
+Versión 1.1.1: reconoce una zona libre del botón si otra extensión tapa su centro, sin hacer clic sobre el elemento superpuesto. Comprobación real sin envío realizada con un contacto agendado y otro mostrado por número. No se probó un envío real durante esas comprobaciones.
+En «Contacto para probar sin enviar» elegí un jugador y usá «Abrir y comprobar (sin enviar)». Abre su chat, carga el mensaje guardado y comprueba teléfono, texto y botón. «Comprobar chat abierto» hace la misma verificación sin cambiar de chat. Ninguno de estos botones envía mensajes.
+
 Versión 1.1.0: utiliza el permiso debugger de Chrome para ejecutar clics del navegador, porque los clics simulados en la página no abrieron la ficha del contacto en la prueba real. Ese permiso es amplio: permite controlar pestañas. El código de esta herramienta limita su uso a la pestaña activa de https://web.whatsapp.com y desconecta el control al terminar. Chrome muestra un aviso durante el control.
 Al actualizar, reemplazá los archivos en la misma carpeta, recargá la extensión en chrome://extensions y aceptá el permiso si Chrome lo solicita. No la desinstales: conservar la carpeta y el identificador mantiene el registro local.
 Antes de iniciar una tanda, podés usar «Comprobar chat abierto (sin enviar)» con el primer contacto pendiente seleccionado ya abierto y el mensaje preparado. Comprueba número, texto y botón; puede abrir y cerrar la ficha del contacto, pero no envía mensajes.

@@ -57,9 +57,15 @@ async function lipaWhatsAppStep(expected, action) {
   }
   function point(el) {
     if(!visible(el))return null;
-    const rect=el.getBoundingClientRect(),x=rect.x+rect.width/2,y=rect.y+rect.height/2;
-    const hit=document.elementFromPoint(x,y);
-    return hit&&(hit===el||el.contains(hit))?{x,y}:null;
+    const rect=el.getBoundingClientRect();
+    // Floating extensions can cover only the centre of a button. Select an
+    // exposed interior point; never click through an unrelated overlay.
+    for(const [fx,fy] of [[.5,.5],[.2,.5],[.8,.5],[.5,.2],[.5,.8],[.2,.2],[.8,.2],[.2,.8],[.8,.8]]) {
+      const x=rect.x+rect.width*fx,y=rect.y+rect.height*fy;
+      const hit=document.elementFromPoint(x,y);
+      if(hit&&(hit===el||el.contains(hit)))return {x,y};
+    }
+    return null;
   }
   function inspect() {
     const main=document.querySelector('#main');
@@ -89,7 +95,7 @@ async function lipaWhatsAppStep(expected, action) {
     const header=infoHeader?.closest('header')||infoHeader?.parentElement;
     const close=header?.querySelector('button[aria-label="Cerrar"],button[aria-label="Close"],[role="button"][aria-label="Cerrar"],[role="button"][aria-label="Close"]');
     const closePoint=point(close);
-    return closePoint?{interaction:'closeContact',target:closePoint}:{error:'El botón Enviar está tapado. Cerrá la ficha del contacto.'};
+    return closePoint?{interaction:'closeContact',target:closePoint}:{error:'El botón Enviar está tapado por otra ventana o extensión.'};
   }
   if(action==='send') {
     const current=inspect();
