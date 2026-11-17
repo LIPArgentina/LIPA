@@ -5,11 +5,20 @@ async function lipaWhatsAppStep(expected, action) {
   const normalize=s=>String(s||'').replace(/\r\n/g,'\n').replace(/\u00a0/g,' ').replace(/[\u200b\u200e\u200f\ufeff]/g,'').trim();
   function text(el) {
     if(!el)return '';
-    const copy=el.cloneNode(true);
-    copy.querySelectorAll('img[alt]').forEach(img=>img.replaceWith(document.createTextNode(img.alt)));
-    copy.querySelectorAll('br').forEach(br=>br.replaceWith(document.createTextNode('\n')));
-    copy.querySelectorAll('div').forEach(div=>{if(div.nextSibling)div.append(document.createTextNode('\n'));});
-    return normalize(copy.textContent);
+    // Lexical uses paragraphs (including <p><br></p> for empty lines).
+    // textContent concatenates them; inserting breaks only for divs loses them.
+    const block=node=>/^(P|DIV|LI)$/.test(node.nodeName);
+    function read(node) {
+      if(node.nodeType===3)return node.nodeValue||'';
+      if(node.nodeName==='IMG')return node.getAttribute('alt')||'';
+      if(node.nodeName==='BR')return '\n';
+      const children=[...node.childNodes];
+      if(block(node)&&children.length===1&&children[0].nodeName==='BR')return '';
+      return children.map((child,i)=>
+        (i>0&&(block(child)||block(children[i-1]))?'\n':'')+read(child)
+      ).join('');
+    }
+    return normalize(read(el));
   }
   const renderedMessage=normalize(expected.message.replace(/(\*{1,3}|_{1,3}|~{1,2}|`{1,3})([^\n]+?)\1/g,'$2'));
   const digits=s=>String(s||'').replace(/\D/g,'');
