@@ -1,0 +1,10 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Tanda de WhatsApp · LIPA</title><link rel="stylesheet" href="panel.css"><main>
+<h1>Tanda de WhatsApp</h1><p id="filters"></p><p id="status" role="status">Cargando…</p>
+<label>Mensaje guardado<textarea id="message" readonly rows="6"></textarea></label>
+<p>Revisá los destinatarios. Podés desmarcar jugadores antes de iniciar. Se usará una pestaña dedicada de WhatsApp Web para recorrer los contactos.</p>
+<div class="actions"><button id="login">Abrir WhatsApp Web</button><button id="start" disabled>Iniciar envíos</button><button id="stop" disabled>Detener</button><button id="report">Descargar registro</button></div>
+<label class="check"><input id="confirm" type="checkbox"> Revisé el mensaje y los números, y quiero enviar esta tanda.</label>
+<p class="note">Mantené este panel abierto y no uses la pestaña de envío mientras trabaja. Detener cancela los próximos envíos; no puede retirar un mensaje ya enviado. Una interrupción o resultado dudoso requiere revisión manual, nunca reenvío automático.</p>
+<table><thead><tr><th>Incluir</th><th>Jugador</th><th>Número</th><th>Estado</th></tr></thead><tbody id="rows"></tbody></table>
+<p class="note">Herramienta no oficial: puede dejar de funcionar si WhatsApp cambia su pantalla o limita la cuenta. “Enviado” significa que se observó el mensaje en el chat, no que el jugador lo recibió o leyó. El registro se guarda solo en este navegador.</p>
+</main><script src="driver.js"></script><script src="panel.js"></script></html>

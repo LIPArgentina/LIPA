@@ -10,6 +10,7 @@
   const $ = selector => document.querySelector(selector);
   let entries = [];
   let diffusionMessage = '';
+  let batchContacts = window.LipaBatch.collect([]);
   let paymentFilter = 'all';
   let categoryFilter = 'all';
   let pendingSubmit = null;
@@ -143,6 +144,9 @@
       return !query || words.every(word => name.includes(word))
         || (/^\d+$/.test(dniQuery) && String(item.dni || '').replace(/\D/g, '').includes(dniQuery));
     });
+    batchContacts = window.LipaBatch.collect(verified);
+    $('#prepareBatch').textContent = 'Preparar tanda (' + batchContacts.contacts.length + ')';
+    $('#prepareBatch').disabled = !batchContacts.contacts.length;
     const pending = filtered.filter(item => !item.corroborado);
     renderBody($('#verifiedBody'), verified, true);
     renderBody($('#pendingBody'), pending, false);
@@ -150,6 +154,16 @@
     $('#pendingCount').textContent = String(pending.length);
   }
   $('#registeredSearch').addEventListener('input', render);
+  $('#prepareBatch').addEventListener('click', () => {
+    if(!diffusionMessage.trim()){openDiffusionMessage();$('#diffusionStatus').textContent='Primero guardá el mensaje para la tanda.';return;}
+    if(batchContacts.contacts.length>30){setMessage('Hay '+batchContacts.contacts.length+' contactos. Ajustá los filtros para preparar una tanda de hasta 30.');return;}
+    if(!document.documentElement.dataset.lipaBatchExtension){$('#batchInstall').showModal();return;}
+    const filters = $('#categoryFilter').selectedOptions[0].textContent + ' · ' + document.querySelector('.filter.active').textContent + ' · Búsqueda: ' + ($('#registeredSearch').value||'Todas') + ' · Omitidos: ' + batchContacts.missing + ' sin número, ' + batchContacts.invalid + ' inválidos, ' + batchContacts.duplicates + ' repetidos';
+    window.dispatchEvent(new CustomEvent('lipa-prepare-batch',{detail:{message:diffusionMessage,contacts:batchContacts.contacts,filters,organizer:String(session.torneoOrganizadorId||session.slug||'')}}));
+    setMessage('Abriendo revisión de destinatarios. Todavía no se enviaron mensajes.',true);
+  });
+  window.addEventListener('lipa-batch-result',event=>{if(event.detail?.error)setMessage(event.detail.error);});
+  $('#closeBatchInstall').addEventListener('click',()=>$('#batchInstall').close());
   function openDiffusionMessage() {
     $('#diffusionMessage').value = diffusionMessage;
     $('#diffusionStatus').textContent = '';

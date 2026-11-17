@@ -1,0 +1,15 @@
+LIPA · Tanda de WhatsApp (Chrome)
+
+1. Extraé este ZIP en una carpeta permanente.
+2. Abrí chrome://extensions, activá Modo desarrollador y elegí Cargar descomprimida.
+3. Seleccioná esta carpeta (la que contiene manifest.json).
+4. Recargá https://lipa.ar/torneos/privados.html, aplicá los filtros y tocá Preparar tanda.
+5. Revisá los números y el texto. Abrí WhatsApp Web e iniciá sesión si hace falta.
+6. Marcá la confirmación y tocá Iniciar envíos. No uses la pestaña de envío durante la tanda.
+
+Máximo 30 contactos; números únicos; sin pendientes de revisión. Los números argentinos de 10 dígitos se completan con 54 9: revisalos en el panel. Para otros países, cargá el prefijo internacional con + en LIPA.
+El registro se guarda en este navegador, no en la base de LIPA. El mismo número y mensaje ya intentados no se vuelven a enviar automáticamente. Ante interrupciones, revisá el chat manualmente. Enviado no equivale a entregado o leído.
+
+Primero probá con un contacto de confianza. La automatización no oficial depende de la pantalla de WhatsApp y puede detenerse si no reconoce sus controles. No elimina el riesgo de restricciones por parte de WhatsApp.
+
+Los datos permanecen en LIPA, esta extensión y WhatsApp; no se envían a servicios de IA. Para quitar la herramienta: chrome://extensions > Quitar. Esto también elimina su registro local.

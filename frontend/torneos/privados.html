@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=19">
+  <link rel="stylesheet" href="./privados.css?v=20">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -55,7 +55,7 @@
     </section>
 
     <section class="list-card verified-card">
-      <div class="list-heading confirmed-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><label class="registered-search" for="registeredSearch">Buscar inscripto<input id="registeredSearch" type="search" placeholder="Nombre o DNI" autocomplete="off" aria-controls="verifiedBody"></label><strong id="verifiedCount">0</strong></div>
+      <div class="list-heading confirmed-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><label class="registered-search" for="registeredSearch">Buscar inscripto<input id="registeredSearch" type="search" placeholder="Nombre o DNI" autocomplete="off" aria-controls="verifiedBody"></label><button id="prepareBatch" type="button" disabled>Preparar tanda (0)</button><strong id="verifiedCount">0</strong></div>
       <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>DNI</th><th>Categoría</th><th><div class="whatsapp-heading">WhatsApp <button id="editDiffusion" type="button" title="Editar mensaje de difusión" aria-label="Editar mensaje de difusión">✎</button></div></th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="verifiedBody"></tbody></table></div>
     </section>
 
@@ -65,6 +65,8 @@
       <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
     </section>
   </main>
+
+  <dialog id="batchInstall" aria-labelledby="batchInstallTitle"><div class="confirmation"><h2 id="batchInstallTitle">Activar tandas en Chrome</h2><p>Instalá la herramienta una sola vez en esta computadora:</p><ol><li><a href="./lipa-whatsapp.zip" download>Descargá la extensión LIPA</a> y extraé el ZIP en una carpeta.</li><li>Abrí <strong>chrome://extensions</strong>, activá «Modo desarrollador» y elegí «Cargar descomprimida».</li><li>Seleccioná la carpeta extraída que contiene manifest.json.</li><li>Recargá esta página y tocá «Preparar tanda».</li></ol><p>El panel muestra el mensaje y los contactos antes de enviar. Necesitás iniciar sesión en WhatsApp Web. Máximo: 30 contactos por tanda.</p><p>Probá primero con un contacto de confianza. La herramienta se detiene si WhatsApp cambia su pantalla o no permite verificar el chat.</p><div class="modal-actions"><button id="closeBatchInstall" type="button">Cerrar</button></div></div></dialog>
 
   <dialog id="diffusionModal" aria-labelledby="diffusionTitle">
     <form id="diffusionForm">
@@ -108,6 +110,7 @@
 
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./categorias.js?v=1" defer></script>
-  <script src="./privados.js?v=20" defer></script>
+  <script src="./tanda.js?v=1" defer></script>
+  <script src="./privados.js?v=21" defer></script>
 </body>
 </html>
