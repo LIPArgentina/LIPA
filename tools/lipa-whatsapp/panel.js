@@ -5,6 +5,20 @@ const labels={pending:'Pendiente',preparing:'Abriendo chat',attempting:'Envío i
 const persist=()=>chrome.storage.local.set({job,history});
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const browserControl=lipaBrowserControl(chrome);
+$('audit').addEventListener('click',async()=>{
+  if(running||checking||!job)return;
+  const contact=job.contacts.find(c=>c.status==='review');
+  if(!contact){$('diagnostic').textContent='No hay un envío detenido para revisar.';return;}
+  checking=true;render();
+  try {
+    const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});
+    const results=[];
+    for(const tab of tabs)results.push(await rawStep(tab.id,contact,'audit'));
+    const observed=results.filter(r=>r.sent);
+    if(observed.length===1){contact.status='sent';delete contact.error;if(history[contact.key])history[contact.key].status='sent';await persist();$('diagnostic').textContent=contact.name+': mensaje encontrado en el chat. No se reenvió nada. La tanda sigue detenida.';}
+    else $('diagnostic').textContent='No se pudo confirmar el envío. Conservá abierto el chat original para revisarlo; no se reenviará.';
+  }catch(error){$('diagnostic').textContent=error.message;}finally{checking=false;render();}
+});
 async function rawStep(tabId,contact,action) {
   const results=await chrome.scripting.executeScript({target:{tabId},func:lipaWhatsAppStep,args:[{phone:contact.phone,message:job.message},action]});
   if(results.length!==1||!results[0].result)throw Error('No se pudo verificar la respuesta de WhatsApp.');
@@ -78,6 +92,7 @@ function render() {
     row.title=contact.error||'';$('rows').append(row);
   });
   $('diagnose').disabled=running||checking;
+  $('audit').disabled=running||checking;
   $('start').disabled=running||checking||!$('confirm').checked||!job.contacts.some(c=>c.status==='pending');
   $('stop').disabled=!running;$('confirm').disabled=running;
 }

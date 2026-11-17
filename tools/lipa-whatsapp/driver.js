@@ -105,14 +105,15 @@ async function lipaWhatsAppStep(expected, action) {
     globalThis.__lipaArmed={phone:expected.phone,message:expected.message,main:current.main,at:Date.now(),ids:new Set([...current.main.querySelectorAll('[data-id]')].map(el=>el.dataset.id))};
     return {armed:true,target};
   }
-  if(action!=='confirm')return {error:'Acción desconocida.'};
+  if(action!=='confirm'&&action!=='audit')return {error:'Acción desconocida.'};
   const armed=globalThis.__lipaArmed;
-  if(!armed||armed.phone!==expected.phone||armed.message!==expected.message||Date.now()-armed.at>30000)return {error:'No hay un envío preparado para comprobar.',clicked:true};
+  if(!armed||armed.phone!==expected.phone||armed.message!==expected.message||(action==='confirm'&&Date.now()-armed.at>30000))return {error:'No hay un envío preparado para comprobar.',clicked:true};
   for(let i=0;i<40;i++) {
     const main=document.querySelector('#main');
     if(main!==armed.main||!(rightPhone(main)||remembered(main)))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
-    const added=[...main.querySelectorAll('[data-id]')].filter(el=>!armed.ids.has(el.dataset.id)&&(el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id.startsWith('true_')));
-    if(added.some(el=>[...el.querySelectorAll('.selectable-text')].some(part=>[normalize(expected.message),renderedMessage].includes(text(part))))){delete globalThis.__lipaArmed;return {sent:true,clicked:true};}
+    const added=[...main.querySelectorAll('[data-id]')].filter(el=>!armed.ids.has(el.dataset.id)&&(el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id.startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"]')));
+    if(added.some(el=>[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[normalize(expected.message),renderedMessage].includes(text(part))))){if(action!=='audit')delete globalThis.__lipaArmed;return {sent:true,clicked:true};}
+    if(action==='audit')return {error:'No se pudo confirmar el mensaje en este chat. No se reenvió nada.'};
     await sleep(500);
   }
   return {error:'Se hizo clic en Enviar, pero no se confirmó el resultado. Revisá ese chat; no se reintentará.',clicked:true};

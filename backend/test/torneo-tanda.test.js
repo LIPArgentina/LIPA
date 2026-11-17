@@ -4,12 +4,12 @@ test('batch contacts deduplicate formatted/local phones and omit missing/invalid
  const rows=[{nombre_oficial:'A',whatsapp:'+54 9 11 2345-6789'},{nombre_oficial:'B',whatsapp:'1123456789'},{nombre_oficial:'C',whatsapp:'005491123456789'},{whatsapp:''},{whatsapp:'123'},{nombre_oficial:'España',whatsapp:'+34 612345678'}];
  const result=batch.collect(rows);assert.equal(result.contacts.length,2);assert.equal(result.missing,1);assert.equal(result.invalid,1);assert.equal(result.duplicates,2);assert.equal(result.contacts[1].phone,'34612345678');
 });
-function driverFixture({phone='5491123456789',composerLabel='',message='Hola 👋\nSeña 🎱',expectedMessage='Hola 👋\nSeña 🎱',paragraphs=false,observed=true,sendIcon=true,overlay='none'}={}){
+function driverFixture({phone='5491123456789',composerLabel='',message='Hola 👋\nSeña 🎱',expectedMessage='Hola 👋\nSeña 🎱',paragraphs=false,observed=true,sendIcon=true,overlay='none',modern=false,incoming=false}={}){
  let clicks=0;const outgoing=[];const visible={getClientRects:()=>[{}]};
  const leaf=value=>({nodeType:3,nodeValue:value});
  const textEl=value=>({...visible,textContent:value,nodeName:'DIV',childNodes:paragraphs?value.split('\n').map(line=>({nodeName:'P',childNodes:line?[{nodeName:'SPAN',childNodes:[leaf(line)]}]:[{nodeName:'BR'}]})):[leaf(value)]});
  const input={...textEl(message),getAttribute:key=>key==='aria-label'?composerLabel:null};const header={querySelectorAll:()=>[textEl('+'+phone)],querySelector:()=>null};
- const send={...visible,contains:()=>false,getBoundingClientRect:()=>({x:10,y:20,width:20,height:20}),click(){clicks++;if(observed)outgoing.push({dataset:{id:'true_'+phone+'@c.us_new'},matches:()=>true,querySelectorAll:()=>[textEl(message)]});}};
+ const send={...visible,contains:()=>false,getBoundingClientRect:()=>({x:10,y:20,width:20,height:20}),click(){clicks++;if(observed)outgoing.push({dataset:{id:modern?'3EB0DA2C94C84B504D984E':'true_'+phone+'@c.us_new'},matches:()=>!modern,closest:()=>null,querySelector:q=>modern&&!incoming&&q.includes('tail-out')?{}:null,querySelectorAll:()=>[textEl(message)]});}};
  const icon={...visible,closest:()=>send};
  const main={querySelector:q=>q==='header'?header:null,querySelectorAll(q){if(q.includes('contenteditable'))return [input];if(q.includes('data-icon'))return sendIcon?[icon]:[];if(q.includes('data-id'))return outgoing;return [];}};
  const context={location:{origin:'https://web.whatsapp.com'},document:{elementFromPoint:x=>overlay==='full'||(overlay==='centre'&&x>=18)?{}:send,querySelector:q=>q==='#main'?main:null,querySelectorAll:()=>[],createTextNode:s=>s},setTimeout:fn=>{fn();},Promise,Set};
@@ -46,4 +46,10 @@ test('partially covered send button uses exposed interior; full overlay blocks w
  assert.equal((await partial.run('prepare')).ready,true);
  const armed=await partial.run('send');assert.equal(armed.armed,true);assert.ok(armed.target.x<18);assert.equal(partial.clicks(),0);
  const blocked=driverFixture({overlay:'full'});assert.ok((await blocked.run('prepare')).error);assert.equal((await blocked.run('send')).clicked,false);assert.equal(blocked.clicks(),0);
+});
+
+test('opaque message IDs confirm only new outgoing messages, including read-only audit',async()=>{
+ const f=driverFixture({modern:true});await f.run('send');assert.ok((await f.run('audit')).error);assert.equal(f.clicks(),0);f.browserClick();assert.equal((await f.run('audit')).sent,true);assert.equal(f.clicks(),1);assert.equal((await f.run('confirm')).sent,true);
+ const incoming=driverFixture({modern:true,incoming:true});await incoming.run('send');incoming.browserClick();assert.ok((await incoming.run('audit')).error);assert.equal(incoming.clicks(),1);
+ const old=driverFixture({modern:true});old.browserClick();await old.run('send');assert.ok((await old.run('audit')).error);assert.equal(old.clicks(),1);
 });
