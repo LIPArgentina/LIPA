@@ -43,3 +43,12 @@ dialog{width:min(460px,calc(100% - 24px));border:1px solid #b98f00;border-radius
 html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78rem;padding:8px 10px}.private-header{min-height:64px}.private-header h1{font-size:1.5rem}.registration-card h2{font-size:1.45rem}.registration-card,.list-card{padding:14px}.organizer-card{padding:12px 14px}.private-main{width:min(1400px,calc(100% - 32px));margin-top:12px}.filters{padding:9px 12px}.list-heading h2{font-size:1.15rem}.list-heading>strong{font-size:1.8rem}input,select{min-height:34px;padding:0 8px}label,legend{font-size:.76rem}fieldset{min-height:58px;gap:8px;padding:6px 9px}.table-wrap th{font-size:.68rem}.table-wrap td{font-size:.82rem;line-height:1.35;padding:6px 5px}.table-wrap input,.table-wrap select{min-height:30px;font-size:.79rem}.player-name-cell strong{font-weight:700}.photo-icon{width:23px;height:23px;min-width:23px;font-size:12px}.team-current{font-weight:700}.table-wrap td:nth-child(7){font-size:.73rem}.table-wrap .contact-editor button{font-size:.65rem;padding:5px 4px}.table-wrap .contact-editor .whatsapp-contact{width:24px;height:26px;flex-basis:24px}.table-wrap .contact-editor .whatsapp-contact svg{width:18px;height:18px}#editDiffusion{width:23px;height:23px;font-size:16px}#prepareBatch{min-height:32px;font-size:.75rem}.registered-search input{min-height:32px}
 @media(min-width:1000px){.contact-editor{flex-wrap:nowrap}.contact-editor input{width:0;flex:1 1 0}.contact-editor button{flex-shrink:0}.payment-editor{flex-wrap:nowrap}.payment-select{width:0;flex:1 1 0}.table-deposit-amount input{width:46px}.table-wrap th:nth-child(5){width:24%}.table-wrap th:nth-child(6){width:12%}}
 @media(max-width:760px){.private-main{width:calc(100% - 16px)}.table-wrap td{padding:6px 3px}.table-wrap input,.table-wrap select{font-size:.9rem}}
+
+@media(min-width:1000px){
+  .table-wrap th:nth-child(1){width:22%}
+  .table-wrap th:nth-child(2){width:15%}
+  .table-wrap th:nth-child(4){width:11%}
+  .table-wrap th:nth-child(5){width:19%}
+  .category-select{max-width:140px}
+  .contact-editor{max-width:252px}
+}
