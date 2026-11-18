@@ -391,7 +391,7 @@ module.exports = function createTorneosPrivadosRouter() {
       const organizador = await findOrganizador({ id, includeInactive: true });
       const { rows: jugadores } = await pool.query(`
         SELECT id, nombre_oficial AS nombre, categoria FROM torneo_inscripciones
-        WHERE torneo_organizador_id=$1 AND corroborado=true
+        WHERE torneo_organizador_id=$1 AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')
         ORDER BY nombre_oficial, id`, [id]);
       const { rows: sorteos } = await pool.query(
         `SELECT s.categoria, s.orden, s.revision, s.updated_at,
@@ -425,7 +425,7 @@ module.exports = function createTorneosPrivadosRouter() {
       await client.query('LOCK TABLE torneo_inscripciones IN SHARE MODE');
       await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE', [req.user.torneoOrganizadorId]);
       const { rows } = await client.query(`SELECT id FROM torneo_inscripciones
-        WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND corroborado=true`,
+        WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')`,
         [req.user.torneoOrganizadorId, categories.valuesFor(categoria)]);
       const ids = new Set(rows.map(row => String(row.id)));
       if (!slots.validOrder(orden, [...ids], categoria)) {

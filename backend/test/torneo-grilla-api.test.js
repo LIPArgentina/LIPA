@@ -13,7 +13,7 @@ function harness(count=30) {
   const client={release(){calls.push('RELEASE');},async query(sql,args){
     calls.push(sql);
     if(sql.startsWith('SELECT orden'))return {rows:[{orden:seeded.map(p=>p.id),revision:drawRevision}]};
-    if(sql.includes('FROM torneo_inscripciones i')){assert.equal(args[0],77);assert.deepEqual(args[1],['segunda','primera_segunda','segunda_tercera']);assert(sql.includes('ANY($2::text[])'));return {rows:eligible.filter(p=>args[1].includes(p.categoria))};}
+    if(sql.includes('FROM torneo_inscripciones i')){assert.equal(args[0],77);assert.deepEqual(args[1],['segunda','primera_segunda','segunda_tercera']);assert(sql.includes('ANY($2::text[])'));assert(sql.includes("i.estado_pago IN ('sena', 'total', 'efectivo')"));return {rows:eligible.filter(p=>args[1].includes(p.categoria))};}
     if(sql.startsWith('SELECT sorteo_revision'))return {rows:stored?[{sorteo_revision:stored.sorteo_revision}]:[]};
     if(sql.startsWith('INSERT INTO torneo_grillas')){if(!stored)stored={jugadores:JSON.parse(args[3]),resultados:{},revision:0,sorteo_revision:args[2]};return {rows:[]};}
     if(sql.startsWith('SELECT * FROM torneo_grillas'))return {rows:stored?[stored]:[]};

@@ -11,7 +11,7 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
     if (!draw) throw fail(422, 'Primero guardá el sorteo de esta categoría.');
     const { rows } = await client.query(`SELECT i.id::text AS id, i.jugador_id, i.nombre_oficial AS nombre, COALESCE(j.foto_path,'') AS foto_path
       FROM torneo_inscripciones i LEFT JOIN jugadores j ON j.id=i.jugador_id
-      WHERE i.torneo_organizador_id=$1 AND i.categoria = ANY($2::text[]) AND i.corroborado=true`, [organizer, categories.valuesFor(category)]);
+      WHERE i.torneo_organizador_id=$1 AND i.categoria = ANY($2::text[]) AND i.corroborado=true AND i.estado_pago IN ('sena', 'total', 'efectivo')`, [organizer, categories.valuesFor(category)]);
     const ids = draw.orden.map(id=>id===null?null:String(id)), players = new Map(rows.map(p => [p.id,p]));
     const capacity=slots.capacity(category);
     if (ids.length !== capacity || (slots.enabled(category) ? rows.length<2 || rows.length>capacity : rows.length!==30)) throw fail(422, slots.enabled(category)?`Esta grilla admite de 2 a ${capacity} jugadores; guardá un nuevo sorteo para aplicar este formato.`:'Este formato requiere exactamente 30 jugadores confirmados y sorteados en la categoría.');
