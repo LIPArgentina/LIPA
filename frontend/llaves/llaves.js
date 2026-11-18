@@ -522,6 +522,9 @@ function renderBracket(data){
     if (!slot) return;
 
     const needsExtra = ['q1','q2','q3','q4','s1','s2'].includes(round.id) && llSeriesWinner(round).needsExtra;
+    const localityAction = currentCategory === 'tercera' && ['s1','s2'].includes(round.id)
+      ? `<button class="btn-locality" type="button" data-action="toggle-locality" data-round="${escapeHtml(round.id)}">${round.manualLocality ? 'RESTABLECER AUTOMÁTICA' : 'INVERTIR LOCALÍA'}</button>`
+      : '';
     const legsMarkup = round.legs
       .filter((leg, index) => {
         if (index < 2) return true;
@@ -540,12 +543,13 @@ function renderBracket(data){
       .join('');
 
     slot.innerHTML = `
-      <article class="tie-card" data-round-card="${config.id}" data-extra-deleted="${round.extraDeleted ? '1' : '0'}">
+      <article class="tie-card" data-round-card="${config.id}" data-extra-deleted="${round.extraDeleted ? '1' : '0'}" data-manual-locality="${round.manualLocality ? '1' : '0'}">
         <div class="tie-header">
           <div>
             <div class="tie-subtitle">${escapeHtml(config.subtitle)}</div>
             <h2 class="tie-title">${escapeHtml(config.title)}</h2>
           </div>
+          ${localityAction}
         </div>
         <p class="tie-helper">${escapeHtml(config.helper)}</p>
         <div class="round-group">${legsMarkup}</div>
@@ -587,6 +591,7 @@ function readBracketFromUI(){
       id: config.id,
       title: config.title,
       extraDeleted: card?.dataset.extraDeleted === '1',
+      manualLocality: card?.dataset.manualLocality === '1',
       legs: legEls.map(legEl => ({
         date: legEl.querySelector('[data-field="date"]')?.value || '',
         home: {
@@ -642,9 +647,32 @@ function wireInputs(){
     });
   });
 
+  document.querySelectorAll('#bracketRoot [data-action="toggle-locality"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const data = readBracketFromUI();
+      const round = llGetRound(data, btn.dataset.round);
+      if (!round || !Array.isArray(round.legs) || round.legs.length < 2) return;
+
+      if (round.manualLocality) {
+        round.manualLocality = false;
+      } else {
+        const currentBest = normalizeTeamName(round.legs?.[1]?.home?.team);
+        const currentOther = normalizeTeamName(round.legs?.[1]?.away?.team);
+        if (!llIsRealTeam(currentBest) || !llIsRealTeam(currentOther)) return;
+        llSetSeriesTeams(round, currentOther, currentBest);
+        round.manualLocality = true;
+      }
+
+      applyAutomaticAdvance(data);
+      renderBracket(data);
+      wireInputs();
+    });
+  });
+
   document.querySelectorAll('#bracketRoot select, #bracketRoot input[type="date"]').forEach(el => {
     el.addEventListener('change', () => {
       const data = readBracketFromUI();
+      applyManualSemifinalSelection(data, el);
       applyAutomaticAdvance(data);
       renderBracket(data);
       wireInputs();
@@ -853,6 +881,7 @@ function flattenStandings(standings){
         equipo: row.equipo || row.team || '',
         pts: Number(row.pts || 0),
         tr: Number(row.tr || 0),
+        ju: Number(row.ju || 0),
         pos: Number(row.pos || 0)
       };
     });
@@ -890,6 +919,21 @@ function stableTieSeed(value){
   return Math.abs(hash);
 }
 
+function compareRate(totalA, gamesA, totalB, gamesB){
+  const aGames = Number(gamesA || 0);
+  const bGames = Number(gamesB || 0);
+  const aTotal = Number(totalA || 0);
+  const bTotal = Number(totalB || 0);
+
+  if (aGames <= 0 && bGames <= 0) return 0;
+  if (aGames <= 0) return -1;
+  if (bGames <= 0) return 1;
+
+  const left = aTotal * bGames;
+  const right = bTotal * aGames;
+  return left === right ? 0 : (left > right ? 1 : -1);
+}
+
 function compareSportingAdvantage(teamA, teamB, data, standings){
   const a = normalizeTeamName(teamA) || 'WO';
   const b = normalizeTeamName(teamB) || 'WO';
@@ -904,9 +948,17 @@ function compareSportingAdvantage(teamA, teamB, data, standings){
   const qA = quarterStats[aKey] || { pts: 0, tr: 0 };
   const qB = quarterStats[bKey] || { pts: 0, tr: 0 };
 
+  const rateChecks = [
+    compareRate(sA.pts, sA.ju, sB.pts, sB.ju),
+    compareRate(sA.tr, sA.ju, sB.tr, sB.ju)
+  ];
+
+  for (const result of rateChecks) {
+    if (result > 0) return [a, b];
+    if (result < 0) return [b, a];
+  }
+
   const checks = [
-    [Number(sA.pts || 0), Number(sB.pts || 0)],
-    [Number(sA.tr || 0), Number(sB.tr || 0)],
     [Number(qA.pts || 0), Number(qB.pts || 0)],
     [Number(qA.tr || 0), Number(qB.tr || 0)]
   ];
@@ -917,6 +969,56 @@ function compareSportingAdvantage(teamA, teamB, data, standings){
   }
 
   return stableTieSeed(a) <= stableTieSeed(b) ? [a, b] : [b, a];
+}
+
+function llRoundContainsSeries(round, teamA, teamB){
+  if (!round || !Array.isArray(round.legs) || round.legs.length < 2) return false;
+  const a = normalizeForCompare(teamA);
+  const b = normalizeForCompare(teamB);
+  if (!a || !b || a === b) return false;
+
+  const leg0Home = normalizeForCompare(round.legs?.[0]?.home?.team);
+  const leg0Away = normalizeForCompare(round.legs?.[0]?.away?.team);
+  const leg1Home = normalizeForCompare(round.legs?.[1]?.home?.team);
+  const leg1Away = normalizeForCompare(round.legs?.[1]?.away?.team);
+  const expected = new Set([a, b]);
+
+  return expected.has(leg0Home) && expected.has(leg0Away) && leg0Home !== leg0Away &&
+    leg1Home === leg0Away && leg1Away === leg0Home;
+}
+
+function llSetSemifinalTeams(round, bestTeam, otherTeam){
+  if (round?.manualLocality && llRoundContainsSeries(round, bestTeam, otherTeam)) return;
+  if (round) round.manualLocality = false;
+  llSetSeriesTeams(round, bestTeam, otherTeam);
+}
+
+function applyManualSemifinalSelection(data, element){
+  if (currentCategory !== 'tercera' || !element?.matches?.('[data-field="team"]')) return false;
+  const block = element.closest('.match-block');
+  const roundId = block?.dataset?.round;
+  if (!['s1','s2'].includes(roundId)) return false;
+
+  const sourceRounds = roundId === 's1' ? ['q1','q2'] : ['q3','q4'];
+  const candidates = sourceRounds
+    .map(id => llSeriesWinner(llGetRound(data, id)).winner)
+    .filter(llIsRealTeam);
+  if (candidates.length !== 2) return false;
+
+  const selected = normalizeTeamName(element.value);
+  const selectedKey = normalizeForCompare(selected);
+  const selectedIndex = candidates.findIndex(team => normalizeForCompare(team) === selectedKey);
+  if (selectedIndex < 0) return false;
+
+  const other = candidates[selectedIndex === 0 ? 1 : 0];
+  const legIndex = Number(block.dataset.leg || 0);
+  const side = element.dataset.side;
+  const selectedDefinesAtHome = (legIndex === 0 && side === 'away') || (legIndex === 1 && side === 'home');
+  const round = llGetRound(data, roundId);
+
+  llSetSeriesTeams(round, selectedDefinesAtHome ? selected : other, selectedDefinesAtHome ? other : selected);
+  round.manualLocality = true;
+  return true;
 }
 
 function applyAutomaticAdvance(data, standings = CURRENT_STANDINGS){
@@ -931,8 +1033,8 @@ function applyAutomaticAdvance(data, standings = CURRENT_STANDINGS){
     const [s1Best, s1Other] = compareSportingAdvantage(q1.winner, q2.winner, data, standings);
     const [s2Best, s2Other] = compareSportingAdvantage(q3.winner, q4.winner, data, standings);
 
-    llSetSeriesTeams(llGetRound(data, 's1'), s1Best, s1Other);
-    llSetSeriesTeams(llGetRound(data, 's2'), s2Best, s2Other);
+    llSetSemifinalTeams(llGetRound(data, 's1'), s1Best, s1Other);
+    llSetSemifinalTeams(llGetRound(data, 's2'), s2Best, s2Other);
   }
 
   const s1 = llSeriesWinner(llGetRound(data, 's1'));
@@ -952,6 +1054,8 @@ function mergeSavedEditableData(baseData, savedData){
     const savedRound = savedData.rounds.find(r => r?.id === round.id);
     if (!savedRound || !Array.isArray(savedRound.legs)) return;
 
+    round.manualLocality = !!savedRound.manualLocality;
+
     while (round.legs.length < savedRound.legs.length) {
       const savedLeg = savedRound.legs[round.legs.length] || {};
       const extra = getEmptyLeg();
@@ -967,7 +1071,7 @@ function mergeSavedEditableData(baseData, savedData){
 
       leg.date = typeof savedLeg.date === 'string' ? savedLeg.date : leg.date;
 
-      if (index >= 2) {
+      if (index >= 2 || (round.manualLocality && ['s1','s2'].includes(round.id))) {
         leg.home.team = normalizeTeamName(savedLeg?.home?.team) || leg.home.team;
         leg.away.team = normalizeTeamName(savedLeg?.away?.team) || leg.away.team;
       }

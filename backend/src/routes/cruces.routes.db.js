@@ -2247,6 +2247,7 @@ function llavesAutoFlattenStandings(standings) {
         equipo: row.equipo || row.team || '',
         pts: Number(row.pts || 0),
         tr: Number(row.tr || 0),
+        ju: Number(row.ju || 0),
         pos: Number(row.pos || 0)
       };
     });
@@ -2284,6 +2285,21 @@ function llavesAutoStableTieSeed(value) {
   return Math.abs(hash);
 }
 
+function llavesAutoCompareRate(totalA, gamesA, totalB, gamesB) {
+  const aGames = Number(gamesA || 0);
+  const bGames = Number(gamesB || 0);
+  const aTotal = Number(totalA || 0);
+  const bTotal = Number(totalB || 0);
+
+  if (aGames <= 0 && bGames <= 0) return 0;
+  if (aGames <= 0) return -1;
+  if (bGames <= 0) return 1;
+
+  const left = aTotal * bGames;
+  const right = bTotal * aGames;
+  return left === right ? 0 : (left > right ? 1 : -1);
+}
+
 function llavesAutoCompareSportingAdvantage(teamA, teamB, data, standings) {
   const a = llavesAutoCleanTeamName(teamA) || 'WO';
   const b = llavesAutoCleanTeamName(teamB) || 'WO';
@@ -2298,9 +2314,17 @@ function llavesAutoCompareSportingAdvantage(teamA, teamB, data, standings) {
   const qA = quarterStats[aKey] || { pts: 0, tr: 0 };
   const qB = quarterStats[bKey] || { pts: 0, tr: 0 };
 
+  const rateChecks = [
+    llavesAutoCompareRate(sA.pts, sA.ju, sB.pts, sB.ju),
+    llavesAutoCompareRate(sA.tr, sA.ju, sB.tr, sB.ju)
+  ];
+
+  for (const result of rateChecks) {
+    if (result > 0) return [a, b];
+    if (result < 0) return [b, a];
+  }
+
   const checks = [
-    [Number(sA.pts || 0), Number(sB.pts || 0)],
-    [Number(sA.tr || 0), Number(sB.tr || 0)],
     [Number(qA.pts || 0), Number(qB.pts || 0)],
     [Number(qA.tr || 0), Number(qB.tr || 0)]
   ];
@@ -2311,6 +2335,28 @@ function llavesAutoCompareSportingAdvantage(teamA, teamB, data, standings) {
   }
 
   return llavesAutoStableTieSeed(a) <= llavesAutoStableTieSeed(b) ? [a, b] : [b, a];
+}
+
+function llavesAutoRoundContainsSeries(round, teamA, teamB) {
+  if (!round || !Array.isArray(round.legs) || round.legs.length < 2) return false;
+  const a = normalizeLlavesTeamKey(teamA);
+  const b = normalizeLlavesTeamKey(teamB);
+  if (!a || !b || a === b) return false;
+
+  const leg0Home = normalizeLlavesTeamKey(round.legs?.[0]?.home?.team);
+  const leg0Away = normalizeLlavesTeamKey(round.legs?.[0]?.away?.team);
+  const leg1Home = normalizeLlavesTeamKey(round.legs?.[1]?.home?.team);
+  const leg1Away = normalizeLlavesTeamKey(round.legs?.[1]?.away?.team);
+  const expected = new Set([a, b]);
+
+  return expected.has(leg0Home) && expected.has(leg0Away) && leg0Home !== leg0Away &&
+    leg1Home === leg0Away && leg1Away === leg0Home;
+}
+
+function llavesAutoSetSemifinalTeams(round, bestTeam, otherTeam) {
+  if (round?.manualLocality && llavesAutoRoundContainsSeries(round, bestTeam, otherTeam)) return;
+  if (round) round.manualLocality = false;
+  llavesAutoSetSeriesTeams(round, bestTeam, otherTeam);
 }
 
 function llavesAutoApplyAutomaticAdvance(data, category, standings, edition) {
@@ -2325,8 +2371,8 @@ function llavesAutoApplyAutomaticAdvance(data, category, standings, edition) {
     const [s1Best, s1Other] = llavesAutoCompareSportingAdvantage(q1.winner, q2.winner, data, standings);
     const [s2Best, s2Other] = llavesAutoCompareSportingAdvantage(q3.winner, q4.winner, data, standings);
 
-    llavesAutoSetSeriesTeams(llavesAutoGetRound(data, 's1'), s1Best, s1Other);
-    llavesAutoSetSeriesTeams(llavesAutoGetRound(data, 's2'), s2Best, s2Other);
+    llavesAutoSetSemifinalTeams(llavesAutoGetRound(data, 's1'), s1Best, s1Other);
+    llavesAutoSetSemifinalTeams(llavesAutoGetRound(data, 's2'), s2Best, s2Other);
   }
 
   const s1 = llavesAutoSeriesWinner(llavesAutoGetRound(data, 's1'));

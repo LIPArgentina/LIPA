@@ -337,6 +337,25 @@ header img{ height:60px; width:auto; display:block; }
   background:#3a1010;
 }
 
+.btn-locality{
+  border:1px solid var(--gold);
+  background:#0b0b0d;
+  color:var(--gold);
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:.04em;
+  border-radius:10px;
+  padding:7px 10px;
+  cursor:pointer;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+
+.btn-locality:hover{
+  background:var(--gold);
+  color:#0b0b0d;
+}
+
 
 
 .match-block-extra .team-row-extra{
