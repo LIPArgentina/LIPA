@@ -493,6 +493,9 @@ module.exports = function createTorneosPrivadosRouter() {
               FROM jugador_equipos je JOIN equipos e ON e.id=je.equipo_id
              WHERE je.jugador_id=j.id
              ORDER BY (je.activo AND e.activo AND je.hasta IS NULL) DESC NULLS LAST,
+                      CASE WHEN je.activo AND e.activo AND je.hasta IS NULL THEN
+                        CASE LOWER(je.categoria) WHEN 'tercera' THEN 1 WHEN 'segunda' THEN 2 WHEN 'primera' THEN 3 ELSE 4 END
+                      ELSE 4 END ASC,
                       COALESCE(je.hasta, je.desde) DESC NULLS LAST, je.id DESC LIMIT 1
           ) team ON true
          WHERE i.torneo_organizador_id=$1 ORDER BY i.created_at DESC, i.id DESC
