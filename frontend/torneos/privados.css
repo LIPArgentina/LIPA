@@ -61,3 +61,11 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
   .table-wrap .contact-editor{width:228px;max-width:100%;gap:3px}
   .table-wrap .contact-editor input{flex:0 1 120px;width:120px;max-width:120px;padding:0 5px}
 }
+
+@media(min-width:1000px){
+  .table-wrap th:nth-child(1){width:20.5%}
+  .table-wrap th:nth-child(2){width:14%}
+  .table-wrap th:nth-child(6){width:14.5%}
+  .table-wrap .table-deposit-amount{flex:0 0 auto}
+  .table-wrap .table-deposit-amount input{width:64px;min-width:64px;padding:0 5px}
+}
