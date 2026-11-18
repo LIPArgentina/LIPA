@@ -9,6 +9,8 @@
 
   const $ = selector => document.querySelector(selector);
   let entries = [];
+  const tableSort = {verifiedBody:{key:'date',direction:'desc'},pendingBody:{key:'date',direction:'desc'}};
+  const nameCollator = new Intl.Collator('es', {sensitivity:'base',numeric:true});
   let diffusionMessage = '';
   let batchContacts = window.LipaBatch.collect([]);
   let paymentFilter = 'all';
@@ -118,7 +120,13 @@
       target.innerHTML = '<tr><td class="empty" colspan="8">No hay inscripciones para mostrar.</td></tr>';
       return;
     }
-    for (const entry of rows) {
+    const sort=tableSort[target.id];
+    const value=entry=>sort.key==='date' ? (Date.parse(entry.created_at)||0) : sort.key==='team' ? (entry.equipo_nombre||'Sin registro') : (verified ? entry.nombre_oficial : entry.nombre_ingresado)||'';
+    const ordered=[...rows].sort((a,b)=>{
+      const comparison=sort.key==='date' ? value(a)-value(b) : nameCollator.compare(value(a),value(b));
+      return (sort.direction==='asc'?comparison:-comparison)||Number(a.id)-Number(b.id);
+    });
+    for (const entry of ordered) {
       const tr = document.createElement('tr');
       const name = verified ? entry.nombre_oficial : entry.nombre_ingresado;
       tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td class="${entry.equipo_actual ? 'team-current' : 'team-history'}" title="${entry.equipo_nombre ? (entry.equipo_actual ? 'Equipo actual' : 'Último equipo histórico') : 'Sin registro'}">${escapeHtml(entry.equipo_nombre || 'Sin registro')}</td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
@@ -129,7 +137,20 @@
       target.appendChild(tr);
     }
   }
+  document.querySelectorAll('[data-sort]').forEach(button=>button.addEventListener('click',()=>{
+    const table=button.closest('table');
+    tableSort[table.querySelector('tbody').id]={key:button.dataset.sort,direction:button.dataset.direction};
+    render();
+  }));
   function render() {
+    document.querySelectorAll('[data-sort-column]').forEach(th=>{
+      const sort=tableSort[th.closest('table').querySelector('tbody').id];
+      th.setAttribute('aria-sort',sort.key===th.dataset.sortColumn ? (sort.direction==='asc'?'ascending':'descending') : 'none');
+      th.querySelectorAll('[data-sort]').forEach(button=>{
+        const active=button.dataset.sort===sort.key&&button.dataset.direction===sort.direction;
+        button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));
+      });
+    });
     const filtered = entries.filter(item => {
       const paymentMatches = paymentFilter === 'all' || paymentState(item) === paymentFilter;
       const categoryMatches = categoryFilter === 'all'

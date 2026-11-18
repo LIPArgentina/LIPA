@@ -69,3 +69,6 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
   .table-wrap .table-deposit-amount{flex:0 0 auto}
   .table-wrap .table-deposit-amount input{width:64px;min-width:64px;padding:0 5px}
 }
+
+.sort-heading{display:flex;align-items:center;gap:5px}.sort-buttons{display:inline-flex;gap:2px}.sort-buttons button{padding:2px 3px;min-width:16px;border:0;border-radius:3px;background:transparent;color:#858a94;font-size:9px;line-height:1.2}.sort-buttons button:hover,.sort-buttons button.active{color:var(--gold);background:#302a15}.sort-buttons button:focus-visible{outline:2px solid var(--gold)}
+@media(min-width:1100px){#registrationForm{grid-template-columns:minmax(150px,1.2fr) minmax(95px,.55fr) minmax(150px,.9fr) max-content auto;gap:10px}#registrationForm>label{min-width:0}#registrationForm fieldset{flex-wrap:nowrap;gap:9px;min-height:54px;padding:6px 10px}#registrationForm .radio{font-size:.73rem}#registrationForm .deposit-amount input{width:48px}}
