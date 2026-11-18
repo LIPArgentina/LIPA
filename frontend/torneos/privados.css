@@ -52,3 +52,12 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
   .category-select{max-width:140px}
   .contact-editor{max-width:252px}
 }
+
+/* Keep desktop editors at content-sized widths instead of stretching. */
+@media(min-width:1000px){
+  .table-wrap th:nth-child(4){width:136px}
+  .table-wrap th:nth-child(5){width:238px}
+  .table-wrap .category-select{width:126px;max-width:100%;font-size:.76rem}
+  .table-wrap .contact-editor{width:228px;max-width:100%;gap:3px}
+  .table-wrap .contact-editor input{flex:0 1 120px;width:120px;max-width:120px;padding:0 5px}
+}
