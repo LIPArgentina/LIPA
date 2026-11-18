@@ -2,6 +2,7 @@
 const $=id=>document.getElementById(id);
 let job, running=false, stopping=false, workTab=null, history={};
 const labels={pending:'Pendiente',preparing:'Abriendo chat',attempting:'Envío iniciado · revisar',sent:'Enviado · no confirma entrega',review:'Revisar manualmente',duplicate:'Ya intentado anteriormente',skipped:'Omitido'};
+const selectable=contact=>contact.status==='pending'||contact.status==='duplicate';
 const persist=()=>chrome.storage.local.set({job,history});
 // Short waits run in the extension worker, independent of hidden-tab timers.
 const pause=async ms=>{
@@ -37,12 +38,13 @@ function render() {
   $('rows').replaceChildren();
   job.contacts.forEach((contact,i)=>{
     const row=document.createElement('tr'),select=document.createElement('td'),check=document.createElement('input');
-    check.type='checkbox';check.setAttribute('aria-label','Incluir a '+contact.name);check.checked=contact.selected!==false;check.disabled=running||contact.status!=='pending';
+    check.type='checkbox';check.setAttribute('aria-label','Incluir a '+contact.name);check.checked=contact.selected!==false;check.disabled=running||!selectable(contact);
     check.addEventListener('change',()=>{contact.selected=check.checked;persist();render();});select.append(check);row.append(select);
     [contact.name,'+'+contact.phone,labels[contact.status]||contact.status].forEach(value=>{const cell=document.createElement('td');cell.textContent=value;row.append(cell);});
-    row.title=contact.error||'';$('rows').append(row);
+    if(contact.status==='duplicate')row.classList.add('previous-attempt');
+    row.title=contact.error||(contact.status==='duplicate'?'Podés marcarlo para volver a enviar.':'');$('rows').append(row);
   });
-  const pending=job.contacts.filter(c=>c.status==='pending');
+  const pending=job.contacts.filter(selectable);
   const selected=pending.filter(c=>c.selected!==false).length;
   $('selectAll').checked=pending.length>0&&selected===pending.length;
   $('selectAll').indeterminate=selected>0&&selected<pending.length;
@@ -56,14 +58,14 @@ async function step(contact,action) {
 $('selectAll').addEventListener('change',()=>{
   if(running||!job)return;
   const selected=$('selectAll').checked;
-  job.contacts.forEach(contact=>{if(contact.status==='pending')contact.selected=selected;});
+  job.contacts.forEach(contact=>{if(selectable(contact))contact.selected=selected;});
   persist();render();
 });
 $('login').addEventListener('click',async()=>{if(workTab){try{await chrome.tabs.update(workTab,{active:true});return;}catch(_){}}const tab=await chrome.tabs.create({url:'https://web.whatsapp.com/'});workTab=tab.id;});
 $('stop').addEventListener('click',()=>{stopping=true;$('status').textContent='Deteniendo. Los próximos mensajes no se enviarán.';if(workTab)chrome.tabs.remove(workTab).catch(()=>{});});
 $('start').addEventListener('click',async()=>{
   if(running||!job)return;
-  const queue=job.contacts.filter(c=>c.status==='pending'&&c.selected!==false);
+  const queue=job.contacts.filter(c=>selectable(c)&&c.selected!==false);
   if(!queue.length){$('status').textContent='Seleccioná al menos un contacto pendiente.';return;}
   running=true;stopping=false;render();
   for(const contact of queue) {
@@ -118,6 +120,6 @@ window.addEventListener('pagehide',()=>{browserControl.release();});
   const ownTab=await chrome.tabs.getCurrent();const {activeTab}=await chrome.storage.local.get('activeTab');
   if(activeTab&&ownTab.id!==activeTab){let existing;try{existing=await chrome.tabs.get(activeTab);}catch(_){}if(existing?.url===chrome.runtime.getURL('panel.html')){$('status').textContent='Usá el panel original de la tanda.';return;}}
   await chrome.storage.local.set({activeTab:ownTab.id});
-  for(const contact of job.contacts){contact.key=await fingerprint(contact);if(contact.status==='preparing')contact.status='pending';if(contact.status==='attempting')contact.status='review';if(contact.status==='pending'&&history[contact.key])contact.status='duplicate';}
+  for(const contact of job.contacts){contact.key=await fingerprint(contact);if(contact.status==='preparing')contact.status='pending';if(contact.status==='attempting')contact.status='review';if(contact.status==='pending'&&history[contact.key])contact.status='duplicate';if(contact.status==='duplicate')contact.selected=false;}
   await persist();$('message').value=job.message;$('filters').textContent=job.filters;$('status').textContent=job.contacts.length+' contactos. Revisá antes de iniciar.';render();
 })().catch(error=>{$('status').textContent=error.message;});
