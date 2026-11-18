@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=20">
+  <link rel="stylesheet" href="./privados.css?v=21">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -36,6 +36,7 @@
           <legend>Pago realizado</legend>
           <label class="radio"><input type="radio" name="payment" value="total" required> Total</label>
           <label class="radio deposit-radio"><input type="radio" name="payment" value="sena" required> Seña <span class="deposit-amount"><span>$</span><input id="depositAmount" type="text" inputmode="numeric" maxlength="5" placeholder="10000" aria-label="Monto de seña en pesos" disabled></span></label>
+          <label class="radio payment-cash"><input type="radio" name="payment" value="efectivo"> Efectivo</label>
           <label class="radio"><input type="radio" name="payment" value="sin_sena" required> Sin seña</label>
         </fieldset>
         <div class="registration-actions"><button class="primary" type="submit">Aceptar inscripción</button><button type="submit" id="addWaiting">Agregar a lista de espera</button></div>
@@ -49,6 +50,7 @@
         <button class="filter active" data-payment="all">Todos</button>
         <button class="filter" data-payment="total">Pago total</button>
         <button class="filter" data-payment="sena">Seña</button>
+        <button class="filter cash-filter" data-payment="efectivo">Efectivo</button>
         <button class="filter" data-payment="sin_sena">Sin seña</button>
       </div>
       <label class="category-filter-label">Categoría:<select id="categoryFilter"><option value="all">Todas</option><option value="primera">Primera</option><option value="segunda">Segunda</option><option value="tercera">Tercera</option><option value="sin_definir">Sin definir</option></select></label>
@@ -56,13 +58,13 @@
 
     <section class="list-card verified-card">
       <div class="list-heading confirmed-heading"><div><span>CORROBORADOS EN DB</span><h2>Jugadores confirmados</h2></div><label class="registered-search" for="registeredSearch">Buscar inscripto<input id="registeredSearch" type="search" placeholder="Nombre o DNI" autocomplete="off" aria-controls="verifiedBody"></label><button id="prepareBatch" type="button" disabled>Preparar tanda (0)</button><strong id="verifiedCount">0</strong></div>
-      <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>DNI</th><th>Categoría</th><th><div class="whatsapp-heading">WhatsApp <button id="editDiffusion" type="button" title="Editar mensaje de difusión" aria-label="Editar mensaje de difusión">✎</button></div></th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="verifiedBody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>Equipo</th><th>DNI</th><th>Categoría</th><th><div class="whatsapp-heading">WhatsApp <button id="editDiffusion" type="button" title="Editar mensaje de difusión" aria-label="Editar mensaje de difusión">✎</button></div></th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="verifiedBody"></tbody></table></div>
     </section>
 
     <section class="list-card pending-card">
       <div class="list-heading"><div><span>PENDIENTES DE REVISIÓN</span><h2>Lista de espera y DNI pendientes</h2></div><div class="pending-heading-actions"><button id="refreshPending" type="button">Revisar pendientes</button><strong id="pendingCount">0</strong></div></div>
       <p class="pending-note">“Revisar pendientes” pasa a confirmados a los jugadores de esta lista cuyo DNI figure en la base, incluidos los de lista de espera.</p>
-      <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Jugador ingresado</th><th>Equipo</th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th>Inscripción</th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
     </section>
   </main>
 
@@ -111,6 +113,6 @@
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./categorias.js?v=1" defer></script>
   <script src="./tanda.js?v=1" defer></script>
-  <script src="./privados.js?v=21" defer></script>
+  <script src="./privados.js?v=22" defer></script>
 </body>
 </html>

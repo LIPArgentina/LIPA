@@ -83,7 +83,7 @@ module.exports = function createTorneosPrivadosRouter() {
           dni TEXT NOT NULL,
           whatsapp TEXT NOT NULL,
           categoria TEXT,
-          estado_pago TEXT NOT NULL CHECK (estado_pago IN ('total', 'sena', 'sin_sena')),
+          estado_pago TEXT NOT NULL CHECK (estado_pago IN ('total', 'sena', 'sin_sena', 'efectivo')),
           monto_sena INTEGER,
           corroborado BOOLEAN NOT NULL DEFAULT false,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -138,7 +138,7 @@ module.exports = function createTorneosPrivadosRouter() {
          WHERE estado_pago <> 'sena';
         ALTER TABLE torneo_inscripciones
           ADD CONSTRAINT torneo_inscripciones_estado_pago_check
-          CHECK (estado_pago IN ('total', 'sena', 'sin_sena'));
+          CHECK (estado_pago IN ('total', 'sena', 'sin_sena', 'efectivo'));
         ALTER TABLE torneo_inscripciones
           DROP CONSTRAINT IF EXISTS torneo_inscripciones_porcentaje_sena_check;
         UPDATE torneo_inscripciones SET porcentaje_sena = NULL;
@@ -148,7 +148,7 @@ module.exports = function createTorneosPrivadosRouter() {
           ADD CONSTRAINT torneo_inscripciones_monto_sena_check
           CHECK (
             (estado_pago = 'sena' AND monto_sena BETWEEN 1000 AND 99999000)
-            OR (estado_pago IN ('total', 'sin_sena') AND monto_sena IS NULL)
+            OR (estado_pago IN ('total', 'sin_sena', 'efectivo') AND monto_sena IS NULL)
           );
         ALTER TABLE torneo_inscripciones
           DROP CONSTRAINT IF EXISTS torneo_inscripciones_categoria_check;
@@ -485,9 +485,16 @@ module.exports = function createTorneosPrivadosRouter() {
       const { rows } = await pool.query(`
         SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp, i.categoria,
                i.estado_pago, i.monto_sena, i.corroborado, i.created_at, i.updated_at,
-               COALESCE(j.foto_path, '') AS foto_path
+               COALESCE(j.foto_path, '') AS foto_path, team.nombre AS equipo_nombre, team.actual AS equipo_actual
           FROM torneo_inscripciones i
           LEFT JOIN jugadores j ON j.id = i.jugador_id
+          LEFT JOIN LATERAL (
+            SELECT e.nombre, (je.activo AND e.activo AND je.hasta IS NULL) AS actual
+              FROM jugador_equipos je JOIN equipos e ON e.id=je.equipo_id
+             WHERE je.jugador_id=j.id
+             ORDER BY (je.activo AND e.activo AND je.hasta IS NULL) DESC NULLS LAST,
+                      COALESCE(je.hasta, je.desde) DESC NULLS LAST, je.id DESC LIMIT 1
+          ) team ON true
          WHERE i.torneo_organizador_id=$1 ORDER BY i.created_at DESC, i.id DESC
       `, [req.user.torneoOrganizadorId]);
       res.json({ ok: true, organizador: {
@@ -571,7 +578,7 @@ module.exports = function createTorneosPrivadosRouter() {
       const montoSena = estadoPago === 'sena' && normalizedAmount !== null && normalizedAmount <= 99999000
         ? normalizedAmount
         : null;
-      if (!nombre || dni.length < 6 || !['total', 'sena', 'sin_sena'].includes(estadoPago)) {
+      if (!nombre || dni.length < 6 || !['total', 'sena', 'sin_sena', 'efectivo'].includes(estadoPago)) {
         return res.status(400).json({ ok: false, error: 'Nombre, DNI y estado de pago son obligatorios' });
       }
       if (estadoPago === 'sena' && montoSena === null) {
@@ -618,8 +625,9 @@ module.exports = function createTorneosPrivadosRouter() {
       const montoSena = estado === 'sena' && normalizedAmount !== null && normalizedAmount <= 99999000
         ? normalizedAmount
         : null;
-      if (!['total', 'sena', 'sin_sena'].includes(estado)) return res.status(400).json({ ok: false, error: 'Estado de pago inválido' });
+      if (!['total', 'sena', 'sin_sena', 'efectivo'].includes(estado)) return res.status(400).json({ ok: false, error: 'Estado de pago inválido' });
       if (estado === 'sena' && montoSena === null) return res.status(400).json({ ok: false, error: 'Ingresá un monto de seña válido' });
+      await ensureSchema();
       const result = await pool.query(`
         UPDATE torneo_inscripciones
            SET estado_pago=$1, monto_sena=$2, updated_at=NOW()

@@ -87,11 +87,12 @@
   function paymentSelect(entry) {
     const state = paymentState(entry);
     const storedAmount = Number(entry.monto_sena || 0) || (entry.estado_pago === '50' ? 50000 : '');
-    const paymentClass = state === 'total' ? 'payment-total' : state === 'sena' ? 'payment-deposit' : 'payment-none';
+    const paymentClass = state === 'efectivo' ? 'payment-cash' : state === 'total' ? 'payment-total' : state === 'sena' ? 'payment-deposit' : 'payment-none';
     return `<div class="payment-editor">
       <select class="payment-select ${paymentClass}" data-id="${entry.id}">
         <option value="sin_sena" ${state === 'sin_sena' ? 'selected' : ''}>Sin seña</option>
         <option value="sena" ${state === 'sena' ? 'selected' : ''}>Seña</option>
+        <option value="efectivo" ${state === 'efectivo' ? 'selected' : ''}>Efectivo</option>
         <option value="total" ${state === 'total' ? 'selected' : ''}>Pago total</option>
       </select>
       <label class="table-deposit-amount"><span>$</span><input class="payment-amount" data-id="${entry.id}" type="text" inputmode="numeric" maxlength="5" value="${storedAmount}" aria-label="Monto de seña en pesos" ${state === 'sena' ? '' : 'disabled'}></label>
@@ -114,16 +115,17 @@
   function renderBody(target, rows, verified) {
     target.innerHTML = '';
     if (!rows.length) {
-      target.innerHTML = '<tr><td class="empty" colspan="7">No hay inscripciones para mostrar.</td></tr>';
+      target.innerHTML = '<tr><td class="empty" colspan="8">No hay inscripciones para mostrar.</td></tr>';
       return;
     }
     for (const entry of rows) {
       const tr = document.createElement('tr');
       const name = verified ? entry.nombre_oficial : entry.nombre_ingresado;
-      tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
+      tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td class="${entry.equipo_actual ? 'team-current' : 'team-history'}" title="${entry.equipo_nombre ? (entry.equipo_actual ? 'Equipo actual' : 'Último equipo histórico') : 'Sin registro'}">${escapeHtml(entry.equipo_nombre || 'Sin registro')}</td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
         <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp">${whatsappContact(entry.whatsapp)}${verified ? whatsappContact(entry.whatsapp, true) : ''}<button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
         <td><button class="delete-button" data-delete="${entry.id}">Quitar</button></td>`;
+      [...tr.children].forEach((cell,index)=>cell.dataset.label=['Jugador','Equipo','DNI','Categoría','WhatsApp','Pago','Inscripción','Acciones'][index]);
       target.appendChild(tr);
     }
   }
