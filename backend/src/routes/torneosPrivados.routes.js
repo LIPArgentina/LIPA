@@ -489,7 +489,7 @@ module.exports = function createTorneosPrivadosRouter() {
           FROM torneo_inscripciones i
           LEFT JOIN jugadores j ON j.id = i.jugador_id
           LEFT JOIN LATERAL (
-            SELECT e.nombre, (je.activo AND e.activo AND je.hasta IS NULL) AS actual
+            SELECT e.display_name AS nombre, (je.activo AND e.activo AND je.hasta IS NULL) AS actual
               FROM jugador_equipos je JOIN equipos e ON e.id=je.equipo_id
              WHERE je.jugador_id=j.id
              ORDER BY (je.activo AND e.activo AND je.hasta IS NULL) DESC NULLS LAST,
