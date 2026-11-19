@@ -100,6 +100,7 @@
     node.title=match.label+' — '+match.sources.map(sourceLabel).join(' / ');
     node.append(label,playerRow(match.a,match,0,players),callControls(match),playerRow(match.b,match,1,players));
     board.append(node);
+    return node;
   }
   function matchLocation(match){
     const node=document.querySelector('[data-match-id="'+match.id+'"]');
@@ -109,9 +110,38 @@
     const response=await fetch(API+'/api/torneo-organizador/grilla/'+category+'/'+action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({matchId:match.id,revision:data.revision,drawRevision:data.drawRevision,...extra}),signal:AbortSignal.timeout(20000)});
     const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo completar.');return result;
   }
+  const plannedLocations=new Map(), sendingCalls=new Set();
+  let callHint;
+  function closeCallHint(){
+    if(!callHint)return;
+    callHint.button.removeAttribute('aria-describedby');
+    callHint.bubble.remove();callHint=null;
+  }
+  function showCallHint(button,message){
+    closeCallHint();
+    const bubble=document.createElement('div');
+    bubble.className='call-hint';bubble.id='callHint';bubble.setAttribute('role','alert');
+    bubble.textContent=message;document.body.append(bubble);
+    button.setAttribute('aria-describedby',bubble.id);callHint={button,bubble};
+    placeCallHint();
+  }
+  function placeCallHint(){
+    if(!callHint)return;
+    const {button,bubble}=callHint;
+    const anchor=button.getBoundingClientRect(),bounds=bubble.getBoundingClientRect();
+    if(!button.isConnected || !anchor.width || anchor.bottom<=0 || anchor.top>=innerHeight || anchor.right<=0 || anchor.left>=innerWidth){closeCallHint();return;}
+    const right=anchor.right+8;
+    bubble.style.left=Math.max(6,Math.min(right+bounds.width<=innerWidth-6?right:anchor.right-bounds.width,innerWidth-bounds.width-6))+'px';
+    const top=right+bounds.width<=innerWidth-6?anchor.top:anchor.bottom+6;
+    bubble.style.top=Math.max(6,top+bounds.height<=innerHeight-6?top:anchor.top-bounds.height-6)+'px';
+  }
+  document.addEventListener('pointerdown',event=>{if(callHint && event.target!==callHint.button)closeCallHint();});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')closeCallHint();});
+  window.addEventListener('scroll',placeCallHint,true);
+  window.addEventListener('resize',placeCallHint);
   function callControls(match){
     const row=document.createElement('div');row.className='match-call';
-    if(!match.a || !match.b || match.bye)return row;
+    if(match.bye || (viewer && (!match.a || !match.b)))return row;
     const saved=data.assignments?.[match.id];
     const valid=saved && saved.a===match.a && saved.b===match.b;
     if(viewer){row.textContent=valid?'Mesa '+saved.mesa+' · '+saved.piso:'Mesa por asignar';return row;}
@@ -119,22 +149,43 @@
     table.add(new Option('Mesa',''));for(let n=1;n<=19;n++)table.add(new Option(String(n),String(n)));
     const floor=document.createElement('select');floor.className='match-floor';floor.setAttribute('aria-label','Piso de '+matchLabel(match));
     floor.add(new Option('Piso',''));floor.add(new Option('Arriba','arriba'));floor.add(new Option('Abajo','abajo'));
-    if(valid){table.value=saved.mesa;floor.value=saved.piso;}
+    const key=[category,data.drawRevision,match.id].join('/');
+    let plan=plannedLocations.get(key);
+    if(plan && ((plan.a && plan.a!==match.a)||(plan.b && plan.b!==match.b))){
+      plannedLocations.delete(key);plan=null;
+    }
+    if(plan){plan.a=match.a;plan.b=match.b;}
+    const location=plan || (valid && saved);
+    if(location){table.value=location.mesa;floor.value=location.piso;}
+    const remember=()=>{closeCallHint();plannedLocations.set(key,{a:match.a,b:match.b,mesa:table.value,piso:floor.value});};
+    table.onchange=floor.onchange=remember;
     const button=document.createElement('button');button.className='call-match';button.textContent='🔔';button.title='Llamar a ambos jugadores';button.setAttribute('aria-label','Llamar a ambos jugadores');
-    button.disabled=Boolean(match.winner)||saving||Boolean(pending);
+    table.disabled=floor.disabled=button.disabled=Boolean(match.winner)||saving||Boolean(pending)||conflicted||sendingCalls.has(key);
     button.onclick=async()=>{
+      closeCallHint();
       const mesa=Number(table.value),piso=floor.value;
-      if(!mesa || !piso){status('Elegí la mesa y el piso antes de llamar.',true);return;}
-      button.disabled=true;
-      try{const result=await organizerAction('llamar',match,{mesa,piso});data.assignments={...data.assignments,[match.id]:result.assignment};status('Llamado enviado a ambos jugadores.');}
-      catch(error){status(error.message,true);}finally{button.disabled=Boolean(match.winner);}
+      if(!mesa || !piso){showCallHint(button,'Falta elegir '+(!mesa && !piso?'la mesa y el piso':!mesa?'la mesa':'el piso')+'.');return;}
+      if(!match.a || !match.b){showCallHint(button,'El llamado espera a que se definan los dos jugadores.');return;}
+      const grid=data;sendingCalls.add(key);table.disabled=floor.disabled=button.disabled=true;
+      try{
+        const result=await organizerAction('llamar',match,{mesa,piso});
+        grid.assignments={...grid.assignments,[match.id]:result.assignment};plannedLocations.delete(key);
+        if(data===grid)status('Llamado enviado a ambos jugadores.');
+      }catch(error){if(data===grid){status(error.message,true);if(button.isConnected)showCallHint(button,error.message);}}
+      finally{
+        sendingCalls.delete(key);
+        if(button.isConnected)table.disabled=floor.disabled=button.disabled=false;
+        else if(data===grid)render();
+      }
     };
     row.append(table,floor,button);return row;
   }
   function renderBoard(rounds, boardId, frameId, repechage=false) {
     const board=$(boardId),frame=$(frameId);board.replaceChildren();
-    const W=206,G=28,TOP=45,depth=rounds.length-1,dual=view==='double'&&!repechage;
+    const W=206,G=28,depth=rounds.length-1,dual=view==='double'&&!repechage;
     const {positions,width,height}=window.LipaBracketLayout.build(rounds,dual);
+    const headerSpace=viewer?0:40;
+    for(const pos of positions.values()){pos.y+=headerSpace;pos.center+=headerSpace;}
     const players=new Map(data.players.map(p=>[String(p.id),p]));
     const titles=rounds.map((round,index)=>{
       if(boardId==='#mainBoard')return 'Ganadores · Ronda '+(index+1);
@@ -142,12 +193,7 @@
       if(repechage)return 'Repechaje · Ronda '+(index+1);
       return index===0?'Primera ronda':round.length===1?'Final':round.length===2?'Semifinal':round.length===4?'Cuartos':round.length===8?'Octavos':'Ronda '+(index+1);
     });
-    function title(text,x) {const el=document.createElement('div');el.className='round-title';el.style.cssText=`left:${x}px;width:${W}px`;el.textContent=text.toUpperCase();board.append(el);}
-    rounds.forEach((round,r)=>{
-      title((titles[r] || 'Ronda '+(r+1)),r*(W+G));
-      if(dual && boardId==='#mainBoard' && rounds.at(-1).length>1)title(titles[r],(depth*2+1-r)*(W+G));
-      else if(dual && r<depth)title(titles[r],(depth*2-r)*(W+G));
-    });
+    const columns=new Map();
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('connectors');svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('aria-hidden','true');
     rounds.forEach(round=>round.forEach(match=>{
       for(const source of match.sources||[]){
@@ -156,8 +202,19 @@
         const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',`M ${x1} ${from.center} H ${mid} V ${to.center} H ${x2}`);svg.append(path);
       }
     }));board.append(svg);
-    rounds.forEach((round,r)=>round.forEach(match=>card(match,positions.get(match.id),board,players,r===depth,repechage)));
-    let boardHeight=height;
+    rounds.forEach((round,r)=>round.forEach(match=>{
+      const pos=positions.get(match.id);
+      const node=card(match,pos,board,players,r===depth,repechage);
+      if(!columns.has(pos.x))columns.set(pos.x,{title:titles[r],cards:[]});
+      columns.get(pos.x).cards.push(node);
+    }));
+    for(const [x,column] of [...columns].sort((a,b)=>a[0]-b[0])){
+      const el=document.createElement('div');el.className='round-title';
+      el.style.cssText=`left:${x}px;width:${W}px`;el.textContent=column.title.toUpperCase();
+      if(!viewer)el.append(LipaColumnSearch(column.cards,column.title,[category,data.drawRevision,view,boardId,x].join('/')));
+      board.append(el);
+    }
+    let boardHeight=height+headerSpace;
     if(boardId==='#finalBoard')rounds[depth].forEach((final,index)=>{
     const fp=positions.get(final.id),winner=players.get(final.winner);
     const crown=document.createElement('div');crown.className='champion';
@@ -180,6 +237,7 @@
   }
   function fit() { if(!dimensions.length)return; const width=$('#mainFrame').parentElement.clientWidth-24;zoom=Math.max(.35,Math.min(1,width/Math.max(...dimensions.map(d=>d.width))));if(innerWidth<760)zoom=.85;applyZoom(); }
   function render() {
+    closeCallHint();
     updatePublication();
     if(!data || !state)return;
     dimensions.length=0;
@@ -256,6 +314,7 @@
     } finally {publishing=false;updatePublication();}
   };
   async function load() {
+    closeCallHint();
     const request=++requestId;data=null;state=null;conflicted=false;$('#emptyState').hidden=true;$('#mainSection').hidden=true;$('#repSection').hidden=true;$('#finalSection').hidden=true;$('#reload').hidden=true;status('Cargando grilla…');
     updatePublication();
     try {
@@ -311,13 +370,17 @@
       }catch(error){if(request!==requestId)return;if(error.status===401){location.replace('./torneos.html');return;}if(error.status===404){showPendingDraw();return;}status(error.message,true);}
       finally{refreshing=false;}
     }
-    let lastCall='0',checking=false;
+    let lastCall='0',checking=false,visibleSince=performance.now();
     async function calls(){if(document.hidden||checking)return;checking=true;try{
       const result=await LipaViewer.api('avisos?after='+lastCall);
       const box=$('#personalCalls');
+      const now=result.serverTime || Date.now();
+      const earliest=now-Math.min(30000,performance.now()-visibleSince);
+      const fresh=result.avisos.some(call=>Date.parse(call.created_at)>=earliest);
       result.avisos.forEach(call=>{const item=document.createElement('p');item.textContent=call.mensaje;box.prepend(item);box.hidden=false;lastCall=call.id;while(box.children.length>5)box.lastElementChild.remove();});
+      if(fresh)LipaCallSound.ring();
     }catch(error){if(error.status===401)location.replace('./torneos.html');}finally{checking=false;}}
-    setInterval(refresh,10000);setInterval(calls,5000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refresh();calls();}});calls();
+    setInterval(refresh,10000);setInterval(calls,5000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){visibleSince=performance.now();refresh();calls();}});calls();
   }
   load();
 })();

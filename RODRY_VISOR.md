@@ -8,6 +8,8 @@ El visor comparte la grilla del organizador y los resultados publicados en LIPA.
 - El servidor verifica el DNI en `jugadores`; guarda un token aleatorio con hash SHA-256, vigencia 180 días. El token del visor no concede acceso de organizador. El cierre elimina la sesión y su asociación de push.
 - El visor no expone DNI, teléfonos ni identificadores internos de jugador. Las rutas de llamados y contactos requieren sesión de organizador.
 - Las mesas se vinculan al sorteo, partido y ambos participantes. Si cambia alguno, la asignación anterior no se muestra.
+- Cada columna de la grilla del organizador permite buscar por nombre o apellido. Enter o la flecha lleva a la siguiente coincidencia. En los partidos pendientes se puede preseleccionar mesa y piso mientras la página sigue abierta. La campana indica qué falta y confirma la asignación al enviar el llamado a ambos rivales.
+- En el visor, «Activar sonido» reproduce una prueba del tono de cuatro notas. Los llamados nuevos reproducen ese tono con el visor abierto y el audio habilitado. En segundo plano, el aviso web solicita sonido y vibración al sistema según los permisos del dispositivo.
 
 ## Publicación
 

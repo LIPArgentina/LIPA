@@ -106,7 +106,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     if (!/^\d{1,20}$/.test(after)) throw fail(400,'Consulta inválida.');
     res.locals.lecturaVisor=true;
     const {rows}=await pool.query(`SELECT id::text,mensaje,created_at FROM torneo_avisos WHERE jugador_id=$1 AND id>$2::bigint AND created_at>NOW()-INTERVAL '12 hours' ORDER BY torneo_avisos.id LIMIT 30`,[user.jugador_id,after]);
-    res.json({avisos:rows});
+    res.json({avisos:rows,serverTime:Date.now()});
   }));
   // Web FCM is separate from the native APK, whose current bridge exposes no FCM token.
   router.get('/torneo-visor/push-config',route(async(_req,res)=>{
@@ -180,7 +180,9 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       const tokens=rows.map(r=>r.fcm_token);
       for(let i=0;i<tokens.length;i+=500) {
         const batch=tokens.slice(i,i+500);
-        try {const sent=await firebase.messaging().sendEachForMulticast({tokens:batch,notification:{title:'LIPA · Llamado a mesa',body:mensaje},webpush:{fcmOptions:{link:'https://lipa.ar/torneos/visor.html'}}});
+        try {const sent=await firebase.messaging().sendEachForMulticast({tokens:batch,notification:{title:'LIPA · Llamado a mesa',body:mensaje},webpush:{
+          headers:{Urgency:'high'},notification:{title:'LIPA · Llamado a mesa',body:mensaje,silent:false,vibrate:[220,110,220,110,380]},
+          fcmOptions:{link:'https://lipa.ar/torneos/visor.html'}}});
           for(let j=0;j<sent.responses.length;j++) if(['messaging/registration-token-not-registered','messaging/invalid-registration-token'].includes(sent.responses[j].error?.code)) await pool.query('UPDATE torneo_visor_sesiones SET fcm_token=NULL WHERE fcm_token=$1',[batch[j]]);
         } catch(error) {console.error('Push de llamado:',error.message);}
       }

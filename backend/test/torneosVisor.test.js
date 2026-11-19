@@ -24,7 +24,7 @@ function fixture(){
     if(sql.includes('DISTINCT ON(match_id)'))return result(llamados);
     if(sql.includes('FROM torneo_inscripciones i'))return result(players.filter(p=>args[1].includes(p.id)).map(p=>({...p,whatsapp:'1123456789'})));
     if(sql.includes('INSERT INTO torneo_llamados')){llamados.push({match_id:args[3],a:args[4],b:args[5],mesa:args[6],piso:args[7]});return result([{id:llamados.length}]);}
-    if(sql.includes('INSERT INTO torneo_avisos')){avisos.push({id:String(avisos.length+1),jugador_id:args[1],mensaje:args[2]});return result([]);}
+    if(sql.includes('INSERT INTO torneo_avisos')){avisos.push({id:String(avisos.length+1),jugador_id:args[1],mensaje:args[2],created_at:new Date().toISOString()});return result([]);}
     if(sql.includes('FROM torneo_avisos'))return result(avisos.filter(a=>a.jugador_id===args[0]&&BigInt(a.id)>BigInt(args[1])));
     if(sql.includes('UPDATE torneo_visor_sesiones'))return result([]);
     throw new Error('Unexpected query: '+sql);
@@ -42,7 +42,10 @@ function fixture(){
   app.use((_req,res)=>res.status(404).json({error:'Not found'}));
   return {app,saved,avisos,draw};
 }
-if(process.env.VISOR_DEMO==='1')fixture().app.listen(3097,'127.0.0.1',()=>console.log('DEMO ONLY http://localhost:3097/torneos/torneos.html · DNI 30000000'));
+if(process.env.VISOR_DEMO==='1'){
+  const port=Number(process.env.VISOR_DEMO_PORT || 3097);
+  fixture().app.listen(port,'127.0.0.1',()=>console.log('DEMO ONLY http://localhost:'+port+'/torneos/torneos.html · DNI 30000000'));
+}
 else test('DNI session, read-only API, private calls and organizer authorization',async()=>{
   const {app,saved,avisos,draw}=fixture();
   const http=require('http'),net=require('net');
@@ -82,10 +85,17 @@ else test('DNI session, read-only API, private calls and organizer authorization
     draw.visible=false;
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{...call,mesa:20},null,true)).status,400);
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{...call,revision:9},null,true)).status,409);
+    const later={...call,matchId:'de-w1-0'};
+    assert.equal((await request('torneo-organizador/grilla/primera/llamar',later,null,true)).status,400);
+    assert.equal(avisos.length,0);
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',call,null,true)).status,200);
     assert.equal(avisos.length,2);assert.match(avisos[0].mensaje,/Mesa 19 · Piso arriba/);
     assert.equal((await request('torneo-visor/grilla/primera',null,login.token)).status,404);
     const inbox=await (await request('torneo-visor/avisos?after=0',null,login.token)).json();assert.equal(inbox.avisos.length,1);
+    assert.ok(Date.parse(inbox.avisos[0].created_at)<=inbox.serverTime);
+    saved.resultados={'de-w0-0':{a:'1',b:'2',score:[7,1]},'de-w0-1':{a:'3',b:'4',score:[1,7]}};
+    assert.equal((await request('torneo-organizador/grilla/primera/llamar',later,null,true)).status,200);
+    assert.deepEqual(avisos.slice(-2).map(call=>call.jugador_id),[101,104]);
     const other=await (await request('torneo-visor/login',{dni:'30000007'})).json();
     assert.equal((await (await request('torneo-visor/avisos?after=0',null,other.token)).json()).avisos.length,0);
     const contact=await (await request('torneo-organizador/grilla/primera/contactar',{...call,playerId:match.a},null,true)).json();assert.match(contact.url,/^https:\/\/wa.me\/5491123456789\?text=/);assert.match(decodeURIComponent(contact.url),/Mesa 19/);
