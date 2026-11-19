@@ -380,7 +380,7 @@
     for(const section of ['#mainSection','#repSection','#finalSection'])$(section).hidden=true;
     for(const board of ['#mainBoard','#repBoard','#finalBoard'])$(board).replaceChildren();
     $('#reload').hidden=true;
-    $('#emptyState').textContent='Sorteo pendiente para esta categoría.';
+    $('#emptyState').textContent='La grilla de esta categoría está pendiente de publicación.';
     $('#emptyState').hidden=false;
     status('El visor se actualiza automáticamente.');
   }
@@ -435,7 +435,8 @@
     $('#publication').hidden=!data;
     if(!data)return;
     $('#publicationStatus').textContent=!data.canPublish?'':data.published?'Grilla publicada en '+category+'.':'Borrador de '+category+' · Los llamados llegan a los dos jugadores.';
-    $('#publishGrid').hidden=!data.canPublish || data.published;
+    $('#publishGrid').hidden=!data.canPublish;
+    $('#publishGrid').textContent=data.published?'Ocultar grilla':'Publicar grilla';
     const busy=publishing || controlling || saving || Boolean(pending) || conflicted;
     $('#publishGrid').disabled=busy;$('#resetGrid').disabled=busy;
     $('#restoreGrid').disabled=busy || !data.backupDate;
@@ -443,14 +444,15 @@
   }
   if($('#publishGrid'))$('#publishGrid').onclick=async()=>{
     const grid=data;
-    if(!grid?.canPublish || grid.published || publishing || saving || pending || conflicted)return;
-    publishing=true;updatePublication();
+    if(!grid?.canPublish || publishing || controlling || saving || pending || conflicted)return;
+    const action=grid.published?'/ocultar':'/publicar';
+    publishing=true;callChanges++;updatePublication();
     try {
-      await api('POST',{drawRevision:grid.drawRevision,revision:grid.revision},'/publicar');
-      grid.published=true;
+      const result=await api('POST',{drawRevision:grid.drawRevision,revision:grid.revision},action);
+      grid.published=result.published;
     } catch(error) {
       if(grid===data){status(error.message,true);$('#reload').hidden=false;}
-    } finally {publishing=false;updatePublication();}
+    } finally {publishing=false;callChanges++;updatePublication();}
   };
   async function load() {
     closeCallHint();

@@ -26,7 +26,13 @@ function fixture(){
     if(sql.startsWith('UPDATE torneo_grillas SET control_revision=')){saved.control_revision++;return result([]);}
     if(sql.includes('AS habilitados') && sql.includes('g.publicada_at IS NOT NULL') && sql.includes('s.revision=g.sorteo_revision'))return result((args[3] || draw.visible) && args[1]==='primera'?[{...saved,...draw}]:[]);
     if(sql.startsWith('LOCK TABLE'))return result([]);
-    if(sql.startsWith('UPDATE torneo_grillas SET publicada_at')){draw.visible=true;return result([]);}
+    if(sql.startsWith('UPDATE torneo_grillas SET publicada_at')){
+      const [id,category,drawRevision,revision,published]=args;
+      if(id!==1 || category!==saved.categoria || drawRevision!==saved.sorteo_revision || revision!==saved.revision)return {rowCount:0};
+      draw.visible=published;
+      saved.publicada_at=published?'2026-01-01':null;
+      return {rowCount:1};
+    }
     if(sql.includes('DISTINCT ON(match_id)')){
       const latest=[...new Map(llamados.map(call=>[call.match_id,call])).values()];
       return result(latest.map(call=>sql.includes('WITH ultimos')?{...call,avisos:avisos.filter(v=>v.llamado_id===call.callId).map(v=>({
@@ -122,7 +128,11 @@ else test('DNI session, read-only API, private calls and organizer authorization
     assert.equal((await request(reserve,{...table1,mesa:null,piso:null},null,true)).status,200);
     assert.equal((await request(reserve,call,null,true)).status,200);
     assert.equal(avisos.length,0);
-    draw.visible=false;
+    const hide='torneo-organizador/grilla/primera/ocultar';
+    assert.equal((await request(hide,publish,login.token)).status,403);
+    assert.equal((await request(hide,{...publish,revision:9},null,true)).status,409);
+    assert.ok(draw.visible);
+    assert.deepEqual(await (await request(hide,publish,null,true)).json(),{published:false});
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{...call,mesa:20},null,true)).status,400);
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{...call,revision:9},null,true)).status,409);
     const later={...call,matchId:'de-w1-0'};
@@ -155,7 +165,7 @@ else test('DNI session, read-only API, private calls and organizer authorization
     assert.deepEqual(await receipts(match.id),{'1':false,'2':false});
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',later,null,true)).status,200);
     assert.deepEqual(await receipts(later.matchId),{'1':false,'4':false});
-    draw.visible=true;
+    assert.deepEqual(await (await request('torneo-organizador/grilla/primera/publicar',publish,null,true)).json(),{published:true});
     const publicGrid=await (await request('torneo-visor/grilla/primera',null,login.token)).json();
     assert.doesNotMatch(JSON.stringify(publicGrid),/receipts|clave_pendiente|confirmado_at/);
     assert.ok(avisos[1].clave_pendiente);

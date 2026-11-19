@@ -210,23 +210,25 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     res.json({canPublish:id===owner,published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,revision:saved.revision,controlRevision:saved.control_revision,backupDate:saved.respaldo_fecha,assignments:locations,present,occupied});
   }));
   require('./torneosReset.routes')(router,{pool,route,requireTorneoOrganizador,readGrid,occupiedTables});
-  router.post('/torneo-organizador/grilla/:categoria/publicar',requireTorneoOrganizador,route(async(req,res)=>{
+  router.post('/torneo-organizador/grilla/:categoria/:accion(publicar|ocultar)',requireTorneoOrganizador,route(async(req,res)=>{
     const id=req.user.torneoOrganizadorId, category=req.params.categoria;
+    const published=req.params.accion==='publicar';
+    const {drawRevision,revision}=req.body || {};
     if (id!==await organizer()) throw fail(403,'Este organizador no administra el visor del evento.');
+    if (!validCategory(category)) throw fail(400,'Categoría inválida.');
+    if (!Number.isInteger(drawRevision) || !Number.isInteger(revision)) throw fail(400,'Falta la versión de la grilla.');
     const client=await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query('LOCK TABLE torneo_inscripciones IN SHARE MODE');
       await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[id]);
-      const saved=await currentGrid(id,category,client,true);
-      if (saved.sorteo_revision!==req.body?.drawRevision || saved.revision!==req.body?.revision) {
-        throw fail(409,'La grilla cambió. Recargá la categoría antes de publicarla.');
-      }
-      await client.query(`UPDATE torneo_grillas SET publicada_at=COALESCE(publicada_at,NOW())
-        WHERE torneo_organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3`,[id,category,saved.sorteo_revision]);
+      if (published) await currentGrid(id,category,client,true);
+      const updated=await client.query(`UPDATE torneo_grillas SET publicada_at=CASE WHEN $5 THEN COALESCE(publicada_at,NOW()) ELSE NULL END
+        WHERE torneo_organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3 AND revision=$4`,[id,category,drawRevision,revision,published]);
+      if (!updated.rowCount) throw fail(409,'La grilla cambió. Recargá la categoría.');
       await client.query('COMMIT');
     } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    res.json({published:true});
+    res.json({published});
   }));
   async function matchContext(req, allowFinished=false, db=pool) {
     const category=req.params.categoria, saved=await readGrid(req.user.torneoOrganizadorId,category,db);
