@@ -28,7 +28,7 @@
     const [round,index]=match.id.split('-');
     const title=round==='p'?'Primera ronda':round.startsWith('r')
       ? 'Repechaje · Ronda '+(Number(round.slice(1))+1)
-      : (category==='tercera'?['','Dieciseisavos','Octavos','Cuartos','Semifinal','Final']:['','Octavos','Cuartos','Semifinal','Final'])[Number(round.slice(1))];
+      : 'Ronda '+(Number(round.slice(1))+1);
     return `${title}, partido ${Number(index)+1}`;
   }
   function photo(player) {
@@ -96,25 +96,14 @@
   function renderBoard(rounds, boardId, frameId, repechage=false) {
     const board=$(boardId),frame=$(frameId);board.replaceChildren();
     const W=206,G=28,TOP=45,depth=rounds.length-1,dual=view==='double';
-    const initial=rounds[0].length, rows=dual?initial/2:initial;
-    const STEP=rounds[depth].length>1?Math.max(96,dual?768/rows:180/Math.pow(2,depth)):96;
-    const width=dual?(depth*2+1)*W+depth*2*G:(depth+2)*W+(depth+1)*G;
-    const height=Math.max(rows*STEP+70,dual?560:0);
-    const positions=new Map(), players=new Map(data.players.map(p=>[String(p.id),p]));
+    const {positions,width,height}=window.LipaBracketLayout.build(rounds,dual);
+    const players=new Map(data.players.map(p=>[String(p.id),p]));
     const titles=rounds.map((round,index)=>{
       if(repechage)return index===rounds.length-1?'Clasificación':index===0?'Primera rueda':'Ronda '+(index+1);
       return index===0?'Primera ronda':round.length===1?'Final':round.length===2?'Semifinal':round.length===4?'Cuartos':round.length===8?'Octavos':'Ronda '+(index+1);
     });
     function title(text,x) {const el=document.createElement('div');el.className='round-title';el.style.cssText=`left:${x}px;width:${W}px`;el.textContent=text.toUpperCase();board.append(el);}
     rounds.forEach((round,r)=>{
-      const half=round.length/2;
-      round.forEach((match,i)=>{
-        let x,y;
-        if(!dual) { x=r*(W+G);y=TOP+((i+.5)*Math.pow(2,r)*STEP)-42; }
-        else if(r===depth) {x=depth*(W+G);y=TOP+(i+.5)*rows*STEP/round.length-54;}
-        else {const right=i>=half; x=(right?depth*2-r:r)*(W+G);y=TOP+((i%half+.5)*Math.pow(2,r)*STEP)-42;}
-        positions.set(match.id,{x,y,width:W,center:y+(r===depth?56:44)});
-      });
       title((titles[r] || 'Ronda '+(r+1)),r*(W+G));
       if(dual && r<depth)title(titles[r],(depth*2-r)*(W+G));
     });
@@ -139,6 +128,7 @@
     finalPath.setAttribute('d',dual?`M ${fp.x+W/2} ${fp.y+110} V ${cy}`:`M ${fp.x+W} ${fp.center} H ${cx}`);svg.append(finalPath);
     boardHeight=Math.max(boardHeight,cy+145);
     });
+    svg.setAttribute('height',boardHeight);
     dimensions.push({board,frame,width,height:boardHeight});
   }
   function applyZoom() {
