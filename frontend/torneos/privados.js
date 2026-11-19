@@ -211,10 +211,11 @@
   function updatePresenceControls(){
     const active=entries.filter(entry=>!entry.baja_at);
     const present=active.filter(entry=>entry.en_sala).length;
-    $('#presenceCount').textContent='En sala · '+present+' de '+active.length;
-    const busy=bulkPresenceBusy || pendingPresence.size>0;
-    $('#markAllPresent').disabled=busy || present===active.length;
-    $('#unmarkAllPresent').disabled=busy || present===0;
+    const master=$('#allPresent');
+    master.checked=active.length>0 && present===active.length;
+    master.indeterminate=present>0 && present<active.length;
+    master.disabled=bulkPresenceBusy || pendingPresence.size>0 || active.length===0;
+    master.title=present+' de '+active.length+' en sala. '+(master.checked?'Desmarcar todos':'Marcar todos en sala');
     document.querySelectorAll('#verifiedBody [data-presence],#pendingBody [data-presence]').forEach(box=>{
       box.disabled=bulkPresenceBusy || pendingPresence.has(box.dataset.presence);
     });
@@ -239,8 +240,11 @@
     }catch(error){$('#presenceStatus').textContent=error.message;}
     finally{bulkPresenceBusy=false;updatePresenceControls();}
   }
-  $('#markAllPresent').onclick=()=>setAllPresent(true);
-  $('#unmarkAllPresent').onclick=()=>setAllPresent(false);
+  $('#allPresent').onchange=event=>{
+    const enSala=event.target.checked;
+    updatePresenceControls();
+    setAllPresent(enSala);
+  };
   $('#registeredSearch').addEventListener('input', render);
   $('#prepareBatch').addEventListener('click', () => {
     if(!diffusionMessage.trim()){openDiffusionMessage();$('#diffusionStatus').textContent='Primero guardá el mensaje para la tanda.';return;}

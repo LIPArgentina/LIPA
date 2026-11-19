@@ -80,5 +80,12 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
 .payment-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.payment-heading #paymentSum{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--gold,#ffc400)}.payment-sum-note{font-size:11px;color:#d8bd79;margin:8px 0 0}
 
 .table-wrap th:first-child{width:48px}.table-wrap .presence-check{width:20px;height:20px;min-height:20px;margin:0;accent-color:#ffca40;cursor:pointer}
-.presence-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
-.presence-actions button{border-color:var(--gold)}.presence-actions strong{color:var(--muted)}.presence-actions button:disabled{opacity:.62}
+.table-wrap th.presence-column{width:82px}
+.presence-heading{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font:inherit;color:inherit;cursor:pointer}
+.presence-heading input{flex:none}
+#presenceStatus:not(:empty){margin-bottom:8px}
+@media(max-width:760px){
+  .verified-card .table-wrap thead{display:block}
+  .verified-card thead th:not(.presence-column){display:none}
+  .verified-card thead .presence-column{display:block;width:auto;border:0}
+}
