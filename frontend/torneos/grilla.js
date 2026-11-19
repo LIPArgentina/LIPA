@@ -74,8 +74,10 @@
   window.addEventListener('resize',placePreview);
   function playerRow(id, match, slot, players, label) {
     const p=players.get(id), row=document.createElement('div');
+    if(p && id)row.dataset.entrant=id;
     const wo=slot===0?match.woA:match.woB;
     row.className=`player ${id && id===match.winner?'winner':''} ${!p?'placeholder':''} ${wo?'wo':''}`;
+    if(id && !data.present?.includes(id))row.classList.add('absent');
     const number=document.createElement('span');number.className='position';number.textContent=p?.position || (wo && match.id.startsWith('de-w0-')?Number(match.id.split('-').at(-1))*2+slot+1:'—');
     const name=document.createElement('span');name.className='name';name.textContent=p?.nombre || (wo?'WO':label || sourceLabel(match.sources?.[slot]));
     enablePreview(name,p,match);
@@ -90,6 +92,7 @@
     const portrait=photo(p);
     enablePreview(portrait,p,match);
     const identity=document.createElement('div');identity.className='player-identity';identity.append(name);
+    if(id && p){const absent=document.createElement('small');absent.className='attendance-note';absent.textContent='Fuera de sala';identity.append(absent);}
     if(!viewer && p){
       const receipt=document.createElement('small');receipt.className='call-receipt';receipt.hidden=true;
       receipt.dataset.player=id;identity.append(receipt);
@@ -123,13 +126,18 @@
   }
   function matchLocation(match){
     const node=document.querySelector('[data-match-id="'+match.id+'"]');
-    return {mesa:Number(node?.querySelector('.match-table')?.value),piso:node?.querySelector('.match-floor')?.value||''};
+    const [piso,n]=(node?.querySelector('.match-table')?.value || '').split('-');
+    return {mesa:Number(n)||0,piso};
   }
   async function organizerAction(action,match,extra={}){
     const response=await fetch(API+'/api/torneo-organizador/grilla/'+category+'/'+action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({matchId:match.id,revision:data.revision,drawRevision:data.drawRevision,...extra}),signal:AbortSignal.timeout(20000)});
     const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo completar.');return result;
   }
-  const plannedLocations=new Map(), sendingCalls=new Set();
+  const sendingCalls=new Set(),roomControls=new WeakMap();
+  function syncRoomControls(){
+    for(const row of document.querySelectorAll('#bracketPanel .player[data-entrant]'))row.classList.toggle('absent',!data.present?.includes(row.dataset.entrant));
+    for(const row of document.querySelectorAll('#bracketPanel .match-call'))roomControls.get(row)?.();
+  }
   let callChanges=0,readingCalls=false;
   async function refreshReceipts(){
     if(readingCalls || document.hidden || !data)return;
@@ -142,14 +150,12 @@
         const id=card.dataset.matchId,assignment=info.assignments[id],previous=grid.assignments?.[id];
         if(JSON.stringify(previous?.receipts)!==JSON.stringify(assignment?.receipts) || previous?.callId!==assignment?.callId){
           updateReceipts(card,assignment);
-          const key=[category,grid.drawRevision,id].join('/');
-          if(assignment && card.classList.contains('with-receipts') && !plannedLocations.has(key) && !sendingCalls.has(key)){
-            const table=card.querySelector('.match-table'),floor=card.querySelector('.match-floor');
-            if(table && floor){table.value=assignment.mesa;floor.value=assignment.piso;}
-          }
         }
       }
       grid.assignments=info.assignments;
+      if(JSON.stringify([grid.occupied,grid.present])!==JSON.stringify([info.occupied,info.present])){
+        grid.occupied=info.occupied;grid.present=info.present;syncRoomControls();
+      }
     }catch{/* Keep the last known confirmations until the next successful refresh. */}
     finally{readingCalls=false;}
   }
@@ -186,37 +192,63 @@
     if(match.bye || (viewer && (!match.a || !match.b)))return row;
     const saved=data.assignments?.[match.id];
     const valid=saved && saved.a===match.a && saved.b===match.b;
-    if(viewer){row.textContent=valid?'Mesa '+saved.mesa+' · '+saved.piso:'Mesa por asignar';return row;}
-    const table=document.createElement('select');table.className='match-table';table.setAttribute('aria-label','Mesa de '+matchLabel(match));
-    table.add(new Option('Mesa',''));for(let n=1;n<=19;n++)table.add(new Option(String(n),String(n)));
-    const floor=document.createElement('select');floor.className='match-floor';floor.setAttribute('aria-label','Piso de '+matchLabel(match));
-    floor.add(new Option('Piso',''));floor.add(new Option('Arriba','arriba'));floor.add(new Option('Abajo','abajo'));
-    const key=[category,data.drawRevision,match.id].join('/');
-    let plan=plannedLocations.get(key);
-    if(plan && ((plan.a && plan.a!==match.a)||(plan.b && plan.b!==match.b))){
-      plannedLocations.delete(key);plan=null;
+    if(viewer){
+      const location=match.winner?saved:data.reservations?.[match.id];
+      row.textContent=location && location.a===match.a && location.b===match.b?'Mesa '+location.mesa+' · '+location.piso:'Mesa por asignar';return row;
     }
-    if(plan){plan.a=match.a;plan.b=match.b;}
-    const location=plan || (valid && saved);
-    if(location){table.value=location.mesa;floor.value=location.piso;}
-    const remember=()=>{closeCallHint();plannedLocations.set(key,{a:match.a,b:match.b,mesa:table.value,piso:floor.value});};
-    table.onchange=floor.onchange=remember;
-    const button=document.createElement('button');button.className='call-match';button.textContent='🔔';button.title='Llamar a ambos jugadores';button.setAttribute('aria-label','Llamar a ambos jugadores');
-    table.disabled=floor.disabled=button.disabled=Boolean(match.winner)||saving||Boolean(pending)||conflicted||sendingCalls.has(key);
+    const table=document.createElement('select');table.className='match-table';
+    table.setAttribute('aria-label','Mesa y piso de '+matchLabel(match));
+    const key=[category,data.drawRevision,match.id].join('/');
+    const button=document.createElement('button');button.className='call-match';button.textContent='🔔';button.title='Llamar a ambos jugadores';button.setAttribute('aria-label',button.title);
+    const own=t=>t.category===category && t.drawRevision===data.drawRevision && t.matchId===match.id && t.a===match.a && t.b===match.b;
+    const playable=()=>Boolean(match.a && match.b && [match.a,match.b].every(id=>data.present?.includes(id)));
+    const code=t=>t?t.piso+'-'+t.mesa:'';
+    function options(){
+      const occupied=data.occupied || [],mine=occupied.find(own);
+      const location=match.winner && valid?saved:mine;
+      table.replaceChildren(new Option(location && !match.winner?'Liberar mesa':'Elegir mesa',''));
+      for(const [piso,numbers] of Object.entries(LipaMesas.pisos)){
+        const group=document.createElement('optgroup');group.label=piso==='arriba'?'Arriba':'Abajo';
+        for(const mesa of numbers){
+          const selected=location?.piso===piso && location.mesa===mesa;
+          if(!selected && (!playable() || occupied.some(t=>t.piso===piso && t.mesa===mesa && !own(t))))continue;
+          group.append(new Option('Mesa '+mesa+' · '+piso,piso+'-'+mesa));
+        }
+        if(group.children.length)table.append(group);
+      }
+      table.value=code(location);
+      button.disabled=Boolean(match.winner)||saving||Boolean(pending)||conflicted||sendingCalls.has(key);
+      table.disabled=button.disabled || (!playable() && !mine);
+    }
+    table.onchange=async()=>{
+      const grid=data,previous=code((grid.occupied||[]).find(own)),[piso,n]=table.value.split('-');
+      closeCallHint();sendingCalls.add(key);callChanges++;table.disabled=button.disabled=true;
+      try{
+        const result=await organizerAction('mesa',match,{mesa:n?Number(n):null,piso:piso||null,previous});
+        grid.occupied=result.occupied;
+        if(data===grid)status(n?'Mesa asignada.':'Mesa liberada.');
+      }catch(error){if(data===grid){status(error.message,true);showCallHint(table,error.message);}}
+      finally{
+        sendingCalls.delete(key);callChanges++;
+        if(data===grid){syncRoomControls();refreshReceipts();}
+      }
+    };
+    roomControls.set(row,options);options();
     button.onclick=async()=>{
       closeCallHint();
-      const mesa=Number(table.value),piso=floor.value;
-      if(!mesa || !piso){showCallHint(button,'Falta elegir '+(!mesa && !piso?'la mesa y el piso':!mesa?'la mesa':'el piso')+'.');return;}
       if(!match.a || !match.b){showCallHint(button,'El llamado espera a que se definan los dos jugadores.');return;}
-      const grid=data;sendingCalls.add(key);table.disabled=floor.disabled=button.disabled=true;
+      if(!playable()){const missing=data.players.filter(p=>[match.a,match.b].includes(p.id) && !data.present?.includes(p.id));showCallHint(button,'Falta marcar en sala a '+missing.map(p=>p.nombre).join(' y ')+'.');return;}
+      const {mesa,piso}=matchLocation(match);
+      if(!mesa || !piso){showCallHint(button,'Falta asignar la mesa y el piso.');return;}
+      const grid=data;sendingCalls.add(key);table.disabled=button.disabled=true;
       try{
-        const result=await organizerAction('llamar',match,{mesa,piso});
+        const result=await organizerAction('llamar',match,{mesa,piso,requireReservation:true});
         callChanges++;
         const previous=grid.assignments?.[match.id];
         if(!previous?.callId || !result.assignment.callId || BigInt(previous.callId)<BigInt(result.assignment.callId)){
           grid.assignments={...grid.assignments,[match.id]:result.assignment};
         }
-        plannedLocations.delete(key);
+
         if(data===grid){
           const card=document.querySelector('[data-match-id="'+match.id+'"]');
           if(card)updateReceipts(card,grid.assignments[match.id]);
@@ -225,11 +257,11 @@
       }catch(error){if(data===grid){status(error.message,true);if(button.isConnected)showCallHint(button,error.message);}}
       finally{
         sendingCalls.delete(key);
-        if(button.isConnected)table.disabled=floor.disabled=button.disabled=false;
+        if(button.isConnected)options();
         else if(data===grid)render();
       }
     };
-    row.append(table,floor,button);return row;
+    row.append(table,button);return row;
   }
   function renderBoard(rounds, boardId, frameId, repechage=false) {
     const board=$(boardId),frame=$(frameId);board.replaceChildren();
@@ -328,6 +360,7 @@
     try {
       const result=await api('PATCH',pending);
       data.results=result.results;data.revision=result.revision;state=engine.build(data.players,data.results,category);
+      data.occupied=(data.occupied || []).filter(t=>t.category!==category || state.matches.some(m=>m.id===t.matchId && !m.winner && m.a===t.a && m.b===t.b));
       pending=null;status(result.cleared.length?'Guardado. Se actualizaron los cruces afectados.':'Todos los resultados guardados.');lockTabs(false);
     } catch(error) {
       status(error.message || 'No se pudo guardar el resultado.',true);
@@ -375,7 +408,7 @@
         if(!result.ok)throw new Error('No se pudieron cargar las mesas.');
         const info=await result.json();
         if(info.drawRevision!==undefined && info.drawRevision!==response.drawRevision)throw new Error('Cambió el sorteo. Recargá la categoría.');
-        Object.assign(response,{assignments:info.assignments,canPublish:info.canPublish,published:info.published});
+        Object.assign(response,{present:info.present,occupied:info.occupied,assignments:info.assignments,canPublish:info.canPublish,published:info.published});
       }
       if(request!==requestId)return;
       data=response;state=engine.build(data.players,data.results,category);
@@ -399,19 +432,27 @@
   window.addEventListener('beforeunload',event=>{if(pending || saving){event.preventDefault();event.returnValue='';}});
   if(viewer){
     if(!LipaViewer.read()){location.replace('./torneos.html');return;}
-    LipaViewer.api('session').then(user=>$('#viewerName').textContent=user.nombre).catch(error=>{if(error.status===401)location.replace('./torneos.html');else status(error.message,true);});
+    LipaViewer.api('session').then(user=>{
+      $('#viewerName').textContent=user.nombre;
+      if(requestId===0 && !['primera','segunda','tercera'].includes(requestedCategory) && ['primera','segunda','tercera'].includes(user.categoria)){
+        category=user.categoria;
+        document.querySelectorAll('[data-category]').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.category===category)));
+        $('#bracketPanel').setAttribute('aria-labelledby','tab-'+category);
+      }
+    }).catch(error=>{if(error.status===401)location.replace('./torneos.html?listado=1');else status(error.message,true);})
+      .finally(()=>{if(requestId===0 && LipaViewer.read())load();});
     $('#logoutViewer').onclick=()=>LipaViewer.logout().catch(error=>status(error.message,true));
     $('#enablePush').onclick=async()=>{const button=$('#enablePush');button.disabled=true;try{await LipaViewerPush();$('#pushStatus').textContent='Notificaciones activadas.';}catch(error){$('#pushStatus').textContent=error.message;}finally{button.disabled=false;}};
     if(window.AndroidBridge){$('#enablePush').hidden=true;$('#pushStatus').textContent='Mantené el visor abierto para recibir tus llamados a mesa.';}
     let refreshing=false;
     async function refresh(){
-      if(document.hidden || refreshing)return;refreshing=true;
+      if(!requestId || document.hidden || refreshing)return;refreshing=true;
       const request=requestId;
       try{
         const response=await api('GET');
         if(request!==requestId)return;
         if(!data || data.revision!==response.revision || data.drawRevision!==response.drawRevision ||
-            JSON.stringify(data.assignments)!==JSON.stringify(response.assignments)){
+            JSON.stringify(data.present)!==JSON.stringify(response.present) || JSON.stringify(data.reservations)!==JSON.stringify(response.reservations) || JSON.stringify(data.assignments)!==JSON.stringify(response.assignments)){
           const firstLoad=!data;
           data=response;state=engine.build(data.players,data.results,category);
           $('#emptyState').hidden=true;$('#reload').hidden=true;$('#mainSection').hidden=false;$('#finalSection').hidden=false;
@@ -428,5 +469,5 @@
     setInterval(refreshReceipts,5000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshReceipts();});
   }
-  load();
+  if(!viewer)load();
 })();

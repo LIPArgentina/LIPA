@@ -120,6 +120,9 @@ module.exports = function createTorneosPrivadosRouter() {
           ON torneo_inscripciones(torneo_organizador_id, corroborado, created_at DESC);
 
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS baja_at TIMESTAMPTZ;
+        ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS en_sala BOOLEAN NOT NULL DEFAULT false;
+        ALTER TABLE torneo_grillas ADD COLUMN IF NOT EXISTS mesas JSONB;
+        ALTER TABLE torneo_grillas ALTER COLUMN mesas SET DEFAULT '{}'::jsonb;
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS lista_espera BOOLEAN NOT NULL DEFAULT false;
         ALTER TABLE torneo_inscripciones
           ADD COLUMN IF NOT EXISTS categoria TEXT;
@@ -490,7 +493,7 @@ module.exports = function createTorneosPrivadosRouter() {
       const actualizadas = await reconcilePendingRegistrations(req.user.torneoOrganizadorId);
       const organizador = await findOrganizador({ id: req.user.torneoOrganizadorId, includeInactive: true });
       const { rows } = await pool.query(`
-        SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp, i.categoria,
+        SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp, i.categoria, i.en_sala,
                i.estado_pago, i.monto_sena, i.corroborado, i.created_at, i.updated_at, i.baja_at,
                COALESCE(j.foto_path, '') AS foto_path, team.nombre AS equipo_nombre, team.actual AS equipo_actual
           FROM torneo_inscripciones i
@@ -651,6 +654,16 @@ module.exports = function createTorneosPrivadosRouter() {
     }
   });
 
+  router.patch('/torneo-organizador/inscripciones/:id/presencia', requireTorneoOrganizador, async (req,res)=>{
+    if(typeof req.body?.enSala!=='boolean' || !/^[1-9]\d{0,17}$/.test(req.params.id))return res.status(400).json({error:'Presencia inválida.'});
+    try{
+      await ensureSchema();
+      const {rows}=await pool.query(`UPDATE torneo_inscripciones SET en_sala=$1
+        WHERE id=$2 AND torneo_organizador_id=$3 AND baja_at IS NULL RETURNING en_sala`,[req.body.enSala,req.params.id,req.user.torneoOrganizadorId]);
+      if(!rows.length)return res.status(404).json({error:'La inscripción ya no está activa.'});
+      res.json(rows[0]);
+    }catch(error){console.error('Guardar presencia:',error.message);res.status(500).json({error:'No se pudo guardar la presencia.'});}
+  });
   router.patch('/torneo-organizador/inscripciones/:id/contacto', requireTorneoOrganizador, async (req, res) => {
     try {
       const whatsapp = cleanWhatsapp(req.body?.whatsapp);
@@ -700,7 +713,7 @@ module.exports = function createTorneosPrivadosRouter() {
   router.delete('/torneo-organizador/inscripciones/:id', requireTorneoOrganizador, async (req, res) => {
     try {
       await ensureSchema();
-      const result = await pool.query('UPDATE torneo_inscripciones SET baja_at=COALESCE(baja_at,NOW()), updated_at=NOW() WHERE id=$1 AND torneo_organizador_id=$2', [Number(req.params.id), req.user.torneoOrganizadorId]);
+      const result = await pool.query('UPDATE torneo_inscripciones SET baja_at=COALESCE(baja_at,NOW()), en_sala=false, updated_at=NOW() WHERE id=$1 AND torneo_organizador_id=$2', [Number(req.params.id), req.user.torneoOrganizadorId]);
       if (!result.rowCount) return res.status(404).json({ ok: false, error: 'Inscripción no encontrada' });
       res.json({ ok: true });
     } catch (error) {

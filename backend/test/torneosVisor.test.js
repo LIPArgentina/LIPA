@@ -7,7 +7,8 @@ const mount=require('../src/routes/torneosVisor.routes');
 function fixture(){
   const sessions=new Map(),avisos=[],llamados=[];
   const players=Array.from({length:8},(_,i)=>({id:String(i+1),jugador_id:i+101,nombre:'Jugador de prueba '+(i+1),position:i+1,foto_path:'',dni:String(30000000+i)}));
-  const saved={jugadores:players,resultados:{},revision:0,sorteo_revision:1};
+  players.forEach(p=>{p.en_sala=true;p.categoria='primera';});
+  const saved={jugadores:players,resultados:{},revision:0,sorteo_revision:1,categoria:'primera',mesas:{}};
   const draw={visible:true,orden:players.map(p=>p.id),habilitados:players.map(p=>p.id)};
   const result=rows=>({rows});
   const pool={release(){},async connect(){return pool;},async query(sql,args=[]){
@@ -16,6 +17,10 @@ function fixture(){
     if(sql.includes('SELECT s.jugador_id')){const s=sessions.get(args[0]);return result(s?[{...s,nombre:players.find(p=>p.jugador_id===s.jugador_id).nombre}]:[]);}
     if(sql.includes('DELETE FROM torneo_visor_sesiones')){sessions.delete(args[0]);return result([]);}
     if(sql.includes('SELECT id,nombre FROM jugadores'))return result(players.filter(p=>p.dni===args[0]).map(p=>({id:p.jugador_id,nombre:p.nombre})));
+    if(sql.includes('SELECT i.categoria FROM torneo_inscripciones'))return result(players.filter(p=>p.jugador_id===args[1]));
+    if(sql.includes('AND en_sala AND baja_at'))return result(players.filter(p=>p.en_sala));
+    if(sql.includes('SELECT g.categoria,g.sorteo_revision,g.mesas'))return result([saved]);
+    if(sql.startsWith('UPDATE torneo_grillas SET mesas=')){saved.mesas=JSON.parse(args[0]);return result([]);}
     if(sql.includes('SELECT id FROM torneo_organizadores'))return result([{id:1}]);
     if(sql.includes('SELECT g.* FROM torneo_grillas') || sql.includes('SELECT g.sorteo_revision,g.publicada_at FROM torneo_grillas'))return result(args[1]==='primera'?[saved]:[]);
     if(sql.includes('AS habilitados') && sql.includes('g.publicada_at IS NOT NULL') && sql.includes('s.revision=g.sorteo_revision'))return result((args[3] || draw.visible) && args[1]==='primera'?[{...saved,...draw}]:[]);
@@ -93,6 +98,22 @@ else test('DNI session, read-only API, private calls and organizer authorization
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{},login.token)).status,403);
     const match=require('../../frontend/torneos/grilla-engine').build(saved.jugadores,{},'primera').matches.find(m=>m.a&&m.b&&!m.bye);
     const call={matchId:match.id,revision:0,drawRevision:1,mesa:19,piso:'arriba'};
+    assert.equal(login.categoria,'primera');
+    const reserve='torneo-organizador/grilla/primera/mesa',ring='torneo-organizador/grilla/primera/llamar';
+    saved.jugadores[1].en_sala=false;
+    assert.equal((await request(reserve,call,null,true)).status,409);
+    assert.equal((await request(ring,call,null,true)).status,409);
+    assert.equal(avisos.length,0);
+    saved.jugadores[1].en_sala=true;
+    assert.equal((await request(reserve,{...call,piso:'abajo'},null,true)).status,400);
+    const table1={...call,mesa:1};
+    assert.equal((await request(reserve,table1,null,true)).status,200);
+    assert.equal((await request(reserve,{...table1,matchId:'de-w0-1'},null,true)).status,409);
+    assert.equal((await request(ring,{...table1,matchId:'de-w0-1'},null,true)).status,409);
+    assert.equal((await request(reserve,{...table1,matchId:'de-w0-1',piso:'abajo'},null,true)).status,200);
+    assert.equal((await request(reserve,{...table1,mesa:null,piso:null},null,true)).status,200);
+    assert.equal((await request(reserve,call,null,true)).status,200);
+    assert.equal(avisos.length,0);
     draw.visible=false;
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{...call,mesa:20},null,true)).status,400);
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{...call,revision:9},null,true)).status,409);

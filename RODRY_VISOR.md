@@ -2,13 +2,13 @@
 
 El visor comparte la grilla del organizador y los resultados publicados en LIPA.
 
-- `frontend/torneos/torneos.html`: tarjeta permanente en primer lugar, incluso sin otras publicaciones; flyer, DNI y bienvenida.
+- `frontend/torneos/torneos.html`: tarjeta del evento con flyer y DNI. Al ingresar, el jugador abre su categoría de inscripción. Con inscripción doble abre la primera de las dos y puede cambiar de pestaña. Volver a Torneos permite consultar el listado general.
 - `frontend/torneos/visor.html`: consulta de las tres categorías con resultados cada 10 segundos y llamados personales cada 5 segundos. Cerrar sesión está en el contenido de `<main>`, fuera de los encabezados.
 - `frontend/torneos/grilla.html`: mesa 1–19, piso arriba/abajo y botón rojo de llamada entre jugadores; botón WhatsApp debajo de la foto ampliada. WhatsApp abre el chat con texto preparado, sin enviarlo automáticamente.
 - El servidor verifica el DNI en `jugadores`; guarda un token aleatorio con hash SHA-256, vigencia 180 días. El token del visor no concede acceso de organizador. El cierre elimina la sesión y su asociación de push.
 - El visor no expone DNI, teléfonos ni identificadores internos de jugador. Las rutas de llamados y contactos requieren sesión de organizador.
 - Las mesas se vinculan al sorteo, partido y ambos participantes. Si cambia alguno, la asignación anterior no se muestra.
-- Cada columna de la grilla del organizador permite buscar por nombre o apellido. Enter o la flecha lleva a la siguiente coincidencia. En los partidos pendientes se puede preseleccionar mesa y piso mientras la página sigue abierta. La campana indica qué falta y confirma la asignación al enviar el llamado a ambos rivales.
+- Cada columna permite buscar por nombre o apellido. El organizador marca «En sala» en la primera columna de Inscripciones. Ambos rivales deben estar presentes para reservar o llamar. Elegir una mesa la reserva para ese cruce en todas las categorías del organizador. Arriba existen las mesas 1 a 19 y abajo las 1 a 6 y 11 a 15. «Liberar mesa», cambiar de mesa o finalizar el partido devuelve la mesa anterior al menú. La campana envía el aviso a ambos rivales.
 - «Activar sonido» reproduce una muestra. Con el visor abierto, la alarma se repite mientras el jugador tenga llamados pendientes. Tocar cada mensaje lo confirma para ese jugador en todos sus dispositivos. La campana también funciona con la grilla en borrador. En segundo plano, el sonido y la vibración de la notificación dependen del sistema. Tocar la notificación abre el visor y confirma ese llamado.
 
 ## Publicación

@@ -2,6 +2,7 @@ const bracket = require('../../../frontend/torneos/grilla-engine');
 const { photoUrl } = require('../torneoFoto');
 const categories = require('../../../frontend/torneos/categorias');
 const slots = require('../../../frontend/torneos/cupos');
+const mesas = require('../../../frontend/torneos/mesas');
 
 module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requireTorneoOrganizador, getTournamentRanking }) {
   const divisions = Object.keys(bracket.limits);
@@ -86,9 +87,10 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
       const after=bracket.build(saved.jugadores,{...before.clean,[matchId]:{a:match.a,b:match.b,score}},category);
       const cleared=bracket.invalidated(before,after,matchId);
       if(cleared.length && confirmCorrection!==true) throw fail(409,'La corrección borra resultados posteriores afectados. Confirmá para continuar.','CONFIRM_CORRECTION');
+      const remaining=saved.mesas==null?null:JSON.stringify(mesas.active(mesas.active(saved.mesas,before),after));
       const {rows: updated}=await client.query(`UPDATE torneo_grillas SET resultados_anteriores=CASE WHEN EXISTS (SELECT 1 FROM jsonb_object_keys(resultados) AS k(id) WHERE id !~ '^(de-[wl][01]-|mx-k)') THEN resultados_anteriores || resultados ELSE resultados_anteriores END,
-        resultados=$1::jsonb, revision=revision+1,updated_at=NOW()
-        WHERE torneo_organizador_id=$2 AND categoria=$3 RETURNING revision`,[JSON.stringify(after.clean),organizer,category]);
+        resultados=$1::jsonb, revision=revision+1,updated_at=NOW(),mesas=$4::jsonb
+        WHERE torneo_organizador_id=$2 AND categoria=$3 RETURNING revision`,[JSON.stringify(after.clean),organizer,category,remaining]);
       await client.query('COMMIT');
       res.json({results:after.clean,revision:updated[0].revision,cleared});
     } catch(error) {

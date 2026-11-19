@@ -131,7 +131,7 @@
   function renderBody(target, rows, verified) {
     target.innerHTML = '';
     if (!rows.length) {
-      target.innerHTML = '<tr><td class="empty" colspan="8">No hay inscripciones para mostrar.</td></tr>';
+      target.innerHTML = '<tr><td class="empty" colspan="9">No hay inscripciones para mostrar.</td></tr>';
       return;
     }
     const sort=tableSort[target.id];
@@ -147,7 +147,9 @@
         <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp">${whatsappContact(entry.whatsapp)}${verified ? whatsappContact(entry.whatsapp, true) : ''}<button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
         <td>${entry.baja_at ? `<span class="inactive-date" title="Fecha de baja">Baja: ${dateFormatter.format(new Date(entry.baja_at))}</span><button type="button" class="restore-button" data-restore="${entry.id}">Volver a inscribir</button>` : `<button class="delete-button" data-delete="${entry.id}">Dar de baja</button>`}</td>`;
-      [...tr.children].forEach((cell,index)=>cell.dataset.label=['Jugador','Equipo','DNI','Categoría','WhatsApp','Pago','Inscripción','Acciones'][index]);
+      const presence=tr.insertCell(0);
+      presence.innerHTML=`<input class="presence-check" type="checkbox" data-presence="${entry.id}" aria-label="En sala: ${escapeHtml(name)}" ${entry.en_sala?'checked':''}>`;
+      [...tr.children].forEach((cell,index)=>cell.dataset.label=['En sala','Jugador','Equipo','DNI','Categoría','WhatsApp','Pago','Inscripción','Acciones'][index]);
       if(entry.baja_at){
         tr.querySelectorAll('select,input').forEach(control=>control.disabled=true);
         tr.querySelectorAll('[data-save-contact],[data-diffusion]').forEach(control=>control.remove());
@@ -362,6 +364,18 @@
   });
   $('#cancelPending').addEventListener('click', () => { pendingSubmit = null; $('#pendingModal').close(); });
   document.addEventListener('change', async event => {
+    const check=event.target.closest('[data-presence]');
+    if(check){
+      check.disabled=true;
+      try{
+        const saved=await api('/torneo-organizador/inscripciones/'+check.dataset.presence+'/presencia',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enSala:check.checked})});
+        const entry=entries.find(p=>String(p.id)===check.dataset.presence);
+        if(entry)entry.en_sala=saved.en_sala;
+        const current=document.querySelector('[data-presence="'+check.dataset.presence+'"]');if(current)current.checked=saved.en_sala;
+      }catch(error){check.checked=!check.checked;alert(error.message);await load();}
+      finally{check.disabled=false;}
+      return;
+    }
     const category = event.target.closest('.category-select');
     if (category) {
       try {

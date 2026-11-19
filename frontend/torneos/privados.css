@@ -35,37 +35,37 @@ dialog{width:min(460px,calc(100% - 24px));border:1px solid #b98f00;border-radius
 
 /* Compact registrations with team provenance. */
 .team-current{color:var(--green);font-weight:800}.team-history{color:var(--muted)}.payment-select.payment-cash{color:#62adff;font-weight:900}
-.table-wrap table{min-width:0;table-layout:fixed}.table-wrap th,.table-wrap td{padding:8px 5px;overflow-wrap:anywhere}.table-wrap th:nth-child(1){width:18%}.table-wrap th:nth-child(2){width:12%}.table-wrap th:nth-child(3){width:8%}.table-wrap th:nth-child(4){width:13%}.table-wrap th:nth-child(5){width:22%}.table-wrap th:nth-child(6){width:14%}.table-wrap th:nth-child(7){width:8%}.table-wrap th:nth-child(8){width:5%}
+.table-wrap table{min-width:0;table-layout:fixed}.table-wrap th,.table-wrap td{padding:8px 5px;overflow-wrap:anywhere}.table-wrap th:nth-child(2){width:18%}.table-wrap th:nth-child(3){width:12%}.table-wrap th:nth-child(4){width:8%}.table-wrap th:nth-child(5){width:13%}.table-wrap th:nth-child(6){width:22%}.table-wrap th:nth-child(7){width:14%}.table-wrap th:nth-child(8){width:8%}.table-wrap th:nth-child(9){width:5%}
 .player-name-cell{min-width:0;gap:4px}.player-name-cell strong{min-width:0}.category-select{min-width:0;padding:0 4px;font-size:.73rem}.contact-editor{min-width:0;gap:3px;flex-wrap:wrap}.contact-editor input{min-width:0;width:100%;min-height:30px;padding:0 5px;font-size:.76rem}.contact-editor button{padding:5px;font-size:.65rem}.contact-editor .whatsapp-contact{flex-basis:27px;width:27px;height:27px}.contact-editor .whatsapp-contact svg{width:20px;height:20px}.payment-editor{min-width:0;gap:3px;flex-wrap:wrap}.payment-select{min-width:0;padding:0 4px;font-size:.74rem}.table-deposit-amount:has(input:disabled){display:none}.delete-button{padding:6px 3px;font-size:.65rem}#registrationForm fieldset{flex-wrap:wrap}
 @media(max-width:760px){.table-wrap thead{display:none}.table-wrap table,.table-wrap tbody,.table-wrap tr,.table-wrap td{display:block;width:100%}.table-wrap tr{padding:10px;border-bottom:1px solid var(--line)}.table-wrap td{display:grid;grid-template-columns:90px minmax(0,1fr);align-items:center;gap:8px;border:0}.table-wrap td::before{content:attr(data-label);color:var(--gold2);font-size:.7rem;font-weight:800}.table-wrap td.empty{display:block}.table-wrap td.empty::before{content:none}.table-wrap{overflow:visible}.contact-editor input{width:100%}}
 
 /* Smaller typography and denser desktop rows. */
-html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78rem;padding:8px 10px}.private-header{min-height:64px}.private-header h1{font-size:1.5rem}.registration-card h2{font-size:1.45rem}.registration-card,.list-card{padding:14px}.organizer-card{padding:12px 14px}.private-main{width:min(1400px,calc(100% - 32px));margin-top:12px}.filters{padding:9px 12px}.list-heading h2{font-size:1.15rem}.list-heading>strong{font-size:1.8rem}input,select{min-height:34px;padding:0 8px}label,legend{font-size:.76rem}fieldset{min-height:58px;gap:8px;padding:6px 9px}.table-wrap th{font-size:.68rem}.table-wrap td{font-size:.82rem;line-height:1.35;padding:6px 5px}.table-wrap input,.table-wrap select{min-height:30px;font-size:.79rem}.player-name-cell strong{font-weight:700}.photo-icon{width:23px;height:23px;min-width:23px;font-size:12px}.team-current{font-weight:700}.table-wrap td:nth-child(7){font-size:.73rem}.table-wrap .contact-editor button{font-size:.65rem;padding:5px 4px}.table-wrap .contact-editor .whatsapp-contact{width:24px;height:26px;flex-basis:24px}.table-wrap .contact-editor .whatsapp-contact svg{width:18px;height:18px}#editDiffusion{width:23px;height:23px;font-size:16px}#prepareBatch{min-height:32px;font-size:.75rem}.registered-search input{min-height:32px}
-@media(min-width:1000px){.contact-editor{flex-wrap:nowrap}.contact-editor input{width:0;flex:1 1 0}.contact-editor button{flex-shrink:0}.payment-editor{flex-wrap:nowrap}.payment-select{width:0;flex:1 1 0}.table-deposit-amount input{width:46px}.table-wrap th:nth-child(5){width:24%}.table-wrap th:nth-child(6){width:12%}}
+html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78rem;padding:8px 10px}.private-header{min-height:64px}.private-header h1{font-size:1.5rem}.registration-card h2{font-size:1.45rem}.registration-card,.list-card{padding:14px}.organizer-card{padding:12px 14px}.private-main{width:min(1400px,calc(100% - 32px));margin-top:12px}.filters{padding:9px 12px}.list-heading h2{font-size:1.15rem}.list-heading>strong{font-size:1.8rem}input,select{min-height:34px;padding:0 8px}label,legend{font-size:.76rem}fieldset{min-height:58px;gap:8px;padding:6px 9px}.table-wrap th{font-size:.68rem}.table-wrap td{font-size:.82rem;line-height:1.35;padding:6px 5px}.table-wrap input,.table-wrap select{min-height:30px;font-size:.79rem}.player-name-cell strong{font-weight:700}.photo-icon{width:23px;height:23px;min-width:23px;font-size:12px}.team-current{font-weight:700}.table-wrap td:nth-child(8){font-size:.73rem}.table-wrap .contact-editor button{font-size:.65rem;padding:5px 4px}.table-wrap .contact-editor .whatsapp-contact{width:24px;height:26px;flex-basis:24px}.table-wrap .contact-editor .whatsapp-contact svg{width:18px;height:18px}#editDiffusion{width:23px;height:23px;font-size:16px}#prepareBatch{min-height:32px;font-size:.75rem}.registered-search input{min-height:32px}
+@media(min-width:1000px){.contact-editor{flex-wrap:nowrap}.contact-editor input{width:0;flex:1 1 0}.contact-editor button{flex-shrink:0}.payment-editor{flex-wrap:nowrap}.payment-select{width:0;flex:1 1 0}.table-deposit-amount input{width:46px}.table-wrap th:nth-child(6){width:24%}.table-wrap th:nth-child(7){width:12%}}
 @media(max-width:760px){.private-main{width:calc(100% - 16px)}.table-wrap td{padding:6px 3px}.table-wrap input,.table-wrap select{font-size:.9rem}}
 
 @media(min-width:1000px){
-  .table-wrap th:nth-child(1){width:22%}
-  .table-wrap th:nth-child(2){width:15%}
-  .table-wrap th:nth-child(4){width:11%}
-  .table-wrap th:nth-child(5){width:19%}
+  .table-wrap th:nth-child(2){width:22%}
+  .table-wrap th:nth-child(3){width:15%}
+  .table-wrap th:nth-child(5){width:11%}
+  .table-wrap th:nth-child(6){width:19%}
   .category-select{max-width:140px}
   .contact-editor{max-width:252px}
 }
 
 /* Keep desktop editors at content-sized widths instead of stretching. */
 @media(min-width:1000px){
-  .table-wrap th:nth-child(4){width:136px}
-  .table-wrap th:nth-child(5){width:238px}
+  .table-wrap th:nth-child(5){width:136px}
+  .table-wrap th:nth-child(6){width:238px}
   .table-wrap .category-select{width:126px;max-width:100%;font-size:.76rem}
   .table-wrap .contact-editor{width:228px;max-width:100%;gap:3px}
   .table-wrap .contact-editor input{flex:0 1 120px;width:120px;max-width:120px;padding:0 5px}
 }
 
 @media(min-width:1000px){
-  .table-wrap th:nth-child(1){width:20.5%}
-  .table-wrap th:nth-child(2){width:14%}
-  .table-wrap th:nth-child(6){width:14.5%}
+  .table-wrap th:nth-child(2){width:20.5%}
+  .table-wrap th:nth-child(3){width:14%}
+  .table-wrap th:nth-child(7){width:14.5%}
   .table-wrap .table-deposit-amount{flex:0 0 auto}
   .table-wrap .table-deposit-amount input{width:64px;min-width:64px;padding:0 5px}
 }
@@ -78,3 +78,5 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
 .restore-button{display:block;width:100%;padding:5px 2px;margin-top:5px;font-size:.65rem;white-space:normal;overflow-wrap:normal}
 
 .payment-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.payment-heading #paymentSum{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--gold,#ffc400)}.payment-sum-note{font-size:11px;color:#d8bd79;margin:8px 0 0}
+
+.table-wrap th:first-child{width:48px}.table-wrap .presence-check{width:20px;height:20px;min-height:20px;margin:0;accent-color:#ffca40;cursor:pointer}

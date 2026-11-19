@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const bracket = require('../../../frontend/torneos/grilla-engine');
 const categories = require('../../../frontend/torneos/categorias');
 const slots = require('../../../frontend/torneos/cupos');
+const mesas = require('../../../frontend/torneos/mesas');
 const firebase = require('../../firebase');
 const webApp = require('../torneoFirebaseWeb.json');
 const { photoUrl } = require('../torneoFoto');
@@ -34,6 +35,10 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
         ADD COLUMN IF NOT EXISTS confirmado_at TIMESTAMPTZ;
       CREATE INDEX IF NOT EXISTS torneo_avisos_llamado_idx ON torneo_avisos(llamado_id);
       CREATE INDEX IF NOT EXISTS torneo_llamados_grilla_idx ON torneo_llamados(organizador_id,categoria,sorteo_revision,id DESC);
+      UPDATE torneo_grillas g SET mesas=COALESCE((SELECT jsonb_object_agg(m.match_id,jsonb_build_object('a',m.a,'b',m.b,'piso',m.piso,'mesa',m.mesa))
+        FROM (SELECT DISTINCT ON(match_id) match_id,a,b,piso,mesa FROM torneo_llamados
+          WHERE organizador_id=g.torneo_organizador_id AND categoria=g.categoria AND sorteo_revision=g.sorteo_revision
+          ORDER BY match_id,id DESC) m),'{}'::jsonb) WHERE g.mesas IS NULL;
     `).catch(error => { ready = null; throw error; });
     return ready;
   }
@@ -84,6 +89,25 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       return [match.match_id,{...match,receipts}];
     }));
   }
+  async function playerDivision(playerId){
+    const {rows}=await pool.query(`SELECT i.categoria FROM torneo_inscripciones i JOIN jugadores j ON j.id=$2
+      WHERE i.torneo_organizador_id=$1 AND i.baja_at IS NULL AND (i.jugador_id=j.id OR
+        (i.jugador_id IS NULL AND regexp_replace(i.dni,'[^0-9]','','g')=regexp_replace(j.dni::text,'[^0-9]','','g')))
+      ORDER BY (i.jugador_id IS NOT NULL) DESC,i.id LIMIT 1`,[await organizer(),playerId]);
+    return Object.keys(bracket.limits).find(category=>categories.includes(rows[0]?.categoria,category)) || null;
+  }
+  async function presentPlayers(id,category){
+    const {rows}=await pool.query(`SELECT id::text FROM torneo_inscripciones WHERE torneo_organizador_id=$1
+      AND en_sala AND baja_at IS NULL AND categoria=ANY($2::text[])`,[id,categories.valuesFor(category)]);
+    return rows.map(p=>p.id);
+  }
+  async function occupiedTables(db,id){
+    const {rows}=await db.query(`SELECT g.categoria,g.sorteo_revision,g.mesas,g.jugadores,g.resultados
+      FROM torneo_grillas g JOIN torneo_sorteos s USING (torneo_organizador_id,categoria)
+      WHERE g.torneo_organizador_id=$1 AND g.sorteo_revision=s.revision AND g.mesas<>'{}'::jsonb`,[id]);
+    return rows.flatMap(g=>Object.entries(mesas.active(g.mesas,bracket.build(g.jugadores,g.resultados,g.categoria)))
+      .map(([matchId,location])=>({...location,category:g.categoria,drawRevision:g.sorteo_revision,matchId})));
+  }
   router.post('/torneo-visor/login', rateLimit({windowMs:15*60*1000,limit:300,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'Demasiados intentos. Esperá unos minutos.'}}), route(async(req,res)=>{
     const raw = String(req.body?.dni || '').trim();
     if (!/^[\d.\s-]{6,16}$/.test(raw)) throw fail(400,'Ingresá un DNI válido.');
@@ -94,9 +118,9 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     if (rows.length>1) throw fail(409,'Este DNI tiene registros duplicados. Contactá a la Comisión.');
     const token = crypto.randomBytes(32).toString('hex');
     await pool.query(`INSERT INTO torneo_visor_sesiones(token_hash,jugador_id,expires_at,installation_id) VALUES($1,$2,NOW()+INTERVAL '180 days',$3)`,[hash(token),rows[0].id,String(req.body?.installationId || '').slice(0,160)]);
-    res.json({token,nombre:rows[0].nombre});
+    res.json({token,nombre:rows[0].nombre,categoria:await playerDivision(rows[0].id)});
   }));
-  router.get('/torneo-visor/session',route(async(req,res)=>{const user=await session(req);res.json({nombre:user.nombre});}));
+  router.get('/torneo-visor/session',route(async(req,res)=>{const user=await session(req);res.json({nombre:user.nombre,categoria:await playerDivision(user.jugador_id)});}));
   router.post('/torneo-visor/logout',route(async(req,res)=>{const user=await session(req);await pool.query('DELETE FROM torneo_visor_sesiones WHERE token_hash=$1',[user.tokenHash]);res.json({ok:true});}));
   async function currentGrid(id,category,db,includeDraft=false) {
     if (!validCategory(category)) throw fail(400,'Categoría inválida.');
@@ -123,7 +147,11 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const players=saved.jugadores.map(player=>({
       id:player.id,nombre:player.nombre,position:player.position,ranking:player.ranking,wo:player.wo,fotoUrl:photoUrl(player)
     }));
-    res.json({players,results:bracket.build(players,saved.resultados,category).clean,revision:saved.revision,drawRevision:saved.sorteo_revision,assignments:await assignments(id,category,saved.sorteo_revision)});
+    const state=bracket.build(players,saved.resultados,category);
+    const registered=new Set(players.map(p=>p.id)),reservations=mesas.active(saved.mesas,state);
+    const present=(await presentPlayers(id,category)).filter(entrant=>registered.has(entrant));
+    res.json({players,results:state.clean,revision:saved.revision,drawRevision:saved.sorteo_revision,present,
+      assignments:{...await assignments(id,category,saved.sorteo_revision),...reservations},reservations});
   }));
   router.get('/torneo-visor/avisos',route(async(req,res)=>{
     const user=await session(req), after=String(req.query.after || '0');
@@ -172,7 +200,8 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       WHERE g.torneo_organizador_id=$1 AND g.categoria=$2`,[id,category]);
     if(!saved)throw fail(404,'No hay grilla para esta categoría.');
     res.locals.lecturaVisor=true;
-    res.json({canPublish:id===await organizer(),published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,assignments:await organizerAssignments(id,category,saved.sorteo_revision)});
+    const [owner,locations,present,occupied]=await Promise.all([organizer(),organizerAssignments(id,category,saved.sorteo_revision),presentPlayers(id,category),occupiedTables(pool,id)]);
+    res.json({canPublish:id===owner,published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,assignments:locations,present,occupied});
   }));
   router.post('/torneo-organizador/grilla/:categoria/publicar',requireTorneoOrganizador,route(async(req,res)=>{
     const id=req.user.torneoOrganizadorId, category=req.params.categoria;
@@ -192,30 +221,61 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
     res.json({published:true});
   }));
-  async function matchContext(req, allowFinished=false) {
-    const category=req.params.categoria, saved=await readGrid(req.user.torneoOrganizadorId,category);
+  async function matchContext(req, allowFinished=false, db=pool) {
+    const category=req.params.categoria, saved=await readGrid(req.user.torneoOrganizadorId,category,db);
     if (req.body.drawRevision!==saved.sorteo_revision || req.body.revision!==saved.revision) throw fail(409,'La grilla cambió. Recargá antes de llamar.');
     const match=bracket.build(saved.jugadores,saved.resultados,category).matches.find(m=>m.id===req.body.matchId);
     if (!match?.a || !match?.b || match.bye || (!allowFinished && match.winner)) throw fail(400,'El partido debe tener ambos jugadores y estar pendiente.');
-    const {rows}=await pool.query(`SELECT i.id::text AS id,i.nombre_oficial AS nombre,i.whatsapp,COALESCE(i.jugador_id,j.id) AS jugador_id FROM torneo_inscripciones i LEFT JOIN jugadores j ON regexp_replace(j.dni::text,'[^0-9]','','g')=regexp_replace(i.dni,'[^0-9]','','g') WHERE i.torneo_organizador_id=$1 AND i.id::text=ANY($2::text[]) AND i.baja_at IS NULL`,[req.user.torneoOrganizadorId,[match.a,match.b]]);
+    const {rows}=await db.query(`SELECT i.id::text AS id,i.en_sala,i.nombre_oficial AS nombre,i.whatsapp,COALESCE(i.jugador_id,j.id) AS jugador_id FROM torneo_inscripciones i LEFT JOIN jugadores j ON i.jugador_id IS NULL AND regexp_replace(j.dni::text,'[^0-9]','','g')=regexp_replace(i.dni,'[^0-9]','','g') WHERE i.torneo_organizador_id=$1 AND i.id::text=ANY($2::text[]) AND i.baja_at IS NULL ${allowFinished?'':'FOR SHARE OF i'}`,[req.user.torneoOrganizadorId,[match.a,match.b]]);
     const a=rows.find(p=>p.id===match.a), b=rows.find(p=>p.id===match.b);
     if (!a || !b) throw fail(409,'Cambiaron los participantes. Recargá la grilla.');
     return {saved,match,a,b};
   }
-  router.post('/torneo-organizador/grilla/:categoria/llamar',requireTorneoOrganizador,route(async(req,res)=>{
+  async function reserve(req,client,calling){
     const {mesa,piso}=req.body || {};
-    if (!Number.isInteger(mesa) || mesa<1 || mesa>19 || !['arriba','abajo'].includes(piso)) throw fail(400,'Elegí una mesa del 1 al 19 y el piso.');
-    const {saved,match,a,b}=await matchContext(req);
-    if (!a.jugador_id || !b.jugador_id || a.jugador_id===b.jugador_id) throw fail(409,'Revisá la vinculación de ambos jugadores antes de llamarlos.');
-    const mensaje=`Llamado a mesa · ${req.params.categoria.toUpperCase()}\n${a.nombre} vs. ${b.nombre}\nMesa ${mesa} · Piso ${piso}. Presentate para jugar.`;
+    const release=!calling && mesa===null && piso===null;
+    if(!release && !mesas.valid(mesa,piso))throw fail(400,'Elegí una mesa disponible en ese piso.');
+    const id=req.user.torneoOrganizadorId,category=req.params.categoria;
+    await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[id]);
+    const context=await matchContext(req,false,client);
+    const {saved,match,a,b}=context;
+    const old=saved.mesas?.[match.id];
+    const previous=old?.a===match.a && old.b===match.b?old:null;
+    const key=previous?previous.piso+'-'+previous.mesa:'';
+    const selected=release?'':piso+'-'+mesa;
+    if(req.body.previous!==undefined && req.body.previous!==key && selected!==key)throw fail(409,'La mesa de este partido cambió. Volvé a elegirla.');
+    if(!release){
+      const missing=[a,b].filter(p=>!p.en_sala);
+      if(missing.length)throw fail(409,'Falta marcar en sala a '+missing.map(p=>p.nombre).join(' y ')+'.');
+      const occupied=await occupiedTables(client,id);
+      if(occupied.some(t=>t.mesa===mesa && t.piso===piso && (t.category!==category || t.matchId!==match.id)))throw fail(409,'Esa mesa ya está asignada a otro partido.');
+      if(calling && ((req.body.requireReservation || previous) && key!==selected))throw fail(409,'La mesa de este partido cambió. Revisá la asignación antes de llamar.');
+    }
+    if(key!==selected){
+      const locations={...saved.mesas};
+      if(release)delete locations[match.id];else locations[match.id]={mesa,piso,a:match.a,b:match.b};
+      await client.query('UPDATE torneo_grillas SET mesas=$1::jsonb WHERE torneo_organizador_id=$2 AND categoria=$3',[JSON.stringify(locations),id,category]);
+    }
+    return context;
+  }
+  router.post('/torneo-organizador/grilla/:categoria/mesa',requireTorneoOrganizador,route(async(req,res)=>{
     const client=await pool.connect();
-    const destinations=new Map([[a.jugador_id,crypto.randomUUID()],[b.jugador_id,crypto.randomUUID()]]);
-    let callId;
+    try{
+      await client.query('BEGIN');await reserve(req,client,false);
+      const occupied=await occupiedTables(client,req.user.torneoOrganizadorId);
+      await client.query('COMMIT');res.json({occupied});
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+  }));
+  router.post('/torneo-organizador/grilla/:categoria/llamar',requireTorneoOrganizador,route(async(req,res)=>{
+    const {mesa,piso}=req.body || {},client=await pool.connect(),destinations=new Map();
+    let callId,mensaje,match;
     try {
       await client.query('BEGIN');
-      await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[req.user.torneoOrganizadorId]);
-      const current=await readGrid(req.user.torneoOrganizadorId,req.params.categoria,client);
-      if(current.revision!==saved.revision || current.sorteo_revision!==saved.sorteo_revision) throw fail(409,'La grilla cambió. Recargá antes de llamar.');
+      const context=await reserve(req,client,true);
+      const {saved,a,b}=context;match=context.match;
+      if (!a.jugador_id || !b.jugador_id || a.jugador_id===b.jugador_id) throw fail(409,'Revisá la vinculación de ambos jugadores antes de llamarlos.');
+      for(const player of [a,b])destinations.set(player.jugador_id,crypto.randomUUID());
+      mensaje=`Llamado a mesa · ${req.params.categoria.toUpperCase()}\n${a.nombre} vs. ${b.nombre}\nMesa ${mesa} · Piso ${piso}. Presentate para jugar.`;
       const {rows}=await client.query(`INSERT INTO torneo_llamados(organizador_id,categoria,sorteo_revision,match_id,a,b,mesa,piso,mensaje) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,[req.user.torneoOrganizadorId,req.params.categoria,saved.sorteo_revision,match.id,match.a,match.b,mesa,piso,mensaje]);
       callId=String(rows[0].id);
       for (const player of [a,b]) await client.query('INSERT INTO torneo_avisos(llamado_id,jugador_id,mensaje,clave_pendiente,inscripcion_id) VALUES($1,$2,$3,$4,$5)',[callId,player.jugador_id,mensaje,destinations.get(player.jugador_id),player.id]);
