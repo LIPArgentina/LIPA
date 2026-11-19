@@ -1,5 +1,14 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.LipaBracketLayout=api;})(typeof globalThis==='object'?globalThis:this,function(){
  function build(rounds,dual){
+  if(rounds[0]?.[0]?.id.startsWith('de-w') && rounds.at(-1).length>1){
+    const positions=new Map(),depth=rounds.length-1,height=Math.max(420,(rounds[0].length/(dual?2:1))*120+100);
+    rounds.forEach((round,r)=>round.forEach((m,i)=>{
+      const right=dual&&i>=round.length/2,local=right?i-round.length/2:i;
+      const center=r?(positions.get(m.sources[0].matchId).center+positions.get(m.sources[1].matchId).center)/2:104+local*120;
+      positions.set(m.id,{x:(right?2*depth+1-r:r)*234,y:center-44,center,width:206});
+    }));
+    return {positions,width:(dual?2*rounds.length:rounds.length)*234+224,height};
+  }
   if(rounds[0]?.[0]?.id.startsWith('de-l')){
     const positions=new Map(),height=Math.max(420,Math.max(...rounds.map(r=>r.length))*120+100);
     rounds.forEach((round,r)=>round.forEach((m,i)=>{const center=60+(i+.5)*(height-100)/round.length;positions.set(m.id,{x:r*234,y:center-44,center,width:206});}));

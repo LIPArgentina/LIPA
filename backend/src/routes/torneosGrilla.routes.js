@@ -53,7 +53,7 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
       }));
       await client.query('COMMIT');
       res.set('Cache-Control','no-store');
-      res.json({players, results:bracket.build(players,saved.resultados,category).clean, legacyResults:Object.keys(saved.resultados||{}).some(id=>!id.startsWith('de-')), revision:saved.revision, drawRevision:saved.sorteo_revision});
+      res.json({players, results:bracket.build(players,saved.resultados,category).clean, legacyResults:Object.keys(saved.resultados||{}).some(id=>! /^(de-[wl][01]-|mx-k)/.test(id)), revision:saved.revision, drawRevision:saved.sorteo_revision});
     } catch(error) {
       if(client) await client.query('ROLLBACK').catch(()=>{});
       if(!error.status) console.error('GET torneo grilla',error);
@@ -81,7 +81,7 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
       const after=bracket.build(saved.jugadores,{...before.clean,[matchId]:{a:match.a,b:match.b,score}},category);
       const cleared=bracket.invalidated(before,after,matchId);
       if(cleared.length && confirmCorrection!==true) throw fail(409,'La corrección borra resultados posteriores afectados. Confirmá para continuar.','CONFIRM_CORRECTION');
-      const {rows: updated}=await client.query(`UPDATE torneo_grillas SET resultados_anteriores=CASE WHEN EXISTS (SELECT 1 FROM jsonb_object_keys(resultados) AS k(id) WHERE id NOT LIKE 'de-%') THEN resultados_anteriores || resultados ELSE resultados_anteriores END,
+      const {rows: updated}=await client.query(`UPDATE torneo_grillas SET resultados_anteriores=CASE WHEN EXISTS (SELECT 1 FROM jsonb_object_keys(resultados) AS k(id) WHERE id !~ '^(de-[wl][01]-|mx-k)') THEN resultados_anteriores || resultados ELSE resultados_anteriores END,
         resultados=$1::jsonb, revision=revision+1,updated_at=NOW()
         WHERE torneo_organizador_id=$2 AND categoria=$3 RETURNING revision`,[JSON.stringify(after.clean),organizer,category]);
       await client.query('COMMIT');

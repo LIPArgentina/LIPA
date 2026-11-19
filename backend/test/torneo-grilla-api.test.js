@@ -54,3 +54,13 @@ test('GET restores WO and PATCH blocks scoring an automatic advance',async()=>{
 });
 
 test('old scores are excluded from new bracket and archived on first save',async()=>{const h=harness();h.stored.resultados={'p-0':{a:'1',b:'2',score:[5,0]}};const get=await h.request('get');assert.equal(get.data.legacyResults,true);assert.deepEqual(get.data.results,{});assert(h.stored.resultados['p-0']);const patch=await h.request('patch',{matchId:'de-w0-0',score:[5,0],revision:0,drawRevision:1});assert.equal(patch.status,200);assert(h.calls.some(sql=>sql.includes('resultados_anteriores || resultados')));});
+
+test('mixed format keeps early scores, excludes old later rounds and saves knockout results',async()=>{
+ const h=harness(30);let state=engine.build(h.stored.jugadores);
+ while(!state.knockout[0].every(m=>m.a&&m.b||m.bye)){
+ const m=state.matches.find(m=>m.id.startsWith('de-')&&m.a&&m.b&&!m.resolved);assert(m);state=engine.build(h.stored.jugadores,{...state.clean,[m.id]:{a:m.a,b:m.b,score:[5,0]}});
+ }
+ h.stored.resultados={...state.clean,'de-final':{a:'1',b:'2',score:[5,0]},'de-w2-0':{a:'1',b:'9',score:[5,0]}};
+ const get=await h.request('get');assert(get.data.legacyResults);assert(get.data.results['de-w0-0']);assert(!get.data.results['de-final']);assert(!get.data.results['de-w2-0']);
+ const m=state.knockout[0].find(m=>m.a&&m.b);const result=await h.request('patch',{matchId:m.id,score:[5,0],revision:0,drawRevision:1});assert.equal(result.status,200);assert(result.data.results[m.id]);assert(h.calls.some(sql=>sql.includes("id !~ '^(de-[wl][01]-|mx-k)'")));
+});

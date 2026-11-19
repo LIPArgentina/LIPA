@@ -15,6 +15,6 @@ test('Tercera completes every roster size from 2 to 60 without a WO score',()=>{
  for(let n=2;n<=60;n++){
   const players=slots.fill(roster(n),'tercera');let s=engine.build(players,{},'tercera'),steps=0;
   while(!s.champion){const m=s.matches.find(m=>m.a&&m.b&&!m.resolved);assert(m,`Blocked with ${n}`);assert.notEqual(m.a,m.b);s=play(s,players,m);assert(++steps<=2*n-2);}
-  assert.equal(steps,2*n-2);assert(s.final.winner);
+  assert.equal(steps,s.matches.filter(m=>m.a&&m.b).length);assert(s.final.winner);
  }
 });

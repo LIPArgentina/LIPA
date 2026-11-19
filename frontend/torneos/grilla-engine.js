@@ -36,20 +36,18 @@
       const m=match(id,a.id,b.id,a.ready,b.ready);m.sources=[a,b];m.label=label;return m;
     }
     const main=[Array.from({length:size/2},(_,i)=>linked('de-w0-'+i,seed(i*2),seed(i*2+1),'Ganadores · Ronda 1 · Partido '+(i+1)))];
-    for(let r=1;main[r-1].length>1;r++)main.push(Array.from({length:main[r-1].length/2},(_,i)=>linked('de-w'+r+'-'+i,source(main[r-1][i*2]),source(main[r-1][i*2+1]),'Ganadores · Ronda '+(r+1)+' · Partido '+(i+1))));
+    if(size>2)main.push(Array.from({length:size/4},(_,i)=>linked('de-w1-'+i,source(main[0][i*2]),source(main[0][i*2+1]),'Ganadores · Ronda 2 · Partido '+(i+1))));
     const rep=[];
     if(size>2){
       rep.push(Array.from({length:size/4},(_,i)=>linked('de-l0-'+i,source(main[0][i*2],'loser'),source(main[0][i*2+1],'loser'),'Perdedores · Ronda 1 · Partido '+(i+1))));
-      for(let w=1;w<main.length;w++){
-        const previous=rep.at(-1),r=rep.length;
-        // Cross opposite neighbouring branches to avoid an immediate rematch.
-        rep.push(previous.map((m,i)=>linked('de-l'+r+'-'+i,source(m),source(main[w][previous.length>1?(i^1):i],'loser'),'Perdedores · Ronda '+(r+1)+' · Partido '+(i+1))));
-        if(w<main.length-1){const previous=rep.at(-1),r=rep.length;rep.push(Array.from({length:previous.length/2},(_,i)=>linked('de-l'+r+'-'+i,source(previous[i*2]),source(previous[i*2+1]),'Perdedores · Ronda '+(r+1)+' · Partido '+(i+1))));}
-      }
+      rep.push(rep[0].map((m,i)=>linked('de-l1-'+i,source(m),source(main[1][rep[0].length>1?(i^1):i],'loser'),'Perdedores · Ronda 2 · Partido '+(i+1))));
     }
-    const upper=main.at(-1)[0],lower=rep.length?source(rep.at(-1)[0]):source(upper,'loser');
-    const final=linked('de-final',source(upper),lower,'Gran final · Partido único');
-    return {format:'double-elimination-v1',main,rep,final,matches,clean,capacity,bracketSize:size,champion:final.winner};
+    const qualifiers=main.at(-1),count=qualifiers.length;
+    // Pair undefeated players with recovered players from distant draw branches.
+    const knockout=[qualifiers.map((m,i)=>linked('mx-k0-'+i,source(m),rep.length?source(rep[1][count>=4?(i+count/2)%count:i]):source(m,'loser'),'Eliminación directa · Ronda 1 · Partido '+(i+1)))];
+    for(let r=1;knockout[r-1].length>1;r++)knockout.push(Array.from({length:knockout[r-1].length/2},(_,i)=>linked('mx-k'+r+'-'+i,source(knockout[r-1][i*2]),source(knockout[r-1][i*2+1]),'Eliminación directa · Ronda '+(r+1)+' · Partido '+(i+1))));
+    const final=knockout.at(-1)[0];final.label='Final · Partido único';
+    return {format:'mixed-two-rounds-v1',main,rep,knockout,final,matches,clean,capacity,bracketSize:size,champion:final.winner};
   }
 
   function invalidated(before, after, editedId) {

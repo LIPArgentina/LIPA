@@ -46,7 +46,7 @@ test('every roster size 2..30 completes without scoring WO or duplicate octavos'
    assert(!match.bye);assert.notEqual(match.a,match.b);s=enter(s,players,match.id,[bracket.limits[category],0],category);
    assert(++games<=2*n-2);
   }
-  assert(s.champion);assert(s.main[0].every(m=>m.resolved));assert.equal(games,2*n-2);
+  assert(s.champion);assert(s.main[0].every(m=>m.resolved));assert.equal(games,s.matches.filter(m=>m.a&&m.b).length);
   assert(s.rep.flat().every(m=>!m.a||roster(n).some(p=>p.id===m.a)));
   const octavos=s.main[1].flatMap(m=>[m.a,m.b]).filter(Boolean);assert.equal(new Set(octavos).size,octavos.length);
   assert.equal(bracket.build(players,JSON.parse(JSON.stringify(s.clean)),category).champion,s.champion);

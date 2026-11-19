@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');const eng
 test('variable brackets have bounded non-overlapping positions and connected feeder centres',()=>{
  for(const n of [2,30,60,62,64,66,90,128,180])for(const category of ['primera','segunda','tercera']){
  const players=Array.from({length:n},(_,i)=>({id:String(i+1)}));const state=engine.build(players,{},category);
- for(const rounds of [state.main,state.rep])for(const dual of [false,true]){
+ for(const rounds of [state.main,state.rep,state.knockout])for(const dual of [false,true]){
  if(!rounds.length)continue;const result=layout.build(rounds,dual),pos=[...result.positions.values()];
  for(const p of pos){assert(Number.isFinite(p.x)&&Number.isFinite(p.y));assert(p.y>=0);assert(p.x+p.width<=result.width);assert(p.y+112<result.height);}
  for(let i=0;i<pos.length;i++)for(let j=i+1;j<pos.length;j++)if(pos[i].x===pos[j].x)assert(Math.abs(pos[i].center-pos[j].center)>=100);

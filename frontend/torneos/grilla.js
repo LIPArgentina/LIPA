@@ -25,8 +25,8 @@
   function matchLabel(match) {return match.label||match.id;}
   function sourceLabel(source){
     if(!source?.matchId)return 'Por definir';
-    const parts=source.matchId.match(/^de-([wl])(\d+)-(\d+)$/);
-    const code=parts?(parts[1]==='w'?'G':'P')+(Number(parts[2])+1)+'-'+(Number(parts[3])+1):'Final';
+    const parts=source.matchId.match(/^(?:de|mx)-([wlk])(\d+)-(\d+)$/);
+    const code=parts?(parts[1]==='w'?'G':parts[1]==='l'?'P':'E')+(Number(parts[2])+1)+'-'+(Number(parts[3])+1):'Final';
     return (source.outcome==='loser'?'Pierde ':'Gana ')+code;
   }
   function photo(player) {
@@ -86,25 +86,27 @@
     node.style.cssText=`left:${pos.x}px;top:${pos.y}px;width:${pos.width}px`;
     node.dataset.matchId=match.id;
     const label=document.createElement('p');label.className='match-label';
-    label.textContent=match.bye?'PASE AUTOMÁTICO · WO':match.id==='de-final'?'GRAN FINAL':match.label.replace('Ganadores · Ronda ','G').replace('Perdedores · Ronda ','P').replace(' · Partido ',' · Partido ');
+    label.textContent=match.bye?'PASE AUTOMÁTICO · WO':match.id===state.final.id?'GRAN FINAL':match.label.replace('Ganadores · Ronda ','G').replace('Perdedores · Ronda ','P').replace('Eliminación directa · Ronda ','E');
     node.title=match.label+' — '+match.sources.map(sourceLabel).join(' / ');
     node.append(label,playerRow(match.a,match,0,players),playerRow(match.b,match,1,players));
     board.append(node);
   }
   function renderBoard(rounds, boardId, frameId, repechage=false) {
     const board=$(boardId),frame=$(frameId);board.replaceChildren();
-    const W=206,G=28,TOP=45,depth=rounds.length-1,dual=view==='double'&&!repechage&&boardId!=='#finalBoard';
+    const W=206,G=28,TOP=45,depth=rounds.length-1,dual=view==='double'&&!repechage;
     const {positions,width,height}=window.LipaBracketLayout.build(rounds,dual);
     const players=new Map(data.players.map(p=>[String(p.id),p]));
     const titles=rounds.map((round,index)=>{
-      if(boardId==='#finalBoard')return 'Gran final · Sin revancha';
-      if(repechage)return index===rounds.length-1?'Final de perdedores':'Perdedores · Ronda '+(index+1);
+      if(boardId==='#mainBoard')return 'Ganadores · Ronda '+(index+1);
+      if(boardId==='#finalBoard')return round.length===1?'Final':round.length===2?'Semifinales':round.length===4?'Cuartos':round.length===8?'Octavos':round.length===16?'32 clasificados':'Eliminación directa · Ronda '+(index+1);
+      if(repechage)return 'Repechaje · Ronda '+(index+1);
       return index===0?'Primera ronda':round.length===1?'Final':round.length===2?'Semifinal':round.length===4?'Cuartos':round.length===8?'Octavos':'Ronda '+(index+1);
     });
     function title(text,x) {const el=document.createElement('div');el.className='round-title';el.style.cssText=`left:${x}px;width:${W}px`;el.textContent=text.toUpperCase();board.append(el);}
     rounds.forEach((round,r)=>{
       title((titles[r] || 'Ronda '+(r+1)),r*(W+G));
-      if(dual && r<depth)title(titles[r],(depth*2-r)*(W+G));
+      if(dual && boardId==='#mainBoard' && rounds.at(-1).length>1)title(titles[r],(depth*2+1-r)*(W+G));
+      else if(dual && r<depth)title(titles[r],(depth*2-r)*(W+G));
     });
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('connectors');svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('aria-hidden','true');
     rounds.forEach(round=>round.forEach(match=>{
@@ -136,7 +138,7 @@
     dimensions.forEach(({board,frame,width,height})=>{board.style.width=`${width}px`;board.style.height=`${height}px`;board.style.transform=`scale(${zoom})`;frame.style.width=`${width*zoom}px`;frame.style.height=`${height*zoom}px`;});
     $('#zoom').value=Math.round(zoom*100);$('#zoomValue').textContent=`${Math.round(zoom*100)}%`;
   }
-  function fit() { if(!dimensions.length)return; const width=$('#mainFrame').parentElement.clientWidth-24;zoom=Math.max(.35,Math.min(1,width/dimensions[0].width));if(innerWidth<760)zoom=.85;applyZoom(); }
+  function fit() { if(!dimensions.length)return; const width=$('#mainFrame').parentElement.clientWidth-24;zoom=Math.max(.35,Math.min(1,width/Math.max(...dimensions.map(d=>d.width))));if(innerWidth<760)zoom=.85;applyZoom(); }
   function render() {
     if(!data || !state)return;
     dimensions.length=0;
@@ -145,11 +147,12 @@
     renderBoard(state.main,'#mainBoard','#mainFrame');
     $('#repSection').hidden=!state.rep.length;
     if(state.rep.length)renderBoard(state.rep,'#repBoard','#repFrame',true);
-    renderBoard([[state.final]],'#finalBoard','#finalFrame');
-    $('#byeNote').textContent='La primera derrota lleva a esta llave. La segunda derrota elimina. Los WO avanzan sin sumar derrotas.';
+    renderBoard(state.knockout,'#finalBoard','#finalFrame');
+    $('#byeNote').textContent='Segunda oportunidad para quienes pierden en las primeras dos rondas. Sus ganadores se unen a los invictos en la eliminación directa. Los WO dan pase automático.';
     const realCount=data.players.filter(p=>p.id!==null).length;
     $('#mainSection .badge').textContent=`${realCount} jugadores · ${state.bracketSize-realCount} pases automáticos`;
-    $('#repSection .badge').textContent='El ganador pasa a la gran final';
+    $('#repSection .badge').textContent=state.rep.length?state.rep.at(-1).length+' lugares en eliminación directa':'';
+    $('#finalSection .badge').textContent=state.knockout[0].length*2+' lugares · Una derrota elimina';
     applyZoom();
   }
   function confirmCorrection() {
@@ -186,7 +189,7 @@
     try {
       const response=await api('GET');if(request!==requestId)return;
       data=response;state=engine.build(data.players,data.results,category);
-      $('#mainSection').hidden=false;$('#repSection').hidden=false;$('#finalSection').hidden=false;status(data.legacyResults?'Formato actualizado: los resultados anteriores se conservan separados; cargá los nuevos cruces.':'Resultados guardados automáticamente.');render();fit();
+      $('#mainSection').hidden=false;$('#repSection').hidden=false;$('#finalSection').hidden=false;status(data.legacyResults?'Formato actualizado: se conservan las primeras dos rondas compatibles; los resultados de las etapas reemplazadas quedan archivados.':'Resultados guardados automáticamente.');render();fit();
     } catch(error) {
       if(request!==requestId)return;status('No se pudo abrir esta categoría.',true);
       const box=$('#emptyState');box.replaceChildren();const p=document.createElement('p');p.textContent=error.message;const a=document.createElement('a');a.href='./sorteo.html';a.textContent='Ir al sorteo';box.append(p,a);box.hidden=false;$('#reload').hidden=false;
