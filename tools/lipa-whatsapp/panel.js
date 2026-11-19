@@ -94,6 +94,7 @@ $('start').addEventListener('click',async()=>{
       const armed=await step(contact,'send');
       if(!armed.armed)throw Error(armed.error||'No se pudo preparar el envío.');
       await browserControl.click(workTab,armed.target,()=>stopping);
+      $('status').textContent='Comprobando el mensaje de '+contact.name+'…';
       const result=await step(contact,'confirm');
       if(!result.sent)throw Error(result.error||'No se pudo confirmar el envío.');
       contact.status='sent';history[contact.key].status='sent';await persist();render();

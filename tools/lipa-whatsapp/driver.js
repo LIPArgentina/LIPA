@@ -166,7 +166,23 @@ async function lipaWhatsAppStep(expected, action) {
     const main=document.querySelector('#main');
     if(main!==armed.main||!(rightPhone(main)||remembered(main)||expected.media&&mediaProof()))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
     const added=[...main.querySelectorAll('[data-id]')].filter(el=>!armed.ids.has(el.dataset.id)&&(el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id.startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"]')));
-    if(added.some(el=>[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[normalize(expected.message),renderedMessage].includes(text(part)))&&(!expected.media||(expected.media.type.startsWith('video/')?el.querySelector('video,[data-icon="video-play"],[data-icon="media-play"],[data-icon="play"]'):el.querySelector('img[src^="blob:"]')))&&!el.querySelector('[role="progressbar"],[data-icon="msg-error"]'))){if(action!=='audit')delete globalThis.__lipaArmed;return {sent:true,clicked:true};}
+    const compact=value=>normalize(value).replace(/\s+/g,' ');
+    const expectedTexts=[expected.message,renderedMessage].map(compact);
+    for(const el of added){
+      // WhatsApp may collapse a long caption. Expand only a read-more control
+      // inside this newly observed outgoing message, never another chat control.
+      armed.expanded ||= new WeakSet();
+      for(const button of el.querySelectorAll('button,[role="button"]')){
+        if(/^(Leer m[aá]s|Ver m[aá]s|Read more|See more)$/i.test(normalize(button.textContent))&&!armed.expanded.has(button)){
+          armed.expanded.add(button);button.click();
+        }
+      }
+      const caption=[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[text(part),part.innerText].filter(v=>typeof v==='string').some(value=>expectedTexts.includes(compact(value))));
+      const media=!expected.media||(expected.media.type.startsWith('video/')?el.querySelector('video,[data-icon="video-play"],[data-icon="media-play"],[data-icon="play"]'):el.querySelector('img[src^="blob:"],img[src^="data:image/"],img[data-testid="media-url-provider"],img[alt="Imagen"],img[alt="Image"]'));
+      if(caption&&media&&!el.querySelector('[role="progressbar"],[data-icon="msg-error"]')){
+        if(action!=='audit')delete globalThis.__lipaArmed;return {sent:true,clicked:true};
+      }
+    }
     if(action==='audit')return {error:'No se pudo confirmar el mensaje en este chat. No se reenvió nada.'};
     await sleep(250);
   }

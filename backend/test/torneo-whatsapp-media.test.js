@@ -21,7 +21,7 @@ function driverFixture(type='image/png'){
  const document={body:{},querySelector:s=>s==='#main'?main:null,querySelectorAll:s=>s.includes('contenteditable')?[caption]:[],elementFromPoint:()=>send};
  const expected={phone:'5491112345678',message:'Hola 👋',media:{hash:'abc',type}},ctx={document,location:{origin:'https://web.whatsapp.com'},setTimeout,Date,globalThis:null};ctx.globalThis=ctx;ctx.__lipaMedia={main,header,label:header.textContent,phone:expected.phone,hash:'abc',at:Date.now(),captionSet:true};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/driver.js'),'utf8'),ctx);
- return {expected,ctx,header,caption,preview,visual,send,setMedia:v=>withMedia=v,add:()=>added=true,step:action=>ctx.lipaWhatsAppStep(expected,action)};
+ return {expected,ctx,header,caption,preview,visual,send,outgoing,setMedia:v=>withMedia=v,add:()=>added=true,step:action=>ctx.lipaWhatsAppStep(expected,action)};
 }
 test('media prepare/arm checks recipient and exact caption without clicking send',async()=>{
  const f=driverFixture();assert.equal((await f.step('mediaPrepare')).ready,true);assert.equal((await f.step('send')).armed,true);
@@ -78,4 +78,15 @@ test('two distinct exposed media Send controls remain blocked',async()=>{
 test('recognizes actual WhatsApp Enviar 1 seleccionado label without an icon match',async()=>{
  const f=driverFixture();f.preview.querySelectorAll=s=>s==='img'?[f.visual]:s.includes('[aria-label="Enviar 1 seleccionado"]')?[f.send]:[];
  assert.equal((await f.step('mediaPrepare')).ready,true);assert.equal((await f.step('send')).armed,true);
+});
+
+test('sent media confirmation expands long captions and recognizes data URL images',async()=>{
+ const f=driverFixture();f.expected.message='Hola 👋\n\nTexto completo del torneo';await f.step('send');
+ // Arm explicitly because the preview above still contains its short sample caption.
+ f.caption.childNodes=[{nodeType:3,nodeValue:f.expected.message}];assert((await f.step('send')).armed);
+ f.caption.childNodes=[{nodeType:3,nodeValue:'Hola 👋'}];let clicks=0;
+ const more={textContent:'Leer más',click(){clicks++;f.caption.childNodes=[{nodeType:3,nodeValue:'Hola 👋 Texto completo del torneo'}];}};
+ f.outgoing.querySelectorAll=s=>s==='button,[role="button"]'?[more]:[f.caption];
+ f.outgoing.querySelector=s=>s.includes('progressbar')?null:s.includes('data:image/')?f.visual:null;f.add();
+ assert.equal((await f.step('confirm')).sent,true);assert.equal(clicks,1);
 });
