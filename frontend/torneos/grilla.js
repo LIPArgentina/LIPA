@@ -5,10 +5,12 @@
   }
   const engine = window.LipaBracket, $ = s => document.querySelector(s);
   const API = String(window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
-  let category='primera', data=null, state=null, pending=null, saving=false, requestId=0, conflicted=false;
+  const requestedCategory=new URLSearchParams(location.search).get('categoria');
+  let category=['primera','segunda','tercera'].includes(requestedCategory)?requestedCategory:'primera', data=null, state=null, pending=null, saving=false, requestId=0, conflicted=false;
   let view='double', zoom=1;
   try { view=localStorage.getItem('lipa.bracket.view') || 'double'; } catch (_) {}
   if(!['simple','double'].includes(view)) view='double';
+  document.querySelectorAll('[data-category]').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.category===category)));
   const dimensions=[];
   async function api(method, body) {
     const response=await fetch(`${API}/api/torneo-organizador/grilla/${category}`, {

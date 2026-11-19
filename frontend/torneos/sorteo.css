@@ -13,3 +13,5 @@
 .export-actions{display:flex;gap:6px;margin-top:7px}.export-actions button{flex:1;min-height:32px;padding:6px;border:1px solid #8d7109;border-radius:7px;background:#111318;color:#ffdc65;font:700 11px Montserrat,system-ui;cursor:pointer}.export-actions button:disabled{opacity:.4;cursor:default}.export-actions button:hover:not(:disabled){background:#332a0e}
 
 .category-heading{flex-wrap:wrap;gap:8px}.size-label{display:flex;align-items:center;gap:5px;font-size:12px;color:#ffdc65}.draw-size{width:72px;padding:5px;border:1px solid #b98f00;border-radius:6px;background:#111318;color:white;font:inherit}
+
+.draw-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.draw-actions .draw-button{font-size:12px;padding:6px}.grid-link{display:flex;align-items:center;justify-content:center;min-height:44px;border:1px solid #b98f00;border-radius:9px;color:#ffdc65;background:#111318;text-decoration:none;font-size:12px;font-weight:900;text-align:center;padding:6px}
