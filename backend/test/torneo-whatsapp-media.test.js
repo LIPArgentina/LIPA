@@ -21,7 +21,7 @@ function driverFixture(type='image/png'){
  const document={body:{},querySelector:s=>s==='#main'?main:null,querySelectorAll:s=>s.includes('contenteditable')?[caption]:[],elementFromPoint:()=>send};
  const expected={phone:'5491112345678',message:'Hola 👋',media:{hash:'abc',type}},ctx={document,location:{origin:'https://web.whatsapp.com'},setTimeout,Date,globalThis:null};ctx.globalThis=ctx;ctx.__lipaMedia={main,header,label:header.textContent,phone:expected.phone,hash:'abc',at:Date.now(),captionSet:true};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/driver.js'),'utf8'),ctx);
- return {expected,ctx,header,caption,preview,visual,setMedia:v=>withMedia=v,add:()=>added=true,step:action=>ctx.lipaWhatsAppStep(expected,action)};
+ return {expected,ctx,header,caption,preview,visual,send,setMedia:v=>withMedia=v,add:()=>added=true,step:action=>ctx.lipaWhatsAppStep(expected,action)};
 }
 test('media prepare/arm checks recipient and exact caption without clicking send',async()=>{
  const f=driverFixture();assert.equal((await f.step('mediaPrepare')).ready,true);assert.equal((await f.step('send')).armed,true);
@@ -61,4 +61,16 @@ test('caption in preview footer and data URL image are recognized; caption fills
  const realQuery=f.preview.querySelectorAll;f.preview.querySelectorAll=s=>s==='img'?[f.visual]:[];
  assert.equal((await f.step('mediaPrepare')).interaction,'caption');f.caption.childNodes=[{nodeType:3,nodeValue:f.expected.message}];assert((await f.step('send')).error);
  f.preview.querySelectorAll=realQuery;assert.equal((await f.step('mediaPrepare')).ready,true);assert.equal((await f.step('send')).armed,true);
+});
+
+test('media Send deduplicates nested wrappers and ignores a covered chat button',async()=>{
+ const f=driverFixture();const inner={...f.send,closest(){return this;}},covered={...f.send,getBoundingClientRect:()=>({x:250,y:10,width:20,height:20}),closest(){return this;}};
+ f.send.contains=el=>el===inner;
+ f.preview.querySelectorAll=s=>s==='img'?[f.visual]:[f.send,inner,covered];
+ assert.equal((await f.step('mediaPrepare')).ready,true);const armed=await f.step('send');assert(armed.armed);assert(armed.target.x<100);
+});
+test('two distinct exposed media Send controls remain blocked',async()=>{
+ const f=driverFixture(),other={...f.send,getBoundingClientRect:()=>({x:250,y:10,width:20,height:20}),closest(){return this;}};
+ f.preview.querySelectorAll=s=>s==='img'?[f.visual]:[f.send,other];f.ctx.document.elementFromPoint=x=>x>200?other:f.send;
+ const result=await f.step('send');assert(!result.armed);assert.match(result.error,/único botón/);
 });

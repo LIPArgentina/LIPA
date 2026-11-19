@@ -109,7 +109,11 @@ async function lipaWhatsAppStep(expected, action) {
     for(const editor of editors){
       let root=editor.parentElement,found=null;
       while(root&&root!==document.body){
-        const sends=[...new Set([...root.querySelectorAll('button[aria-label="Enviar"],button[aria-label="Send"],[role="button"][aria-label="Enviar"],[role="button"][aria-label="Send"],[data-icon="send"],[data-icon="wds-ic-send-filled"]')].filter(visible).map(el=>el.closest('button,[role="button"]')).filter(Boolean))];
+        const sendMarkers=[...root.querySelectorAll('[aria-label="Enviar"],[aria-label="Send"],[title="Enviar"],[title="Send"],[data-testid="send"],[data-icon="send"],[data-icon="send-filled"],[data-icon="wds-ic-send-filled"]')].filter(visible);
+        const controls=[...new Set(sendMarkers.map(el=>el.closest('button,[role="button"],[tabindex="0"]')||el.closest('[aria-label="Enviar"],[aria-label="Send"],[title="Enviar"],[title="Send"]')).filter(Boolean))];
+        // Nested icon/label wrappers describe the same control. Occluded chat
+        // buttons behind the media editor must not count as another Send button.
+        const sends=controls.filter(el=>!controls.some(other=>other!==el&&other.contains(el))).filter(el=>point(el));
         const media=[...root.querySelectorAll(expected.media.type.startsWith('video/')?'video':'img')].filter(el=>visible(el)&&['blob:','data:image/','data:video/'].some(prefix=>(el.currentSrc||el.src||'').startsWith(prefix))&&!el.closest?.('[data-id],header,#pane-side'));
         if(media.length>=1){found={editor,send:sends.length===1?sends[0]:null,media:media[0]};if(found.send)break;}root=root.parentElement;
       }
