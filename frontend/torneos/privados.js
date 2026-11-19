@@ -9,6 +9,7 @@
 
   const $ = selector => document.querySelector(selector);
   let entries = [];
+  let visibleConfirmed = [];
   let bulkPresenceBusy=false;
   const pendingPresence=new Set();
   const tableSort = {verifiedBody:{key:'date',direction:'desc'},pendingBody:{key:'date',direction:'desc'},inactiveBody:{key:'date',direction:'desc'}};
@@ -202,32 +203,32 @@
     const inactive = entries.filter(item=>item.baja_at);
     renderBody($('#inactiveBody'), inactive, true);
     $('#inactiveCount').textContent=String(inactive.length);
-    renderBody($('#verifiedBody'), verified, true);
+    visibleConfirmed = verified;
+    renderBody($('#verifiedBody'), visibleConfirmed, true);
     renderBody($('#pendingBody'), pending, false);
     $('#verifiedCount').textContent = String(verified.length);
     $('#pendingCount').textContent = String(pending.length);
     updatePresenceControls();
   }
   function updatePresenceControls(){
-    const active=entries.filter(entry=>!entry.baja_at);
-    const present=active.filter(entry=>entry.en_sala).length;
+    const total=visibleConfirmed.length;
+    const present=visibleConfirmed.filter(entry=>entry.en_sala).length;
     const master=$('#allPresent');
-    master.checked=active.length>0 && present===active.length;
-    master.indeterminate=present>0 && present<active.length;
-    master.disabled=bulkPresenceBusy || pendingPresence.size>0 || active.length===0;
-    master.title=present+' de '+active.length+' en sala. '+(master.checked?'Desmarcar todos':'Marcar todos en sala');
+    master.checked=total>0 && present===total;
+    master.indeterminate=present>0 && present<total;
+    master.disabled=bulkPresenceBusy || pendingPresence.size>0 || total===0;
+    master.title=present+' de '+total+' jugadores visibles en sala';
     document.querySelectorAll('#verifiedBody [data-presence],#pendingBody [data-presence]').forEach(box=>{
       box.disabled=bulkPresenceBusy || pendingPresence.has(box.dataset.presence);
     });
   }
   async function setAllPresent(enSala){
     if(bulkPresenceBusy || pendingPresence.size)return;
-    const targets=entries.filter(entry=>!entry.baja_at);
-    const changes=targets.filter(entry=>Boolean(entry.en_sala)!==enSala).length;
-    if(!changes)return;
-    const players=changes===1?'1 jugador':changes+' jugadores';
-    const question=enSala?'¿Marcar a todos en sala? Falta marcar a '+players+'.':'¿Desmarcar a todos? Se quitará la marca de presencia a '+players+'.';
-    if(!confirm(question+' Se incluyen los inscriptos activos de todas las categorías, aunque estén ocultos por los filtros.'))return;
+    const targets=visibleConfirmed.filter(entry=>Boolean(entry.en_sala)!==enSala);
+    if(!targets.length)return;
+    const players=targets.length===1?'1 jugador visible':targets.length+' jugadores visibles';
+    const question=enSala?'¿Marcar en sala a '+players+'?':'¿Quitar la marca de asistencia a '+players+'?';
+    if(!confirm(question))return;
     bulkPresenceBusy=true;updatePresenceControls();$('#presenceStatus').textContent='Guardando…';
     try{
       const result=await api('/torneo-organizador/inscripciones/presencia-grupal',{method:'PATCH',headers:{'Content-Type':'application/json'},
