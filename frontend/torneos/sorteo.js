@@ -189,10 +189,9 @@
       const state = { category, label, players, card, body: card.querySelector('tbody'), status: card.querySelector('.status'), button: card.querySelector('.draw-button'), revision: saved?.revision || 0, drawn: Boolean(saved), dirty: false, timer: null, saving: false };
       state.status.id = `status-${category}`;
       state.hasResults = Boolean(saved?.tiene_resultados);
-      state.button.disabled = realCount < 2 || (window.LipaSlots.enabled(category) && realCount>window.LipaSlots.capacity(category));
+      state.button.disabled = realCount < 2;
       message(state, saved ? (valid ? 'Orden guardado recuperado.' : 'Cambiaron los participantes. Repetí el sorteo.') : 'Listo para sortear.', saved ? (valid ? 'saved' : 'error') : '');
       if (realCount < 2) message(state, 'Se necesitan al menos dos jugadores para sortear.');
-      if (window.LipaSlots.enabled(category) && realCount>window.LipaSlots.capacity(category)) message(state, `Esta grilla admite hasta ${window.LipaSlots.capacity(category)} jugadores.`, 'error');
       state.button.addEventListener('click', () => toggle(state));
       card.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportPlayers(state, button.dataset.export)));
       states.push(state);

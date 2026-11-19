@@ -4,9 +4,9 @@
   else root.LipaSlots=api;
 })(typeof globalThis==='object'?globalThis:this,function(){
   const enabled=category=>category==='segunda'||category==='tercera';
-  const capacity=category=>category==='tercera'?60:30;
+  const capacity=(category,count=0)=>Math.max(category==='tercera'?60:30,Math.ceil(count/6)*6);
   function fill(players,category){
-    const size=capacity(category);
+    const size=capacity(category,players.length);
     if(!enabled(category)||players.length>=size)return [...players];
     // Occupy the non-multiples first, then replace WO at 3, 6, 9... in order.
     const priority=Array.from({length:size},(_,i)=>i).filter(i=>(i+1)%3!==0)
@@ -19,7 +19,7 @@
     const real=order.filter(id=>id!==null);
     if(real.length!==ids.length || new Set(real).size!==ids.length || !real.every(id=>ids.includes(id)))return false;
     if(!enabled(category))return order.length===ids.length;
-    if(ids.length>capacity(category) || order.length!==capacity(category))return false;
+    if(order.length!==capacity(category,ids.length))return false;
     const expected=fill(ids.map(id=>({id})),category);
     return order.every((id,i)=>(id===null)===(expected[i].id===null));
   }

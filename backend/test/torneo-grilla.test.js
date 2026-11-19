@@ -9,8 +9,8 @@ function enter(state,id,a,b,roster=players,category='segunda') {
 function firstRound(roster=players) {
   let s=engine.build(roster);for(let i=0;i<15;i++)s=enter(s,`p-${i}`,5,2,roster);return s;
 }
-test('requires 30 and preserves exact first-round order',()=>{
-  assert.throws(()=>engine.build(players.slice(1)));const s=engine.build(players);assert.equal(s.main[0].length,16);
+test('requires at least two and preserves exact first-round order',()=>{
+  assert.throws(()=>engine.build(players.slice(0,1)));const s=engine.build(players);assert.equal(s.main[0].length,16);
   for(let i=0;i<15;i++){assert.equal(s.main[0][i].a,String(i*2+1));assert.equal(s.main[0][i].b,String(i*2+2));}
   assert.equal(s.bye,null);
 });

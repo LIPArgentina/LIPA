@@ -25,7 +25,7 @@
     if(match.bye) return 'Pase libre';
     const [round,index]=match.id.split('-');
     const title=round==='p'?'Primera ronda':round.startsWith('r')
-      ? 'Repechaje · '+(category==='tercera'?['Primera rueda','Ronda de 16','Ronda de 8','Clasificación']:['Primera rueda','Cuartos','Semifinal','Final']).slice(4-(state?.rep.length || 4))[Number(round.slice(1))]
+      ? 'Repechaje · Ronda '+(Number(round.slice(1))+1)
       : (category==='tercera'?['','Dieciseisavos','Octavos','Cuartos','Semifinal','Final']:['','Octavos','Cuartos','Semifinal','Final'])[Number(round.slice(1))];
     return `${title}, partido ${Number(index)+1}`;
   }
@@ -99,7 +99,10 @@
     const width=dual?(depth*2+1)*W+depth*2*G:(depth+2)*W+(depth+1)*G;
     const height=Math.max(rows*STEP+70,dual?560:0);
     const positions=new Map(), players=new Map(data.players.map(p=>[String(p.id),p]));
-    const titles=repechage?(category==='tercera'?['Primera rueda','Ronda de 16','Ronda de 8','Clasificación']:['Primera rueda','Cuartos','Semifinal','Final']).slice(4-rounds.length):(category==='tercera'?['Primera ronda','Dieciseisavos','Octavos','Cuartos','Semifinal','Final']:['Primera ronda','Octavos','Cuartos','Semifinal','Final']);
+    const titles=rounds.map((round,index)=>{
+      if(repechage)return index===rounds.length-1?'Clasificación':index===0?'Primera rueda':'Ronda '+(index+1);
+      return index===0?'Primera ronda':round.length===1?'Final':round.length===2?'Semifinal':round.length===4?'Cuartos':round.length===8?'Octavos':'Ronda '+(index+1);
+    });
     function title(text,x) {const el=document.createElement('div');el.className='round-title';el.style.cssText=`left:${x}px;width:${W}px`;el.textContent=text.toUpperCase();board.append(el);}
     rounds.forEach((round,r)=>{
       const half=round.length/2;
@@ -110,7 +113,7 @@
         else {const right=i>=half; x=(right?depth*2-r:r)*(W+G);y=TOP+((i%half+.5)*Math.pow(2,r)*STEP)-42;}
         positions.set(match.id,{x,y,width:W,center:y+(r===depth?56:44)});
       });
-      title(titles[r],r*(W+G));
+      title((titles[r] || 'Ronda '+(r+1)),r*(W+G));
       if(dual && r<depth)title(titles[r],(depth*2-r)*(W+G));
     });
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('connectors');svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('aria-hidden','true');
@@ -126,8 +129,8 @@
     const crown=document.createElement('div');crown.className='champion';
     const cx=dual?fp.x:(depth+1)*(W+G),cy=dual?fp.y+145:fp.center-65;
     crown.style.cssText=`left:${cx-8}px;top:${cy}px;width:${W+16}px`;
-    const crownTitle=document.createElement('small');crownTitle.textContent=repechage?(category==='tercera'?`CLASIFICADO ${index+1} · RONDA DE 32`:'CLASIFICADO A OCTAVOS'):'★ CAMPEÓN ★';
-    const winnerName=document.createElement('strong');winnerName.textContent=winner?.nombre || (repechage?(category==='tercera'?'Un lugar entre los 32':'Un lugar entre los 16'):'Esperando al campeón');
+    const crownTitle=document.createElement('small');crownTitle.textContent=repechage?(category==='tercera'?`CLASIFICADO ${index+1}`:'CLASIFICADO DEL REPECHAJE'):'★ CAMPEÓN ★';
+    const winnerName=document.createElement('strong');winnerName.textContent=winner?.nombre || (repechage?(category==='tercera'?'Esperando clasificado':'Esperando clasificado'):'Esperando al campeón');
     enablePreview(winnerName,winner);
     crown.append(crownTitle,photo(winner),winnerName);board.append(crown);
     const finalPath=document.createElementNS(svg.namespaceURI,'path');
@@ -155,9 +158,9 @@
       ? `Pase libre: ${byeNames.join('; ')}.${state.rankingFallback?' Igualdad sin desempate de ranking: se conserva la prioridad del orden del sorteo.':''}`
       : state.firstComplete?'Repechaje formado con los perdedores de los partidos jugados.':'El pase libre se define al completar los partidos jugados de primera ronda: puntos a favor, diferencia y ranking general LIPA. Los WO no participan del repechaje.';
     const realCount=data.players.filter(p=>p.id!==null).length;
-    const capacity=category==='tercera'?60:30;
+    const capacity=state.capacity;
     $('#mainSection .badge').textContent=realCount===capacity?`${capacity} jugadores + repechaje`:`${realCount} jugadores · ${capacity-realCount} WO + repechaje`;
-    $('#repSection .badge').textContent=category==='tercera'?'2 clasificados a la ronda de 32':'1 clasificado a octavos';
+    $('#repSection .badge').textContent=category==='tercera'?'2 clasificados del repechaje':'1 clasificado del repechaje';
     applyZoom();
   }
   function confirmCorrection() {

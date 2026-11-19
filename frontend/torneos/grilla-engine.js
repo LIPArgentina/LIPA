@@ -7,8 +7,8 @@
   'use strict';
   const limits = { primera: 7, segunda: 6, tercera: 5 };
   function build(players, stored = {}, category = 'tercera') {
-    const capacity=category==='tercera'?60:30, qualifierCount=category==='tercera'?2:1;
-    if (players.length !== capacity) throw new Error(`Este formato requiere ${capacity} posiciones sorteadas.`);
+    const capacity=players.length, qualifierCount=category==='tercera'?2:1;
+    if (capacity<2) throw new Error('Se necesitan al menos dos jugadores.');
     if (category === 'primera' && players.some(p=>p.id===null)) throw new Error('Primera no admite WO.');
     const matches = [], clean = {}, byId = Object.fromEntries(players.filter(p=>p.id!==null).map(p => [String(p.id), p]));
     function match(id, a, b, readyA=true, readyB=true) {
@@ -29,11 +29,11 @@
       matches.push(result); return result;
     }
     function nextRound(previous,prefix){
-      return Array.from({length:previous.length/2},(_,i)=>{
-        const a=previous[i*2],b=previous[i*2+1];return match(`${prefix}-${i}`,a.winner,b.winner,a.resolved,b.resolved);
+      return Array.from({length:Math.ceil(previous.length/2)},(_,i)=>{
+        const a=previous[i*2],b=previous[i*2+1]||{winner:null,resolved:true};return match(`${prefix}-${i}`,a.winner,b.winner,a.resolved,b.resolved);
       });
     }
-    const first = Array.from({ length: capacity/2 }, (_, i) => match(`p-${i}`, players[i * 2].id, players[i * 2 + 1].id));
+    const first = Array.from({ length: Math.ceil(capacity/2) }, (_, i) => match(`p-${i}`, players[i * 2].id, players[i * 2 + 1]?.id));
     const firstComplete = first.every(m => m.resolved);
     let bye = null, byes=[], rankingFallback = false;
     const losers = firstComplete ? first.filter(m=>m.loser).map((m, index) => {
@@ -56,7 +56,7 @@
     for(let round=1;rep[round-1].length>qualifierCount;round++)rep.push(nextRound(rep[round-1],`r${round}`));
     const qualifiers=rep.at(-1).map(m=>m.winner),qualifier=qualifiers[0];
     const entries=rep.at(-1).map((m,i)=>match(qualifierCount===1?'qualifier':`qualifier-${i+1}`,m.winner,null,m.resolved,true));
-    const seeded=qualifierCount===1?[...first,entries[0]]:[...first.slice(0,15),entries[0],...first.slice(15),entries[1]];
+    const seeded=qualifierCount===1?[...first,entries[0]]:[...first.slice(0,Math.ceil(first.length/2)),entries[0],...first.slice(Math.ceil(first.length/2)),entries[1]];
     const main = [seeded];
     for (let round = 1; main[round-1].length>1; round++) main.push(nextRound(main[round-1],`m${round}`));
     return { main, rep, matches, clean, bye, byes, firstComplete, qualifier, qualifiers, capacity, champion: main.at(-1)[0].winner, rankingFallback, loserCount:losers.length };
