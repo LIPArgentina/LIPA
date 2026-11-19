@@ -13,6 +13,8 @@ El visor comparte la grilla del organizador y los resultados publicados en LIPA.
 
 ## Publicación
 
+En la grilla del organizador, cada jugador muestra «Pendiente» o «✓ Confirmó» para el último llamado de ese cruce. La consulta se actualiza cada cinco segundos. «Sin registro» identifica llamados antiguos cuyo estado no se puede reconstruir. El visor personal retira cada mensaje al tocarlo y conserva en pantalla los que todavía esperan confirmación.
+
 Rodrigo puede sortear y probar los llamados en borrador. En la grilla del organizador, «Publicar grilla» habilita únicamente la categoría que está viendo. Al repetir el sorteo, esa categoría vuelve a borrador. Los llamados de mesa se entregan a ambos jugadores también durante las pruebas.
 
 El visor busca al organizador activo con el slug exacto `rodry-baygo-torneos`, verificado en producción para Rodrigo Baygorria (ID 1). El backend admite una vinculación explícita mediante `TORNEO_VISOR_ORGANIZADOR_ID`.

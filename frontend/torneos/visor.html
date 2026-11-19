@@ -6,15 +6,15 @@
   <title>EVENTO FIN DE AÑO LIPA</title>
   <link rel="icon" href="../logo_liga.png">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./grilla.css?v=alarma-3">
+  <link rel="stylesheet" href="./grilla.css?v=recibidos-1">
   <script src="../config.js?v=rodry-1"></script>
   <script src="./grilla-engine.js?v=mixed-two-rounds-1" defer></script>
   <script src="./grilla-layout.js?v=rodry-1" defer></script>
   <script src="./visor-session.js" defer></script>
   <script src="./visor-push.js" defer></script>
   <script src="./visor-sonido.js?v=alarma-3" defer></script>
-  <script src="./visor-llamados.js?v=alarma-3" defer></script>
-  <script src="./grilla.js?v=alarma-3" defer></script>
+  <script src="./visor-llamados.js?v=recibidos-1" defer></script>
+  <script src="./grilla.js?v=recibidos-1" defer></script>
 </head>
 <body data-viewer="true">
   <header class="topbar" hidden>
@@ -24,7 +24,7 @@
     <section class="viewer-session"><div><strong>EVENTO FIN DE AÑO LIPA</strong><span id="viewerName"></span></div><div><a href="./torneos.html">VOLVER A TORNEOS</a><button type="button" id="enablePush">ACTIVAR AVISOS</button><button type="button" id="testSound">ACTIVAR SONIDO</button><button type="button" id="logoutViewer">CERRAR SESIÓN</button></div></section>
     <p id="soundStatus" role="status"></p>
     <section id="pendingCalls" class="pending-calls" aria-live="polite" aria-label="Llamados pendientes de confirmación" hidden></section>
-    <p id="pushStatus" role="status"></p><section id="personalCalls" class="personal-calls" aria-live="polite" hidden></section>
+    <p id="pushStatus" role="status"></p>
     <div class="toolbar">
       <div class="tabs" role="tablist" aria-label="Categorías">
         <button type="button" role="tab" id="tab-primera" aria-controls="bracketPanel" aria-selected="true" data-category="primera">PRIMERA</button>

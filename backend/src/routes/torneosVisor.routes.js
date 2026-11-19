@@ -30,6 +30,9 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
       CREATE INDEX IF NOT EXISTS torneo_avisos_jugador_idx ON torneo_avisos(jugador_id,id);
       ALTER TABLE torneo_avisos ADD COLUMN IF NOT EXISTS clave_pendiente UUID;
+      ALTER TABLE torneo_avisos ADD COLUMN IF NOT EXISTS inscripcion_id TEXT,
+        ADD COLUMN IF NOT EXISTS confirmado_at TIMESTAMPTZ;
+      CREATE INDEX IF NOT EXISTS torneo_avisos_llamado_idx ON torneo_avisos(llamado_id);
       CREATE INDEX IF NOT EXISTS torneo_llamados_grilla_idx ON torneo_llamados(organizador_id,categoria,sorteo_revision,id DESC);
     `).catch(error => { ready = null; throw error; });
     return ready;
@@ -60,6 +63,26 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
   async function assignments(id, category, revision) {
     const {rows} = await pool.query(`SELECT DISTINCT ON(match_id) match_id,a,b,mesa,piso FROM torneo_llamados WHERE organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3 ORDER BY match_id,id DESC`,[id,category,revision]);
     return Object.fromEntries(rows.map(row=>[row.match_id,row]));
+  }
+  async function organizerAssignments(id,category,revision){
+    const {rows}=await pool.query(`WITH ultimos AS (
+      SELECT DISTINCT ON(match_id) id,match_id,a,b,mesa,piso FROM torneo_llamados
+      WHERE organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3 ORDER BY match_id,id DESC
+    )
+    SELECT u.match_id,u.a,u.b,u.mesa,u.piso,u.id::text AS "callId",
+      ARRAY(SELECT json_build_object('inscripcion',v.inscripcion_id,'pendiente',v.clave_pendiente IS NOT NULL,
+        'confirmado',v.confirmado_at IS NOT NULL) FROM torneo_avisos v WHERE v.llamado_id=u.id ORDER BY v.id) AS avisos
+    FROM ultimos u`,[id,category,revision]);
+    return Object.fromEntries(rows.map(({avisos,...match})=>{
+      const receipts={};
+      const tracked=avisos.some(v=>v.pendiente || v.confirmado || v.inscripcion);
+      avisos.forEach((v,index)=>{
+        // Older calls always inserted the two recipients in bracket order.
+        const player=v.inscripcion || (avisos.length===2 && [match.a,match.b][index]);
+        if(player && tracked)receipts[player]=!v.pendiente;
+      });
+      return [match.match_id,{...match,receipts}];
+    }));
   }
   router.post('/torneo-visor/login', rateLimit({windowMs:15*60*1000,limit:300,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'Demasiados intentos. Esperá unos minutos.'}}), route(async(req,res)=>{
     const raw = String(req.body?.dni || '').trim();
@@ -112,18 +135,15 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
   router.get('/torneo-visor/llamados',route(async(req,res)=>{
     const user=await session(req);
     res.locals.lecturaVisor=true;
-    const {rows}=await pool.query(`SELECT id::text,mensaje,clave_pendiente FROM (
-      SELECT id,mensaje,clave_pendiente FROM torneo_avisos WHERE jugador_id=$1 AND clave_pendiente IS NOT NULL
-      UNION ALL
-      (SELECT id,mensaje,clave_pendiente FROM torneo_avisos WHERE jugador_id=$1 AND clave_pendiente IS NULL
-        AND created_at>NOW()-INTERVAL '12 hours' ORDER BY id DESC LIMIT 5)
-    ) AS bandeja ORDER BY bandeja.id DESC`,[user.jugador_id]);
+    const {rows}=await pool.query(`SELECT id::text,mensaje,clave_pendiente FROM torneo_avisos
+      WHERE jugador_id=$1 AND clave_pendiente IS NOT NULL ORDER BY torneo_avisos.id DESC`,[user.jugador_id]);
     res.json({avisos:rows});
   }));
   router.post('/torneo-visor/avisos/:id/confirmar',route(async(req,res)=>{
     const user=await session(req), id=req.params.id;
     if(!/^[1-9]\d{0,18}$/.test(id) || BigInt(id)>9223372036854775807n)throw fail(400,'Aviso inválido.');
-    const result=await pool.query('UPDATE torneo_avisos SET clave_pendiente=NULL WHERE jugador_id=$1 AND id=$2 RETURNING id',[user.jugador_id,id]);
+    const result=await pool.query(`UPDATE torneo_avisos SET confirmado_at=CASE WHEN clave_pendiente IS NOT NULL THEN NOW() ELSE confirmado_at END,
+      clave_pendiente=NULL WHERE jugador_id=$1 AND id=$2 RETURNING id`,[user.jugador_id,id]);
     if(!result.rowCount)throw fail(404,'Aviso inexistente.');
     res.json({ok:true});
   }));
@@ -145,8 +165,14 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     await pool.query('UPDATE torneo_visor_sesiones SET fcm_token=$1 WHERE token_hash=$2',[token,user.tokenHash]);res.json({ok:true});
   }));
   router.get('/torneo-organizador/grilla/:categoria/llamados',requireTorneoOrganizador,route(async(req,res)=>{
-    const saved=await readGrid(req.user.torneoOrganizadorId,req.params.categoria);
-    res.json({canPublish:req.user.torneoOrganizadorId===await organizer(),published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,assignments:await assignments(req.user.torneoOrganizadorId,req.params.categoria,saved.sorteo_revision)});
+    const id=req.user.torneoOrganizadorId,category=req.params.categoria;
+    if(!validCategory(category))throw fail(400,'Categoría inválida.');
+    const {rows:[saved]}=await pool.query(`SELECT g.sorteo_revision,g.publicada_at FROM torneo_grillas g JOIN torneo_sorteos s
+      ON s.torneo_organizador_id=g.torneo_organizador_id AND s.categoria=g.categoria AND s.revision=g.sorteo_revision
+      WHERE g.torneo_organizador_id=$1 AND g.categoria=$2`,[id,category]);
+    if(!saved)throw fail(404,'No hay grilla para esta categoría.');
+    res.locals.lecturaVisor=true;
+    res.json({canPublish:id===await organizer(),published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,assignments:await organizerAssignments(id,category,saved.sorteo_revision)});
   }));
   router.post('/torneo-organizador/grilla/:categoria/publicar',requireTorneoOrganizador,route(async(req,res)=>{
     const id=req.user.torneoOrganizadorId, category=req.params.categoria;
@@ -184,13 +210,15 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const mensaje=`Llamado a mesa · ${req.params.categoria.toUpperCase()}\n${a.nombre} vs. ${b.nombre}\nMesa ${mesa} · Piso ${piso}. Presentate para jugar.`;
     const client=await pool.connect();
     const destinations=new Map([[a.jugador_id,crypto.randomUUID()],[b.jugador_id,crypto.randomUUID()]]);
+    let callId;
     try {
       await client.query('BEGIN');
       await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[req.user.torneoOrganizadorId]);
       const current=await readGrid(req.user.torneoOrganizadorId,req.params.categoria,client);
       if(current.revision!==saved.revision || current.sorteo_revision!==saved.sorteo_revision) throw fail(409,'La grilla cambió. Recargá antes de llamar.');
       const {rows}=await client.query(`INSERT INTO torneo_llamados(organizador_id,categoria,sorteo_revision,match_id,a,b,mesa,piso,mensaje) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,[req.user.torneoOrganizadorId,req.params.categoria,saved.sorteo_revision,match.id,match.a,match.b,mesa,piso,mensaje]);
-      for (const [id,key] of destinations) await client.query('INSERT INTO torneo_avisos(llamado_id,jugador_id,mensaje,clave_pendiente) VALUES($1,$2,$3,$4)',[rows[0].id,id,mensaje,key]);
+      callId=String(rows[0].id);
+      for (const player of [a,b]) await client.query('INSERT INTO torneo_avisos(llamado_id,jugador_id,mensaje,clave_pendiente,inscripcion_id) VALUES($1,$2,$3,$4,$5)',[callId,player.jugador_id,mensaje,destinations.get(player.jugador_id),player.id]);
       await client.query('COMMIT');
     } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
     if (firebase) {
@@ -209,7 +237,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
         } catch(error) {console.error('Push de llamado:',error.message);}
       }
     }
-    res.json({ok:true,mensaje,assignment:{a:match.a,b:match.b,mesa,piso}});
+    res.json({ok:true,mensaje,assignment:{a:match.a,b:match.b,mesa,piso,callId,receipts:{[match.a]:false,[match.b]:false}}});
   }));
   router.post('/torneo-organizador/grilla/:categoria/contactar',requireTorneoOrganizador,route(async(req,res)=>{
     const {a,b}=await matchContext(req,true), player=[a,b].find(p=>p.id===String(req.body.playerId));

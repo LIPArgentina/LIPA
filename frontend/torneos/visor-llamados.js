@@ -1,5 +1,5 @@
 window.LipaViewerCalls=()=>{
-  const alerts=document.querySelector('#pendingCalls'),historyBox=document.querySelector('#personalCalls');
+  const alerts=document.querySelector('#pendingCalls');
   const token=LipaViewer.read().token,prefix='lipa.aviso.tocado.'+token.slice(-16)+'.';
   const touched=new Set(),sending=new Set();
   let inbox=[],checking=false,lastRender,openedKey='';
@@ -8,13 +8,9 @@ window.LipaViewerCalls=()=>{
     try{return localStorage.getItem(prefix+id)==='1';}catch{return false;}
   }
   function render(){
-    const active=[],history=[];
-    for(const item of inbox){
-      if(item.clave_pendiente && !marked(item.id))active.push(item);
-      else if(history.length<5)history.push(item);
-    }
+    const active=inbox.filter(item=>item.clave_pendiente && !marked(item.id));
     LipaCallSound.setPending(active.length>0);
-    const signature=JSON.stringify([active,history]);
+    const signature=JSON.stringify(active);
     if(signature===lastRender)return;
     lastRender=signature;
     const focusId=document.activeElement?.dataset.aviso;
@@ -26,8 +22,13 @@ window.LipaViewerCalls=()=>{
     }));
     alerts.hidden=!active.length;
     if(focusId && active.length)(Array.from(alerts.children).find(el=>el.dataset.aviso===focusId)||alerts.firstElementChild).focus({preventScroll:true});
-    historyBox.replaceChildren(...history.map(item=>{const p=document.createElement('p');p.textContent=item.mensaje;return p;}));
-    historyBox.hidden=!history.length;
+  }
+  async function closeNotification(key){
+    try{
+      const registration=await navigator.serviceWorker?.getRegistration();
+      const notifications=await registration?.getNotifications?.({tag:'lipa-llamado-'+key});
+      for(const notification of notifications || [])notification.close();
+    }catch{/* The in-page message is independent of system notification support. */}
   }
   async function send(id){
     if(sending.has(id) || LipaViewer.read()?.token!==token)return;
@@ -41,7 +42,7 @@ window.LipaViewerCalls=()=>{
   function acknowledge(item){
     touched.add(item.id);
     try{localStorage.setItem(prefix+item.id,'1');}catch{}
-    render();send(item.id);
+    render();send(item.id);closeNotification(item.clave_pendiente);
   }
   function applyNotificationTap(){
     if(!openedKey)return;
@@ -58,6 +59,8 @@ window.LipaViewerCalls=()=>{
     checking=true;
     try{
       const result=await LipaViewer.api('llamados');
+      const pendingKeys=new Set(result.avisos.map(item=>item.clave_pendiente));
+      for(const item of inbox)if(item.clave_pendiente && !pendingKeys.has(item.clave_pendiente))closeNotification(item.clave_pendiente);
       inbox=result.avisos;
       applyNotificationTap();
       for(const item of inbox)if(item.clave_pendiente && marked(item.id))send(item.id);

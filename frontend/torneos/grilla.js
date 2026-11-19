@@ -89,7 +89,25 @@
     select.addEventListener('change',onScore);
     const portrait=photo(p);
     enablePreview(portrait,p,match);
-    row.append(number,portrait,name,select);return row;
+    const identity=document.createElement('div');identity.className='player-identity';identity.append(name);
+    if(!viewer && p){
+      const receipt=document.createElement('small');receipt.className='call-receipt';receipt.hidden=true;
+      receipt.dataset.player=id;identity.append(receipt);
+    }
+    row.append(number,portrait,identity,select);return row;
+  }
+  function updateReceipts(card,assignment){
+    const labels=card.querySelectorAll('.call-receipt');
+    const valid=labels.length===2 && assignment?.a===labels[0].dataset.player && assignment.b===labels[1].dataset.player;
+    card.classList.toggle('with-receipts',valid);
+    labels.forEach(label=>{
+      label.hidden=!valid;
+      if(!valid)return;
+      const confirmed=assignment.receipts?.[label.dataset.player];
+      label.dataset.confirmed=String(confirmed);
+      label.textContent=confirmed===true?'✓ Confirmó':confirmed===false?'Pendiente':'Sin registro';
+      label.title='Confirmación del último llamado a mesa';
+    });
   }
   function card(match, pos, board, players, isFinal, repechage) {
     const node=document.createElement('article');node.className=`match ${isFinal?'finalist':''} ${match.bye?'rep-pass':''}`;
@@ -99,6 +117,7 @@
     label.textContent=match.bye?'PASE AUTOMÁTICO · WO':match.id===state.final.id?'GRAN FINAL':match.label.replace('Ganadores · Ronda ','G').replace('Perdedores · Ronda ','P').replace('Eliminación directa · Ronda ','E');
     node.title=match.label+' — '+match.sources.map(sourceLabel).join(' / ');
     node.append(label,playerRow(match.a,match,0,players),callControls(match),playerRow(match.b,match,1,players));
+    if(!viewer)updateReceipts(node,data.assignments?.[match.id]);
     board.append(node);
     return node;
   }
@@ -111,6 +130,29 @@
     const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo completar.');return result;
   }
   const plannedLocations=new Map(), sendingCalls=new Set();
+  let callChanges=0,readingCalls=false;
+  async function refreshReceipts(){
+    if(readingCalls || document.hidden || !data)return;
+    const grid=data,version=callChanges;
+    readingCalls=true;
+    try{
+      const info=await api('GET',null,'/llamados');
+      if(grid!==data || grid.drawRevision!==info.drawRevision || version!==callChanges)return;
+      for(const card of document.querySelectorAll('article[data-match-id]')){
+        const id=card.dataset.matchId,assignment=info.assignments[id],previous=grid.assignments?.[id];
+        if(JSON.stringify(previous?.receipts)!==JSON.stringify(assignment?.receipts) || previous?.callId!==assignment?.callId){
+          updateReceipts(card,assignment);
+          const key=[category,grid.drawRevision,id].join('/');
+          if(assignment && card.classList.contains('with-receipts') && !plannedLocations.has(key) && !sendingCalls.has(key)){
+            const table=card.querySelector('.match-table'),floor=card.querySelector('.match-floor');
+            if(table && floor){table.value=assignment.mesa;floor.value=assignment.piso;}
+          }
+        }
+      }
+      grid.assignments=info.assignments;
+    }catch{/* Keep the last known confirmations until the next successful refresh. */}
+    finally{readingCalls=false;}
+  }
   let callHint;
   function closeCallHint(){
     if(!callHint)return;
@@ -169,8 +211,17 @@
       const grid=data;sendingCalls.add(key);table.disabled=floor.disabled=button.disabled=true;
       try{
         const result=await organizerAction('llamar',match,{mesa,piso});
-        grid.assignments={...grid.assignments,[match.id]:result.assignment};plannedLocations.delete(key);
-        if(data===grid)status('Llamado enviado a ambos jugadores.');
+        callChanges++;
+        const previous=grid.assignments?.[match.id];
+        if(!previous?.callId || !result.assignment.callId || BigInt(previous.callId)<BigInt(result.assignment.callId)){
+          grid.assignments={...grid.assignments,[match.id]:result.assignment};
+        }
+        plannedLocations.delete(key);
+        if(data===grid){
+          const card=document.querySelector('[data-match-id="'+match.id+'"]');
+          if(card)updateReceipts(card,grid.assignments[match.id]);
+          status('Llamado enviado a ambos jugadores.');
+        }
       }catch(error){if(data===grid){status(error.message,true);if(button.isConnected)showCallHint(button,error.message);}}
       finally{
         sendingCalls.delete(key);
@@ -372,6 +423,10 @@
     }
     LipaViewerCalls();
     setInterval(refresh,10000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+  }
+  if(!viewer){
+    setInterval(refreshReceipts,5000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshReceipts();});
   }
   load();
 })();
