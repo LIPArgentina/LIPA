@@ -100,6 +100,8 @@ module.exports = function createTorneosPrivadosRouter() {
           PRIMARY KEY (torneo_organizador_id, categoria)
         );
 
+        ALTER TABLE torneo_sorteos ADD COLUMN IF NOT EXISTS visible_en_visor BOOLEAN NOT NULL DEFAULT false;
+
         CREATE TABLE IF NOT EXISTS torneo_grillas (
           torneo_organizador_id INTEGER NOT NULL REFERENCES torneo_organizadores(id) ON DELETE CASCADE,
           categoria TEXT NOT NULL CHECK (categoria IN ('primera','segunda','tercera')),
@@ -450,9 +452,9 @@ module.exports = function createTorneosPrivadosRouter() {
       }
       await client.query('DELETE FROM torneo_grillas WHERE torneo_organizador_id=$1 AND categoria=$2', [req.user.torneoOrganizadorId, categoria]);
       const { rows: result } = await client.query(`INSERT INTO torneo_sorteos
-        (torneo_organizador_id, categoria, orden) VALUES ($1,$2,$3::jsonb)
+        (torneo_organizador_id, categoria, orden, visible_en_visor) VALUES ($1,$2,$3::jsonb,true)
         ON CONFLICT (torneo_organizador_id, categoria) DO UPDATE
-        SET orden=EXCLUDED.orden, revision=torneo_sorteos.revision+1, updated_at=NOW()
+        SET orden=EXCLUDED.orden, visible_en_visor=true, revision=torneo_sorteos.revision+1, updated_at=NOW()
         RETURNING revision, updated_at`, [req.user.torneoOrganizadorId, categoria, JSON.stringify(orden)]);
       await client.query('COMMIT');
       res.json({ ok: true, ...result[0] });

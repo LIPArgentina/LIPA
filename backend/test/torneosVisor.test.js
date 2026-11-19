@@ -8,6 +8,7 @@ function fixture(){
   const sessions=new Map(),avisos=[],llamados=[];
   const players=Array.from({length:8},(_,i)=>({id:String(i+1),jugador_id:i+101,nombre:'Jugador de prueba '+(i+1),position:i+1,foto_path:'',dni:String(30000000+i)}));
   const saved={jugadores:players,resultados:{},revision:0,sorteo_revision:1};
+  const draw={visible:true,orden:players.map(p=>p.id),habilitados:players.map(p=>p.id)};
   const result=rows=>({rows});
   const pool={release(){},async connect(){return pool;},async query(sql,args=[]){
     if(sql.includes('CREATE TABLE')||sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK')return result([]);
@@ -17,6 +18,7 @@ function fixture(){
     if(sql.includes('SELECT id,nombre FROM jugadores'))return result(players.filter(p=>p.dni===args[0]).map(p=>({id:p.jugador_id,nombre:p.nombre})));
     if(sql.includes('SELECT id FROM torneo_organizadores'))return result([{id:1}]);
     if(sql.includes('SELECT g.* FROM torneo_grillas'))return result(args[1]==='primera'?[saved]:[]);
+    if(sql.includes('AS habilitados') && sql.includes('AND s.visible_en_visor') && sql.includes('s.revision=g.sorteo_revision'))return result(draw.visible && args[1]==='primera'?[{...saved,...draw}]:[]);
     if(sql.includes('DISTINCT ON(match_id)'))return result(llamados);
     if(sql.includes('FROM torneo_inscripciones i'))return result(players.filter(p=>args[1].includes(p.id)).map(p=>({...p,whatsapp:'1123456789'})));
     if(sql.includes('INSERT INTO torneo_llamados')){llamados.push({match_id:args[3],a:args[4],b:args[5],mesa:args[6],piso:args[7]});return result([{id:llamados.length}]);}
@@ -36,11 +38,11 @@ function fixture(){
     app.use(express.static(path.resolve(__dirname,'../../frontend')));
   }
   app.use((_req,res)=>res.status(404).json({error:'Not found'}));
-  return {app,saved,avisos};
+  return {app,saved,avisos,draw};
 }
 if(process.env.VISOR_DEMO==='1')fixture().app.listen(3097,'127.0.0.1',()=>console.log('DEMO ONLY http://localhost:3097/torneos/torneos.html · DNI 30000000'));
 else test('DNI session, read-only API, private calls and organizer authorization',async()=>{
-  const {app,saved,avisos}=fixture();
+  const {app,saved,avisos,draw}=fixture();
   const http=require('http'),net=require('net');
   async function request(url,body,token,organizer=false,method){return new Promise((resolve,reject)=>{
     const req=new http.IncomingMessage(new net.Socket());req.url='/api/'+url;req.method=method||(body?'POST':'GET');req.body=body;req._body=true;req.headers={...(token?{authorization:'Bearer '+token}:{}),...(organizer?{'x-demo-organizer':'yes'}:{})};Object.defineProperty(req.socket,'remoteAddress',{value:'127.0.0.1'});
@@ -51,6 +53,13 @@ else test('DNI session, read-only API, private calls and organizer authorization
     assert.equal((await request('torneo-visor/login',{dni:'99999999'})).status,403);
     assert.equal((await request('torneo-visor/login',{dni:'abc30000000'})).status,400);
     const login=await (await request('torneo-visor/login',{dni:'30.000.000'})).json();assert.match(login.token,/^[a-f0-9]{64}$/);
+    draw.visible=false;
+    const hidden=await request('torneo-visor/grilla/primera',null,login.token);
+    assert.equal(hidden.status,404);assert.deepEqual(await hidden.json(),{error:'Sorteo pendiente para esta categoría.'});
+    draw.visible=true;
+    draw.habilitados.push('99');
+    assert.equal((await request('torneo-visor/grilla/primera',null,login.token)).status,404);
+    draw.habilitados.pop();
     saved.jugadores[0].foto_path='30000000_1720000000000.jpg';
     const view=await (await request('torneo-visor/grilla/primera',null,login.token)).json();
     assert.doesNotMatch(JSON.stringify(view),/30000000|foto_path/);

@@ -224,6 +224,16 @@
       conflicted=error.status===409;$('#reload').hidden=!conflicted;$('#retrySave').hidden=conflicted;
     } finally {saving=false;render();}
   }
+  function showPendingDraw(){
+    data=null;state=null;dimensions.length=0;
+    if(preview.open)preview.close();
+    for(const section of ['#mainSection','#repSection','#finalSection'])$(section).hidden=true;
+    for(const board of ['#mainBoard','#repBoard','#finalBoard'])$(board).replaceChildren();
+    $('#reload').hidden=true;
+    $('#emptyState').textContent='Sorteo pendiente para esta categoría.';
+    $('#emptyState').hidden=false;
+    status('El visor se actualiza automáticamente.');
+  }
   async function load() {
     const request=++requestId;data=null;state=null;conflicted=false;$('#emptyState').hidden=true;$('#mainSection').hidden=true;$('#repSection').hidden=true;$('#finalSection').hidden=true;$('#reload').hidden=true;status('Cargando grilla…');
     try {
@@ -233,7 +243,9 @@
       data=response;state=engine.build(data.players,data.results,category);
       $('#mainSection').hidden=false;$('#repSection').hidden=false;$('#finalSection').hidden=false;status(viewer?'Actualización automática cada 10 segundos.':data.legacyResults?'Formato actualizado: se conservan las primeras dos rondas compatibles; los resultados de las etapas reemplazadas quedan archivados.':'Resultados guardados automáticamente.');render();fit();
     } catch(error) {
-      if(request!==requestId)return;status('No se pudo abrir esta categoría.',true);
+      if(request!==requestId)return;
+      if(viewer && error.status===404){showPendingDraw();return;}
+      status('No se pudo abrir esta categoría.',true);
       const box=$('#emptyState');box.replaceChildren();const p=document.createElement('p');p.textContent=error.message;const a=document.createElement('a');a.href=viewer?'./torneos.html':'./sorteo.html';a.textContent=viewer?'Volver a torneos':'Ir al sorteo';box.append(p,a);box.hidden=false;$('#reload').hidden=false;
     }
   }
@@ -256,8 +268,9 @@
     let refreshing=false;
     async function refresh(){
       if(document.hidden || refreshing)return;refreshing=true;
+      const request=requestId;
       try{
-        const request=requestId, response=await api('GET');
+        const response=await api('GET');
         if(request!==requestId)return;
         if(!data || data.revision!==response.revision || data.drawRevision!==response.drawRevision ||
             JSON.stringify(data.assignments)!==JSON.stringify(response.assignments)){
@@ -267,7 +280,7 @@
           render();if(firstLoad)fit();
         }
         status('Actualizado · '+new Date().toLocaleTimeString('es-AR'));
-      }catch(error){if(error.status===401){location.replace('./torneos.html');return;}if(error.status===404 && data){load();return;}status(error.message,true);}
+      }catch(error){if(request!==requestId)return;if(error.status===401){location.replace('./torneos.html');return;}if(error.status===404){showPendingDraw();return;}status(error.message,true);}
       finally{refreshing=false;}
     }
     let lastCall='0',checking=false;

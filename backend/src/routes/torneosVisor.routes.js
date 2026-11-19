@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const bracket = require('../../../frontend/torneos/grilla-engine');
+const categories = require('../../../frontend/torneos/categorias');
+const slots = require('../../../frontend/torneos/cupos');
 const firebase = require('../../firebase');
 const webApp = require('../torneoFirebaseWeb.json');
 const { photoUrl } = require('../torneoFoto');
@@ -76,7 +78,20 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
   router.get('/torneo-visor/grilla/:categoria',route(async(req,res)=>{
     await session(req);
     res.locals.lecturaVisor=true;
-    const id=await organizer(), category=req.params.categoria, saved=await readGrid(id,category);
+    const id=await organizer(), category=req.params.categoria;
+    if (!validCategory(category)) throw fail(400,'Categoría inválida.');
+    const {rows}=await pool.query(`SELECT g.*, s.orden,
+      ARRAY(SELECT i.id::text FROM torneo_inscripciones i
+        WHERE i.torneo_organizador_id=g.torneo_organizador_id AND i.categoria=ANY($3::text[])
+          AND i.baja_at IS NULL AND i.corroborado AND i.estado_pago IN ('sena','total','efectivo')) AS habilitados
+      FROM torneo_grillas g JOIN torneo_sorteos s USING (torneo_organizador_id,categoria)
+      WHERE g.torneo_organizador_id=$1 AND g.categoria=$2 AND s.visible_en_visor AND s.revision=g.sorteo_revision`,
+      [id,category,categories.valuesFor(category)]);
+    const saved=rows[0];
+    if (!saved || saved.habilitados.length<2 || !slots.validOrder(saved.orden,saved.habilitados,category,saved.orden.length)
+        || saved.jugadores.length!==saved.orden.length || saved.jugadores.some((p,i)=>p.id!==saved.orden[i])) {
+      throw fail(404,'Sorteo pendiente para esta categoría.');
+    }
     const players=saved.jugadores.map(player=>({
       id:player.id,nombre:player.nombre,position:player.position,ranking:player.ranking,wo:player.wo,fotoUrl:photoUrl(player)
     }));
