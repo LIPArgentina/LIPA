@@ -8,7 +8,7 @@ function fixture(){
   const sessions=new Map(),avisos=[],llamados=[];
   const players=Array.from({length:8},(_,i)=>({id:String(i+1),jugador_id:i+101,nombre:'Jugador de prueba '+(i+1),position:i+1,foto_path:'',dni:String(30000000+i)}));
   players.forEach(p=>{p.en_sala=true;p.categoria='primera';});
-  const saved={jugadores:players,resultados:{},revision:0,sorteo_revision:1,categoria:'primera',mesas:{}};
+  const saved={jugadores:players,resultados:{},revision:0,sorteo_revision:1,control_revision:0,categoria:'primera',mesas:{}};
   const draw={visible:true,orden:players.map(p=>p.id),habilitados:players.map(p=>p.id)};
   const result=rows=>({rows});
   const pool={release(){},async connect(){return pool;},async query(sql,args=[]){
@@ -20,9 +20,10 @@ function fixture(){
     if(sql.includes('SELECT i.categoria FROM torneo_inscripciones'))return result(players.filter(p=>p.jugador_id===args[1]));
     if(sql.includes('AND en_sala AND baja_at'))return result(players.filter(p=>p.en_sala));
     if(sql.includes('SELECT g.categoria,g.sorteo_revision,g.mesas'))return result([saved]);
-    if(sql.startsWith('UPDATE torneo_grillas SET mesas=')){saved.mesas=JSON.parse(args[0]);return result([]);}
+    if(sql.startsWith('UPDATE torneo_grillas SET mesas=')){saved.mesas=JSON.parse(args[0]);saved.control_revision++;return result([]);}
     if(sql.includes('SELECT id FROM torneo_organizadores'))return result([{id:1}]);
-    if(sql.includes('SELECT g.* FROM torneo_grillas') || sql.includes('SELECT g.sorteo_revision,g.publicada_at FROM torneo_grillas'))return result(args[1]==='primera'?[saved]:[]);
+    if(sql.includes('SELECT g.* FROM torneo_grillas') || sql.includes('SELECT g.sorteo_revision,g.publicada_at'))return result(args[1]==='primera'?[saved]:[]);
+    if(sql.startsWith('UPDATE torneo_grillas SET control_revision=')){saved.control_revision++;return result([]);}
     if(sql.includes('AS habilitados') && sql.includes('g.publicada_at IS NOT NULL') && sql.includes('s.revision=g.sorteo_revision'))return result((args[3] || draw.visible) && args[1]==='primera'?[{...saved,...draw}]:[]);
     if(sql.startsWith('LOCK TABLE'))return result([]);
     if(sql.startsWith('UPDATE torneo_grillas SET publicada_at')){draw.visible=true;return result([]);}
@@ -78,6 +79,13 @@ else test('DNI session, read-only API, private calls and organizer authorization
     const hidden=await request('torneo-visor/grilla/primera',null,login.token);
     assert.equal(hidden.status,404);assert.deepEqual(await hidden.json(),{error:'Sorteo pendiente para esta categoría.'});
     const publish={drawRevision:1,revision:0};
+    const resetPath='torneo-organizador/grilla/primera/control/';
+    const control={...publish,controlRevision:0,confirmar:true};
+    assert.equal((await request(resetPath+'resetear',control,login.token)).status,403);
+    assert.equal((await request(resetPath+'resetear',{...control,confirmar:false},null,true)).status,400);
+    assert.equal((await request(resetPath+'recuperar',control,null,true)).status,404);
+    assert.equal((await request(resetPath+'partido',{...control,matchId:'invalid'},null,true)).status,400);
+    assert.equal((await request(resetPath+'resetear',{...control,controlRevision:2},null,true)).status,409);
     assert.equal((await request('torneo-organizador/grilla/primera/publicar',publish,login.token)).status,403);
     assert.equal((await request('torneo-organizador/grilla/primera/publicar',{...publish,drawRevision:2},null,true)).status,409);
     assert.equal(draw.visible,false);

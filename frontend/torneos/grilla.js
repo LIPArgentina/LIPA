@@ -108,7 +108,7 @@
       if(!valid)return;
       const confirmed=assignment.receipts?.[label.dataset.player];
       label.dataset.confirmed=String(confirmed);
-      label.textContent=confirmed===true?'✓ Confirmó':confirmed===false?'Pendiente':'Sin registro';
+      label.textContent=confirmed===true?'✓ Confirmó':confirmed===false?(assignment.recuperado?'Volver a llamar':'Pendiente'):'Sin registro';
       label.title='Confirmación del último llamado a mesa';
     });
   }
@@ -146,6 +146,7 @@
     try{
       const info=await api('GET',null,'/llamados');
       if(grid!==data || grid.drawRevision!==info.drawRevision || version!==callChanges)return;
+      if(info.revision>grid.revision && !pending && !saving && !publishing && !controlling && !sendingCalls.size){await load();return;}
       for(const card of document.querySelectorAll('article[data-match-id]')){
         const id=card.dataset.matchId,assignment=info.assignments[id],previous=grid.assignments?.[id];
         if(JSON.stringify(previous?.receipts)!==JSON.stringify(assignment?.receipts) || previous?.callId!==assignment?.callId){
@@ -153,6 +154,7 @@
         }
       }
       grid.assignments=info.assignments;
+      grid.backupDate=info.backupDate;grid.published=info.published;updatePublication();
       if(JSON.stringify([grid.occupied,grid.present])!==JSON.stringify([info.occupied,info.present])){
         grid.occupied=info.occupied;grid.present=info.present;syncRoomControls();
       }
@@ -200,14 +202,17 @@
     table.setAttribute('aria-label','Mesa y piso de '+matchLabel(match));
     const key=[category,data.drawRevision,match.id].join('/');
     const button=document.createElement('button');button.className='call-match';button.textContent='🔔';button.title='Llamar a ambos jugadores';button.setAttribute('aria-label',button.title);
+    const reset=document.createElement('button');reset.type='button';reset.className='reset-match';reset.textContent='Reset';
+    reset.setAttribute('aria-label','Resetear '+matchLabel(match));reset.onclick=()=>gridAction('partido',match);
     const own=t=>t.category===category && t.drawRevision===data.drawRevision && t.matchId===match.id && t.a===match.a && t.b===match.b;
     const playable=()=>Boolean(match.a && match.b && [match.a,match.b].every(id=>data.present?.includes(id)));
     const code=t=>t?t.piso+'-'+t.mesa:'';
     function options(){
       const occupied=data.occupied || [],mine=occupied.find(own);
       const location=match.winner && valid?saved:mine;
-      table.replaceChildren(new Option(location && !match.winner?'Liberar mesa':'Elegir mesa',''));
-      for(const [piso,numbers] of Object.entries(LipaMesas.pisos)){
+      table.replaceChildren(new Option(match.winner?'Sin mesa':location?'Liberar mesa':'Elegir mesa',''));
+      if(match.winner && location)table.add(new Option('Mesa '+location.mesa+' · '+location.piso,code(location)));
+      for(const [piso,numbers] of Object.entries(match.winner?{}:LipaMesas.pisos)){
         const group=document.createElement('optgroup');group.label=piso==='arriba'?'Arriba':'Abajo';
         for(const mesa of numbers){
           const selected=location?.piso===piso && location.mesa===mesa;
@@ -219,6 +224,7 @@
       table.value=code(location);
       button.disabled=Boolean(match.winner)||saving||Boolean(pending)||conflicted||sendingCalls.has(key);
       table.disabled=button.disabled || (!playable() && !mine);
+      reset.disabled=saving || Boolean(pending) || conflicted || sendingCalls.size>0 || !(match.score.some(n=>n!==null) || mine || data.assignments?.[match.id]);
     }
     table.onchange=async()=>{
       const grid=data,previous=code((grid.occupied||[]).find(own)),[piso,n]=table.value.split('-');
@@ -262,7 +268,7 @@
         }
       }
     };
-    row.append(table,button);return row;
+    row.append(table,button,reset);return row;
   }
   function renderBoard(rounds, boardId, frameId, repechage=false) {
     const board=$(boardId),frame=$(frameId);board.replaceChildren();
@@ -379,13 +385,61 @@
     status('El visor se actualiza automáticamente.');
   }
   let publishing=false;
+  let controlling=false;
+  async function gridAction(action,match){
+    const grid=data;
+    if(!grid || controlling || publishing || saving || pending || conflicted || sendingCalls.size)return;
+    controlling=true;lockTabs(true);$('#bracketPanel').inert=true;updatePublication();
+    const dialog=$('#gridActionDialog'),division=category.toUpperCase();
+    try{
+      // Capture the table/call version before opening the confirmation, including edits from this tab.
+      const info=await api('GET',null,'/llamados');
+      if(data!==grid || pending || saving || publishing || sendingCalls.size)return;
+      if(info.drawRevision!==grid.drawRevision || info.revision!==grid.revision)throw new Error('La grilla cambió. Recargá la categoría.');
+      const body={revision:grid.revision,drawRevision:grid.drawRevision,controlRevision:info.controlRevision,confirmar:true};
+      let title,detail,accept;
+      if(action==='partido'){
+        body.matchId=match.id;
+        title='¿Resetear este partido de '+division+'?';accept='Resetear partido';
+        detail=matchLabel(match)+'. Se borrarán sus puntos, mesa y llamados. También se limpiarán los cruces posteriores cuyos jugadores cambien.';
+      }else if(action==='resetear'){
+        title='¿Resetear la grilla completa de '+division+'?';accept='Resetear grilla completa';
+        detail='Se guardará una copia en la base de datos y se borrarán todos los resultados, mesas y llamados de esta categoría. El sorteo se conserva y la grilla quedará en borrador.';
+      }else{
+        if(!info.backupDate)throw new Error('Todavía no hay una copia para este sorteo.');
+        title='¿Recargar la última grilla de '+division+'?';accept='Recargar última grilla';
+        detail='La copia del '+new Date(info.backupDate).toLocaleString('es-AR')+' reemplazará los valores actuales de esta categoría. Las mesas volverán a asignarse y la grilla quedará en borrador. Para llamar a los jugadores, usá la campana.';
+      }
+      $('#gridActionTitle').textContent=title;$('#gridActionInfo').textContent=detail;$('#acceptGridAction').textContent=accept;
+      dialog.returnValue='cancel';
+      const confirmed=new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='confirm'),{once:true}));
+      dialog.showModal();
+      if(!await confirmed || grid!==data)return;
+      const previousZoom=zoom;
+      await api('POST',body,'/control/'+action);
+      await load();
+      if(data && match){
+        zoom=previousZoom;applyZoom();
+        document.querySelector('[data-match-id="'+match.id+'"]')?.scrollIntoView({block:'center',inline:'nearest'});
+      }
+      if(data)status(action==='partido'?'Partido reseteado.':action==='resetear'?'Grilla reseteada. La copia quedó guardada.':'Última grilla recuperada.');
+    }catch(error){status(error.message,true);$('#reload').hidden=false;}
+    finally{controlling=false;$('#bracketPanel').inert=false;if(!pending && !saving)lockTabs(false);updatePublication();}
+  }
+  if(!viewer){
+    $('#resetGrid').onclick=()=>gridAction('resetear');
+    $('#restoreGrid').onclick=()=>gridAction('recuperar');
+  }
   function updatePublication(){
     if(viewer || !$('#publication'))return;
-    $('#publication').hidden=!data?.canPublish;
-    if(!data?.canPublish)return;
-    $('#publicationStatus').textContent=data.published?'Grilla publicada en '+category+'.':'Borrador de '+category+' · Los llamados llegan a los dos jugadores.';
-    $('#publishGrid').hidden=data.published;
-    $('#publishGrid').disabled=publishing || saving || Boolean(pending) || conflicted;
+    $('#publication').hidden=!data;
+    if(!data)return;
+    $('#publicationStatus').textContent=!data.canPublish?'':data.published?'Grilla publicada en '+category+'.':'Borrador de '+category+' · Los llamados llegan a los dos jugadores.';
+    $('#publishGrid').hidden=!data.canPublish || data.published;
+    const busy=publishing || controlling || saving || Boolean(pending) || conflicted;
+    $('#publishGrid').disabled=busy;$('#resetGrid').disabled=busy;
+    $('#restoreGrid').disabled=busy || !data.backupDate;
+    $('#restoreGrid').title=data.backupDate?'Recuperar la copia anterior al último reset completo':'Primero guardá una copia con Resetear grilla completa';
   }
   if($('#publishGrid'))$('#publishGrid').onclick=async()=>{
     const grid=data;
@@ -409,7 +463,7 @@
         if(!result.ok)throw new Error('No se pudieron cargar las mesas.');
         const info=await result.json();
         if(info.drawRevision!==undefined && info.drawRevision!==response.drawRevision)throw new Error('Cambió el sorteo. Recargá la categoría.');
-        Object.assign(response,{present:info.present,occupied:info.occupied,assignments:info.assignments,canPublish:info.canPublish,published:info.published});
+        Object.assign(response,{present:info.present,occupied:info.occupied,assignments:info.assignments,canPublish:info.canPublish,published:info.published,backupDate:info.backupDate});
       }
       if(request!==requestId)return;
       data=response;state=engine.build(data.players,data.results,category);

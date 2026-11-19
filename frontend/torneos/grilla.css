@@ -12,7 +12,9 @@
 #soundStatus{font-size:12px;color:#e2d1a2}#soundStatus:empty{display:none}
 .player-identity{min-width:0;font-size:10px;line-height:1.05}.player-identity .name{display:block}
 .attendance-note{display:none}.player.absent{filter:grayscale(1);background:#26282a;color:#b5b5b5}.player.absent .attendance-note{display:block;font-size:9px;line-height:1.1;color:#ccc}.match:has(.absent) .player{height:45px}
-.match-call select.match-table{width:146px;max-width:76%}
+.match-call select.match-table{width:120px;min-width:0;flex-shrink:1}
+.match-call .reset-match{height:25px;padding:0 6px;border:1px solid #937842;border-radius:5px;background:#201b14;color:#f8d98c;font:700 10px Montserrat,system-ui,sans-serif}
+#publication{flex-wrap:wrap}#resetGrid{border-color:#94664e;color:#ffbf98}
 .match.with-receipts .player{height:45px}
 .call-receipt:not([hidden]){display:block;font-size:9px;font-weight:700;line-height:1.12;color:#bdb9ad}
 .call-receipt[data-confirmed="false"]{color:#ffda78}.call-receipt[data-confirmed="true"]{color:#98edb6}

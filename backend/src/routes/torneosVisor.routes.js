@@ -35,6 +35,9 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
         ADD COLUMN IF NOT EXISTS confirmado_at TIMESTAMPTZ;
       CREATE INDEX IF NOT EXISTS torneo_avisos_llamado_idx ON torneo_avisos(llamado_id);
       CREATE INDEX IF NOT EXISTS torneo_llamados_grilla_idx ON torneo_llamados(organizador_id,categoria,sorteo_revision,id DESC);
+      ALTER TABLE torneo_llamados ADD COLUMN IF NOT EXISTS estado_grilla TEXT NOT NULL DEFAULT 'activo';
+      ALTER TABLE torneo_grillas ADD COLUMN IF NOT EXISTS respaldo_reset JSONB,
+        ADD COLUMN IF NOT EXISTS control_revision INTEGER NOT NULL DEFAULT 0;
       UPDATE torneo_grillas g SET mesas=COALESCE((SELECT jsonb_object_agg(m.match_id,jsonb_build_object('a',m.a,'b',m.b,'piso',m.piso,'mesa',m.mesa))
         FROM (SELECT DISTINCT ON(match_id) match_id,a,b,piso,mesa FROM torneo_llamados
           WHERE organizador_id=g.torneo_organizador_id AND categoria=g.categoria AND sorteo_revision=g.sorteo_revision
@@ -66,15 +69,15 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     return rows[0];
   }
   async function assignments(id, category, revision) {
-    const {rows} = await pool.query(`SELECT DISTINCT ON(match_id) match_id,a,b,mesa,piso FROM torneo_llamados WHERE organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3 ORDER BY match_id,id DESC`,[id,category,revision]);
+    const {rows} = await pool.query(`SELECT DISTINCT ON(match_id) match_id,a,b,mesa,piso FROM torneo_llamados WHERE organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3 AND estado_grilla<>'archivado' ORDER BY match_id,id DESC`,[id,category,revision]);
     return Object.fromEntries(rows.map(row=>[row.match_id,row]));
   }
   async function organizerAssignments(id,category,revision){
     const {rows}=await pool.query(`WITH ultimos AS (
-      SELECT DISTINCT ON(match_id) id,match_id,a,b,mesa,piso FROM torneo_llamados
-      WHERE organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3 ORDER BY match_id,id DESC
+      SELECT DISTINCT ON(match_id) id,match_id,a,b,mesa,piso,estado_grilla FROM torneo_llamados
+      WHERE organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3 AND estado_grilla<>'archivado' ORDER BY match_id,id DESC
     )
-    SELECT u.match_id,u.a,u.b,u.mesa,u.piso,u.id::text AS "callId",
+    SELECT u.match_id,u.a,u.b,u.mesa,u.piso,u.id::text AS "callId",u.estado_grilla='recuperado' AS recuperado,
       ARRAY(SELECT json_build_object('inscripcion',v.inscripcion_id,'pendiente',v.clave_pendiente IS NOT NULL,
         'confirmado',v.confirmado_at IS NOT NULL) FROM torneo_avisos v WHERE v.llamado_id=u.id ORDER BY v.id) AS avisos
     FROM ultimos u`,[id,category,revision]);
@@ -157,21 +160,24 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const user=await session(req), after=String(req.query.after || '0');
     if (!/^\d{1,20}$/.test(after)) throw fail(400,'Consulta inválida.');
     res.locals.lecturaVisor=true;
-    const {rows}=await pool.query(`SELECT id::text,mensaje,created_at FROM torneo_avisos WHERE jugador_id=$1 AND id>$2::bigint AND created_at>NOW()-INTERVAL '12 hours' ORDER BY torneo_avisos.id LIMIT 30`,[user.jugador_id,after]);
+    const {rows}=await pool.query(`SELECT id::text,mensaje,created_at FROM torneo_avisos WHERE jugador_id=$1 AND id>$2::bigint AND created_at>NOW()-INTERVAL '12 hours'
+      AND EXISTS(SELECT 1 FROM torneo_llamados l WHERE l.id=llamado_id AND l.estado_grilla='activo') ORDER BY torneo_avisos.id LIMIT 30`,[user.jugador_id,after]);
     res.json({avisos:rows,serverTime:Date.now()});
   }));
   router.get('/torneo-visor/llamados',route(async(req,res)=>{
     const user=await session(req);
     res.locals.lecturaVisor=true;
     const {rows}=await pool.query(`SELECT id::text,mensaje,clave_pendiente FROM torneo_avisos
-      WHERE jugador_id=$1 AND clave_pendiente IS NOT NULL ORDER BY torneo_avisos.id DESC`,[user.jugador_id]);
+      WHERE jugador_id=$1 AND clave_pendiente IS NOT NULL AND EXISTS(SELECT 1 FROM torneo_llamados l WHERE l.id=llamado_id AND l.estado_grilla='activo')
+      ORDER BY torneo_avisos.id DESC`,[user.jugador_id]);
     res.json({avisos:rows});
   }));
   router.post('/torneo-visor/avisos/:id/confirmar',route(async(req,res)=>{
     const user=await session(req), id=req.params.id;
     if(!/^[1-9]\d{0,18}$/.test(id) || BigInt(id)>9223372036854775807n)throw fail(400,'Aviso inválido.');
     const result=await pool.query(`UPDATE torneo_avisos SET confirmado_at=CASE WHEN clave_pendiente IS NOT NULL THEN NOW() ELSE confirmado_at END,
-      clave_pendiente=NULL WHERE jugador_id=$1 AND id=$2 RETURNING id`,[user.jugador_id,id]);
+      clave_pendiente=NULL WHERE jugador_id=$1 AND id=$2 AND EXISTS(SELECT 1 FROM torneo_llamados l
+        WHERE l.id=llamado_id AND l.estado_grilla='activo') RETURNING id`,[user.jugador_id,id]);
     if(!result.rowCount)throw fail(404,'Aviso inexistente.');
     res.json({ok:true});
   }));
@@ -195,14 +201,15 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
   router.get('/torneo-organizador/grilla/:categoria/llamados',requireTorneoOrganizador,route(async(req,res)=>{
     const id=req.user.torneoOrganizadorId,category=req.params.categoria;
     if(!validCategory(category))throw fail(400,'Categoría inválida.');
-    const {rows:[saved]}=await pool.query(`SELECT g.sorteo_revision,g.publicada_at FROM torneo_grillas g JOIN torneo_sorteos s
+    const {rows:[saved]}=await pool.query(`SELECT g.sorteo_revision,g.publicada_at,g.control_revision,g.revision,g.respaldo_reset->>'fecha' AS respaldo_fecha FROM torneo_grillas g JOIN torneo_sorteos s
       ON s.torneo_organizador_id=g.torneo_organizador_id AND s.categoria=g.categoria AND s.revision=g.sorteo_revision
       WHERE g.torneo_organizador_id=$1 AND g.categoria=$2`,[id,category]);
     if(!saved)throw fail(404,'No hay grilla para esta categoría.');
     res.locals.lecturaVisor=true;
     const [owner,locations,present,occupied]=await Promise.all([organizer(),organizerAssignments(id,category,saved.sorteo_revision),presentPlayers(id,category),occupiedTables(pool,id)]);
-    res.json({canPublish:id===owner,published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,assignments:locations,present,occupied});
+    res.json({canPublish:id===owner,published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,revision:saved.revision,controlRevision:saved.control_revision,backupDate:saved.respaldo_fecha,assignments:locations,present,occupied});
   }));
+  require('./torneosReset.routes')(router,{pool,route,requireTorneoOrganizador,readGrid,occupiedTables});
   router.post('/torneo-organizador/grilla/:categoria/publicar',requireTorneoOrganizador,route(async(req,res)=>{
     const id=req.user.torneoOrganizadorId, category=req.params.categoria;
     if (id!==await organizer()) throw fail(403,'Este organizador no administra el visor del evento.');
@@ -254,7 +261,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     if(key!==selected){
       const locations={...saved.mesas};
       if(release)delete locations[match.id];else locations[match.id]={mesa,piso,a:match.a,b:match.b};
-      await client.query('UPDATE torneo_grillas SET mesas=$1::jsonb WHERE torneo_organizador_id=$2 AND categoria=$3',[JSON.stringify(locations),id,category]);
+      await client.query('UPDATE torneo_grillas SET mesas=$1::jsonb,control_revision=control_revision+1 WHERE torneo_organizador_id=$2 AND categoria=$3',[JSON.stringify(locations),id,category]);
     }
     return context;
   }
@@ -279,6 +286,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       const {rows}=await client.query(`INSERT INTO torneo_llamados(organizador_id,categoria,sorteo_revision,match_id,a,b,mesa,piso,mensaje) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,[req.user.torneoOrganizadorId,req.params.categoria,saved.sorteo_revision,match.id,match.a,match.b,mesa,piso,mensaje]);
       callId=String(rows[0].id);
       for (const player of [a,b]) await client.query('INSERT INTO torneo_avisos(llamado_id,jugador_id,mensaje,clave_pendiente,inscripcion_id) VALUES($1,$2,$3,$4,$5)',[callId,player.jugador_id,mensaje,destinations.get(player.jugador_id),player.id]);
+      await client.query('UPDATE torneo_grillas SET control_revision=control_revision+1 WHERE torneo_organizador_id=$1 AND categoria=$2',[req.user.torneoOrganizadorId,req.params.categoria]);
       await client.query('COMMIT');
     } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
     if (firebase) {

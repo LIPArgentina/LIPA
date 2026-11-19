@@ -13,6 +13,8 @@ El visor comparte la grilla del organizador y los resultados publicados en LIPA.
 
 ## Publicación
 
+«Reset» junto a cada mesa limpia el marcador, la mesa y los llamados del cruce. También limpia los partidos posteriores cuyos rivales cambian. «Resetear grilla completa» guarda en la base la última versión de la categoría dentro del mismo sorteo y la deja en blanco y en borrador. «Recargar última grilla» recupera esa copia en borrador. Si una mesa de la copia está ocupada en otra categoría, la recuperación se cancela y muestra el conflicto. Recuperar una copia no reenvía los llamados.
+
 En la grilla del organizador, cada jugador muestra «Pendiente» o «✓ Confirmó» para el último llamado de ese cruce. La consulta se actualiza cada cinco segundos. «Sin registro» identifica llamados antiguos cuyo estado no se puede reconstruir. El visor personal retira cada mensaje al tocarlo y conserva en pantalla los que todavía esperan confirmación.
 
 Rodrigo puede sortear y probar los llamados en borrador. En la grilla del organizador, «Publicar grilla» habilita únicamente la categoría que está viendo. Al repetir el sorteo, esa categoría vuelve a borrador. Los llamados de mesa se entregan a ambos jugadores también durante las pruebas.
