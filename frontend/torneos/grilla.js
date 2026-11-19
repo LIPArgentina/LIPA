@@ -1,6 +1,7 @@
 (() => {
   'use strict';
-  if (window.LPI_AUTH?.readSession?.()?.role !== 'torneo') {
+  const viewer=document.body.dataset.viewer==='true';
+  if (!viewer && window.LPI_AUTH?.readSession?.()?.role !== 'torneo') {
     location.replace(`/auth/login.html?return=${encodeURIComponent(location.pathname)}`); return;
   }
   const engine = window.LipaBracket, $ = s => document.querySelector(s);
@@ -13,6 +14,7 @@
   document.querySelectorAll('[data-category]').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.category===category)));
   const dimensions=[];
   async function api(method, body) {
+    if(viewer){if(method!=='GET')throw new Error('El visor es de solo lectura.');return LipaViewer.api('grilla/'+category);}
     const response=await fetch(`${API}/api/torneo-organizador/grilla/${category}`, {
       method, credentials:'include', headers:{'Content-Type':'application/json'},
       ...(body ? {body:JSON.stringify(body)} : {}), signal:AbortSignal.timeout(20000)
@@ -31,7 +33,7 @@
   }
   function photo(player) {
     const img=document.createElement('img'); img.alt=''; img.loading='lazy';
-    img.src=player?.foto_path ? `${API}/api/players-admin/photo/${encodeURIComponent(player.foto_path)}` : '../logo_liga.png';
+    img.src=player?.fotoUrl ? API+player.fotoUrl : '../logo_liga.png';
     img.addEventListener('error',()=>{img.src='../logo_liga.png';},{once:true}); return img;
   }
   const preview=$('#playerPreview');
@@ -46,20 +48,26 @@
     preview.style.left=`${Math.max(margin,Math.min(left,width-bounds.width-margin))}px`;
     preview.style.top=`${Math.max(margin,Math.min(top,height-bounds.height-margin))}px`;
   }
-  function openPreview(player,event,trigger) {
+  function openPreview(player,event,trigger,match) {
     const bounds=trigger.getBoundingClientRect();
     previewPoint=event.detail===0?{x:bounds.left+bounds.width/2,y:bounds.top+bounds.height/2}:{x:event.clientX,y:event.clientY};
     $('#previewName').textContent=player.nombre;
     const img=photo(player);img.alt=`Foto de ${player.nombre}`;img.loading='eager';
     $('#previewPhoto').replaceChildren(img);
+    const contact=$('#previewContact');contact.hidden=viewer || !match?.a || !match?.b;
+    contact.onclick=async()=>{
+      contact.disabled=true;
+      try{const result=await organizerAction('contactar',match,{playerId:player.id,...matchLocation(match)});location.href=result.url;}
+      catch(error){status(error.message,true);}finally{contact.disabled=false;}
+    };
     preview.showModal();placePreview();
   }
-  function enablePreview(node,player) {
+  function enablePreview(node,player,match) {
     if(!player || player.id===null)return;
     node.classList.add('player-peek');node.setAttribute('role','button');node.tabIndex=0;
     node.setAttribute('aria-haspopup','dialog');node.setAttribute('aria-label',`Ampliar foto de ${player.nombre}`);
-    node.addEventListener('click',event=>openPreview(player,event,node));
-    node.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openPreview(player,{detail:0},node);}});
+    node.addEventListener('click',event=>openPreview(player,event,node,match));
+    node.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openPreview(player,{detail:0},node,match);}});
   }
   $('#closePreview').addEventListener('click',()=>preview.close());
   preview.addEventListener('click',event=>{if(event.target===preview){const r=preview.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)preview.close();}});
@@ -70,16 +78,18 @@
     row.className=`player ${id && id===match.winner?'winner':''} ${!p?'placeholder':''} ${wo?'wo':''}`;
     const number=document.createElement('span');number.className='position';number.textContent=p?.position || (wo && match.id.startsWith('de-w0-')?Number(match.id.split('-').at(-1))*2+slot+1:'—');
     const name=document.createElement('span');name.className='name';name.textContent=p?.nombre || (wo?'WO':label || sourceLabel(match.sources?.[slot]));
-    enablePreview(name,p);
+    enablePreview(name,p,match);
     const select=document.createElement('select');
     select.setAttribute('aria-label',`${matchLabel(match)} · Puntos de ${p?.nombre || 'jugador por definir'}${p?'':' '+(slot+1)}`);
     select.dataset.match=match.id;select.dataset.slot=slot;
     const blank=document.createElement('option');blank.value='';blank.textContent='—';select.append(blank);
     for(let value=0;value<=engine.limits[category];value++) {const option=document.createElement('option');option.value=value;option.textContent=value;select.append(option);}
     select.value=match.score[slot]===null?'':String(match.score[slot]);
-    select.disabled=!match.a || !match.b || match.bye || Boolean(pending) || saving || conflicted;
+    select.disabled=viewer || !match.a || !match.b || match.bye || Boolean(pending) || saving || conflicted;
     select.addEventListener('change',onScore);
-    row.append(number,photo(p),name,select);return row;
+    const portrait=photo(p);
+    enablePreview(portrait,p,match);
+    row.append(number,portrait,name,select);return row;
   }
   function card(match, pos, board, players, isFinal, repechage) {
     const node=document.createElement('article');node.className=`match ${isFinal?'finalist':''} ${match.bye?'rep-pass':''}`;
@@ -88,8 +98,38 @@
     const label=document.createElement('p');label.className='match-label';
     label.textContent=match.bye?'PASE AUTOMÁTICO · WO':match.id===state.final.id?'GRAN FINAL':match.label.replace('Ganadores · Ronda ','G').replace('Perdedores · Ronda ','P').replace('Eliminación directa · Ronda ','E');
     node.title=match.label+' — '+match.sources.map(sourceLabel).join(' / ');
-    node.append(label,playerRow(match.a,match,0,players),playerRow(match.b,match,1,players));
+    node.append(label,playerRow(match.a,match,0,players),callControls(match),playerRow(match.b,match,1,players));
     board.append(node);
+  }
+  function matchLocation(match){
+    const node=document.querySelector('[data-match-id="'+match.id+'"]');
+    return {mesa:Number(node?.querySelector('.match-table')?.value),piso:node?.querySelector('.match-floor')?.value||''};
+  }
+  async function organizerAction(action,match,extra={}){
+    const response=await fetch(API+'/api/torneo-organizador/grilla/'+category+'/'+action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({matchId:match.id,revision:data.revision,drawRevision:data.drawRevision,...extra}),signal:AbortSignal.timeout(20000)});
+    const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo completar.');return result;
+  }
+  function callControls(match){
+    const row=document.createElement('div');row.className='match-call';
+    if(!match.a || !match.b || match.bye)return row;
+    const saved=data.assignments?.[match.id];
+    const valid=saved && saved.a===match.a && saved.b===match.b;
+    if(viewer){row.textContent=valid?'Mesa '+saved.mesa+' · '+saved.piso:'Mesa por asignar';return row;}
+    const table=document.createElement('select');table.className='match-table';table.setAttribute('aria-label','Mesa de '+matchLabel(match));
+    table.add(new Option('Mesa',''));for(let n=1;n<=19;n++)table.add(new Option(String(n),String(n)));
+    const floor=document.createElement('select');floor.className='match-floor';floor.setAttribute('aria-label','Piso de '+matchLabel(match));
+    floor.add(new Option('Piso',''));floor.add(new Option('Arriba','arriba'));floor.add(new Option('Abajo','abajo'));
+    if(valid){table.value=saved.mesa;floor.value=saved.piso;}
+    const button=document.createElement('button');button.className='call-match';button.textContent='🔔';button.title='Llamar a ambos jugadores';button.setAttribute('aria-label','Llamar a ambos jugadores');
+    button.disabled=Boolean(match.winner)||saving||Boolean(pending);
+    button.onclick=async()=>{
+      const mesa=Number(table.value),piso=floor.value;
+      if(!mesa || !piso){status('Elegí la mesa y el piso antes de llamar.',true);return;}
+      button.disabled=true;
+      try{const result=await organizerAction('llamar',match,{mesa,piso});data.assignments={...data.assignments,[match.id]:result.assignment};status('Llamado enviado a ambos jugadores.');}
+      catch(error){status(error.message,true);}finally{button.disabled=Boolean(match.winner);}
+    };
+    row.append(table,floor,button);return row;
   }
   function renderBoard(rounds, boardId, frameId, repechage=false) {
     const board=$(boardId),frame=$(frameId);board.replaceChildren();
@@ -121,14 +161,14 @@
     if(boardId==='#finalBoard')rounds[depth].forEach((final,index)=>{
     const fp=positions.get(final.id),winner=players.get(final.winner);
     const crown=document.createElement('div');crown.className='champion';
-    const cx=dual?fp.x:(depth+1)*(W+G),cy=dual?fp.y+145:fp.center-65;
+    const cx=dual?fp.x:(depth+1)*(W+G),cy=dual?fp.y+185:fp.center-65;
     crown.style.cssText=`left:${cx-8}px;top:${cy}px;width:${W+16}px`;
     const crownTitle=document.createElement('small');crownTitle.textContent=repechage?(category==='tercera'?`CLASIFICADO ${index+1}`:'CLASIFICADO DEL REPECHAJE'):'★ CAMPEÓN ★';
     const winnerName=document.createElement('strong');winnerName.textContent=winner?.nombre || (repechage?(category==='tercera'?'Esperando clasificado':'Esperando clasificado'):'Esperando al campeón');
-    enablePreview(winnerName,winner);
+    enablePreview(winnerName,winner,final);
     crown.append(crownTitle,photo(winner),winnerName);board.append(crown);
     const finalPath=document.createElementNS(svg.namespaceURI,'path');
-    finalPath.setAttribute('d',dual?`M ${fp.x+W/2} ${fp.y+110} V ${cy}`:`M ${fp.x+W} ${fp.center} H ${cx}`);svg.append(finalPath);
+    finalPath.setAttribute('d',dual?`M ${fp.x+W/2} ${fp.y+150} V ${cy}`:`M ${fp.x+W} ${fp.center} H ${cx}`);svg.append(finalPath);
     boardHeight=Math.max(boardHeight,cy+145);
     });
     svg.setAttribute('height',boardHeight);
@@ -188,11 +228,13 @@
     const request=++requestId;data=null;state=null;conflicted=false;$('#emptyState').hidden=true;$('#mainSection').hidden=true;$('#repSection').hidden=true;$('#finalSection').hidden=true;$('#reload').hidden=true;status('Cargando grilla…');
     try {
       const response=await api('GET');if(request!==requestId)return;
+      if(!viewer){const result=await fetch(API+'/api/torneo-organizador/grilla/'+category+'/llamados',{credentials:'include',cache:'no-store'});if(!result.ok)throw new Error('No se pudieron cargar las mesas.');response.assignments=(await result.json()).assignments;}
+      if(request!==requestId)return;
       data=response;state=engine.build(data.players,data.results,category);
-      $('#mainSection').hidden=false;$('#repSection').hidden=false;$('#finalSection').hidden=false;status(data.legacyResults?'Formato actualizado: se conservan las primeras dos rondas compatibles; los resultados de las etapas reemplazadas quedan archivados.':'Resultados guardados automáticamente.');render();fit();
+      $('#mainSection').hidden=false;$('#repSection').hidden=false;$('#finalSection').hidden=false;status(viewer?'Actualización automática cada 10 segundos.':data.legacyResults?'Formato actualizado: se conservan las primeras dos rondas compatibles; los resultados de las etapas reemplazadas quedan archivados.':'Resultados guardados automáticamente.');render();fit();
     } catch(error) {
       if(request!==requestId)return;status('No se pudo abrir esta categoría.',true);
-      const box=$('#emptyState');box.replaceChildren();const p=document.createElement('p');p.textContent=error.message;const a=document.createElement('a');a.href='./sorteo.html';a.textContent='Ir al sorteo';box.append(p,a);box.hidden=false;$('#reload').hidden=false;
+      const box=$('#emptyState');box.replaceChildren();const p=document.createElement('p');p.textContent=error.message;const a=document.createElement('a');a.href=viewer?'./torneos.html':'./sorteo.html';a.textContent=viewer?'Volver a torneos':'Ir al sorteo';box.append(p,a);box.hidden=false;$('#reload').hidden=false;
     }
   }
   document.querySelectorAll('[data-category]').forEach(button=>button.addEventListener('click',()=>{
@@ -205,5 +247,36 @@
   $('#fitView').addEventListener('click',fit);$('#retrySave').addEventListener('click',persist);
   $('#reload').addEventListener('click',()=>{pending=null;lockTabs(false);$('#retrySave').hidden=true;load();});
   window.addEventListener('beforeunload',event=>{if(pending || saving){event.preventDefault();event.returnValue='';}});
+  if(viewer){
+    if(!LipaViewer.read()){location.replace('./torneos.html');return;}
+    LipaViewer.api('session').then(user=>$('#viewerName').textContent=user.nombre).catch(error=>{if(error.status===401)location.replace('./torneos.html');else status(error.message,true);});
+    $('#logoutViewer').onclick=()=>LipaViewer.logout().catch(error=>status(error.message,true));
+    $('#enablePush').onclick=async()=>{const button=$('#enablePush');button.disabled=true;try{await LipaViewerPush();$('#pushStatus').textContent='Notificaciones activadas.';}catch(error){$('#pushStatus').textContent=error.message;}finally{button.disabled=false;}};
+    if(window.AndroidBridge){$('#enablePush').hidden=true;$('#pushStatus').textContent='Mantené el visor abierto para recibir tus llamados a mesa.';}
+    let refreshing=false;
+    async function refresh(){
+      if(document.hidden || refreshing)return;refreshing=true;
+      try{
+        const request=requestId, response=await api('GET');
+        if(request!==requestId)return;
+        if(!data || data.revision!==response.revision || data.drawRevision!==response.drawRevision ||
+            JSON.stringify(data.assignments)!==JSON.stringify(response.assignments)){
+          const firstLoad=!data;
+          data=response;state=engine.build(data.players,data.results,category);
+          $('#emptyState').hidden=true;$('#reload').hidden=true;$('#mainSection').hidden=false;$('#finalSection').hidden=false;
+          render();if(firstLoad)fit();
+        }
+        status('Actualizado · '+new Date().toLocaleTimeString('es-AR'));
+      }catch(error){if(error.status===401){location.replace('./torneos.html');return;}if(error.status===404 && data){load();return;}status(error.message,true);}
+      finally{refreshing=false;}
+    }
+    let lastCall='0',checking=false;
+    async function calls(){if(document.hidden||checking)return;checking=true;try{
+      const result=await LipaViewer.api('avisos?after='+lastCall);
+      const box=$('#personalCalls');
+      result.avisos.forEach(call=>{const item=document.createElement('p');item.textContent=call.mensaje;box.prepend(item);box.hidden=false;lastCall=call.id;while(box.children.length>5)box.lastElementChild.remove();});
+    }catch(error){if(error.status===401)location.replace('./torneos.html');}finally{checking=false;}}
+    setInterval(refresh,10000);setInterval(calls,5000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refresh();calls();}});calls();
+  }
   load();
 })();

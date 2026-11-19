@@ -1,4 +1,5 @@
 const bracket = require('../../../frontend/torneos/grilla-engine');
+const { photoUrl } = require('../torneoFoto');
 const categories = require('../../../frontend/torneos/categorias');
 const slots = require('../../../frontend/torneos/cupos');
 
@@ -53,7 +54,11 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
       }));
       await client.query('COMMIT');
       res.set('Cache-Control','no-store');
-      res.json({players, results:bracket.build(players,saved.resultados,category).clean, legacyResults:Object.keys(saved.resultados||{}).some(id=>! /^(de-[wl][01]-|mx-k)/.test(id)), revision:saved.revision, drawRevision:saved.sorteo_revision});
+      const publicPlayers=players.map(player=>{
+        const {foto_path,...info}=player;
+        return {...info,fotoUrl:photoUrl(player)};
+      });
+      res.json({players:publicPlayers, results:bracket.build(players,saved.resultados,category).clean, legacyResults:Object.keys(saved.resultados||{}).some(id=>! /^(de-[wl][01]-|mx-k)/.test(id)), revision:saved.revision, drawRevision:saved.sorteo_revision});
     } catch(error) {
       if(client) await client.query('ROLLBACK').catch(()=>{});
       if(!error.status) console.error('GET torneo grilla',error);

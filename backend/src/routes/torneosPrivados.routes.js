@@ -386,6 +386,7 @@ module.exports = function createTorneosPrivadosRouter() {
   });
 
   mountGrillaRoutes(router, { pool, ensureSchema, requireTorneoOrganizador, getTournamentRanking });
+  require('./torneosVisor.routes')(router, { pool, ensureSchema, requireTorneoOrganizador });
 
   router.get('/torneo-organizador/sorteos', requireTorneoOrganizador, async (req, res) => {
     try {

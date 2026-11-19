@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const sharp = require('sharp');
+const { validPhoto } = require('../torneoFoto');
 const pool = require('../../db');
 const { requireAdmin, requireSecondCategoryAccess } = require('../middleware/auth');
 
@@ -2180,6 +2181,23 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     } finally {
       client.release();
     }
+  });
+
+  router.get('/torneo-foto/:id/:code', async (req, res) => {
+    const {id,code}=req.params;
+    if (!validPhoto(id,code)) return res.sendStatus(404);
+    res.locals.lecturaVisor=true;
+    try {
+      const {rows}=await pool.query(`SELECT j.foto_path FROM torneo_inscripciones i
+        JOIN jugadores j ON j.id=i.jugador_id WHERE i.id=$1 AND i.baja_at IS NULL`,[id]);
+      const filename=rows[0]?.foto_path;
+      if (!filename || filename!==safeName(path.basename(filename))) return res.sendStatus(404);
+      const variant=await getPlayerDisplayVariant(path.join(playersRoot,filename),filename);
+      res.set('Cross-Origin-Resource-Policy','cross-origin').set('Cache-Control','private, max-age=300');
+      return res.type('image/webp').sendFile(variant, error=>{
+        if (error && !res.headersSent) res.sendStatus(404);
+      });
+    } catch { return res.sendStatus(404); }
   });
 
   router.get('/players-admin/photo/:filename', async (req, res) => {

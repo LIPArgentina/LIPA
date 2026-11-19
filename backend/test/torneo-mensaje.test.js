@@ -13,7 +13,7 @@ function harness() {
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/routes/torneosPrivados.routes.js'),'utf8'),{module,console,require(name){
     if(name==='express')return {Router:()=>router};if(name==='../../db')return pool;
     if(name==='../middleware/auth')return {requireTorneoOrganizador:auth};
-    if(name==='./torneosGrilla.routes')return ()=>{};return {};
+    if(['./torneosGrilla.routes','./torneosVisor.routes'].includes(name))return ()=>{};return {};
   }});module.exports();
   const handlers=routes['put /torneo-organizador/mensaje-difusion'];
   assert.equal(handlers[0],auth);

@@ -1,0 +1,11 @@
+{
+  "config": {
+    "apiKey": "AIzaSyAJ_2qzCkvpX3FZPxM6fbMv9qX7eNWaJSU",
+    "authDomain": "lipa-app-4a7c7.firebaseapp.com",
+    "projectId": "lipa-app-4a7c7",
+    "storageBucket": "lipa-app-4a7c7.firebasestorage.app",
+    "messagingSenderId": "146181020860",
+    "appId": "1:146181020860:web:01b70afc1d3ff45786c4b9"
+  },
+  "vapidKey": "BBo1MBwbcxCXv0WNrhVieBhFLiuqMMo8i-eS4wS_8UPov2zfozsPIYdanpPtIuKKYZ3ZNOJ9_00Y3A84TcRyldA"
+}

@@ -82,6 +82,9 @@ const isLocalRequest = (req) => {
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
+  // En la sede, muchos visores comparten IP y consultan la grilla continuamente.
+  skipSuccessfulRequests: true,
+  requestWasSuccessful: (_req,res) => res.locals.lecturaVisor === true,
   skip: (req) => {
     if (isLocalRequest(req)) return true;
 
