@@ -1,5 +1,10 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.LipaBracketLayout=api;})(typeof globalThis==='object'?globalThis:this,function(){
  function build(rounds,dual){
+  if(rounds[0]?.[0]?.id.startsWith('de-l')){
+    const positions=new Map(),height=Math.max(420,Math.max(...rounds.map(r=>r.length))*120+100);
+    rounds.forEach((round,r)=>round.forEach((m,i)=>{const center=60+(i+.5)*(height-100)/round.length;positions.set(m.id,{x:r*234,y:center-44,center,width:206});}));
+    return {positions,width:rounds.length*234+224,height};
+  }
   const W=206,G=28,TOP=45,STEP=110,depth=rounds.length-1,positions=new Map();
   const rootCount=rounds[depth].length,span=2**depth,half=Math.max(1,span/2);
   let offset=TOP;

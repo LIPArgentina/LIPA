@@ -29,26 +29,28 @@ test('GET initializes ranking snapshot and reuses it on later requests',async()=
  r=await h.request('get');assert.equal(r.data.players[0].ranking,30);assert.equal(h.rankCalls,1);
 });
 test('PATCH saves only a valid known match and persists revision',async()=>{
- const h=harness();const r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,200);assert.equal(r.data.revision,1);assert.deepEqual(h.stored.resultados['p-0'],{a:'1',b:'2',score:[5,0]});assert(h.calls.includes('COMMIT'));assert.equal(h.calls.at(-1),'RELEASE');
+ const h=harness();const r=await h.request('patch',{matchId:'de-w0-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,200);assert.equal(r.data.revision,1);assert.deepEqual(h.stored.resultados['de-w0-0'],{a:'1',b:'2',score:[5,0]});assert(h.calls.includes('COMMIT'));assert.equal(h.calls.at(-1),'RELEASE');
 });
 test('rejects invalid score, unavailable round, stale revision and changed roster',async()=>{
- let h=harness();let r=await h.request('patch',{matchId:'p-0',score:[7,0],revision:0,drawRevision:1});assert.equal(r.status,400);assert.equal(h.calls.length,0);
- h=harness();r=await h.request('patch',{matchId:'m4-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,400);
- h=harness();r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:1,drawRevision:1});assert.equal(r.status,409);assert.equal(r.data.code,'STALE');assert(h.calls.includes('ROLLBACK'));
- h=harness();h.eligible=h.players.slice(1);r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,409);assert.equal(h.stored.revision,0);
- h=harness();h.drawRevision=2;r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,409);
+ let h=harness();let r=await h.request('patch',{matchId:'de-w0-0',score:[7,0],revision:0,drawRevision:1});assert.equal(r.status,400);assert.equal(h.calls.length,0);
+ h=harness();r=await h.request('patch',{matchId:'de-w4-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,400);
+ h=harness();r=await h.request('patch',{matchId:'de-w0-0',score:[5,0],revision:1,drawRevision:1});assert.equal(r.status,409);assert.equal(r.data.code,'STALE');assert(h.calls.includes('ROLLBACK'));
+ h=harness();h.eligible=h.players.slice(1);r=await h.request('patch',{matchId:'de-w0-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,409);assert.equal(h.stored.revision,0);
+ h=harness();h.drawRevision=2;r=await h.request('patch',{matchId:'de-w0-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,409);
 });
 test('requires confirmation to clear downstream results and preserves other games',async()=>{
  const h=harness();let s=engine.build(h.players);
- for(let i=0;i<4;i++){const m=s.matches.find(m=>m.id===`p-${i}`);s=engine.build(h.players,{...s.clean,[m.id]:{a:m.a,b:m.b,score:[5,1]}});}
- for(const id of ['m1-0','m1-1']){const m=s.matches.find(m=>m.id===id);s=engine.build(h.players,{...s.clean,[m.id]:{a:m.a,b:m.b,score:[5,1]}});}
- h.stored.resultados=s.clean;const body={matchId:'p-0',score:[0,5],revision:0,drawRevision:1};
- let r=await h.request('patch',body);assert.equal(r.status,409);assert.equal(r.data.code,'CONFIRM_CORRECTION');assert(h.stored.resultados['m1-0']);
- r=await h.request('patch',{...body,confirmCorrection:true});assert.equal(r.status,200);assert(!h.stored.resultados['m1-0']);assert(h.stored.resultados['m1-1']);
+ for(let i=0;i<4;i++){const m=s.matches.find(m=>m.id===`de-w0-${i}`);s=engine.build(h.players,{...s.clean,[m.id]:{a:m.a,b:m.b,score:[5,1]}});}
+ for(const id of ['de-w1-0','de-w1-1']){const m=s.matches.find(m=>m.id===id);s=engine.build(h.players,{...s.clean,[m.id]:{a:m.a,b:m.b,score:[5,1]}});}
+ h.stored.resultados=s.clean;const body={matchId:'de-w0-0',score:[0,5],revision:0,drawRevision:1};
+ let r=await h.request('patch',body);assert.equal(r.status,409);assert.equal(r.data.code,'CONFIRM_CORRECTION');assert(h.stored.resultados['de-w1-0']);
+ r=await h.request('patch',{...body,confirmCorrection:true});assert.equal(r.status,200);assert(!h.stored.resultados['de-w1-0']);assert(h.stored.resultados['de-w1-1']);
 });
 
 test('GET restores WO and PATCH blocks scoring an automatic advance',async()=>{
  const h=harness(20);let r=await h.request('get');assert.equal(r.status,200);assert.equal(r.data.players.length,30);assert.equal(r.data.players.filter(p=>p.id===null).length,10);assert.equal(r.data.players[2].nombre,'WO');
- r=await h.request('patch',{matchId:'p-1',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,400);assert.equal(h.stored.revision,0);
- r=await h.request('patch',{matchId:'p-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,200);
+ r=await h.request('patch',{matchId:'de-w0-1',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,400);assert.equal(h.stored.revision,0);
+ r=await h.request('patch',{matchId:'de-w0-0',score:[5,0],revision:0,drawRevision:1});assert.equal(r.status,200);
 });
+
+test('old scores are excluded from new bracket and archived on first save',async()=>{const h=harness();h.stored.resultados={'p-0':{a:'1',b:'2',score:[5,0]}};const get=await h.request('get');assert.equal(get.data.legacyResults,true);assert.deepEqual(get.data.results,{});assert(h.stored.resultados['p-0']);const patch=await h.request('patch',{matchId:'de-w0-0',score:[5,0],revision:0,drawRevision:1});assert.equal(patch.status,200);assert(h.calls.some(sql=>sql.includes('resultados_anteriores || resultados')));});

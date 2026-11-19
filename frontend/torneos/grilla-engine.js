@@ -7,10 +7,10 @@
   'use strict';
   const limits = { primera: 7, segunda: 6, tercera: 5 };
   function build(players, stored = {}, category = 'tercera') {
-    const capacity=players.length, qualifierCount=category==='tercera'?2:1;
+    const capacity=players.length;
     if (capacity<2) throw new Error('Se necesitan al menos dos jugadores.');
 
-    const matches = [], clean = {}, byId = Object.fromEntries(players.filter(p=>p.id!==null).map(p => [String(p.id), p]));
+    const matches = [], clean = {};
     function match(id, a, b, readyA=true, readyB=true) {
       a = a == null ? null : String(a); b = b == null ? null : String(b);
       const old = Object.prototype.hasOwnProperty.call(stored, id) ? stored[id] : null;
@@ -28,39 +28,30 @@
       const result = { id, a, b, score, winner, loser, resolved, bye, woA, woB };
       matches.push(result); return result;
     }
-    function nextRound(previous,prefix){
-      return Array.from({length:Math.ceil(previous.length/2)},(_,i)=>{
-        const a=previous[i*2],b=previous[i*2+1]||{winner:null,resolved:true};return match(`${prefix}-${i}`,a.winner,b.winner,a.resolved,b.resolved);
-      });
+    // Stable power-of-two winners tree; original draw positions never move.
+    const size=2**Math.ceil(Math.log2(capacity));
+    const source=(m,outcome='winner')=>({id:m[outcome],ready:m.resolved,matchId:m.id,outcome});
+    const seed=i=>({id:players[i]?.id??null,ready:true,position:i+1});
+    function linked(id,a,b,label){
+      const m=match(id,a.id,b.id,a.ready,b.ready);m.sources=[a,b];m.label=label;return m;
     }
-    const first = Array.from({ length: Math.ceil(capacity/2) }, (_, i) => match(`p-${i}`, players[i * 2].id, players[i * 2 + 1]?.id));
-    const firstComplete = first.every(m => m.resolved);
-    let bye = null, byes=[], rankingFallback = false;
-    const losers = firstComplete ? first.filter(m=>m.loser).map((m, index) => {
-      const slot = m.loser === m.a ? 0 : 1;
-      return { id: m.loser, points: m.score[slot], diff: m.score[slot] - m.score[1-slot], rank: byId[m.loser].ranking || Infinity, index };
-    }) : [];
-    const repSize=firstComplete?Math.max(qualifierCount*2,2**Math.ceil(Math.log2(Math.max(1,losers.length)))):qualifierCount*16;
-    if (firstComplete && losers.length) {
-      const priority = [...losers].sort((a,b) => b.points-a.points || b.diff-a.diff || a.rank-b.rank || a.index-b.index);
-      byes=priority.slice(0,repSize-losers.length);bye=byes[0] || null;
-      const last=byes.at(-1),next=priority[byes.length];
-      rankingFallback=Boolean(last && next && last.points===next.points && last.diff===next.diff && last.rank===next.rank);
+    const main=[Array.from({length:size/2},(_,i)=>linked('de-w0-'+i,seed(i*2),seed(i*2+1),'Ganadores · Ronda 1 · Partido '+(i+1)))];
+    for(let r=1;main[r-1].length>1;r++)main.push(Array.from({length:main[r-1].length/2},(_,i)=>linked('de-w'+r+'-'+i,source(main[r-1][i*2]),source(main[r-1][i*2+1]),'Ganadores · Ronda '+(r+1)+' · Partido '+(i+1))));
+    const rep=[];
+    if(size>2){
+      rep.push(Array.from({length:size/4},(_,i)=>linked('de-l0-'+i,source(main[0][i*2],'loser'),source(main[0][i*2+1],'loser'),'Perdedores · Ronda 1 · Partido '+(i+1))));
+      for(let w=1;w<main.length;w++){
+        const previous=rep.at(-1),r=rep.length;
+        // Cross opposite neighbouring branches to avoid an immediate rematch.
+        rep.push(previous.map((m,i)=>linked('de-l'+r+'-'+i,source(m),source(main[w][previous.length>1?(i^1):i],'loser'),'Perdedores · Ronda '+(r+1)+' · Partido '+(i+1))));
+        if(w<main.length-1){const previous=rep.at(-1),r=rep.length;rep.push(Array.from({length:previous.length/2},(_,i)=>linked('de-l'+r+'-'+i,source(previous[i*2]),source(previous[i*2+1]),'Perdedores · Ronda '+(r+1)+' · Partido '+(i+1))));}
+      }
     }
-    const byeIds=new Set(byes.map(p=>p.id));
-    const remaining=losers.filter(p=>!byeIds.has(p.id));
-    const repPairs=[];
-    for(let i=0;i<remaining.length;i+=2)repPairs.push([remaining[i].id,remaining[i+1]?.id]);
-    byes.forEach(p=>repPairs.push([p.id,null]));
-    const rep=[Array.from({length:repSize/2},(_,i)=>match(`r0-${i}`,repPairs[i]?.[0],repPairs[i]?.[1],firstComplete,firstComplete))];
-    for(let round=1;rep[round-1].length>qualifierCount;round++)rep.push(nextRound(rep[round-1],`r${round}`));
-    const qualifiers=rep.at(-1).map(m=>m.winner),qualifier=qualifiers[0];
-    const entries=rep.at(-1).map((m,i)=>match(qualifierCount===1?'qualifier':`qualifier-${i+1}`,m.winner,null,m.resolved,true));
-    const seeded=qualifierCount===1?[...first,entries[0]]:[...first.slice(0,Math.ceil(first.length/2)),entries[0],...first.slice(Math.ceil(first.length/2)),entries[1]];
-    const main = [seeded];
-    for (let round = 1; main[round-1].length>1; round++) main.push(nextRound(main[round-1],`m${round}`));
-    return { main, rep, matches, clean, bye, byes, firstComplete, qualifier, qualifiers, capacity, champion: main.at(-1)[0].winner, rankingFallback, loserCount:losers.length };
+    const upper=main.at(-1)[0],lower=rep.length?source(rep.at(-1)[0]):source(upper,'loser');
+    const final=linked('de-final',source(upper),lower,'Gran final · Partido único');
+    return {format:'double-elimination-v1',main,rep,final,matches,clean,capacity,bracketSize:size,champion:final.winner};
   }
+
   function invalidated(before, after, editedId) {
     return Object.keys(before.clean).filter(id => id !== editedId && !Object.prototype.hasOwnProperty.call(after.clean, id));
   }

@@ -8,9 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./grilla.css?v=3">
   <script src="../config.js?v=isolated-sessions-1"></script>
-  <script src="./grilla-engine.js?v=category-link-1" defer></script>
-  <script src="./grilla-layout.js?v=1" defer></script>
-  <script src="./grilla.js?v=layout-1" defer></script>
+  <script src="./grilla-engine.js?v=double-elimination-1" defer></script>
+  <script src="./grilla-layout.js?v=double-elimination-1" defer></script>
+  <script src="./grilla.js?v=double-elimination-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -29,8 +29,9 @@
     <div class="savebar"><span id="saveStatus" role="status">Cargando grilla…</span><button id="retrySave" type="button" hidden>Reintentar guardado</button><button id="reload" type="button" hidden>Recargar</button></div>
     <section id="bracketPanel" role="tabpanel" aria-labelledby="tab-primera">
       <div id="emptyState" hidden></div>
-      <section id="mainSection" class="bracket-section" hidden><div class="section-heading"><div><small>CAMINO AL TÍTULO</small><h2>Grilla principal</h2></div><span class="badge">30 jugadores + repechaje</span></div><div class="board-scroll"><div id="mainFrame" class="board-frame"><div id="mainBoard" class="board"></div></div></div></section>
-      <section id="repSection" class="bracket-section repechage" hidden><div class="section-heading"><div><small>SEGUNDA OPORTUNIDAD</small><h2>Repechaje</h2></div><span class="badge">1 clasificado a octavos</span></div><p id="byeNote" class="bye-note"></p><div class="board-scroll"><div id="repFrame" class="board-frame"><div id="repBoard" class="board"></div></div></div></section>
+      <section id="mainSection" class="bracket-section" hidden><div class="section-heading"><div><small>CAMINO AL TÍTULO</small><h2>Llave de ganadores</h2></div><span class="badge">Doble eliminación</span></div><div class="board-scroll"><div id="mainFrame" class="board-frame"><div id="mainBoard" class="board"></div></div></div></section>
+      <section id="repSection" class="bracket-section repechage" hidden><div class="section-heading"><div><small>SEGUNDA OPORTUNIDAD</small><h2>Llave de perdedores</h2></div><span class="badge">Segunda oportunidad</span></div><p id="byeNote" class="bye-note"></p><div class="board-scroll"><div id="repFrame" class="board-frame"><div id="repBoard" class="board"></div></div></div></section>
+      <section id="finalSection" class="bracket-section" hidden><div class="section-heading"><div><small>PARTIDO ÚNICO · SIN REVANCHA</small><h2>Gran final</h2></div></div><div class="board-scroll"><div id="finalFrame" class="board-frame"><div id="finalBoard" class="board"></div></div></div></section>
     </section>
   </main>
   <dialog id="correctionDialog"><h2>¿Confirmar la corrección?</h2><p>El nuevo resultado cambia los cruces. Se borrarán los resultados posteriores afectados; los otros partidos se conservarán.</p><div class="dialog-actions"><button id="cancelCorrection" type="button">Cancelar</button><button id="confirmCorrection" type="button">Corregir resultado</button></div></dialog>

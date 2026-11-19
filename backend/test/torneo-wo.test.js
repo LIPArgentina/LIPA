@@ -30,15 +30,13 @@ test('Primera keeps legacy unpadded default and accepts explicit WO',()=>{
  assert.equal(slots.fill(roster(20),'primera').length,20);assert(!slots.enabled('primera'));
  assert(!slots.validOrder(slots.fill(roster(20),'segunda').map(p=>p.id),roster(20).map(p=>p.id),'primera'));
  assert(bracket.build(slots.fill(roster(20),'primera',30),{},'primera'));
- let s=bracket.build(roster(30),{},'primera');assert.equal(s.main[0].filter(m=>m.bye).length,0);
- for(let i=0;i<15;i++)s=enter(s,roster(30),`p-${i}`,[7,2],'primera');
- assert.equal(s.loserCount,15);assert.equal(s.byes.length,1);assert.deepEqual(s.rep.map(r=>r.length),[8,4,2,1]);
+ const s=bracket.build(roster(30),{},'primera');assert.equal(s.main[0].filter(m=>m.bye).length,1);
 });
 test('WO advances immediately with no score or loser; pending is not WO',()=>{
  const players=slots.fill(roster(20),'segunda');let s=bracket.build(players);
  assert.equal(s.main[0][1].a,null);assert.equal(s.main[0][1].winner,players[3].id);assert.equal(s.main[0][1].loser,null);
  assert(s.main[0][1].woA);assert.equal(Object.keys(s.clean).length,0);
- assert.equal(s.main[1][0].winner,null);assert(!s.main[1][0].woA);assert.equal(s.qualifier,null);
+ assert.equal(s.main[1][0].winner,null);assert(!s.main[1][0].woA);assert.equal(s.final.winner,null);
 });
 test('every roster size 2..30 completes without scoring WO or duplicate octavos',()=>{
  for(const category of ['segunda'])for(let n=2;n<=30;n++){
@@ -46,9 +44,9 @@ test('every roster size 2..30 completes without scoring WO or duplicate octavos'
   while(!s.champion){
    const match=s.matches.find(m=>m.a&&m.b&&!m.resolved);assert(match,`No next match: ${category}/${n}`);
    assert(!match.bye);assert.notEqual(match.a,match.b);s=enter(s,players,match.id,[bracket.limits[category],0],category);
-   assert(++games<=44);
+   assert(++games<=2*n-2);
   }
-  assert(s.champion);assert(s.firstComplete);assert.equal(s.loserCount,s.main[0].filter(m=>m.loser).length);
+  assert(s.champion);assert(s.main[0].every(m=>m.resolved));assert.equal(games,2*n-2);
   assert(s.rep.flat().every(m=>!m.a||roster(n).some(p=>p.id===m.a)));
   const octavos=s.main[1].flatMap(m=>[m.a,m.b]).filter(Boolean);assert.equal(new Set(octavos).size,octavos.length);
   assert.equal(bracket.build(players,JSON.parse(JSON.stringify(s.clean)),category).champion,s.champion);

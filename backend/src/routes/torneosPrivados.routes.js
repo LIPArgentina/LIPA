@@ -111,6 +111,8 @@ module.exports = function createTorneosPrivadosRouter() {
           PRIMARY KEY (torneo_organizador_id, categoria)
         );
 
+        ALTER TABLE torneo_grillas ADD COLUMN IF NOT EXISTS resultados_anteriores JSONB NOT NULL DEFAULT '{}'::jsonb;
+
         CREATE INDEX IF NOT EXISTS torneo_inscripciones_organizador_idx
           ON torneo_inscripciones(torneo_organizador_id, corroborado, created_at DESC);
 
