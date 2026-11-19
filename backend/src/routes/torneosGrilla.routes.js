@@ -13,9 +13,9 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
       FROM torneo_inscripciones i LEFT JOIN jugadores j ON j.id=i.jugador_id
       WHERE i.torneo_organizador_id=$1 AND i.categoria = ANY($2::text[]) AND i.baja_at IS NULL AND i.corroborado=true AND i.estado_pago IN ('sena', 'total', 'efectivo')`, [organizer, categories.valuesFor(category)]);
     const ids = draw.orden.map(id=>id===null?null:String(id)), players = new Map(rows.map(p => [p.id,p]));
-    const capacity=slots.enabled(category)?slots.capacity(category,rows.length):rows.length;
+    const capacity=ids.length;
     if (rows.length<2 || ids.length!==capacity) throw fail(422, 'Se necesitan al menos dos jugadores; guardá un nuevo sorteo con los participantes actuales.');
-    if (!slots.validOrder(ids, [...players.keys()], category)) throw fail(409, 'Cambiaron los participantes o los WO. Revisá las inscripciones y repetí el sorteo.');
+    if (!slots.validOrder(ids, [...players.keys()], category, ids.length)) throw fail(409, 'Cambiaron los participantes o los WO. Revisá las inscripciones y repetí el sorteo.');
     return { draw, players: ids.map(id => id===null?{id:null,nombre:'WO',wo:true,foto_path:''}:players.get(id)) };
   }
   async function lock(client, organizer) {

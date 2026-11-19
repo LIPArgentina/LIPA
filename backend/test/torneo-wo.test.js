@@ -26,10 +26,10 @@ test('shuffle changes real order but never moves WO, including repeated runs',()
  }
  assert.equal(slots.shuffle(slots.fill(roster(1),'segunda'),()=>0).filter(p=>p.id!==null).length,1);
 });
-test('Primera never pads and rejects WO',()=>{
+test('Primera keeps legacy unpadded default and accepts explicit WO',()=>{
  assert.equal(slots.fill(roster(20),'primera').length,20);assert(!slots.enabled('primera'));
  assert(!slots.validOrder(slots.fill(roster(20),'segunda').map(p=>p.id),roster(20).map(p=>p.id),'primera'));
- assert.throws(()=>bracket.build(slots.fill(roster(20),'segunda'),{},'primera'));
+ assert(bracket.build(slots.fill(roster(20),'primera',30),{},'primera'));
  let s=bracket.build(roster(30),{},'primera');assert.equal(s.main[0].filter(m=>m.bye).length,0);
  for(let i=0;i<15;i++)s=enter(s,roster(30),`p-${i}`,[7,2],'primera');
  assert.equal(s.loserCount,15);assert.equal(s.byes.length,1);assert.deepEqual(s.rep.map(r=>r.length),[8,4,2,1]);
@@ -71,11 +71,20 @@ async function saveDraw(category,order,count){
  await routes['put /torneo-organizador/sorteos/:categoria']({params:{categoria:category},user:{torneoOrganizadorId:77},body:{orden:order,revision:0}},res);
  return {status,data,calls};
 }
-test('draw API saves fixed WO, rejects moved WO, and forbids WO in Primera',async()=>{
+test('draw API saves fixed WO, rejects moved WO, and accepts explicit WO in Primera',async()=>{
  const order=slots.fill(roster(20),'segunda').map(p=>p.id);
  let response=await saveDraw('segunda',order,20);assert.equal(response.status,200);const saved=response.calls.find(q=>q.sql.startsWith('INSERT INTO torneo_sorteos'));assert.deepEqual(JSON.parse(saved.args[2]),order);
  response=await saveDraw('segunda',order,20);assert.equal(response.status,200);
- response=await saveDraw('primera',order,20);assert.equal(response.status,400);
+ response=await saveDraw('primera',order,20);assert.equal(response.status,200);
  const moved=[...order];[moved[0],moved[2]]=[moved[2],moved[0]];response=await saveDraw('segunda',moved,20);assert.equal(response.status,409);
  assert(!response.calls.some(q=>q.sql.startsWith('INSERT INTO torneo_sorteos')));
+});
+
+test('explicit 64 places has exactly two fixed WO for 62 players in every category',async()=>{
+ for(const category of ['primera','segunda','tercera']){
+ const players=slots.fill(roster(62),category,64),ids=roster(62).map(p=>p.id);assert.equal(players.length,64);assert.equal(players.filter(p=>p.id===null).length,2);
+ assert(slots.validOrder(players.map(p=>p.id),ids,category,64));assert.throws(()=>slots.fill(roster(62),category,60));
+ const shuffled=slots.shuffle(players,n=>Math.floor(Math.random()*n));assert.deepEqual(shuffled.map(p=>p.id===null),players.map(p=>p.id===null));
+ assert.equal((await saveDraw(category,players.map(p=>p.id),62)).status,200);
+ }
 });

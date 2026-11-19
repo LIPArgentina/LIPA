@@ -411,7 +411,7 @@ module.exports = function createTorneosPrivadosRouter() {
     const { orden, revision } = req.body || {};
     if (!['primera', 'segunda', 'tercera'].includes(categoria)
         || !Array.isArray(orden) || orden.length < 2
-        || !orden.every(id => (slots.enabled(categoria) && id===null) || (typeof id === 'string' && /^[1-9][0-9]*$/.test(id)))
+        || !orden.every(id => id===null || (typeof id === 'string' && /^[1-9][0-9]*$/.test(id)))
         || orden.filter(id=>id!==null).length < 2
         || new Set(orden.filter(id=>id!==null)).size !== orden.filter(id=>id!==null).length
         || !Number.isSafeInteger(revision) || revision < 0) {
@@ -429,7 +429,7 @@ module.exports = function createTorneosPrivadosRouter() {
         WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND baja_at IS NULL AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')`,
         [req.user.torneoOrganizadorId, categories.valuesFor(categoria)]);
       const ids = new Set(rows.map(row => String(row.id)));
-      if (!slots.validOrder(orden, [...ids], categoria)) {
+      if (!slots.validOrder(orden, [...ids], categoria, orden.length)) {
         await client.query('ROLLBACK');
         return res.status(409).json({ error: 'Cambiaron los participantes. Recargá la página y repetí el sorteo.' });
       }

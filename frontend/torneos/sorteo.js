@@ -37,7 +37,7 @@
   }
   function updateExports(state) {
     state.card.querySelectorAll('[data-export]').forEach(button => {
-      button.disabled = Boolean(state.dirty || state.saving || state.exporting || !state.players.some(player => player.id != null));
+      button.disabled = Boolean(state.sizeChanged || state.invalidSize || state.dirty || state.saving || state.exporting || !state.players.some(player => player.id != null));
       button.title = state.dirty || state.saving ? 'Detené el sorteo y guardá el orden antes de exportar.' : '';
     });
   }
@@ -125,6 +125,7 @@
   }
   async function save(state) {
     state.saving = true;
+    state.sizeInput.disabled=true;
     state.button.disabled = true;
     state.button.textContent = 'GUARDANDO…';
     message(state, 'Guardando el orden del sorteo…');
@@ -135,6 +136,7 @@
       });
       state.revision = data.revision;
       state.dirty = false;
+      state.sizeChanged=false;
       state.drawn = true;
       state.hasResults = false;
       state.button.textContent = 'SORTEAR POSICIÓN';
@@ -145,12 +147,13 @@
       message(state, error.message, 'error');
     } finally {
       state.saving = false;
+      state.sizeInput.disabled=false;
       updateExports(state);
       state.button.disabled = false;
     }
   }
   async function toggle(state) {
-    if (state.saving || state.exporting) return;
+    if (state.saving || state.exporting || state.invalidSize) return;
     if (state.conflict) { location.reload(); return; }
     if (state.timer) {
       clearInterval(state.timer); state.timer = null;
@@ -165,6 +168,7 @@
     state.button.textContent = 'DETENER';
     message(state, 'Sorteando… Presioná DETENER para guardar el orden.');
     shuffle(state);
+    state.sizeInput.disabled=true;
     state.timer = setInterval(() => shuffle(state), 500);
   }
   async function load() {
@@ -180,13 +184,26 @@
       const saved = data.sorteos.find(draw => draw.categoria === category);
       const byId = new Map(players.map(player => [String(player.id), player]));
       const order = Array.isArray(saved?.orden) ? saved.orden.map(id=>id===null?null:String(id)) : [];
-      const valid = Boolean(saved) && window.LipaSlots.validOrder(order, [...byId.keys()], category);
-      players = valid ? order.map(id=>id===null?{id:null,nombre:'WO',wo:true}:byId.get(id)) : window.LipaSlots.fill(players,category);
+      const valid = Boolean(saved) && window.LipaSlots.validOrder(order, [...byId.keys()], category,order.length);
+      const chosenSize=saved?Math.max(2,order.length):Math.max(2,realCount);
+      players = valid ? order.map(id=>id===null?{id:null,nombre:'WO',wo:true}:byId.get(id)) : window.LipaSlots.fill(players,category,Math.max(chosenSize,realCount));
       const card = document.createElement('section');
       card.className = 'category'; card.setAttribute('aria-labelledby', `heading-${category}`);
-      card.innerHTML = `<div class="category-heading"><h2 id="heading-${category}">${label.toUpperCase()}</h2><span class="count">${realCount} jugadores${players.length>realCount?` · ${players.length-realCount} WO`:''}</span></div><div class="table-wrap"><table aria-label="Posiciones de ${label}"><thead><tr><th scope="col">N.º</th><th scope="col">Jugador</th></tr></thead><tbody></tbody></table></div><div class="category-footer"><p class="status" role="status"></p><button type="button" class="draw-button" aria-describedby="status-${category}">SORTEAR POSICIÓN</button><div class="export-actions" aria-label="Exportar ${label}"><button type="button" data-export="image">Exportar imagen</button><button type="button" data-export="text">Exportar texto</button></div></div>`;
+      card.innerHTML = `<div class="category-heading"><h2 id="heading-${category}">${label.toUpperCase()}</h2><label class="size-label">Lugares <input class="draw-size" type="number" min="2" step="1" value="${chosenSize}" aria-label="Cantidad de lugares de ${label}"></label><span class="count">${realCount} jugadores${players.length>realCount?` · ${players.length-realCount} WO`:''}</span></div><div class="table-wrap"><table aria-label="Posiciones de ${label}"><thead><tr><th scope="col">N.º</th><th scope="col">Jugador</th></tr></thead><tbody></tbody></table></div><div class="category-footer"><p class="status" role="status"></p><button type="button" class="draw-button" aria-describedby="status-${category}">SORTEAR POSICIÓN</button><div class="export-actions" aria-label="Exportar ${label}"><button type="button" data-export="image">Exportar imagen</button><button type="button" data-export="text">Exportar texto</button></div></div>`;
       document.querySelector('#categories').append(card);
       const state = { category, label, players, card, body: card.querySelector('tbody'), status: card.querySelector('.status'), button: card.querySelector('.draw-button'), revision: saved?.revision || 0, drawn: Boolean(saved), dirty: false, timer: null, saving: false };
+      state.sizeInput=card.querySelector('.draw-size');
+      function resize(){
+        const size=Number(state.sizeInput.value);
+        state.invalidSize=!Number.isSafeInteger(size)||size<2||size<realCount;
+        state.button.disabled=state.invalidSize||realCount<2;
+        if(state.invalidSize){message(state,`Error: hay ${realCount} jugadores habilitados. Elegí al menos ${Math.max(2,realCount)} lugares.`,'error');updateExports(state);return;}
+        state.players=window.LipaSlots.fill(state.players.filter(p=>p.id!==null),category,size);
+        state.sizeChanged=true;
+        card.querySelector('.count').textContent=`${realCount} jugadores · ${size-realCount} WO`;
+        message(state,'Cantidad ajustada. Sorteá y detené para guardar.');renderRows(state);updateExports(state);
+      }
+      state.sizeInput.addEventListener('input',resize);
       state.status.id = `status-${category}`;
       state.hasResults = Boolean(saved?.tiene_resultados);
       state.button.disabled = realCount < 2;
@@ -194,6 +211,7 @@
       if (realCount < 2) message(state, 'Se necesitan al menos dos jugadores para sortear.');
       state.button.addEventListener('click', () => toggle(state));
       card.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportPlayers(state, button.dataset.export)));
+      if(chosenSize<realCount)resize();
       states.push(state);
       renderRows(state);
       new ResizeObserver(() => fit(state)).observe(card.querySelector('.table-wrap'));

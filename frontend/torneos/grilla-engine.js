@@ -9,7 +9,7 @@
   function build(players, stored = {}, category = 'tercera') {
     const capacity=players.length, qualifierCount=category==='tercera'?2:1;
     if (capacity<2) throw new Error('Se necesitan al menos dos jugadores.');
-    if (category === 'primera' && players.some(p=>p.id===null)) throw new Error('Primera no admite WO.');
+
     const matches = [], clean = {}, byId = Object.fromEntries(players.filter(p=>p.id!==null).map(p => [String(p.id), p]));
     function match(id, a, b, readyA=true, readyB=true) {
       a = a == null ? null : String(a); b = b == null ? null : String(b);
