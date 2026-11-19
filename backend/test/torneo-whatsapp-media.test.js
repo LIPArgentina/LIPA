@@ -107,6 +107,6 @@ test('self chat recognizes new message containers without outgoing markers',asyn
  assert((await f.step('send')).armed);f.add();assert.equal((await f.step('confirm')).sent,true);assert.equal(f.ctx.lipaInspectSent(f.expected).selfChat,true);
 });
 test('diagnostics retain unclassified message blocks instead of an empty report',()=>{
- const f=driverFixture();f.add();f.outgoing.dataset={id:'opaque-message'};f.outgoing.matches=()=>false;f.outgoing.closest=()=>null;f.outgoing.querySelector=()=>null;
+ const f=driverFixture();f.add();f.outgoing.querySelectorAll=s=>s.includes('selectable-text')?[f.caption]:[];f.outgoing.dataset={id:'opaque-message'};f.outgoing.matches=()=>false;f.outgoing.closest=()=>null;f.outgoing.querySelector=()=>null;
  const result=f.ctx.lipaInspectSent(f.expected);assert.equal(result.outgoingCount,0);assert.equal(result.candidates.length,1);assert.equal(result.candidates[0].recognizedOutgoing,false);
 });
