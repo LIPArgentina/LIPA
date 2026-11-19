@@ -100,3 +100,13 @@ test('new outgoing message without data-id is confirmed but an existing one is n
  const f=driverFixture();f.outgoing.dataset={};f.outgoing.innerText='Hola 👋';assert((await f.step('send')).armed);f.add();assert.equal((await f.step('confirm')).sent,true);
  const old=driverFixture();old.outgoing.dataset={};old.outgoing.innerText='Hola 👋';old.add();assert((await old.step('send')).armed);assert((await old.step('audit')).error);
 });
+test('self chat recognizes new message containers without outgoing markers',async()=>{
+ const f=driverFixture();f.header.textContent='Javier (Tú) · Envía mensajes a este mismo número.';f.ctx.__lipaMedia.label=f.header.textContent;
+ f.outgoing.querySelectorAll=s=>s.includes('selectable-text')?[f.caption]:[];f.outgoing.dataset={id:'opaque-message'};f.outgoing.matches=()=>false;f.outgoing.closest=()=>null;
+ const query=f.outgoing.querySelector;f.outgoing.querySelector=s=>s.includes('tail-out')||s==='.message-out'?null:query(s);
+ assert((await f.step('send')).armed);f.add();assert.equal((await f.step('confirm')).sent,true);assert.equal(f.ctx.lipaInspectSent(f.expected).selfChat,true);
+});
+test('diagnostics retain unclassified message blocks instead of an empty report',()=>{
+ const f=driverFixture();f.add();f.outgoing.dataset={id:'opaque-message'};f.outgoing.matches=()=>false;f.outgoing.closest=()=>null;f.outgoing.querySelector=()=>null;
+ const result=f.ctx.lipaInspectSent(f.expected);assert.equal(result.outgoingCount,0);assert.equal(result.candidates.length,1);assert.equal(result.candidates[0].recognizedOutgoing,false);
+});

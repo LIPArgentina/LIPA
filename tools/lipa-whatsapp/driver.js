@@ -100,7 +100,8 @@ async function lipaWhatsAppStep(expected, action) {
     return closePoint?{interaction:'closeContact',target:closePoint}:{error:'El botón Enviar está tapado por otra ventana o extensión.'};
   }
   function outgoingNodes(main){
-    const nodes=[...main.querySelectorAll('[data-id],[data-message-id],.message-out,[data-testid="msg-container"]')].filter(el=>el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||String(el.dataset.id||el.getAttribute?.('data-message-id')||'').startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"],[data-icon="msg-check"],[data-icon="msg-dblcheck"]'));
+    const selfChat=/env[ií]a mensajes a este mismo n[uú]mero|message yourself|messages? to yourself/i.test(main.querySelector('header')?.innerText||main.querySelector('header')?.textContent||'');
+    const nodes=[...main.querySelectorAll('[data-id],[data-message-id],.message-out,[data-testid="msg-container"]')].filter(el=>selfChat||el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||String(el.dataset.id||el.getAttribute?.('data-message-id')||'').startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"],[data-icon="msg-check"],[data-icon="msg-dblcheck"]'));
     return nodes.filter(el=>!nodes.some(other=>other!==el&&other.contains(el)));
   }
   const messageKey=el=>el.dataset.id||el.getAttribute?.('data-message-id')||'';
@@ -202,11 +203,12 @@ function lipaInspectSent(expected){
  const norm=v=>String(v||'').replace(/[\u200b\u200e\u200f\ufeff]/g,'').replace(/\s+/g,' ').trim();
  const raw=norm(expected.message),formatted=norm(expected.message.replace(/(\*{1,3}|_{1,3}|~{1,2}|`{1,3})([^\n]+?)\1/g,'$2'));
  const all=[...main.querySelectorAll('[data-id],[data-message-id],.message-out,[data-testid="msg-container"]')];
- const outgoing=all.filter(el=>el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||String(el.dataset.id||el.getAttribute?.('data-message-id')||'').startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"],[data-icon="msg-check"],[data-icon="msg-dblcheck"]'));
- const candidates=outgoing.filter(el=>!outgoing.some(other=>other!==el&&other.contains(el))).slice(-5).map(el=>{
+ const selfChat=/env[ií]a mensajes a este mismo n[uú]mero|message yourself|messages? to yourself/i.test(main.querySelector('header')?.innerText||main.querySelector('header')?.textContent||'');
+ const outgoing=all.filter(el=>selfChat||el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||String(el.dataset.id||el.getAttribute?.('data-message-id')||'').startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"],[data-icon="msg-check"],[data-icon="msg-dblcheck"]'));
+ const candidates=all.filter(el=>!all.some(other=>other!==el&&other.contains(el))).slice(-5).map(el=>{
  const parts=[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')];
  const caption=parts.some(p=>[p.innerText,p.textContent].some(v=>[raw,formatted].includes(norm(v))));
- return {captionMatch:caption,captionNodes:parts.length,captionLengths:parts.map(p=>norm(p.innerText||p.textContent).length),expectedLength:raw.length,bodyContainsCaption:[raw,formatted].some(v=>norm(el.innerText||el.textContent).includes(v)),images:[...el.querySelectorAll('img')].map(img=>({sourceKind:(img.currentSrc||img.src||'').split(':')[0],width:img.naturalWidth||img.width,height:img.naturalHeight||img.height})),videos:el.querySelectorAll('video').length,canvases:el.querySelectorAll('canvas').length,icons:[...el.querySelectorAll('[data-icon]')].map(n=>n.getAttribute('data-icon')),testIds:[...el.querySelectorAll('[data-testid]')].map(n=>n.getAttribute('data-testid'))};
+ return {recognizedOutgoing:outgoing.includes(el),tag:el.tagName,classes:String(el.className||''),idKind:el.dataset.id?.startsWith('true_')?'true':el.dataset.id?.startsWith('false_')?'false':el.dataset.id?'other':'none',captionMatch:caption,captionNodes:parts.length,captionLengths:parts.map(p=>norm(p.innerText||p.textContent).length),expectedLength:raw.length,bodyContainsCaption:[raw,formatted].some(v=>norm(el.innerText||el.textContent).includes(v)),images:[...el.querySelectorAll('img')].map(img=>({sourceKind:(img.currentSrc||img.src||'').split(':')[0],width:img.naturalWidth||img.width,height:img.naturalHeight||img.height})),videos:el.querySelectorAll('video').length,canvases:el.querySelectorAll('canvas').length,icons:[...el.querySelectorAll('[data-icon]')].map(n=>n.getAttribute('data-icon')),testIds:[...el.querySelectorAll('[data-testid]')].map(n=>n.getAttribute('data-testid'))};
  });
- return {outgoingCount:outgoing.length,messageIdNodes:all.length,candidates};
+ return {selfChat,outgoingCount:outgoing.length,messageIdNodes:all.length,candidates};
 }
