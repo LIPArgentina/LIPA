@@ -74,3 +74,8 @@ test('two distinct exposed media Send controls remain blocked',async()=>{
  f.preview.querySelectorAll=s=>s==='img'?[f.visual]:[f.send,other];f.ctx.document.elementFromPoint=x=>x>200?other:f.send;
  const result=await f.step('send');assert(!result.armed);assert.match(result.error,/único botón/);
 });
+
+test('recognizes actual WhatsApp Enviar 1 seleccionado label without an icon match',async()=>{
+ const f=driverFixture();f.preview.querySelectorAll=s=>s==='img'?[f.visual]:s.includes('[aria-label="Enviar 1 seleccionado"]')?[f.send]:[];
+ assert.equal((await f.step('mediaPrepare')).ready,true);assert.equal((await f.step('send')).armed,true);
+});

@@ -27,7 +27,7 @@ async function prepareChat(tabId,contact,cancelled=()=>false) {
       interactions.add(last.interaction);
       await browserControl.click(tabId,last.target,cancelled);
     }
-    await pause(500);
+    await pause(250);
   }
   return {error:last?.error||'No se pudo abrir y comprobar la ficha del contacto.'};
 }
@@ -99,8 +99,8 @@ $('start').addEventListener('click',async()=>{
       contact.status='sent';history[contact.key].status='sent';await persist();render();
       $('status').textContent='Mensaje observado en el chat de '+contact.name+'.';
       if(contact!==queue[queue.length-1]&&!stopping){
-        $('status').textContent='Mensaje observado en el chat de '+contact.name+'. Pausa de 10 segundos antes del siguiente.';
-        await pause(10000);
+        $('status').textContent='Mensaje observado en el chat de '+contact.name+'. Pausa de 3 segundos antes del siguiente.';
+        await pause(3000);
       }
     } catch(error) {
       contact.error=error.message;contact.status=history[contact.key]?'review':'pending';
@@ -144,7 +144,7 @@ async function prepareMedia(contact){ let clickedMenu=false,lastError='';
   else if(result.error)throw Error(result.error);
   if(i===9)throw Error('No se pudo adjuntar el archivo.');await pause(500);
  }
- for(let i=0;i<120;i++){
+ for(let i=0;i<60;i++){
   if(stopping)throw Error('Tanda detenida.');const result=await step(contact,'mediaPrepare');if(result.ready)return;
   if(result.interaction==='caption'){await browserControl.fillCaption(workTab,result.target,job.message,()=>stopping);await pause(500);continue;}
   if(result.fatal)throw Error(result.error);lastError=result.error||lastError;await pause(500);

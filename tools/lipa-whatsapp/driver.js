@@ -109,7 +109,7 @@ async function lipaWhatsAppStep(expected, action) {
     for(const editor of editors){
       let root=editor.parentElement,found=null;
       while(root&&root!==document.body){
-        const sendMarkers=[...root.querySelectorAll('[aria-label="Enviar"],[aria-label="Send"],[title="Enviar"],[title="Send"],[data-testid="send"],[data-icon="send"],[data-icon="send-filled"],[data-icon="wds-ic-send-filled"]')].filter(visible);
+        const sendMarkers=[...root.querySelectorAll('[aria-label="Enviar"],[aria-label="Enviar 1 seleccionado"],[aria-label="Send 1 selected"],[aria-label="Send"],[title="Enviar"],[title="Send"],[data-testid="send"],[data-icon="send"],[data-icon="send-filled"],[data-icon="wds-ic-send-filled"]')].filter(visible);
         const controls=[...new Set(sendMarkers.map(el=>el.closest('button,[role="button"],[tabindex="0"]')||el.closest('[aria-label="Enviar"],[aria-label="Send"],[title="Enviar"],[title="Send"]')).filter(Boolean))];
         // Nested icon/label wrappers describe the same control. Occluded chat
         // buttons behind the media editor must not count as another Send button.
@@ -162,13 +162,13 @@ async function lipaWhatsAppStep(expected, action) {
   if(action!=='confirm'&&action!=='audit')return {error:'Acción desconocida.'};
   const armed=globalThis.__lipaArmed;
   if(!armed||armed.phone!==expected.phone||armed.message!==expected.message||armed.mediaHash!==(expected.media?.hash)||(action==='confirm'&&Date.now()-armed.at>30000))return {error:'No hay un envío preparado para comprobar.',clicked:true};
-  for(let i=0;i<(expected.media?120:40);i++) {
+  for(let i=0;i<(expected.media?60:40);i++) {
     const main=document.querySelector('#main');
     if(main!==armed.main||!(rightPhone(main)||remembered(main)||expected.media&&mediaProof()))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
     const added=[...main.querySelectorAll('[data-id]')].filter(el=>!armed.ids.has(el.dataset.id)&&(el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id.startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"]')));
     if(added.some(el=>[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[normalize(expected.message),renderedMessage].includes(text(part)))&&(!expected.media||(expected.media.type.startsWith('video/')?el.querySelector('video,[data-icon="video-play"],[data-icon="media-play"],[data-icon="play"]'):el.querySelector('img[src^="blob:"]')))&&!el.querySelector('[role="progressbar"],[data-icon="msg-error"]'))){if(action!=='audit')delete globalThis.__lipaArmed;return {sent:true,clicked:true};}
     if(action==='audit')return {error:'No se pudo confirmar el mensaje en este chat. No se reenvió nada.'};
-    await sleep(500);
+    await sleep(250);
   }
   return {error:'Se hizo clic en Enviar, pero no se confirmó el resultado. Revisá ese chat; no se reintentará.',clicked:true};
 }
