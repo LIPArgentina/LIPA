@@ -17,7 +17,7 @@ function driverFixture(type='image/png'){
  const preview={querySelector:()=>null,querySelectorAll:s=>s==='img'||s==='video'?[visual]:[send],parentElement:null};Object.assign(caption,{parentElement:preview,getClientRects:()=>[{}],closest:()=>null});
  let added=false,withMedia=true;
  const outgoing={dataset:{id:'true_new'},matches:()=>true,querySelectorAll:()=>[caption],querySelector:s=>s.includes('progressbar')?null:withMedia?visual:null};
- const main={querySelector:s=>s.includes('header')?header:null,querySelectorAll:s=>s==='[data-id]'&&added?[outgoing]:[]};
+ const main={querySelector:s=>s.includes('header')?header:null,querySelectorAll:s=>s.includes('[data-id]')&&added?[outgoing]:[]};
  const document={body:{},querySelector:s=>s==='#main'?main:null,querySelectorAll:s=>s.includes('contenteditable')?[caption]:[],elementFromPoint:()=>send};
  const expected={phone:'5491112345678',message:'Hola 👋',media:{hash:'abc',type}},ctx={document,location:{origin:'https://web.whatsapp.com'},setTimeout,Date,globalThis:null};ctx.globalThis=ctx;ctx.__lipaMedia={main,header,label:header.textContent,phone:expected.phone,hash:'abc',at:Date.now(),captionSet:true};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/driver.js'),'utf8'),ctx);
@@ -94,4 +94,9 @@ test('read-only sent inspection exposes structural evidence without sending or c
  const f=driverFixture();f.add();f.outgoing.innerText='Hola 👋';f.caption.innerText='Hola 👋';f.visual.src='https://media.example/image';f.visual.naturalWidth=800;f.visual.naturalHeight=600;
  f.outgoing.querySelectorAll=s=>s.includes('selectable-text')?[f.caption]:s==='img'?[f.visual]:[];
  f.outgoing.click=()=>{throw Error('Diagnostic must not click');};const result=f.ctx.lipaInspectSent(f.expected);assert.equal(result.outgoingCount,1);assert(result.candidates[0].captionMatch);assert.equal(result.candidates[0].images[0].sourceKind,'https');assert(!('sent' in result));
+});
+
+test('new outgoing message without data-id is confirmed but an existing one is not',async()=>{
+ const f=driverFixture();f.outgoing.dataset={};f.outgoing.innerText='Hola 👋';assert((await f.step('send')).armed);f.add();assert.equal((await f.step('confirm')).sent,true);
+ const old=driverFixture();old.outgoing.dataset={};old.outgoing.innerText='Hola 👋';old.add();assert((await old.step('send')).armed);assert((await old.step('audit')).error);
 });

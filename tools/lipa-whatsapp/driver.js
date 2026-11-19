@@ -36,7 +36,7 @@ async function lipaWhatsAppStep(expected, action) {
     if(header && [...header.querySelectorAll('span[title], span[dir], a[href^="tel:"]')].some(el=>visible(el)&&numberMatches(el.textContent)))return true;
     // Existing chat message IDs include the remote JID on compatible versions.
     if([...main.querySelectorAll('[data-id]')].some(el=>{
-      const match=el.dataset.id.match(/^(?:true|false)_(\d+)@(?:c\.us|s\.whatsapp\.net)_/);
+      const match=String(el.dataset.id||'').match(/^(?:true|false)_(\d+)@(?:c\.us|s\.whatsapp\.net)_/);
       return match && match[1]===expected.phone;
     }))return true;
     // Newer accounts may use opaque LIDs. Verify the displayed contact info instead.
@@ -99,6 +99,13 @@ async function lipaWhatsAppStep(expected, action) {
     const closePoint=point(close);
     return closePoint?{interaction:'closeContact',target:closePoint}:{error:'El botón Enviar está tapado por otra ventana o extensión.'};
   }
+  function outgoingNodes(main){
+    const nodes=[...main.querySelectorAll('[data-id],[data-message-id],.message-out,[data-testid="msg-container"]')].filter(el=>el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||String(el.dataset.id||el.getAttribute?.('data-message-id')||'').startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"],[data-icon="msg-check"],[data-icon="msg-dblcheck"]'));
+    return nodes.filter(el=>!nodes.some(other=>other!==el&&other.contains(el)));
+  }
+  const messageKey=el=>el.dataset.id||el.getAttribute?.('data-message-id')||'';
+  const messageSignature=el=>normalize(el.innerText||el.textContent)+'|'+[...el.querySelectorAll('img,video')].map(n=>n.currentSrc||n.src||'').join('|');
+  function snapshot(main){const nodes=outgoingNodes(main);return {ids:new Set(nodes.map(messageKey).filter(Boolean)),nodes:new Set(nodes),signatures:new Set(nodes.map(messageSignature))};}
   function mediaProof(){
     const proof=globalThis.__lipaMedia,main=document.querySelector('#main');
     return proof&&proof.hash===expected.media?.hash&&proof.phone===expected.phone&&proof.main===main&&proof.header===headerIdentity(main)&&proof.label===headerIdentity(main)?.textContent&&Date.now()-proof.at<180000?proof:null;
@@ -148,7 +155,7 @@ async function lipaWhatsAppStep(expected, action) {
     if(preview.send.getAttribute('aria-disabled')==='true'||preview.send.disabled)return {error:'Esperando a que WhatsApp prepare el archivo.'};
     const target=point(preview.send);if(!target)return {error:'El botón de envío del archivo está tapado.'};
     if(action==='mediaPrepare')return {ready:true};
-    globalThis.__lipaArmed={phone:expected.phone,message:expected.message,mediaHash:expected.media.hash,main:proof.main,at:Date.now(),ids:new Set([...proof.main.querySelectorAll('[data-id]')].map(el=>el.dataset.id))};
+    globalThis.__lipaArmed={phone:expected.phone,message:expected.message,mediaHash:expected.media.hash,main:proof.main,at:Date.now(),...snapshot(proof.main)};
     return {armed:true,target};
   }
   if(action==='send') {
@@ -156,7 +163,7 @@ async function lipaWhatsAppStep(expected, action) {
     if(current.error)return {error:current.error,clicked:false};
     const target=point(current.send);
     if(!target)return {error:'El botón Enviar está tapado.',clicked:false};
-    globalThis.__lipaArmed={phone:expected.phone,message:expected.message,main:current.main,at:Date.now(),ids:new Set([...current.main.querySelectorAll('[data-id]')].map(el=>el.dataset.id))};
+    globalThis.__lipaArmed={phone:expected.phone,message:expected.message,main:current.main,at:Date.now(),...snapshot(current.main)};
     return {armed:true,target};
   }
   if(action!=='confirm'&&action!=='audit')return {error:'Acción desconocida.'};
@@ -165,7 +172,7 @@ async function lipaWhatsAppStep(expected, action) {
   for(let i=0;i<(expected.media?60:40);i++) {
     const main=document.querySelector('#main');
     if(main!==armed.main||!(rightPhone(main)||remembered(main)||expected.media&&mediaProof()))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
-    const added=[...main.querySelectorAll('[data-id]')].filter(el=>!armed.ids.has(el.dataset.id)&&(el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id.startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"]')));
+    const added=outgoingNodes(main).filter(el=>messageKey(el)?!armed.ids.has(messageKey(el)):!armed.nodes.has(el)&&!armed.signatures.has(messageSignature(el)));
     const compact=value=>normalize(value).replace(/\s+/g,' ');
     const expectedTexts=[expected.message,renderedMessage].map(compact);
     for(const el of added){
@@ -194,8 +201,8 @@ function lipaInspectSent(expected){
  const main=document.querySelector('#main');if(!main)return {error:'No hay un chat abierto.'};
  const norm=v=>String(v||'').replace(/[\u200b\u200e\u200f\ufeff]/g,'').replace(/\s+/g,' ').trim();
  const raw=norm(expected.message),formatted=norm(expected.message.replace(/(\*{1,3}|_{1,3}|~{1,2}|`{1,3})([^\n]+?)\1/g,'$2'));
- const all=[...main.querySelectorAll('[data-id]')];
- const outgoing=all.filter(el=>el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id?.startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"]'));
+ const all=[...main.querySelectorAll('[data-id],[data-message-id],.message-out,[data-testid="msg-container"]')];
+ const outgoing=all.filter(el=>el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||String(el.dataset.id||el.getAttribute?.('data-message-id')||'').startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"],[data-icon="msg-check"],[data-icon="msg-dblcheck"]'));
  const candidates=outgoing.filter(el=>!outgoing.some(other=>other!==el&&other.contains(el))).slice(-5).map(el=>{
  const parts=[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')];
  const caption=parts.some(p=>[p.innerText,p.textContent].some(v=>[raw,formatted].includes(norm(v))));

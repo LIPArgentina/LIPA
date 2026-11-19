@@ -79,6 +79,7 @@ $('start').addEventListener('click',async()=>{
       const url='https://web.whatsapp.com/send?phone='+contact.phone+(job.media?'':'&text='+encodeURIComponent(job.message));
       if(workTab){try{await chrome.tabs.update(workTab,{url,active:true});}catch(_){workTab=null;}}
       if(!workTab){const tab=await chrome.tabs.create({url,active:true});workTab=tab.id;}
+      job.workTabId=workTab;await persist();
       // Wait for the page to finish loading before injecting the DOM-only driver.
       let loaded=false;
       for(let i=0;i<90&&!stopping;i++){const t=await chrome.tabs.get(workTab);if(t.status==='complete'){loaded=true;break;}await pause(500);}
@@ -157,11 +158,11 @@ async function prepareMedia(contact){ let clickedMenu=false,lastError='';
 $('inspectSent').addEventListener('click',async()=>{
  if(running||!job)return;$('inspectSent').disabled=true;
  try{
-  const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});let tab=tabs.find(t=>t.id===workTab)||tabs.find(t=>t.active);if(!tab&&tabs.length===1)tab=tabs[0];
-  if(!tab)throw Error('Dejá abierto el chat que recibió el mensaje en WhatsApp Web.');
+  const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});let tab=tabs.find(t=>t.id===(workTab||job.workTabId));if(!tab&&tabs.length===1)tab=tabs[0];
+  if(!tab)throw Error('Dejá una sola pestaña de WhatsApp Web abierta, en el chat que recibió el mensaje.');
   const results=await chrome.scripting.executeScript({target:{tabId:tab.id},func:lipaInspectSent,args:[{message:job.message}]});const result=results[0]?.result;if(!result||result.error)throw Error(result?.error||'No se pudo leer el chat.');
   job.lastInspection={at:new Date().toISOString(),...result};await persist();
   const rows=result.candidates;const matched=rows.filter(r=>r.captionMatch).length,contained=rows.filter(r=>r.bodyContainsCaption).length;
-  $('status').textContent='Revisión sin envío: '+result.outgoingCount+' mensajes salientes; texto reconocido: '+matched+'; texto completo dentro del mensaje: '+contained+'; imágenes: '+rows.reduce((n,r)=>n+r.images.length,0)+'. Descargá el registro para revisar el detalle. No se envió nada.';
+  $('status').textContent='Revisión sin envío: '+result.outgoingCount+' mensajes salientes ('+result.messageIdNodes+' bloques detectados); texto reconocido: '+matched+'; texto completo dentro del mensaje: '+contained+'; imágenes: '+rows.reduce((n,r)=>n+r.images.length,0)+'. Descargá el registro para revisar el detalle. No se envió nada.';
  }catch(e){$('status').textContent=e.message;}finally{$('inspectSent').disabled=false;}
 });
