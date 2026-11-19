@@ -97,6 +97,56 @@ async function lipaWhatsAppStep(expected, action) {
     const closePoint=point(close);
     return closePoint?{interaction:'closeContact',target:closePoint}:{error:'El botón Enviar está tapado por otra ventana o extensión.'};
   }
+  function mediaProof(){
+    const proof=globalThis.__lipaMedia,main=document.querySelector('#main');
+    return proof&&proof.hash===expected.media?.hash&&proof.phone===expected.phone&&proof.main===main&&proof.header===headerIdentity(main)&&proof.label===headerIdentity(main)?.textContent&&Date.now()-proof.at<180000?proof:null;
+  }
+  function mediaEditor(){
+    const editors=[...document.querySelectorAll('[contenteditable="true"][role="textbox"]')].filter(el=>visible(el)&&!el.closest('footer,#pane-side,header'));
+    const candidates=[];
+    for(const editor of editors){
+      let root=editor.parentElement;
+      while(root&&root!==document.body){
+        const sends=[...new Set([...root.querySelectorAll('button[aria-label="Enviar"],button[aria-label="Send"],[data-icon="send"],[data-icon="wds-ic-send-filled"]')].filter(visible).map(el=>el.closest('button,[role="button"]')).filter(Boolean))];
+        const media=[...root.querySelectorAll(expected.media.type.startsWith('video/')?'video':'img')].filter(el=>visible(el)&&(el.currentSrc||el.src||'').startsWith('blob:'));
+        if(sends.length===1&&media.length>=1&&!root.querySelector('footer')){candidates.push({editor,send:sends[0],media:media[0]});break;}root=root.parentElement;
+      }
+    }
+    return candidates.length===1?candidates[0]:null;
+  }
+  if(action==='attach'){
+    if(!expected.media||!expected.mediaData)return {error:'Falta el archivo adjunto.'};
+    if(mediaProof())return {attached:true};
+    const current=inspect();if(current.error)return {error:current.error};
+    const inputs=[...document.querySelectorAll('input[type="file"]')].filter(el=>{const accept=el.accept||'';if(el.hasAttribute('capture'))return false;return expected.media.type.startsWith('video/')?/video\//.test(accept):/image\//.test(accept);});
+    if(inputs.length!==1){
+      const buttons=[...current.main.querySelectorAll('button[title="Adjuntar"],button[title="Attach"],button[aria-label="Adjuntar"],button[aria-label="Attach"],[data-icon="plus-rounded"],[data-icon="clip"]')].map(el=>el.closest('button,[role="button"]')).filter(el=>visible(el));
+      const unique=[...new Set(buttons)],target=unique.length===1?point(unique[0]):null;
+      return target?{target}:{error:'No se pudo identificar un único control para adjuntar el archivo.'};
+    }
+    const data=expected.mediaData.split(',')[1],bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0));
+    const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');
+    if(hash!==expected.media.hash||bytes.length!==expected.media.size)return {error:'El archivo no coincide con el revisado en la tanda.'};
+    if(!remembered(current.main))return {error:'Se perdió la comprobación del contacto.'};
+    const file=new File([bytes],expected.media.name,{type:expected.media.type}),transfer=new DataTransfer();transfer.items.add(file);
+    inputs[0].files=transfer.files;
+    globalThis.__lipaMedia={main:current.main,header:headerIdentity(current.main),label:headerIdentity(current.main)?.textContent,phone:expected.phone,hash,at:Date.now(),captionSet:false};
+    inputs[0].dispatchEvent(new Event('change',{bubbles:true}));return {attached:true};
+  }
+  if(action==='mediaPrepare'||action==='send'&&expected.media){
+    const proof=mediaProof();if(!proof)return {fatal:true,error:'Cambió el chat o venció la comprobación del adjunto. No se envió nada.'};
+    const preview=mediaEditor();if(!preview)return {error:'Esperando la vista previa del adjunto.'};
+    if(!proof.captionSet){
+      if(action==='send')return {error:'La descripción del archivo todavía no fue comprobada.'};
+      preview.editor.focus();const selection=getSelection(),range=document.createRange();range.selectNodeContents(preview.editor);selection.removeAllRanges();selection.addRange(range);document.execCommand('insertText',false,expected.message);proof.captionSet=true;return {error:'Comprobando descripción.'};
+    }
+    if(text(preview.editor)!==normalize(expected.message))return {fatal:true,error:'La descripción del archivo no coincide con el mensaje revisado.'};
+    if(preview.send.getAttribute('aria-disabled')==='true'||preview.send.disabled)return {error:'Esperando a que WhatsApp prepare el archivo.'};
+    const target=point(preview.send);if(!target)return {error:'El botón de envío del archivo está tapado.'};
+    if(action==='mediaPrepare')return {ready:true};
+    globalThis.__lipaArmed={phone:expected.phone,message:expected.message,mediaHash:expected.media.hash,main:proof.main,at:Date.now(),ids:new Set([...proof.main.querySelectorAll('[data-id]')].map(el=>el.dataset.id))};
+    return {armed:true,target};
+  }
   if(action==='send') {
     const current=inspect();
     if(current.error)return {error:current.error,clicked:false};
@@ -107,12 +157,12 @@ async function lipaWhatsAppStep(expected, action) {
   }
   if(action!=='confirm'&&action!=='audit')return {error:'Acción desconocida.'};
   const armed=globalThis.__lipaArmed;
-  if(!armed||armed.phone!==expected.phone||armed.message!==expected.message||(action==='confirm'&&Date.now()-armed.at>30000))return {error:'No hay un envío preparado para comprobar.',clicked:true};
-  for(let i=0;i<40;i++) {
+  if(!armed||armed.phone!==expected.phone||armed.message!==expected.message||armed.mediaHash!==(expected.media?.hash)||(action==='confirm'&&Date.now()-armed.at>30000))return {error:'No hay un envío preparado para comprobar.',clicked:true};
+  for(let i=0;i<(expected.media?120:40);i++) {
     const main=document.querySelector('#main');
-    if(main!==armed.main||!(rightPhone(main)||remembered(main)))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
+    if(main!==armed.main||!(rightPhone(main)||remembered(main)||expected.media&&mediaProof()))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
     const added=[...main.querySelectorAll('[data-id]')].filter(el=>!armed.ids.has(el.dataset.id)&&(el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id.startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"]')));
-    if(added.some(el=>[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[normalize(expected.message),renderedMessage].includes(text(part))))){if(action!=='audit')delete globalThis.__lipaArmed;return {sent:true,clicked:true};}
+    if(added.some(el=>[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[normalize(expected.message),renderedMessage].includes(text(part)))&&(!expected.media||(expected.media.type.startsWith('video/')?el.querySelector('video,[data-icon="video-play"],[data-icon="media-play"],[data-icon="play"]'):el.querySelector('img[src^="blob:"]')))&&!el.querySelector('[role="progressbar"],[data-icon="msg-error"]'))){if(action!=='audit')delete globalThis.__lipaArmed;return {sent:true,clicked:true};}
     if(action==='audit')return {error:'No se pudo confirmar el mensaje en este chat. No se reenvió nada.'};
     await sleep(500);
   }

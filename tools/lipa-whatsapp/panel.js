@@ -1,5 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
+let mediaFile=null, mediaURL=null, mediaBusy=false, mediaData=null;
 let job, running=false, stopping=false, workTab=null, history={};
 const labels={pending:'Pendiente',preparing:'Abriendo chat',attempting:'Envío iniciado · revisar',sent:'Enviado · no confirma entrega',review:'Revisar manualmente',duplicate:'Ya intentado anteriormente',skipped:'Omitido'};
 const selectable=contact=>contact.status==='pending'||contact.status==='duplicate';
@@ -11,7 +12,7 @@ const pause=async ms=>{
 };
 const browserControl=lipaBrowserControl(chrome);
 async function rawStep(tabId,contact,action) {
-  const results=await chrome.scripting.executeScript({target:{tabId},func:lipaWhatsAppStep,args:[{phone:contact.phone,message:job.message},action]});
+  const results=await chrome.scripting.executeScript({target:{tabId},func:lipaWhatsAppStep,args:[{phone:contact.phone,message:job.message,media:job.media||null,mediaData:action==='attach'?mediaData:null},action]});
   if(results.length!==1||!results[0].result)throw Error('No se pudo verificar la respuesta de WhatsApp.');
   return results[0].result;
 }
@@ -31,7 +32,7 @@ async function prepareChat(tabId,contact,cancelled=()=>false) {
   return {error:last?.error||'No se pudo abrir y comprobar la ficha del contacto.'};
 }
 async function fingerprint(contact) {
-  const raw=job.organizer+'\n'+contact.phone+'\n'+job.message;
+  const raw=job.organizer+'\n'+contact.phone+'\n'+job.message+(job.media?'\nmedia:'+job.media.hash:'');
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(n=>n.toString(16).padStart(2,'0')).join('');
 }
 function render() {
@@ -49,7 +50,9 @@ function render() {
   $('selectAll').checked=pending.length>0&&selected===pending.length;
   $('selectAll').indeterminate=selected>0&&selected<pending.length;
   $('selectAll').disabled=running||!pending.length;
-  $('start').disabled=running||!selected;
+  $('start').disabled=running||mediaBusy||!selected||Boolean(job.media&&!mediaFile);
+  $('attachment').disabled=running||mediaBusy;
+  $('removeMedia').disabled=running||mediaBusy;
   $('stop').disabled=!running;
 }
 async function step(contact,action) {
@@ -64,10 +67,11 @@ $('selectAll').addEventListener('change',()=>{
 $('login').addEventListener('click',async()=>{if(workTab){try{await chrome.tabs.update(workTab,{active:true});return;}catch(_){}}const tab=await chrome.tabs.create({url:'https://web.whatsapp.com/'});workTab=tab.id;});
 $('stop').addEventListener('click',()=>{stopping=true;$('status').textContent='Deteniendo. Los próximos mensajes no se enviarán.';if(workTab)chrome.tabs.remove(workTab).catch(()=>{});});
 $('start').addEventListener('click',async()=>{
-  if(running||!job)return;
+  if(running||mediaBusy||!job||job.media&&!mediaFile)return;
   const queue=job.contacts.filter(c=>selectable(c)&&c.selected!==false);
   if(!queue.length){$('status').textContent='Seleccioná al menos un contacto pendiente.';return;}
   running=true;stopping=false;render();
+  try{mediaData=job.media?await lipaMedia.dataURL(mediaFile):null;}catch(error){running=false;render();$('status').textContent=error.message;return;}
   for(const contact of queue) {
     if(stopping)break;
     try {
@@ -83,6 +87,7 @@ $('start').addEventListener('click',async()=>{
       const ready=await prepareChat(workTab,contact,()=>stopping);
       if(stopping){contact.status='pending';break;}
       if(!ready.ready)throw Error(ready.error||'No se pudo preparar el chat.');
+      if(job.media){await prepareMedia(contact);if(stopping){contact.status='pending';break;}}
       // Persist uncertainty before the click. A crash must never lead to an automatic duplicate.
       contact.status='attempting';contact.attemptedAt=new Date().toISOString();history[contact.key]={at:contact.attemptedAt,status:'attempting'};
       await persist();render();
@@ -104,12 +109,12 @@ $('start').addEventListener('click',async()=>{
       stopping=true;await persist();break;
     }
   }
-  await browserControl.release();running=false;await persist();render();
+  await browserControl.release();mediaData=null;running=false;await persist();render();
   if(!stopping)$('status').textContent='Tanda finalizada. Revisá los estados de la lista.';
 });
 $('report').addEventListener('click',()=>{
   if(!job)return;
-  const blob=new Blob([JSON.stringify({message:job.message,filters:job.filters,contacts:job.contacts.map(({key,...c})=>c)},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({message:job.message,media:job.media||null,filters:job.filters,contacts:job.contacts.map(({key,...c})=>c)},null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='lipa-registro-tanda.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
 });
 window.addEventListener('beforeunload',event=>{if(running){event.preventDefault();event.returnValue='';}});
@@ -121,5 +126,39 @@ window.addEventListener('pagehide',()=>{browserControl.release();});
   if(activeTab&&ownTab.id!==activeTab){let existing;try{existing=await chrome.tabs.get(activeTab);}catch(_){}if(existing?.url===chrome.runtime.getURL('panel.html')){$('status').textContent='Usá el panel original de la tanda.';return;}}
   await chrome.storage.local.set({activeTab:ownTab.id});
   for(const contact of job.contacts){contact.key=await fingerprint(contact);if(contact.status==='preparing')contact.status='pending';if(contact.status==='attempting')contact.status='review';if(contact.status==='pending'&&history[contact.key])contact.status='duplicate';if(contact.status==='duplicate')contact.selected=false;}
-  await persist();$('message').value=job.message;$('filters').textContent=job.filters;$('status').textContent=job.contacts.length+' contactos. Revisá antes de iniciar.';render();
+  if(job.media){mediaFile=await lipaMedia.read(job.id);if(mediaFile&&(await lipaMedia.validate(mediaFile)).hash!==job.media.hash)mediaFile=null;}
+  showMedia();await persist();$('message').value=job.message;$('filters').textContent=job.filters;$('status').textContent=job.media&&!mediaFile?'No se encontró el adjunto. Volvé a seleccionarlo o quitalo para continuar.':job.contacts.length+' contactos. Revisá antes de iniciar.';render();
 })().catch(error=>{$('status').textContent=error.message;});
+
+function showMedia(){
+  if(mediaURL)URL.revokeObjectURL(mediaURL);mediaURL=null;
+  $('mediaVisual').replaceChildren();$('mediaPreview').hidden=!job?.media;
+  if(!job?.media)return;
+  $('mediaName').textContent=job.media.name+' · '+(job.media.size/1048576).toFixed(1)+' MB';$('mediaCaption').textContent=job.message;
+  if(mediaFile){mediaURL=URL.createObjectURL(mediaFile);const el=document.createElement(job.media.type.startsWith('video/')?'video':'img');el.src=mediaURL;if(el.tagName==='VIDEO'){el.controls=true;el.preload='metadata';}else el.alt='Vista previa del adjunto';$('mediaVisual').append(el);}
+}
+async function refreshKeys(){for(const contact of job.contacts){contact.key=await fingerprint(contact);if(selectable(contact)){contact.status=history[contact.key]?'duplicate':'pending';}}}
+$('attachment').addEventListener('change',async()=>{
+ if(running||mediaBusy||!job)return;const file=$('attachment').files[0];if(!file)return;mediaBusy=true;render();
+ try{const meta=await lipaMedia.validate(file);await lipaMedia.store(job.id,file);job.media=meta;mediaFile=file;await refreshKeys();await persist();showMedia();$('status').textContent='Adjunto listo. Revisá la imagen o el video y su descripción antes de iniciar.';}
+ catch(error){$('status').textContent=error.message;}
+ finally{mediaBusy=false;$('attachment').value='';render();}
+});
+$('removeMedia').addEventListener('click',async()=>{
+ if(running||mediaBusy||!job)return;mediaBusy=true;render();try{await lipaMedia.store(job.id,null);delete job.media;mediaFile=null;await refreshKeys();await persist();showMedia();$('status').textContent='Se enviará únicamente el texto.';}catch(error){$('status').textContent=error.message;}finally{mediaBusy=false;render();}
+});
+async function prepareMedia(contact){
+ let clickedMenu=false;
+ for(let i=0;i<10;i++){
+  if(stopping)throw Error('Tanda detenida.');const result=await step(contact,'attach');
+  if(result.attached)break;
+  if(result.target&&!clickedMenu){await browserControl.click(workTab,result.target,()=>stopping);clickedMenu=true;}
+  else if(result.error)throw Error(result.error);
+  if(i===9)throw Error('No se pudo adjuntar el archivo.');await pause(500);
+ }
+ for(let i=0;i<120;i++){
+  if(stopping)throw Error('Tanda detenida.');const result=await step(contact,'mediaPrepare');if(result.ready)return;
+  if(result.fatal)throw Error(result.error);await pause(500);
+ }
+ throw Error('No se pudo comprobar la vista previa del archivo en WhatsApp. No se envió nada.');
+}

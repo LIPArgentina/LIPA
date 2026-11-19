@@ -2,3 +2,5 @@
 main>label:has(textarea){display:block;margin-top:18px}
 
 .previous-attempt td:last-child{color:#abb1bc}
+
+[hidden]{display:none!important}.media-section{margin-top:20px;padding:16px;border:1px solid #45402d;border-radius:10px}.media-section>label{display:block;color:#ffdc65;margin-bottom:10px}#mediaVisual img,#mediaVisual video{max-width:100%;max-height:300px;object-fit:contain;border-radius:8px}#mediaCaption{white-space:pre-wrap;overflow-wrap:anywhere}#mediaName{overflow-wrap:anywhere;color:#ffdc65}

@@ -1,23 +1,20 @@
-LIPA · Tanda de WhatsApp (Chrome)
+LIPA · Tanda de WhatsApp (Chrome) · Versión 1.2.0
 
-Versión 1.1.1: reconoce una zona libre del botón si otra extensión tapa su centro, sin hacer clic sobre el elemento superpuesto. Comprobación real sin envío realizada con un contacto agendado y otro mostrado por número. No se probó un envío real durante esas comprobaciones.
-En «Contacto para probar sin enviar» elegí un jugador y usá «Abrir y comprobar (sin enviar)». Abre su chat, carga el mensaje guardado y comprueba teléfono, texto y botón. «Comprobar chat abierto» hace la misma verificación sin cambiar de chat. Ninguno de estos botones envía mensajes.
+INSTALAR O ACTUALIZAR
+1. Extraé el ZIP en una carpeta permanente. Si ya está instalada, reemplazá los archivos en esa misma carpeta.
+2. Abrí chrome://extensions. Para instalar: activá Modo desarrollador y elegí Cargar descomprimida. Para actualizar: pulsá Recargar en LIPA.
+3. Recargá Inscripciones de LIPA, aplicá los filtros y tocá Preparar tanda.
 
-Versión 1.1.0: utiliza el permiso debugger de Chrome para ejecutar clics del navegador, porque los clics simulados en la página no abrieron la ficha del contacto en la prueba real. Ese permiso es amplio: permite controlar pestañas. El código de esta herramienta limita su uso a la pestaña activa de https://web.whatsapp.com y desconecta el control al terminar. Chrome muestra un aviso durante el control.
-Al actualizar, reemplazá los archivos en la misma carpeta, recargá la extensión en chrome://extensions y aceptá el permiso si Chrome lo solicita. No la desinstales: conservar la carpeta y el identificador mantiene el registro local.
-Antes de iniciar una tanda, podés usar «Comprobar chat abierto (sin enviar)» con el primer contacto pendiente seleccionado ya abierto y el mensaje preparado. Comprueba número, texto y botón; puede abrir y cerrar la ficha del contacto, pero no envía mensajes.
-Referencia del permiso: https://developer.chrome.com/docs/extensions/reference/api/debugger
+PREPARAR LA TANDA
+Revisá los destinatarios y el mensaje. Podés incluir o excluir contactos y adjuntar un archivo opcional: imagen JPG, PNG o WebP, o video MP4 o WebM, de hasta 16 MB.
+El panel muestra el archivo con su descripción antes de iniciar. El archivo se guarda localmente para esta tanda y esta computadora. Quitar adjunto vuelve al envío de texto solamente.
+El mensaje guardado se usa como descripción de la imagen o video. Sin adjunto se conserva el funcionamiento anterior.
+Los contactos no tienen un límite por tanda; se omiten números vacíos, inválidos o repetidos desde LIPA. Revisá los números antes de iniciar.
 
-1. Extraé este ZIP en una carpeta permanente.
-2. Abrí chrome://extensions, activá Modo desarrollador y elegí Cargar descomprimida.
-3. Seleccioná esta carpeta (la que contiene manifest.json).
-4. Recargá https://lipa.ar/torneos/privados.html, aplicá los filtros y tocá Preparar tanda.
-5. Revisá los números y el texto. Abrí WhatsApp Web e iniciá sesión si hace falta.
-6. Marcá la confirmación y tocá Iniciar envíos. No uses la pestaña de envío durante la tanda.
+ENVIAR
+Abrí WhatsApp Web e iniciá sesión si hace falta. Tocá Iniciar envíos cuando hayas revisado todo. No uses la pestaña de envío durante la tanda. Detener cancela los siguientes envíos, pero no retira un mensaje ya enviado.
+La extensión comprueba el contacto, la descripción y la presencia del adjunto en el mensaje saliente. Ante un resultado dudoso se detiene sin reintentar; revisá el chat manualmente. Enviado no significa entregado ni leído.
+El registro distingue archivos diferentes aunque compartan nombre y texto. Se guarda en este navegador, no en la base de LIPA.
 
-Sin límite de contactos por tanda; números únicos; sin pendientes de revisión. Los números argentinos de 10 dígitos se completan con 54 9: revisalos en el panel. Para otros países, cargá el prefijo internacional con + en LIPA.
-El registro se guarda en este navegador, no en la base de LIPA. El mismo número y mensaje ya intentados no se vuelven a enviar automáticamente. Ante interrupciones, revisá el chat manualmente. Enviado no equivale a entregado o leído.
-
-Primero probá con un contacto de confianza. La automatización no oficial depende de la pantalla de WhatsApp y puede detenerse si no reconoce sus controles. No elimina el riesgo de restricciones por parte de WhatsApp.
-
-Los datos permanecen en LIPA, esta extensión y WhatsApp; no se envían a servicios de IA. Para quitar la herramienta: chrome://extensions > Quitar. Esto también elimina su registro local.
+La extensión usa el permiso debugger ya existente para los clics en la pestaña de WhatsApp y desconecta el control al terminar. La automatización depende de la interfaz de WhatsApp; puede requerir ajustes cuando cambie. No elimina el riesgo de restricciones de WhatsApp.
+No se envían datos a servicios de IA. Quitar la extensión elimina su registro local y sus adjuntos.
