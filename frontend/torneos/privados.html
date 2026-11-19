@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=presencia-1">
+  <link rel="stylesheet" href="./privados.css?v=asistencia-grupal-1">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -45,6 +45,12 @@
       <p id="formMessage" class="message" aria-live="polite"></p>
     </section>
 
+    <section class="filters presence-actions" aria-label="Presencia de todos los inscriptos activos">
+      <strong id="presenceCount" aria-live="polite">En sala</strong>
+      <button type="button" id="markAllPresent" disabled>Marcar todos en sala</button>
+      <button type="button" id="unmarkAllPresent" disabled>Desmarcar todos</button>
+      <span id="presenceStatus" role="status"></span>
+    </section>
     <section class="filters" aria-label="Filtros de inscripciones">
       <div class="filter-group"><strong>Pago:</strong>
         <button class="filter active" data-payment="all">Todos</button>
@@ -117,6 +123,6 @@
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./categorias.js?v=1" defer></script>
   <script src="./tanda.js?v=1" defer></script>
-  <script src="./privados.js?v=presencia-1" defer></script>
+  <script src="./privados.js?v=asistencia-grupal-1" defer></script>
 </body>
 </html>

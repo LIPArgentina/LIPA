@@ -9,6 +9,8 @@
 
   const $ = selector => document.querySelector(selector);
   let entries = [];
+  let bulkPresenceBusy=false;
+  const pendingPresence=new Set();
   const tableSort = {verifiedBody:{key:'date',direction:'desc'},pendingBody:{key:'date',direction:'desc'},inactiveBody:{key:'date',direction:'desc'}};
   const nameCollator = new Intl.Collator('es', {sensitivity:'base',numeric:true});
   let diffusionMessage = '';
@@ -204,7 +206,41 @@
     renderBody($('#pendingBody'), pending, false);
     $('#verifiedCount').textContent = String(verified.length);
     $('#pendingCount').textContent = String(pending.length);
+    updatePresenceControls();
   }
+  function updatePresenceControls(){
+    const active=entries.filter(entry=>!entry.baja_at);
+    const present=active.filter(entry=>entry.en_sala).length;
+    $('#presenceCount').textContent='En sala · '+present+' de '+active.length;
+    const busy=bulkPresenceBusy || pendingPresence.size>0;
+    $('#markAllPresent').disabled=busy || present===active.length;
+    $('#unmarkAllPresent').disabled=busy || present===0;
+    document.querySelectorAll('#verifiedBody [data-presence],#pendingBody [data-presence]').forEach(box=>{
+      box.disabled=bulkPresenceBusy || pendingPresence.has(box.dataset.presence);
+    });
+  }
+  async function setAllPresent(enSala){
+    if(bulkPresenceBusy || pendingPresence.size)return;
+    const targets=entries.filter(entry=>!entry.baja_at);
+    const changes=targets.filter(entry=>Boolean(entry.en_sala)!==enSala).length;
+    if(!changes)return;
+    const players=changes===1?'1 jugador':changes+' jugadores';
+    const question=enSala?'¿Marcar a todos en sala? Falta marcar a '+players+'.':'¿Desmarcar a todos? Se quitará la marca de presencia a '+players+'.';
+    if(!confirm(question+' Se incluyen los inscriptos activos de todas las categorías, aunque estén ocultos por los filtros.'))return;
+    bulkPresenceBusy=true;updatePresenceControls();$('#presenceStatus').textContent='Guardando…';
+    try{
+      const result=await api('/torneo-organizador/inscripciones/presencia-grupal',{method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({enSala,ids:targets.map(entry=>String(entry.id))})});
+      const saved=new Set(result.ids);
+      for(const entry of entries)if(saved.has(String(entry.id)))entry.en_sala=enSala;
+      document.querySelectorAll('[data-presence]').forEach(box=>{if(saved.has(box.dataset.presence))box.checked=enSala;});
+      if(saved.size!==targets.length)await load();
+      $('#presenceStatus').textContent='Presencia actualizada.';
+    }catch(error){$('#presenceStatus').textContent=error.message;}
+    finally{bulkPresenceBusy=false;updatePresenceControls();}
+  }
+  $('#markAllPresent').onclick=()=>setAllPresent(true);
+  $('#unmarkAllPresent').onclick=()=>setAllPresent(false);
   $('#registeredSearch').addEventListener('input', render);
   $('#prepareBatch').addEventListener('click', () => {
     if(!diffusionMessage.trim()){openDiffusionMessage();$('#diffusionStatus').textContent='Primero guardá el mensaje para la tanda.';return;}
@@ -366,14 +402,14 @@
   document.addEventListener('change', async event => {
     const check=event.target.closest('[data-presence]');
     if(check){
-      check.disabled=true;
+      pendingPresence.add(check.dataset.presence);updatePresenceControls();
       try{
         const saved=await api('/torneo-organizador/inscripciones/'+check.dataset.presence+'/presencia',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enSala:check.checked})});
         const entry=entries.find(p=>String(p.id)===check.dataset.presence);
         if(entry)entry.en_sala=saved.en_sala;
         const current=document.querySelector('[data-presence="'+check.dataset.presence+'"]');if(current)current.checked=saved.en_sala;
       }catch(error){check.checked=!check.checked;alert(error.message);await load();}
-      finally{check.disabled=false;}
+      finally{pendingPresence.delete(check.dataset.presence);updatePresenceControls();}
       return;
     }
     const category = event.target.closest('.category-select');

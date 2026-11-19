@@ -654,6 +654,19 @@ module.exports = function createTorneosPrivadosRouter() {
     }
   });
 
+  router.patch('/torneo-organizador/inscripciones/presencia-grupal', requireTorneoOrganizador, async (req,res)=>{
+    const {enSala,ids}=req.body || {};
+    if(typeof enSala!=='boolean' || !Array.isArray(ids) || !ids.length || !ids.every(id=>typeof id==='string' && /^[1-9]\d{0,17}$/.test(id))){
+      return res.status(400).json({error:'Revisá las inscripciones seleccionadas.'});
+    }
+    try{
+      await ensureSchema();
+      const {rows}=await pool.query(`UPDATE torneo_inscripciones SET en_sala=$1
+        WHERE torneo_organizador_id=$2 AND baja_at IS NULL AND id=ANY($3::bigint[]) RETURNING id::text`,
+        [enSala,req.user.torneoOrganizadorId,ids]);
+      res.json({ids:rows.map(row=>row.id)});
+    }catch(error){console.error('Guardar presencia grupal:',error.message);res.status(500).json({error:'No se pudo guardar la presencia del grupo.'});}
+  });
   router.patch('/torneo-organizador/inscripciones/:id/presencia', requireTorneoOrganizador, async (req,res)=>{
     if(typeof req.body?.enSala!=='boolean' || !/^[1-9]\d{0,17}$/.test(req.params.id))return res.status(400).json({error:'Presencia inválida.'});
     try{

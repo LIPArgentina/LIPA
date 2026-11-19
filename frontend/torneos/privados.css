@@ -80,3 +80,5 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
 .payment-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.payment-heading #paymentSum{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--gold,#ffc400)}.payment-sum-note{font-size:11px;color:#d8bd79;margin:8px 0 0}
 
 .table-wrap th:first-child{width:48px}.table-wrap .presence-check{width:20px;height:20px;min-height:20px;margin:0;accent-color:#ffca40;cursor:pointer}
+.filters.presence-actions{justify-content:flex-start;flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px}
+.presence-actions strong{margin-right:6px}.presence-actions button:disabled{opacity:.48}
