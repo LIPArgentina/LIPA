@@ -257,8 +257,9 @@
       }catch(error){if(data===grid){status(error.message,true);if(button.isConnected)showCallHint(button,error.message);}}
       finally{
         sendingCalls.delete(key);
-        if(button.isConnected)options();
-        else if(data===grid)render();
+        if(data===grid){
+          if(button.isConnected)options();else render();
+        }
       }
     };
     row.append(table,button);return row;
