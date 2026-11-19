@@ -81,7 +81,7 @@
     return entry?.estado_pago === '50' ? 'sena' : String(entry?.estado_pago || 'sin_sena');
   }
   function paymentSummary(rows) {
-    const fullAmounts = {tercera:55000, segunda:70000};
+    const fullAmounts = {tercera:55000, segunda:70000, primera:80000, segunda_tercera:125000, primera_segunda:150000};
     let amount=0, missing=0;
     for(const entry of rows){
       const state=paymentState(entry);
