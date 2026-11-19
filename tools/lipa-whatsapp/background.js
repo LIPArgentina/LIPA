@@ -13,7 +13,7 @@ chrome.runtime.onMessage.addListener((request, sender, respond) => {
   preparing = true;
   (async()=>{
     const batch=request.batch;
-    if(!batch || typeof batch.message !== 'string' || !batch.message.trim() || batch.message.length>4000 || !Array.isArray(batch.contacts) || !batch.contacts.length || batch.contacts.length>30) throw Error('La tanda debe tener un mensaje y entre 1 y 30 contactos.');
+    if(!batch || typeof batch.message !== 'string' || !batch.message.trim() || batch.message.length>4000 || !Array.isArray(batch.contacts) || !batch.contacts.length) throw Error('La tanda debe tener un mensaje y al menos un contacto.');
     const contacts=batch.contacts.map(c=>({name:String(c.name||'Jugador').slice(0,200),phone:String(c.phone||'')}));
     if(contacts.some(c=>!/^\d{10,15}$/.test(c.phone)) || new Set(contacts.map(c=>c.phone)).size!==contacts.length) throw Error('Hay teléfonos inválidos o repetidos.');
     const {activeTab}=await chrome.storage.local.get('activeTab');

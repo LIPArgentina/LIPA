@@ -249,7 +249,6 @@
   $('#registeredSearch').addEventListener('input', render);
   $('#prepareBatch').addEventListener('click', () => {
     if(!diffusionMessage.trim()){openDiffusionMessage();$('#diffusionStatus').textContent='Primero guardá el mensaje para la tanda.';return;}
-    if(batchContacts.contacts.length>30){setMessage('Hay '+batchContacts.contacts.length+' contactos. Ajustá los filtros para preparar una tanda de hasta 30.');return;}
     if(!document.documentElement.dataset.lipaBatchExtension){$('#batchInstall').showModal();return;}
     const filters = $('#categoryFilter').selectedOptions[0].textContent + ' · ' + document.querySelector('.filter.active').textContent + ' · Búsqueda: ' + ($('#registeredSearch').value||'Todas') + ' · Omitidos: ' + batchContacts.missing + ' sin número, ' + batchContacts.invalid + ' inválidos, ' + batchContacts.duplicates + ' repetidos';
     window.dispatchEvent(new CustomEvent('lipa-prepare-batch',{detail:{message:diffusionMessage,contacts:batchContacts.contacts,filters,organizer:String(session.torneoOrganizadorId||session.slug||'')}}));
