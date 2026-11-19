@@ -370,17 +370,8 @@
       }catch(error){if(request!==requestId)return;if(error.status===401){location.replace('./torneos.html');return;}if(error.status===404){showPendingDraw();return;}status(error.message,true);}
       finally{refreshing=false;}
     }
-    let lastCall='0',checking=false,visibleSince=performance.now();
-    async function calls(){if(document.hidden||checking)return;checking=true;try{
-      const result=await LipaViewer.api('avisos?after='+lastCall);
-      const box=$('#personalCalls');
-      const now=result.serverTime || Date.now();
-      const earliest=now-Math.min(30000,performance.now()-visibleSince);
-      const fresh=result.avisos.some(call=>Date.parse(call.created_at)>=earliest);
-      result.avisos.forEach(call=>{const item=document.createElement('p');item.textContent=call.mensaje;box.prepend(item);box.hidden=false;lastCall=call.id;while(box.children.length>5)box.lastElementChild.remove();});
-      if(fresh)LipaCallSound.ring();
-    }catch(error){if(error.status===401)location.replace('./torneos.html');}finally{checking=false;}}
-    setInterval(refresh,10000);setInterval(calls,5000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){visibleSince=performance.now();refresh();calls();}});calls();
+    LipaViewerCalls();
+    setInterval(refresh,10000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   }
   load();
 })();

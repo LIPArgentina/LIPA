@@ -9,7 +9,7 @@ El visor comparte la grilla del organizador y los resultados publicados en LIPA.
 - El visor no expone DNI, teléfonos ni identificadores internos de jugador. Las rutas de llamados y contactos requieren sesión de organizador.
 - Las mesas se vinculan al sorteo, partido y ambos participantes. Si cambia alguno, la asignación anterior no se muestra.
 - Cada columna de la grilla del organizador permite buscar por nombre o apellido. Enter o la flecha lleva a la siguiente coincidencia. En los partidos pendientes se puede preseleccionar mesa y piso mientras la página sigue abierta. La campana indica qué falta y confirma la asignación al enviar el llamado a ambos rivales.
-- En el visor, «Activar sonido» reproduce una prueba del tono de cuatro notas. Los llamados nuevos reproducen ese tono con el visor abierto y el audio habilitado. En segundo plano, el aviso web solicita sonido y vibración al sistema según los permisos del dispositivo.
+- «Activar sonido» reproduce una muestra. Con el visor abierto, la alarma se repite mientras el jugador tenga llamados pendientes. Tocar cada mensaje lo confirma para ese jugador en todos sus dispositivos. La campana también funciona con la grilla en borrador. En segundo plano, el sonido y la vibración de la notificación dependen del sistema. Tocar la notificación abre el visor y confirma ese llamado.
 
 ## Publicación
 

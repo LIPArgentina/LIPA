@@ -29,6 +29,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
         jugador_id INTEGER NOT NULL REFERENCES jugadores(id) ON DELETE CASCADE, mensaje TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
       CREATE INDEX IF NOT EXISTS torneo_avisos_jugador_idx ON torneo_avisos(jugador_id,id);
+      ALTER TABLE torneo_avisos ADD COLUMN IF NOT EXISTS clave_pendiente UUID;
       CREATE INDEX IF NOT EXISTS torneo_llamados_grilla_idx ON torneo_llamados(organizador_id,categoria,sorteo_revision,id DESC);
     `).catch(error => { ready = null; throw error; });
     return ready;
@@ -108,6 +109,24 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const {rows}=await pool.query(`SELECT id::text,mensaje,created_at FROM torneo_avisos WHERE jugador_id=$1 AND id>$2::bigint AND created_at>NOW()-INTERVAL '12 hours' ORDER BY torneo_avisos.id LIMIT 30`,[user.jugador_id,after]);
     res.json({avisos:rows,serverTime:Date.now()});
   }));
+  router.get('/torneo-visor/llamados',route(async(req,res)=>{
+    const user=await session(req);
+    res.locals.lecturaVisor=true;
+    const {rows}=await pool.query(`SELECT id::text,mensaje,clave_pendiente FROM (
+      SELECT id,mensaje,clave_pendiente FROM torneo_avisos WHERE jugador_id=$1 AND clave_pendiente IS NOT NULL
+      UNION ALL
+      (SELECT id,mensaje,clave_pendiente FROM torneo_avisos WHERE jugador_id=$1 AND clave_pendiente IS NULL
+        AND created_at>NOW()-INTERVAL '12 hours' ORDER BY id DESC LIMIT 5)
+    ) AS bandeja ORDER BY bandeja.id DESC`,[user.jugador_id]);
+    res.json({avisos:rows});
+  }));
+  router.post('/torneo-visor/avisos/:id/confirmar',route(async(req,res)=>{
+    const user=await session(req), id=req.params.id;
+    if(!/^[1-9]\d{0,18}$/.test(id) || BigInt(id)>9223372036854775807n)throw fail(400,'Aviso inválido.');
+    const result=await pool.query('UPDATE torneo_avisos SET clave_pendiente=NULL WHERE jugador_id=$1 AND id=$2 RETURNING id',[user.jugador_id,id]);
+    if(!result.rowCount)throw fail(404,'Aviso inexistente.');
+    res.json({ok:true});
+  }));
   // Web FCM is separate from the native APK, whose current bridge exposes no FCM token.
   router.get('/torneo-visor/push-config',route(async(_req,res)=>{
     let config=webApp.config;
@@ -164,26 +183,29 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     if (!a.jugador_id || !b.jugador_id || a.jugador_id===b.jugador_id) throw fail(409,'Revisá la vinculación de ambos jugadores antes de llamarlos.');
     const mensaje=`Llamado a mesa · ${req.params.categoria.toUpperCase()}\n${a.nombre} vs. ${b.nombre}\nMesa ${mesa} · Piso ${piso}. Presentate para jugar.`;
     const client=await pool.connect();
-    let recipients;
+    const destinations=new Map([[a.jugador_id,crypto.randomUUID()],[b.jugador_id,crypto.randomUUID()]]);
     try {
       await client.query('BEGIN');
       await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[req.user.torneoOrganizadorId]);
       const current=await readGrid(req.user.torneoOrganizadorId,req.params.categoria,client);
       if(current.revision!==saved.revision || current.sorteo_revision!==saved.sorteo_revision) throw fail(409,'La grilla cambió. Recargá antes de llamar.');
       const {rows}=await client.query(`INSERT INTO torneo_llamados(organizador_id,categoria,sorteo_revision,match_id,a,b,mesa,piso,mensaje) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,[req.user.torneoOrganizadorId,req.params.categoria,saved.sorteo_revision,match.id,match.a,match.b,mesa,piso,mensaje]);
-      recipients=[...new Set([a.jugador_id,b.jugador_id].filter(Boolean))];
-      for (const id of recipients) await client.query('INSERT INTO torneo_avisos(llamado_id,jugador_id,mensaje) VALUES($1,$2,$3)',[rows[0].id,id,mensaje]);
+      for (const [id,key] of destinations) await client.query('INSERT INTO torneo_avisos(llamado_id,jugador_id,mensaje,clave_pendiente) VALUES($1,$2,$3,$4)',[rows[0].id,id,mensaje,key]);
       await client.query('COMMIT');
     } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    if (firebase && recipients.length) {
-      const {rows}=await pool.query('SELECT DISTINCT fcm_token FROM torneo_visor_sesiones WHERE jugador_id=ANY($1::int[]) AND expires_at>NOW() AND fcm_token IS NOT NULL',[recipients]);
-      const tokens=rows.map(r=>r.fcm_token);
-      for(let i=0;i<tokens.length;i+=500) {
-        const batch=tokens.slice(i,i+500);
-        try {const sent=await firebase.messaging().sendEachForMulticast({tokens:batch,notification:{title:'LIPA · Llamado a mesa',body:mensaje},webpush:{
-          headers:{Urgency:'high'},notification:{title:'LIPA · Llamado a mesa',body:mensaje,silent:false,vibrate:[220,110,220,110,380]},
-          fcmOptions:{link:'https://lipa.ar/torneos/visor.html'}}});
-          for(let j=0;j<sent.responses.length;j++) if(['messaging/registration-token-not-registered','messaging/invalid-registration-token'].includes(sent.responses[j].error?.code)) await pool.query('UPDATE torneo_visor_sesiones SET fcm_token=NULL WHERE fcm_token=$1',[batch[j]]);
+    if (firebase) {
+      const {rows}=await pool.query('SELECT DISTINCT jugador_id,fcm_token FROM torneo_visor_sesiones WHERE jugador_id=ANY($1::int[]) AND expires_at>NOW() AND fcm_token IS NOT NULL',[[...destinations.keys()]]);
+      const messages=rows.map(({jugador_id,fcm_token})=>{
+        const key=destinations.get(jugador_id);
+        const notification={title:'LIPA · Llamado a mesa',body:mensaje};
+        return {token:fcm_token,notification,webpush:{headers:{Urgency:'high'},
+          notification:{...notification,tag:'lipa-llamado-'+key,requireInteraction:true,silent:false,vibrate:[350,120,350,120,550]},
+          fcmOptions:{link:'https://lipa.ar/torneos/visor.html#aviso='+key}}};
+      });
+      for(let i=0;i<messages.length;i+=500) {
+        const batch=messages.slice(i,i+500);
+        try {const sent=await firebase.messaging().sendEach(batch);
+          for(let j=0;j<sent.responses.length;j++) if(['messaging/registration-token-not-registered','messaging/invalid-registration-token'].includes(sent.responses[j].error?.code)) await pool.query('UPDATE torneo_visor_sesiones SET fcm_token=NULL WHERE fcm_token=$1',[batch[j].token]);
         } catch(error) {console.error('Push de llamado:',error.message);}
       }
     }
