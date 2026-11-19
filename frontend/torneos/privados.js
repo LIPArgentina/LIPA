@@ -80,6 +80,20 @@
   function paymentState(entry) {
     return entry?.estado_pago === '50' ? 'sena' : String(entry?.estado_pago || 'sin_sena');
   }
+  function paymentSummary(rows) {
+    const fullAmounts = {tercera:55000, segunda:70000};
+    let amount=0, missing=0;
+    for(const entry of rows){
+      const state=paymentState(entry);
+      if(state==='sena'){
+        const deposit=Number(entry.monto_sena)||(entry.estado_pago==='50'?50000:0);
+        if(Number.isFinite(deposit)&&deposit>0)amount+=deposit;else missing++;
+      }else if(state==='total'){
+        if(fullAmounts[entry.categoria])amount+=fullAmounts[entry.categoria];else missing++;
+      }
+    }
+    return {amount,missing};
+  }
   function normalizeDepositAmount(value) {
     const amount = Number(String(value || '').replace(',', '.'));
     if (!Number.isFinite(amount) || amount <= 0) return null;
@@ -171,6 +185,12 @@
       return !query || words.every(word => name.includes(word))
         || (/^\d+$/.test(dniQuery) && String(item.dni || '').replace(/\D/g, '').includes(dniQuery));
     });
+    const summary=paymentSummary(verified),totalNode=$('#paymentSum');
+    totalNode.textContent='$ '+summary.amount.toLocaleString('es-AR')+(summary.missing?' *':'');
+    const explanation='Señas y pagos completos de los jugadores mostrados. No incluye efectivo.'+(summary.missing?' Total parcial: '+summary.missing+' pago(s) sin importe definido.':'');
+    totalNode.title=explanation;totalNode.setAttribute('aria-label',totalNode.textContent+'. '+explanation);
+    $('#paymentSumNote').hidden=!summary.missing;
+    $('#paymentSumNote').textContent=summary.missing?'* Total parcial: faltan definir importes de '+summary.missing+' pago(s).':'';
     batchContacts = window.LipaBatch.collect(verified);
     $('#prepareBatch').textContent = 'Preparar tanda (' + batchContacts.contacts.length + ')';
     $('#prepareBatch').disabled = !batchContacts.contacts.length;

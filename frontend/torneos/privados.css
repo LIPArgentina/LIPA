@@ -76,3 +76,5 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
 .inactive-card{border-color:#555}.inactive-date{font-size:.67rem;color:var(--muted)}.inactive-card select:disabled,.inactive-card input:disabled{opacity:.8}.delete-button{white-space:normal}
 
 .restore-button{display:block;width:100%;padding:5px 2px;margin-top:5px;font-size:.65rem;white-space:normal;overflow-wrap:normal}
+
+.payment-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.payment-heading #paymentSum{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--gold,#ffc400)}.payment-sum-note{font-size:11px;color:#d8bd79;margin:8px 0 0}
