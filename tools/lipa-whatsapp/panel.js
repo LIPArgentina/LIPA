@@ -146,6 +146,7 @@ async function prepareMedia(contact){ let clickedMenu=false,lastError='';
  }
  for(let i=0;i<120;i++){
   if(stopping)throw Error('Tanda detenida.');const result=await step(contact,'mediaPrepare');if(result.ready)return;
+  if(result.interaction==='caption'){await browserControl.fillCaption(workTab,result.target,job.message,()=>stopping);await pause(500);continue;}
   if(result.fatal)throw Error(result.error);lastError=result.error||lastError;await pause(500);
  }
  throw Error('No se pudo comprobar el adjunto: '+(lastError||'no apareció la vista previa')+'. No se envió nada.');

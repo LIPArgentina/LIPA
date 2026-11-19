@@ -30,6 +30,18 @@ function lipaBrowserControl(api) {
     await api.debugger.sendCommand({tabId},'Input.dispatchMouseEvent',{type:'mouseReleased',x:point.x,y:point.y,button:'left',buttons:0,clickCount:1});
   }
   api.debugger?.onDetach?.addListener(source=>{if(source.tabId===attached)attached=null;});
-  return {connect,click,release};
+  async function fillCaption(tabId,point,value,cancelled=()=>false){
+    await click(tabId,point,cancelled);
+    async function command(method,params){await verify(tabId);if(attached!==tabId||cancelled())throw Error('Tanda detenida.');await api.debugger.sendCommand({tabId},method,params);}
+    await command('Input.dispatchKeyEvent',{type:'keyDown',key:'a',code:'KeyA',windowsVirtualKeyCode:65,modifiers:2});
+    await command('Input.dispatchKeyEvent',{type:'keyUp',key:'a',code:'KeyA',windowsVirtualKeyCode:65,modifiers:2});
+    const lines=String(value).replace(/\r\n/g,'\n').split('\n');
+    // Shift+Enter goes through WhatsApp's editor and never invokes plain Enter/send.
+    for(let i=0;i<lines.length;i++){
+      if(i){await command('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,modifiers:8});await command('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,modifiers:8});}
+      if(lines[i])await command('Input.insertText',{text:lines[i]});
+    }
+  }
+  return {connect,click,fillCaption,release};
 }
 if(typeof module==='object')module.exports=lipaBrowserControl;

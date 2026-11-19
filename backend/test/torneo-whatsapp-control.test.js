@@ -25,3 +25,9 @@ test('cancelled action never presses; partial failure is not retried',async()=>{
  assert.equal(partial.calls.filter(c=>c[1]==='mousePressed').length,1);
  assert.equal(partial.calls.filter(c=>c[1]==='mouseReleased').length,1);
 });
+test('multiline caption preserves blank lines and emojis using Shift+Enter, never plain Enter',async()=>{
+ const calls=[];const api={tabs:{get:async()=>({url:'https://web.whatsapp.com/',active:true})},permissions:{contains:async()=>true},debugger:{attach:async()=>{},detach:async()=>{},sendCommand:async(target,method,args)=>calls.push({method,args}),onDetach:{addListener(){}}}};
+ const control=create(api);await control.connect(1);await control.fillCaption(1,{x:20,y:30},'Hola 👋\n\nEl alias es:\nlipa.trebol');
+ assert.deepEqual(calls.filter(c=>c.method==='Input.insertText').map(c=>c.args.text),['Hola 👋','El alias es:','lipa.trebol']);
+ const enter=calls.filter(c=>c.args.key==='Enter');assert.equal(enter.length,6);assert(enter.every(c=>c.args.modifiers===8));
+});

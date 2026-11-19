@@ -136,9 +136,10 @@ async function lipaWhatsAppStep(expected, action) {
     const preview=mediaEditor();if(!preview)return {error:'Esperando la vista previa del adjunto.'};
     if(!proof.captionSet){
       if(action==='send')return {error:'La descripción del archivo todavía no fue comprobada.'};
-      preview.editor.focus();const selection=getSelection(),range=document.createRange();range.selectNodeContents(preview.editor);selection.removeAllRanges();selection.addRange(range);document.execCommand('insertText',false,expected.message);proof.captionSet=true;return {error:'Comprobando descripción.'};
+      const target=point(preview.editor);if(!target)return {error:'El campo de descripción está tapado.'};
+      proof.captionSet=true;return {interaction:'caption',target,error:'Cargando descripción con sus saltos de línea.'};
     }
-    if(text(preview.editor)!==normalize(expected.message))return {fatal:true,error:'La descripción del archivo no coincide con el mensaje revisado.'};
+    if(text(preview.editor)!==normalize(expected.message)&&normalize(preview.editor.innerText)!==normalize(expected.message))return {fatal:true,error:'La descripción del archivo no coincide con el mensaje revisado.'};
     if(!preview.send)return {error:'La imagen y la descripción están listas; no se pudo identificar un único botón Enviar del adjunto.'};
     if(preview.send.getAttribute('aria-disabled')==='true'||preview.send.disabled)return {error:'Esperando a que WhatsApp prepare el archivo.'};
     const target=point(preview.send);if(!target)return {error:'El botón de envío del archivo está tapado.'};

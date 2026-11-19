@@ -55,10 +55,10 @@ test('media opens a blank verified composer and pastes the file without enabling
 test('caption in preview footer and data URL image are recognized; caption fills before send becomes available',async()=>{
  const f=driverFixture();f.visual.src='data:image/png;base64,AAAA';
  f.caption.closest=s=>s.split(',').includes('footer')?{}:null;f.preview.querySelector=s=>s==='footer'?{}:null;
- f.ctx.__lipaMedia.captionSet=false;f.caption.childNodes=[];f.caption.focus=()=>{};
+ f.ctx.__lipaMedia.captionSet=false;f.caption.childNodes=[];f.caption.focus=()=>{};f.caption.getBoundingClientRect=()=>({x:0,y:0,width:100,height:50});f.caption.contains=()=>true;
  f.ctx.getSelection=()=>({removeAllRanges(){},addRange(){}});f.ctx.document.createRange=()=>({selectNodeContents(){}});
  f.ctx.document.execCommand=(command,unused,value)=>{assert.equal(command,'insertText');f.caption.childNodes=[{nodeType:3,nodeValue:value}];};
  const realQuery=f.preview.querySelectorAll;f.preview.querySelectorAll=s=>s==='img'?[f.visual]:[];
- assert((await f.step('mediaPrepare')).error);assert.equal(f.caption.childNodes[0].nodeValue,f.expected.message);assert((await f.step('send')).error);
+ assert.equal((await f.step('mediaPrepare')).interaction,'caption');f.caption.childNodes=[{nodeType:3,nodeValue:f.expected.message}];assert((await f.step('send')).error);
  f.preview.querySelectorAll=realQuery;assert.equal((await f.step('mediaPrepare')).ready,true);assert.equal((await f.step('send')).armed,true);
 });
