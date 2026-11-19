@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=26">
+  <link rel="stylesheet" href="./privados.css?v=27">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -66,6 +66,10 @@
       <p class="pending-note">“Revisar pendientes” pasa a confirmados a los jugadores de esta lista cuyo DNI figure en la base, incluidos los de lista de espera.</p>
       <div class="table-wrap"><table><thead><tr><th data-sort-column="player" aria-sort="none"><span class="sort-heading">Jugador ingresado<span class="sort-buttons"><button type="button" data-sort="player" data-direction="asc" aria-label="Ordenar Jugador ingresado ascendente" title="Orden ascendente">▲</button><button type="button" data-sort="player" data-direction="desc" aria-label="Ordenar Jugador ingresado descendente" title="Orden descendente">▼</button></span></span></th><th data-sort-column="team" aria-sort="none"><span class="sort-heading">Equipo<span class="sort-buttons"><button type="button" data-sort="team" data-direction="asc" aria-label="Ordenar Equipo ascendente" title="Orden ascendente">▲</button><button type="button" data-sort="team" data-direction="desc" aria-label="Ordenar Equipo descendente" title="Orden descendente">▼</button></span></span></th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th data-sort-column="date" aria-sort="none"><span class="sort-heading">Inscripción<span class="sort-buttons"><button type="button" data-sort="date" data-direction="asc" aria-label="Ordenar Inscripción ascendente" title="Orden ascendente">▲</button><button type="button" data-sort="date" data-direction="desc" aria-label="Ordenar Inscripción descendente" title="Orden descendente">▼</button></span></span></th><th></th></tr></thead><tbody id="pendingBody"></tbody></table></div>
     </section>
+    <section class="list-card inactive-card">
+      <div class="list-heading"><div><span>HISTORIAL CONSERVADO</span><h2>Jugadores dados de baja</h2></div><strong id="inactiveCount">0</strong></div>
+      <div class="table-wrap"><table><thead><tr><th data-sort-column="player" aria-sort="none"><span class="sort-heading">Jugador<span class="sort-buttons"><button type="button" data-sort="player" data-direction="asc" aria-label="Ordenar Jugador ascendente" title="Orden ascendente">▲</button><button type="button" data-sort="player" data-direction="desc" aria-label="Ordenar Jugador descendente" title="Orden descendente">▼</button></span></span></th><th data-sort-column="team" aria-sort="none"><span class="sort-heading">Equipo<span class="sort-buttons"><button type="button" data-sort="team" data-direction="asc" aria-label="Ordenar Equipo ascendente" title="Orden ascendente">▲</button><button type="button" data-sort="team" data-direction="desc" aria-label="Ordenar Equipo descendente" title="Orden descendente">▼</button></span></span></th><th>DNI</th><th>Categoría</th><th>WhatsApp</th><th>Pago</th><th data-sort-column="date" aria-sort="none"><span class="sort-heading">Inscripción<span class="sort-buttons"><button type="button" data-sort="date" data-direction="asc" aria-label="Ordenar Inscripción ascendente" title="Orden ascendente">▲</button><button type="button" data-sort="date" data-direction="desc" aria-label="Ordenar Inscripción descendente" title="Orden descendente">▼</button></span></span></th><th></th></tr></thead><tbody id="inactiveBody"></tbody></table></div>
+    </section>
   </main>
 
   <dialog id="batchInstall" aria-labelledby="batchInstallTitle"><div class="confirmation"><h2 id="batchInstallTitle">Activar tandas en Chrome</h2><p>Instalá la herramienta una sola vez en esta computadora:</p><ol><li><a href="./lipa-whatsapp.zip" download>Descargá la extensión LIPA</a> y extraé el ZIP en una carpeta.</li><li>Abrí <strong>chrome://extensions</strong>, activá «Modo desarrollador» y elegí «Cargar descomprimida».</li><li>Seleccioná la carpeta extraída que contiene manifest.json.</li><li>Recargá esta página y tocá «Preparar tanda».</li></ol><p>El panel muestra el mensaje y los contactos antes de enviar. Necesitás iniciar sesión en WhatsApp Web. Máximo: 30 contactos por tanda.</p><p>Probá primero con un contacto de confianza. La herramienta se detiene si WhatsApp cambia su pantalla o no permite verificar el chat.</p><div class="modal-actions"><button id="closeBatchInstall" type="button">Cerrar</button></div></div></dialog>
@@ -113,6 +117,6 @@
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./categorias.js?v=1" defer></script>
   <script src="./tanda.js?v=1" defer></script>
-  <script src="./privados.js?v=23" defer></script>
+  <script src="./privados.js?v=24" defer></script>
 </body>
 </html>

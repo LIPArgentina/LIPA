@@ -64,7 +64,7 @@ test('invalid WO placement, missing players and duplicates are rejected',()=>{
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 async function saveDraw(category,order,count){
  const routes={},calls=[],ids=roster(count).map(p=>p.id),router=new Proxy({}, {get:(_,verb)=>(url,...handlers)=>{routes[verb+' '+url]=handlers.at(-1);}});
- const query=async(sql,args)=>{calls.push({sql,args});if(sql.startsWith('SELECT id FROM torneo_inscripciones')){assert(sql.includes("estado_pago IN ('sena', 'total', 'efectivo')"));return {rows:ids.map(id=>({id}))};}if(sql.startsWith('INSERT INTO torneo_sorteos'))return {rows:[{revision:1}]};return {rows:[]};};
+ const query=async(sql,args)=>{calls.push({sql,args});if(sql.startsWith('SELECT id FROM torneo_inscripciones')){assert(sql.includes("baja_at IS NULL"));assert(sql.includes("estado_pago IN ('sena', 'total', 'efectivo')"));return {rows:ids.map(id=>({id}))};}if(sql.startsWith('INSERT INTO torneo_sorteos'))return {rows:[{revision:1}]};return {rows:[]};};
  const client={query,release(){}},pool={query,connect:async()=>client},module={exports:{}};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/routes/torneosPrivados.routes.js'),'utf8'),{module,console,require(name){if(name==='express')return {Router:()=>router};if(name==='../../db')return pool;if(name.endsWith('/cupos'))return slots;if(name.endsWith('/categorias'))return require('../../frontend/torneos/categorias');if(name==='./torneosGrilla.routes')return ()=>{};return {};}});module.exports();
  let status=200,data;const res={status(s){status=s;return this;},json(d){data=d;return this;}};

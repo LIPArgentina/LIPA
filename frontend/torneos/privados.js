@@ -9,7 +9,7 @@
 
   const $ = selector => document.querySelector(selector);
   let entries = [];
-  const tableSort = {verifiedBody:{key:'date',direction:'desc'},pendingBody:{key:'date',direction:'desc'}};
+  const tableSort = {verifiedBody:{key:'date',direction:'desc'},pendingBody:{key:'date',direction:'desc'},inactiveBody:{key:'date',direction:'desc'}};
   const nameCollator = new Intl.Collator('es', {sensitivity:'base',numeric:true});
   let diffusionMessage = '';
   let batchContacts = window.LipaBatch.collect([]);
@@ -132,8 +132,12 @@
       tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td class="${entry.equipo_actual ? 'team-current' : 'team-history'}" title="${entry.equipo_nombre ? (entry.equipo_actual ? 'Equipo actual' : 'Último equipo histórico') : 'Sin registro'}">${escapeHtml(entry.equipo_nombre || 'Sin registro')}</td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
         <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp">${whatsappContact(entry.whatsapp)}${verified ? whatsappContact(entry.whatsapp, true) : ''}<button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
-        <td><button class="delete-button" data-delete="${entry.id}">Quitar</button></td>`;
+        <td>${entry.baja_at ? `<span class="inactive-date" title="Fecha de baja">Baja: ${dateFormatter.format(new Date(entry.baja_at))}</span>` : `<button class="delete-button" data-delete="${entry.id}">Dar de baja</button>`}</td>`;
       [...tr.children].forEach((cell,index)=>cell.dataset.label=['Jugador','Equipo','DNI','Categoría','WhatsApp','Pago','Inscripción','Acciones'][index]);
+      if(entry.baja_at){
+        tr.querySelectorAll('select,input').forEach(control=>control.disabled=true);
+        tr.querySelectorAll('[data-save-contact],[data-diffusion]').forEach(control=>control.remove());
+      }
       target.appendChild(tr);
     }
   }
@@ -162,7 +166,7 @@
     const words = query.split(/\s+/).filter(Boolean);
     const dniQuery = query.replace(/[.\s-]/g, '');
     const verified = filtered.filter(item => {
-      if (!item.corroborado) return false;
+      if (item.baja_at || !item.corroborado) return false;
       const name = normalizeSearch(`${item.nombre_oficial || ''} ${item.nombre_ingresado || ''}`);
       return !query || words.every(word => name.includes(word))
         || (/^\d+$/.test(dniQuery) && String(item.dni || '').replace(/\D/g, '').includes(dniQuery));
@@ -170,7 +174,10 @@
     batchContacts = window.LipaBatch.collect(verified);
     $('#prepareBatch').textContent = 'Preparar tanda (' + batchContacts.contacts.length + ')';
     $('#prepareBatch').disabled = !batchContacts.contacts.length;
-    const pending = filtered.filter(item => !item.corroborado);
+    const pending = filtered.filter(item => !item.baja_at && !item.corroborado);
+    const inactive = entries.filter(item=>item.baja_at);
+    renderBody($('#inactiveBody'), inactive, true);
+    $('#inactiveCount').textContent=String(inactive.length);
     renderBody($('#verifiedBody'), verified, true);
     renderBody($('#pendingBody'), pending, false);
     $('#verifiedCount').textContent = String(verified.length);
@@ -389,7 +396,7 @@
       return;
     }
     const button = event.target.closest('[data-delete]');
-    if (!button || !confirm('¿Quitar esta inscripción?')) return;
+    if (!button || !confirm('¿Dar de baja a este jugador del torneo? Su contacto y los datos de inscripción y pago se conservarán en la lista de bajas.')) return;
     try { await api(`/torneo-organizador/inscripciones/${button.dataset.delete}`, { method:'DELETE' }); await load(); }
     catch (error) { alert(error.message); }
   });

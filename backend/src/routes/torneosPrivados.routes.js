@@ -114,6 +114,7 @@ module.exports = function createTorneosPrivadosRouter() {
         CREATE INDEX IF NOT EXISTS torneo_inscripciones_organizador_idx
           ON torneo_inscripciones(torneo_organizador_id, corroborado, created_at DESC);
 
+        ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS baja_at TIMESTAMPTZ;
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS lista_espera BOOLEAN NOT NULL DEFAULT false;
         ALTER TABLE torneo_inscripciones
           ADD COLUMN IF NOT EXISTS categoria TEXT;
@@ -191,7 +192,7 @@ module.exports = function createTorneosPrivadosRouter() {
              LIMIT 1
           ) j ON true
          WHERE i.torneo_organizador_id = $1
-           AND i.corroborado = false AND (i.lista_espera = false OR $2::boolean)
+           AND i.baja_at IS NULL AND i.corroborado = false AND (i.lista_espera = false OR $2::boolean)
          FOR UPDATE OF i
       `, [organizerId, includeWaiting]);
 
@@ -391,7 +392,7 @@ module.exports = function createTorneosPrivadosRouter() {
       const organizador = await findOrganizador({ id, includeInactive: true });
       const { rows: jugadores } = await pool.query(`
         SELECT id, nombre_oficial AS nombre, categoria FROM torneo_inscripciones
-        WHERE torneo_organizador_id=$1 AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')
+        WHERE torneo_organizador_id=$1 AND baja_at IS NULL AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')
         ORDER BY nombre_oficial, id`, [id]);
       const { rows: sorteos } = await pool.query(
         `SELECT s.categoria, s.orden, s.revision, s.updated_at,
@@ -425,7 +426,7 @@ module.exports = function createTorneosPrivadosRouter() {
       await client.query('LOCK TABLE torneo_inscripciones IN SHARE MODE');
       await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE', [req.user.torneoOrganizadorId]);
       const { rows } = await client.query(`SELECT id FROM torneo_inscripciones
-        WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')`,
+        WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND baja_at IS NULL AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')`,
         [req.user.torneoOrganizadorId, categories.valuesFor(categoria)]);
       const ids = new Set(rows.map(row => String(row.id)));
       if (!slots.validOrder(orden, [...ids], categoria)) {
@@ -484,7 +485,7 @@ module.exports = function createTorneosPrivadosRouter() {
       const organizador = await findOrganizador({ id: req.user.torneoOrganizadorId, includeInactive: true });
       const { rows } = await pool.query(`
         SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp, i.categoria,
-               i.estado_pago, i.monto_sena, i.corroborado, i.created_at, i.updated_at,
+               i.estado_pago, i.monto_sena, i.corroborado, i.created_at, i.updated_at, i.baja_at,
                COALESCE(j.foto_path, '') AS foto_path, team.nombre AS equipo_nombre, team.actual AS equipo_actual
           FROM torneo_inscripciones i
           LEFT JOIN jugadores j ON j.id = i.jugador_id
@@ -678,12 +679,13 @@ module.exports = function createTorneosPrivadosRouter() {
 
   router.delete('/torneo-organizador/inscripciones/:id', requireTorneoOrganizador, async (req, res) => {
     try {
-      const result = await pool.query('DELETE FROM torneo_inscripciones WHERE id=$1 AND torneo_organizador_id=$2', [Number(req.params.id), req.user.torneoOrganizadorId]);
+      await ensureSchema();
+      const result = await pool.query('UPDATE torneo_inscripciones SET baja_at=COALESCE(baja_at,NOW()), updated_at=NOW() WHERE id=$1 AND torneo_organizador_id=$2', [Number(req.params.id), req.user.torneoOrganizadorId]);
       if (!result.rowCount) return res.status(404).json({ ok: false, error: 'Inscripción no encontrada' });
       res.json({ ok: true });
     } catch (error) {
       console.error('DELETE inscripción', error);
-      res.status(500).json({ ok: false, error: 'No se pudo eliminar la inscripción' });
+      res.status(500).json({ ok: false, error: 'No se pudo dar de baja la inscripción' });
     }
   });
 
