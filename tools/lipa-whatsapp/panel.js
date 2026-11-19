@@ -75,7 +75,7 @@ $('start').addEventListener('click',async()=>{
     if(stopping)break;
     try {
       contact.status='preparing';await persist();render();$('status').textContent='Abriendo el chat de '+contact.name+'…';
-      const url='https://web.whatsapp.com/send?phone='+contact.phone+'&text='+encodeURIComponent(job.message);
+      const url='https://web.whatsapp.com/send?phone='+contact.phone+(job.media?'':'&text='+encodeURIComponent(job.message));
       if(workTab){try{await chrome.tabs.update(workTab,{url,active:true});}catch(_){workTab=null;}}
       if(!workTab){const tab=await chrome.tabs.create({url,active:true});workTab=tab.id;}
       // Wait for the page to finish loading before injecting the DOM-only driver.

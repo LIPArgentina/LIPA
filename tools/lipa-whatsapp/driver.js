@@ -73,9 +73,10 @@ async function lipaWhatsAppStep(expected, action) {
     const inputs=[...main.querySelectorAll('footer [contenteditable="true"][role="textbox"]')].filter(visible);
     if(inputs.length!==1)return {error:'No se pudo identificar un único cuadro de mensaje.'};
     const input=inputs[0];
-    if(text(input)!==normalize(expected.message))return {error:'El mensaje cargado no coincide exactamente con el revisado. Se detuvo para evitar un envío incorrecto.'};
+    if(text(input)!==normalize(expected.media?'':expected.message))return {error:'El mensaje cargado no coincide exactamente con el revisado. Se detuvo para evitar un envío incorrecto.'};
     if(rightPhone(main))remember(main);
     if(!remembered(main))return {error:'No se pudo comprobar el número del chat. No se envió nada.',needPhone:true,main};
+    if(expected.media)return {main,input,send:null};
     const sends=[...new Set([...main.querySelectorAll('footer button[aria-label="Enviar"],footer button[aria-label="Send"],footer [data-icon="send"],footer [data-icon="wds-ic-send-filled"]')].filter(visible).map(el=>el.closest('button,[role="button"]')).filter(Boolean))];
     if(sends.length!==1)return {error:'No se pudo identificar con seguridad el botón Enviar.'};
     return {main,input,send:sends[0]};
@@ -89,6 +90,7 @@ async function lipaWhatsAppStep(expected, action) {
       return target?{interaction:'contact',target}:{error:current.error};
     }
     if(current.error)return {error:current.error};
+    if(expected.media)return {ready:true};
     const target=point(current.send);
     if(target)return {ready:true};
     const infoHeader=document.querySelector('[data-testid="contact-info-header"]');
@@ -118,20 +120,15 @@ async function lipaWhatsAppStep(expected, action) {
     if(!expected.media||!expected.mediaData)return {error:'Falta el archivo adjunto.'};
     if(mediaProof())return {attached:true};
     const current=inspect();if(current.error)return {error:current.error};
-    const inputs=[...document.querySelectorAll('input[type="file"]')].filter(el=>{const accept=el.accept||'';if(el.hasAttribute('capture'))return false;return expected.media.type.startsWith('video/')?/video\//.test(accept):/image\//.test(accept);});
-    if(inputs.length!==1){
-      const buttons=[...current.main.querySelectorAll('button[title="Adjuntar"],button[title="Attach"],button[aria-label="Adjuntar"],button[aria-label="Attach"],[data-icon="plus-rounded"],[data-icon="clip"]')].map(el=>el.closest('button,[role="button"]')).filter(el=>visible(el));
-      const unique=[...new Set(buttons)],target=unique.length===1?point(unique[0]):null;
-      return target?{target}:{error:'No se pudo identificar un único control para adjuntar el archivo.'};
-    }
     const data=expected.mediaData.split(',')[1],bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0));
     const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');
     if(hash!==expected.media.hash||bytes.length!==expected.media.size)return {error:'El archivo no coincide con el revisado en la tanda.'};
     if(!remembered(current.main))return {error:'Se perdió la comprobación del contacto.'};
     const file=new File([bytes],expected.media.name,{type:expected.media.type}),transfer=new DataTransfer();transfer.items.add(file);
-    inputs[0].files=transfer.files;
+    current.input.focus();
     globalThis.__lipaMedia={main:current.main,header:headerIdentity(current.main),label:headerIdentity(current.main)?.textContent,phone:expected.phone,hash,at:Date.now(),captionSet:false};
-    inputs[0].dispatchEvent(new Event('change',{bubbles:true}));return {attached:true};
+    // Use WhatsApp's paste handler on the verified composer, not an unrelated hidden file input.
+    current.input.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:transfer}));return {attached:true};
   }
   if(action==='mediaPrepare'||action==='send'&&expected.media){
     const proof=mediaProof();if(!proof)return {fatal:true,error:'Cambió el chat o venció la comprobación del adjunto. No se envió nada.'};

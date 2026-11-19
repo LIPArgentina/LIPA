@@ -40,3 +40,14 @@ test('extension receives saved attachment, verifies bytes and stores a complete 
  const call=()=>new Promise(resolve=>listener({type:'prepare',batch},{tab:{id:2},url:'https://lipa.ar/torneos/privados.html'},resolve));
  assert.equal((await call()).ok,true);assert.equal(job.media.hash,metadata.hash);assert.equal(storedFile.size,file.size);assert.equal(created,1);await new Promise(r=>setImmediate(r));batch.media.hash='incorrect';assert((await call()).error);assert.equal(created,1);
 });
+test('media opens a blank verified composer and pastes the file without enabling text-only send',async()=>{
+ const bytes=Buffer.from('attachment'),meta=await media.validate(new File([bytes],'test.png',{type:'image/png'}));let pasted,focused=false;
+ const input={nodeType:1,nodeName:'DIV',childNodes:[],getClientRects:()=>[{}],getAttribute:()=> 'Escribir un mensaje para +5491112345678',focus(){focused=true;},dispatchEvent(event){pasted=event;}};
+ const header={textContent:'Jugador'},main={querySelector:()=>header,querySelectorAll:s=>s.includes('contenteditable')?[input]:[]};
+ class Transfer{constructor(){this.files=[];this.items={add:f=>this.files.push(f)};}}
+ class Paste{constructor(type,options){this.type=type;Object.assign(this,options);}}
+ const ctx={location:{origin:'https://web.whatsapp.com'},document:{querySelector:s=>s==='#main'?main:null,querySelectorAll:()=>[]},crypto:require('node:crypto').webcrypto,File,Uint8Array,atob,DataTransfer:Transfer,ClipboardEvent:Paste,setTimeout,Date};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/driver.js'),'utf8'),ctx);
+ const expected={phone:'5491112345678',message:'Descripción que no debe ir sola',media:meta,mediaData:'data:image/png;base64,'+bytes.toString('base64')};
+ assert.equal((await ctx.lipaWhatsAppStep(expected,'prepare')).ready,true);assert.equal((await ctx.lipaWhatsAppStep(expected,'attach')).attached,true);assert(focused);assert.equal(pasted.type,'paste');assert.equal(pasted.clipboardData.files[0].size,bytes.length);assert.equal(input.childNodes.length,0);
+ const send=await ctx.lipaWhatsAppStep(expected,'send');assert(!send.armed);assert(send.error);
+});
