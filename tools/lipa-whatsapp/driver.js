@@ -188,3 +188,18 @@ async function lipaWhatsAppStep(expected, action) {
   }
   return {error:'Se hizo clic en Enviar, pero no se confirmó el resultado. Revisá ese chat; no se reintentará.',clicked:true};
 }
+// Read-only diagnosis: no clicks, typing, navigation, or delivery-state changes.
+function lipaInspectSent(expected){
+ if(location.origin!=='https://web.whatsapp.com')return {error:'Abrí el chat en WhatsApp Web.'};
+ const main=document.querySelector('#main');if(!main)return {error:'No hay un chat abierto.'};
+ const norm=v=>String(v||'').replace(/[\u200b\u200e\u200f\ufeff]/g,'').replace(/\s+/g,' ').trim();
+ const raw=norm(expected.message),formatted=norm(expected.message.replace(/(\*{1,3}|_{1,3}|~{1,2}|`{1,3})([^\n]+?)\1/g,'$2'));
+ const all=[...main.querySelectorAll('[data-id]')];
+ const outgoing=all.filter(el=>el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||el.dataset.id?.startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"]'));
+ const candidates=outgoing.filter(el=>!outgoing.some(other=>other!==el&&other.contains(el))).slice(-5).map(el=>{
+ const parts=[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')];
+ const caption=parts.some(p=>[p.innerText,p.textContent].some(v=>[raw,formatted].includes(norm(v))));
+ return {captionMatch:caption,captionNodes:parts.length,captionLengths:parts.map(p=>norm(p.innerText||p.textContent).length),expectedLength:raw.length,bodyContainsCaption:[raw,formatted].some(v=>norm(el.innerText||el.textContent).includes(v)),images:[...el.querySelectorAll('img')].map(img=>({sourceKind:(img.currentSrc||img.src||'').split(':')[0],width:img.naturalWidth||img.width,height:img.naturalHeight||img.height})),videos:el.querySelectorAll('video').length,canvases:el.querySelectorAll('canvas').length,icons:[...el.querySelectorAll('[data-icon]')].map(n=>n.getAttribute('data-icon')),testIds:[...el.querySelectorAll('[data-testid]')].map(n=>n.getAttribute('data-testid'))};
+ });
+ return {outgoingCount:outgoing.length,messageIdNodes:all.length,candidates};
+}

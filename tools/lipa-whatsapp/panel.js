@@ -53,6 +53,7 @@ function render() {
   $('start').disabled=running||mediaBusy||!selected||Boolean(job.media&&!mediaFile);
 
   $('stop').disabled=!running;
+  $('inspectSent').disabled=running;
 }
 async function step(contact,action) {
   return rawStep(workTab,contact,action);
@@ -114,7 +115,7 @@ $('start').addEventListener('click',async()=>{
 });
 $('report').addEventListener('click',()=>{
   if(!job)return;
-  const blob=new Blob([JSON.stringify({message:job.message,media:job.media||null,filters:job.filters,contacts:job.contacts.map(({key,...c})=>c)},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({inspection:job.lastInspection||null,message:job.message,media:job.media||null,filters:job.filters,contacts:job.contacts.map(({key,...c})=>c)},null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='lipa-registro-tanda.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
 });
 window.addEventListener('beforeunload',event=>{if(running){event.preventDefault();event.returnValue='';}});
@@ -152,3 +153,15 @@ async function prepareMedia(contact){ let clickedMenu=false,lastError='';
  }
  throw Error('No se pudo comprobar el adjunto: '+(lastError||'no apareció la vista previa')+'. No se envió nada.');
 }
+
+$('inspectSent').addEventListener('click',async()=>{
+ if(running||!job)return;$('inspectSent').disabled=true;
+ try{
+  const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});let tab=tabs.find(t=>t.id===workTab)||tabs.find(t=>t.active);if(!tab&&tabs.length===1)tab=tabs[0];
+  if(!tab)throw Error('Dejá abierto el chat que recibió el mensaje en WhatsApp Web.');
+  const results=await chrome.scripting.executeScript({target:{tabId:tab.id},func:lipaInspectSent,args:[{message:job.message}]});const result=results[0]?.result;if(!result||result.error)throw Error(result?.error||'No se pudo leer el chat.');
+  job.lastInspection={at:new Date().toISOString(),...result};await persist();
+  const rows=result.candidates;const matched=rows.filter(r=>r.captionMatch).length,contained=rows.filter(r=>r.bodyContainsCaption).length;
+  $('status').textContent='Revisión sin envío: '+result.outgoingCount+' mensajes salientes; texto reconocido: '+matched+'; texto completo dentro del mensaje: '+contained+'; imágenes: '+rows.reduce((n,r)=>n+r.images.length,0)+'. Descargá el registro para revisar el detalle. No se envió nada.';
+ }catch(e){$('status').textContent=e.message;}finally{$('inspectSent').disabled=false;}
+});

@@ -90,3 +90,8 @@ test('sent media confirmation expands long captions and recognizes data URL imag
  f.outgoing.querySelector=s=>s.includes('progressbar')?null:s.includes('data:image/')?f.visual:null;f.add();
  assert.equal((await f.step('confirm')).sent,true);assert.equal(clicks,1);
 });
+test('read-only sent inspection exposes structural evidence without sending or changing status',()=>{
+ const f=driverFixture();f.add();f.outgoing.innerText='Hola 👋';f.caption.innerText='Hola 👋';f.visual.src='https://media.example/image';f.visual.naturalWidth=800;f.visual.naturalHeight=600;
+ f.outgoing.querySelectorAll=s=>s.includes('selectable-text')?[f.caption]:s==='img'?[f.visual]:[];
+ f.outgoing.click=()=>{throw Error('Diagnostic must not click');};const result=f.ctx.lipaInspectSent(f.expected);assert.equal(result.outgoingCount,1);assert(result.candidates[0].captionMatch);assert.equal(result.candidates[0].images[0].sourceKind,'https');assert(!('sent' in result));
+});
