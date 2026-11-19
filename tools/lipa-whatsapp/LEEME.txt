@@ -1,4 +1,4 @@
-LIPA · Tanda de WhatsApp (Chrome) · Versión 1.2.0
+LIPA · Tanda de WhatsApp (Chrome) · Versión 1.3.0
 
 INSTALAR O ACTUALIZAR
 1. Extraé el ZIP en una carpeta permanente. Si ya está instalada, reemplazá los archivos en esa misma carpeta.
@@ -6,8 +6,8 @@ INSTALAR O ACTUALIZAR
 3. Recargá Inscripciones de LIPA, aplicá los filtros y tocá Preparar tanda.
 
 PREPARAR LA TANDA
-Revisá los destinatarios y el mensaje. Podés incluir o excluir contactos y adjuntar un archivo opcional: imagen JPG, PNG o WebP, o video MP4 o WebM, de hasta 16 MB.
-El panel muestra el archivo con su descripción antes de iniciar. El archivo se guarda localmente para esta tanda y esta computadora. Quitar adjunto vuelve al envío de texto solamente.
+En LIPA abrí Mensaje de difusión: escribí el texto y adjuntá una imagen JPG, PNG o WebP, o un video MP4 o WebM de hasta 16 MB. Guardá ambos antes de preparar la tanda. El contenido se conserva en el servidor para tu organizador, disponible desde cualquier dispositivo.
+Preparar tanda carga automáticamente el mensaje y adjunto guardados. El panel muestra una copia para revisar antes de iniciar. Para modificarla, volvé a Mensaje de difusión y prepará una nueva tanda. La copia de la tanda se conserva localmente; no cambia si luego editás el mensaje guardado.
 El mensaje guardado se usa como descripción de la imagen o video. Sin adjunto se conserva el funcionamiento anterior.
 Los contactos no tienen un límite por tanda; se omiten números vacíos, inválidos o repetidos desde LIPA. Revisá los números antes de iniciar.
 

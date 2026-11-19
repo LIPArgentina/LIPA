@@ -1,4 +1,5 @@
 'use strict';
+if(typeof importScripts==='function')importScripts('media.js');
 let preparing = false;
 chrome.runtime.onMessage.addListener((request, sender, respond) => {
   if(request.type==='delay') {
@@ -19,6 +20,14 @@ chrome.runtime.onMessage.addListener((request, sender, respond) => {
     const {activeTab}=await chrome.storage.local.get('activeTab');
     if(activeTab) {try {const active=await chrome.tabs.get(activeTab); if(active.url===chrome.runtime.getURL('panel.html')) throw Error('Hay una tanda abierta. Cerrá su panel antes de preparar otra.');}catch(e){if(e.message.startsWith('Hay una'))throw e;}}
     const job={id:crypto.randomUUID(),message:batch.message,filters:String(batch.filters||''),organizer:String(batch.organizer||''),contacts:contacts.map(c=>({...c,status:'pending'}))};
+    if(batch.media){
+      const source=batch.media;
+      if(typeof source.dataURL!=='string'||source.dataURL.length>24*1024*1024||!/^data:(image\/(png|jpeg|webp)|video\/(mp4|webm));base64,/.test(source.dataURL))throw Error('El adjunto recibido no es válido.');
+      const bytes=Uint8Array.from(atob(source.dataURL.split(',')[1]),c=>c.charCodeAt(0));
+      const file=new File([bytes],String(source.name||'adjunto'),{type:source.type});const meta=await lipaMedia.validate(file);
+      if(meta.hash!==source.hash||meta.size!==source.size)throw Error('El adjunto recibido no coincide con el guardado.');
+      await lipaMedia.store(job.id,file);job.media=meta;
+    }
     await chrome.storage.local.set({job});
     const tab=await chrome.tabs.create({url:chrome.runtime.getURL('panel.html')});
     await chrome.storage.local.set({activeTab:tab.id});

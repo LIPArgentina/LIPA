@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscripciones de torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
-  <link rel="stylesheet" href="./privados.css?v=casillero-en-sala-1">
+  <link rel="stylesheet" href="./privados.css?v=shared-media-1">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -80,8 +80,9 @@
       <button id="closeDiffusion" class="photo-close" type="button" aria-label="Cerrar mensaje de difusión">×</button>
       <h2 id="diffusionTitle">Mensaje de difusión</h2>
       <label for="diffusionMessage">Mensaje<textarea id="diffusionMessage" rows="6" maxlength="4000" required placeholder="Escribí tu mensaje. Podés incluir emojis 😊"></textarea></label>
-      <div class="emoji-buttons" aria-label="Agregar emoji"><button type="button" data-emoji="👋" aria-label="Agregar saludo">👋</button><button type="button" data-emoji="🎱" aria-label="Agregar bola de pool">🎱</button><button type="button" data-emoji="🏆" aria-label="Agregar trofeo">🏆</button><button type="button" data-emoji="📅" aria-label="Agregar calendario">📅</button><button type="button" data-emoji="📍" aria-label="Agregar ubicación">📍</button><button type="button" data-emoji="✅" aria-label="Agregar tilde">✅</button><button type="button" data-emoji="💰" aria-label="Agregar dinero">💰</button><button type="button" data-emoji="🙌" aria-label="Agregar celebración">🙌</button></div>
-      <p class="diffusion-note">Se guarda para tu organizador en todos tus dispositivos. El ícono dorado abre el chat del jugador con este mensaje listo para enviar.</p>
+      <label for="diffusionAttachment">Imagen o video (opcional)<input id="diffusionAttachment" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"></label><small>Hasta 16 MB. Se guarda junto al mensaje para usarlo desde cualquier dispositivo.</small><div id="diffusionPreview" hidden><div id="diffusionVisual"></div><p id="diffusionFileName"></p><p id="diffusionCaption"></p><button id="removeDiffusionAttachment" type="button">Quitar adjunto</button></div>
+<div class="emoji-buttons" aria-label="Agregar emoji"><button type="button" data-emoji="👋" aria-label="Agregar saludo">👋</button><button type="button" data-emoji="🎱" aria-label="Agregar bola de pool">🎱</button><button type="button" data-emoji="🏆" aria-label="Agregar trofeo">🏆</button><button type="button" data-emoji="📅" aria-label="Agregar calendario">📅</button><button type="button" data-emoji="📍" aria-label="Agregar ubicación">📍</button><button type="button" data-emoji="✅" aria-label="Agregar tilde">✅</button><button type="button" data-emoji="💰" aria-label="Agregar dinero">💰</button><button type="button" data-emoji="🙌" aria-label="Agregar celebración">🙌</button></div>
+      <p class="diffusion-note">Se guarda para tu organizador en todos tus dispositivos. Preparar tanda incluye el texto y el adjunto. El ícono dorado abre el chat individual con el texto.</p>
       <p id="diffusionStatus" class="message" role="status"></p>
       <div class="modal-actions"><button id="copyDiffusion" type="button">Copiar mensaje</button><button id="saveDiffusion" type="submit" class="primary">Guardar mensaje</button></div>
     </form>
@@ -118,6 +119,6 @@
   <script src="../config.js?v=isolated-sessions-1"></script>
   <script src="./categorias.js?v=1" defer></script>
   <script src="./tanda.js?v=1" defer></script>
-  <script src="./privados.js?v=batch-unlimited-1" defer></script>
+  <script src="./privados.js?v=shared-media-1" defer></script>
 </body>
 </html>

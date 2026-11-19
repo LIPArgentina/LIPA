@@ -9,10 +9,12 @@ function harness() {
     if(sql.startsWith('UPDATE torneo_organizadores SET mensaje_difusion')) {messages.set(args[1],args[0]);return {rowCount:1,rows:[{mensaje_difusion:args[0]}]};}
     return {rows:[],rowCount:0};
   }};
+  pool.connect=async()=>({query:pool.query,release(){}});
   const module={exports:{}};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/routes/torneosPrivados.routes.js'),'utf8'),{module,console,require(name){
     if(name==='express')return {Router:()=>router};if(name==='../../db')return pool;
     if(name==='../middleware/auth')return {requireTorneoOrganizador:auth};
+    if(name==='./torneoDifusion.routes')return require('../src/routes/torneoDifusion.routes');
     if(['./torneosGrilla.routes','./torneosVisor.routes'].includes(name))return ()=>{};return {};
   }});module.exports();
   const handlers=routes['put /torneo-organizador/mensaje-difusion'];

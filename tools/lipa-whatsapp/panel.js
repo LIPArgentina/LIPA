@@ -51,8 +51,7 @@ function render() {
   $('selectAll').indeterminate=selected>0&&selected<pending.length;
   $('selectAll').disabled=running||!pending.length;
   $('start').disabled=running||mediaBusy||!selected||Boolean(job.media&&!mediaFile);
-  $('attachment').disabled=running||mediaBusy;
-  $('removeMedia').disabled=running||mediaBusy;
+
   $('stop').disabled=!running;
 }
 async function step(contact,action) {
@@ -127,7 +126,7 @@ window.addEventListener('pagehide',()=>{browserControl.release();});
   await chrome.storage.local.set({activeTab:ownTab.id});
   for(const contact of job.contacts){contact.key=await fingerprint(contact);if(contact.status==='preparing')contact.status='pending';if(contact.status==='attempting')contact.status='review';if(contact.status==='pending'&&history[contact.key])contact.status='duplicate';if(contact.status==='duplicate')contact.selected=false;}
   if(job.media){mediaFile=await lipaMedia.read(job.id);if(mediaFile&&(await lipaMedia.validate(mediaFile)).hash!==job.media.hash)mediaFile=null;}
-  showMedia();await persist();$('message').value=job.message;$('filters').textContent=job.filters;$('status').textContent=job.media&&!mediaFile?'No se encontró el adjunto. Volvé a seleccionarlo o quitalo para continuar.':job.contacts.length+' contactos. Revisá antes de iniciar.';render();
+  showMedia();await persist();$('message').value=job.message;$('filters').textContent=job.filters;$('status').textContent=job.media&&!mediaFile?'No se encontró el adjunto. Volvé a preparar la tanda desde LIPA.':job.contacts.length+' contactos. Revisá antes de iniciar.';render();
 })().catch(error=>{$('status').textContent=error.message;});
 
 function showMedia(){
@@ -137,16 +136,6 @@ function showMedia(){
   $('mediaName').textContent=job.media.name+' · '+(job.media.size/1048576).toFixed(1)+' MB';$('mediaCaption').textContent=job.message;
   if(mediaFile){mediaURL=URL.createObjectURL(mediaFile);const el=document.createElement(job.media.type.startsWith('video/')?'video':'img');el.src=mediaURL;if(el.tagName==='VIDEO'){el.controls=true;el.preload='metadata';}else el.alt='Vista previa del adjunto';$('mediaVisual').append(el);}
 }
-async function refreshKeys(){for(const contact of job.contacts){contact.key=await fingerprint(contact);if(selectable(contact)){contact.status=history[contact.key]?'duplicate':'pending';}}}
-$('attachment').addEventListener('change',async()=>{
- if(running||mediaBusy||!job)return;const file=$('attachment').files[0];if(!file)return;mediaBusy=true;render();
- try{const meta=await lipaMedia.validate(file);await lipaMedia.store(job.id,file);job.media=meta;mediaFile=file;await refreshKeys();await persist();showMedia();$('status').textContent='Adjunto listo. Revisá la imagen o el video y su descripción antes de iniciar.';}
- catch(error){$('status').textContent=error.message;}
- finally{mediaBusy=false;$('attachment').value='';render();}
-});
-$('removeMedia').addEventListener('click',async()=>{
- if(running||mediaBusy||!job)return;mediaBusy=true;render();try{await lipaMedia.store(job.id,null);delete job.media;mediaFile=null;await refreshKeys();await persist();showMedia();$('status').textContent='Se enviará únicamente el texto.';}catch(error){$('status').textContent=error.message;}finally{mediaBusy=false;render();}
-});
 async function prepareMedia(contact){
  let clickedMenu=false;
  for(let i=0;i<10;i++){

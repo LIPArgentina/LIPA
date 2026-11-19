@@ -15,6 +15,7 @@
   const tableSort = {verifiedBody:{key:'date',direction:'desc'},pendingBody:{key:'date',direction:'desc'},inactiveBody:{key:'date',direction:'desc'}};
   const nameCollator = new Intl.Collator('es', {sensitivity:'base',numeric:true});
   let diffusionMessage = '';
+  let diffusionMedia=null, diffusionDraft=undefined, diffusionPreviewURL=null, diffusionPreviewRequest=0, preparingBatch=false;
   let batchContacts = window.LipaBatch.collect([]);
   let paymentFilter = 'all';
   let categoryFilter = 'all';
@@ -247,21 +248,49 @@
     setAllPresent(enSala);
   };
   $('#registeredSearch').addEventListener('input', render);
-  $('#prepareBatch').addEventListener('click', () => {
-    if(!diffusionMessage.trim()){openDiffusionMessage();$('#diffusionStatus').textContent='Primero guardá el mensaje para la tanda.';return;}
+  async function mediaBlob(meta){
+    const response=await fetch(API+'/api/torneo-organizador/mensaje-difusion/adjunto?hash='+encodeURIComponent(meta.hash),{credentials:'include'});
+    if(!response.ok)throw Error('No se pudo cargar el adjunto guardado. Volvé a abrir Mensaje de difusión.');
+    const blob=await response.blob();const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(n=>n.toString(16).padStart(2,'0')).join('');
+    if(hash!==meta.hash||blob.size!==meta.size)throw Error('El archivo cambió o no se descargó completo. Reintentá.');return blob;
+  }
+  async function prepareBatch(contacts,filters){
+    if(preparingBatch)return;
     if(!document.documentElement.dataset.lipaBatchExtension){$('#batchInstall').showModal();return;}
-    const filters = $('#categoryFilter').selectedOptions[0].textContent + ' · ' + document.querySelector('.filter.active').textContent + ' · Búsqueda: ' + ($('#registeredSearch').value||'Todas') + ' · Omitidos: ' + batchContacts.missing + ' sin número, ' + batchContacts.invalid + ' inválidos, ' + batchContacts.duplicates + ' repetidos';
-    window.dispatchEvent(new CustomEvent('lipa-prepare-batch',{detail:{message:diffusionMessage,contacts:batchContacts.contacts,filters,organizer:String(session.torneoOrganizadorId||session.slug||'')}}));
-    setMessage('Abriendo revisión de destinatarios. Todavía no se enviaron mensajes.',true);
+    preparingBatch=true;$('#prepareBatch').disabled=true;setMessage('Cargando mensaje y adjunto guardados…');
+    try{
+      const saved=await api('/torneo-organizador/mensaje-difusion');diffusionMessage=saved.mensaje;diffusionMedia=saved.media;
+      if(!diffusionMessage.trim())throw Error('Primero guardá el mensaje de difusión.');
+      let media=null;
+      if(diffusionMedia){
+        if(document.documentElement.dataset.lipaBatchExtension!=='2')throw Error('Recargá la extensión actualizada y esta página para enviar el adjunto guardado.');
+        const blob=await mediaBlob(diffusionMedia);const dataURL=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob);});media={...diffusionMedia,dataURL};
+      }
+      window.dispatchEvent(new CustomEvent('lipa-prepare-batch',{detail:{message:diffusionMessage,media,contacts,filters,organizer:String(session.torneoOrganizadorId||session.slug||'')}}));
+      setMessage('Abriendo revisión del mensaje, adjunto y destinatarios. Todavía no se envió nada.',true);
+    }catch(error){setMessage(error.message||'No se pudo preparar la tanda.');}finally{preparingBatch=false;render();}
+  }
+  $('#prepareBatch').addEventListener('click',()=>{
+    const filters=$('#categoryFilter').selectedOptions[0].textContent+' · '+document.querySelector('.filter.active').textContent+' · Búsqueda: '+($('#registeredSearch').value||'Todas');
+    prepareBatch(batchContacts.contacts.map(c=>({...c})),filters);
   });
   window.addEventListener('lipa-batch-result',event=>{if(event.detail?.error)setMessage(event.detail.error);});
   $('#closeBatchInstall').addEventListener('click',()=>$('#batchInstall').close());
-  function openDiffusionMessage() {
-    $('#diffusionMessage').value = diffusionMessage;
-    $('#diffusionStatus').textContent = '';
-    $('#diffusionModal').showModal();
-    $('#diffusionMessage').focus();
+  async function showDiffusionPreview(){
+    const request=++diffusionPreviewRequest;if(diffusionPreviewURL)URL.revokeObjectURL(diffusionPreviewURL);diffusionPreviewURL=null;
+    $('#diffusionVisual').replaceChildren();const meta=diffusionDraft===undefined?diffusionMedia:diffusionDraft;
+    $('#diffusionPreview').hidden=!meta;$('#diffusionCaption').textContent=$('#diffusionMessage').value;if(!meta)return;
+    $('#diffusionFileName').textContent=meta.name+' · '+(meta.size/1048576).toFixed(1)+' MB';
+    try{const blob=diffusionDraft instanceof File?diffusionDraft:await mediaBlob(meta);if(request!==diffusionPreviewRequest)return;diffusionPreviewURL=URL.createObjectURL(blob);const el=document.createElement(meta.type.startsWith('video/')?'video':'img');el.src=diffusionPreviewURL;if(el.tagName==='VIDEO')el.controls=true;else el.alt='Vista previa del adjunto';$('#diffusionVisual').append(el);}catch(e){if(request===diffusionPreviewRequest)$('#diffusionStatus').textContent=e.message;}
   }
+  async function openDiffusionMessage(){
+    try{const saved=await api('/torneo-organizador/mensaje-difusion');diffusionMessage=saved.mensaje;diffusionMedia=saved.media;diffusionDraft=undefined;
+      $('#diffusionAttachment').value='';$('#diffusionMessage').value=diffusionMessage;$('#diffusionStatus').textContent='';$('#diffusionModal').showModal();$('#diffusionMessage').focus();showDiffusionPreview();
+    }catch(e){setMessage(e.message);}
+  }
+  $('#diffusionAttachment').addEventListener('change',()=>{const file=$('#diffusionAttachment').files[0];if(!file)return;if(!['image/jpeg','image/png','image/webp','video/mp4','video/webm'].includes(file.type)||!file.size||file.size>16*1024*1024){$('#diffusionStatus').textContent='Elegí JPG, PNG, WebP, MP4 o WebM de hasta 16 MB.';$('#diffusionAttachment').value='';return;}diffusionDraft=file;$('#diffusionStatus').textContent='Adjunto listo para guardar.';showDiffusionPreview();});
+  $('#removeDiffusionAttachment').addEventListener('click',()=>{diffusionDraft=null;$('#diffusionAttachment').value='';showDiffusionPreview();});
+  $('#diffusionMessage').addEventListener('input',()=>$('#diffusionCaption').textContent=$('#diffusionMessage').value);
   $('#editDiffusion').addEventListener('click', openDiffusionMessage);
   $('#copyDiffusion').addEventListener('click', async () => {
     try {
@@ -283,7 +312,7 @@
       const input = $('#diffusionMessage');
       if (input.value.length + emoji.dataset.emoji.length > input.maxLength) return;
       input.setRangeText(emoji.dataset.emoji, input.selectionStart, input.selectionEnd, 'end');
-      input.focus();
+      input.focus();$('#diffusionCaption').textContent=input.value;
     }
   });
   $('#diffusionForm').addEventListener('submit', async event => {
@@ -291,11 +320,9 @@
     const button = $('#saveDiffusion'); button.disabled = true;
     $('#diffusionStatus').textContent = 'Guardando…';
     try {
-      const data = await api('/torneo-organizador/mensaje-difusion', {
-        method:'PUT', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ mensaje:$('#diffusionMessage').value })
-      });
-      diffusionMessage = data.mensaje;
+      const body=new FormData();body.append('mensaje',$('#diffusionMessage').value);body.append('mediaMode',diffusionDraft===undefined?'keep':diffusionDraft===null?'remove':'replace');if(diffusionDraft)body.append('archivo',diffusionDraft);
+      const data=await api('/torneo-organizador/mensaje-difusion',{method:'PUT',body});
+      diffusionMessage = data.mensaje;diffusionMedia=data.media;diffusionDraft=undefined;
       render(); $('#diffusionModal').close();
     } catch (error) { $('#diffusionStatus').textContent = error.message; }
     finally { button.disabled = false; }

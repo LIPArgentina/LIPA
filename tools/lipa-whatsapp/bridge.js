@@ -1,5 +1,5 @@
 'use strict';
-document.documentElement.dataset.lipaBatchExtension = '1';
+document.documentElement.dataset.lipaBatchExtension = '2';
 window.addEventListener('lipa-prepare-batch', async event => {
   try {
     const result = await chrome.runtime.sendMessage({type:'prepare', batch:event.detail});

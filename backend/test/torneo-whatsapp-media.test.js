@@ -31,3 +31,12 @@ test('media prepare/arm checks recipient and exact caption without clicking send
 test('confirmation requires a new outgoing attachment plus matching caption for images and videos',async()=>{
  for(const type of ['image/png','video/mp4']){const f=driverFixture(type);assert.equal((await f.step('send')).armed,true);f.add();f.setMedia(false);assert((await f.step('audit')).error);f.setMedia(true);assert.equal((await f.step('confirm')).sent,true);}
 });
+test('extension receives saved attachment, verifies bytes and stores a complete batch snapshot',async()=>{
+ const source=fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/background.js'),'utf8');let listener,job,storedFile,created=0;
+ const bytes=Buffer.from('sample'),file=new File([bytes],'torneo.png',{type:'image/png'}),metadata=await media.validate(file);
+ const chrome={runtime:{onMessage:{addListener:f=>listener=f},getURL:p=>'extension:'+p},action:{onClicked:{addListener(){}}},storage:{local:{get:async()=>({}),set:async data=>{if(data.job)job=data.job;}}},tabs:{create:async()=>{created++;return {id:1};}}};
+ vm.runInNewContext(source,{chrome,crypto:require('node:crypto').webcrypto,File,atob,Uint8Array,lipaMedia:{validate:f=>media.validate(f),store:async(id,f)=>{storedFile=f;}},setTimeout});
+ const batch={message:'Hola',contacts:[{phone:'5491112345678',name:'Jugador'}],media:{...metadata,dataURL:'data:image/png;base64,'+bytes.toString('base64')}};
+ const call=()=>new Promise(resolve=>listener({type:'prepare',batch},{tab:{id:2},url:'https://lipa.ar/torneos/privados.html'},resolve));
+ assert.equal((await call()).ok,true);assert.equal(job.media.hash,metadata.hash);assert.equal(storedFile.size,file.size);assert.equal(created,1);await new Promise(r=>setImmediate(r));batch.media.hash='incorrect';assert((await call()).error);assert.equal(created,1);
+});

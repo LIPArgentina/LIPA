@@ -89,3 +89,5 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
   .verified-card thead th:not(.presence-column){display:none}
   .verified-card thead .presence-column{display:block;width:auto;border:0}
 }
+
+#diffusionModal{max-height:90vh;overflow-y:auto}#diffusionVisual img,#diffusionVisual video{display:block;max-width:100%;max-height:240px;object-fit:contain;margin:10px auto}#diffusionCaption{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}#diffusionFileName{font-size:11px;overflow-wrap:anywhere}#diffusionAttachment{max-width:100%}

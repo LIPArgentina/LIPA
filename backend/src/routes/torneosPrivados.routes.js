@@ -471,21 +471,7 @@ module.exports = function createTorneosPrivadosRouter() {
     }
   });
 
-  router.put('/torneo-organizador/mensaje-difusion', requireTorneoOrganizador, async (req, res) => {
-    const mensaje = req.body?.mensaje;
-    if (typeof mensaje !== 'string' || !mensaje.trim() || mensaje.length > 4000) {
-      return res.status(400).json({ error:'Escribí un mensaje de hasta 4000 caracteres.' });
-    }
-    try {
-      await ensureSchema();
-      const result = await pool.query('UPDATE torneo_organizadores SET mensaje_difusion=$1, updated_at=NOW() WHERE id=$2 RETURNING mensaje_difusion', [mensaje, req.user.torneoOrganizadorId]);
-      if (!result.rowCount) return res.status(404).json({ error:'Organizador inexistente.' });
-      res.json({ ok:true, mensaje:result.rows[0].mensaje_difusion });
-    } catch (error) {
-      console.error('PUT mensaje de difusión', error);
-      res.status(500).json({ error:'No se pudo guardar el mensaje. Reintentá.' });
-    }
-  });
+  require('./torneoDifusion.routes')(router,{pool,ensureSchema,auth:requireTorneoOrganizador});
 
   router.get('/torneo-organizador/inscripciones', requireTorneoOrganizador, async (req, res) => {
     try {
