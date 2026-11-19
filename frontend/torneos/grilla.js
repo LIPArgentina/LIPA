@@ -13,9 +13,9 @@
   if(!['simple','double'].includes(view)) view='double';
   document.querySelectorAll('[data-category]').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.category===category)));
   const dimensions=[];
-  async function api(method, body) {
+  async function api(method, body, suffix='') {
     if(viewer){if(method!=='GET')throw new Error('El visor es de solo lectura.');return LipaViewer.api('grilla/'+category);}
-    const response=await fetch(`${API}/api/torneo-organizador/grilla/${category}`, {
+    const response=await fetch(`${API}/api/torneo-organizador/grilla/${category}${suffix}`, {
       method, credentials:'include', headers:{'Content-Type':'application/json'},
       ...(body ? {body:JSON.stringify(body)} : {}), signal:AbortSignal.timeout(20000)
     });
@@ -180,6 +180,7 @@
   }
   function fit() { if(!dimensions.length)return; const width=$('#mainFrame').parentElement.clientWidth-24;zoom=Math.max(.35,Math.min(1,width/Math.max(...dimensions.map(d=>d.width))));if(innerWidth<760)zoom=.85;applyZoom(); }
   function render() {
+    updatePublication();
     if(!data || !state)return;
     dimensions.length=0;
     $('#viewToggle').textContent=`VISUALIZACIÓN · ${view==='double'?'DOBLE':'SIMPLE'}`;
@@ -234,11 +235,38 @@
     $('#emptyState').hidden=false;
     status('El visor se actualiza automáticamente.');
   }
+  let publishing=false;
+  function updatePublication(){
+    if(viewer || !$('#publication'))return;
+    $('#publication').hidden=!data?.canPublish;
+    if(!data?.canPublish)return;
+    $('#publicationStatus').textContent=data.published?'Grilla publicada en '+category+'.':'Borrador de '+category+' · Los llamados llegan a los dos jugadores.';
+    $('#publishGrid').hidden=data.published;
+    $('#publishGrid').disabled=publishing || saving || Boolean(pending) || conflicted;
+  }
+  if($('#publishGrid'))$('#publishGrid').onclick=async()=>{
+    const grid=data;
+    if(!grid?.canPublish || grid.published || publishing || saving || pending || conflicted)return;
+    publishing=true;updatePublication();
+    try {
+      await api('POST',{drawRevision:grid.drawRevision,revision:grid.revision},'/publicar');
+      grid.published=true;
+    } catch(error) {
+      if(grid===data){status(error.message,true);$('#reload').hidden=false;}
+    } finally {publishing=false;updatePublication();}
+  };
   async function load() {
     const request=++requestId;data=null;state=null;conflicted=false;$('#emptyState').hidden=true;$('#mainSection').hidden=true;$('#repSection').hidden=true;$('#finalSection').hidden=true;$('#reload').hidden=true;status('Cargando grilla…');
+    updatePublication();
     try {
       const response=await api('GET');if(request!==requestId)return;
-      if(!viewer){const result=await fetch(API+'/api/torneo-organizador/grilla/'+category+'/llamados',{credentials:'include',cache:'no-store'});if(!result.ok)throw new Error('No se pudieron cargar las mesas.');response.assignments=(await result.json()).assignments;}
+      if(!viewer){
+        const result=await fetch(API+'/api/torneo-organizador/grilla/'+category+'/llamados',{credentials:'include',cache:'no-store'});
+        if(!result.ok)throw new Error('No se pudieron cargar las mesas.');
+        const info=await result.json();
+        if(info.drawRevision!==undefined && info.drawRevision!==response.drawRevision)throw new Error('Cambió el sorteo. Recargá la categoría.');
+        Object.assign(response,{assignments:info.assignments,canPublish:info.canPublish,published:info.published});
+      }
       if(request!==requestId)return;
       data=response;state=engine.build(data.players,data.results,category);
       $('#mainSection').hidden=false;$('#repSection').hidden=false;$('#finalSection').hidden=false;status(viewer?'Actualización automática cada 10 segundos.':data.legacyResults?'Formato actualizado: se conservan las primeras dos rondas compatibles; los resultados de las etapas reemplazadas quedan archivados.':'Resultados guardados automáticamente.');render();fit();

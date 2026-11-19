@@ -11,7 +11,7 @@ El visor comparte la grilla del organizador y los resultados publicados en LIPA.
 
 ## Publicación
 
-Publicar juntos frontend y backend. Las tablas complementarias se crean automáticamente con `CREATE TABLE IF NOT EXISTS`, usando el mismo mecanismo de inicialización del módulo de torneos. La grilla original debe estar publicada por el organizador antes de poder consultarla.
+Rodrigo puede sortear y probar los llamados en borrador. En la grilla del organizador, «Publicar grilla» habilita únicamente la categoría que está viendo. Al repetir el sorteo, esa categoría vuelve a borrador. Los llamados de mesa se entregan a ambos jugadores también durante las pruebas.
 
 El visor busca al organizador activo con el slug exacto `rodry-baygo-torneos`, verificado en producción para Rodrigo Baygorria (ID 1). El backend admite una vinculación explícita mediante `TORNEO_VISOR_ORGANIZADOR_ID`.
 

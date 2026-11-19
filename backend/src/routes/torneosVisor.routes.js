@@ -41,8 +41,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const configured = Number(process.env.TORNEO_VISOR_ORGANIZADOR_ID);
     const {rows} = await pool.query(configured ? 'SELECT id FROM torneo_organizadores WHERE id=$1 AND activo=true' :
       `SELECT id FROM torneo_organizadores WHERE activo=true AND slug='rodry-baygo-torneos'`, configured ? [configured] : []);
-    if (rows.length !== 1) throw fail(503,'El visor del torneo todavía no está configurado.');
-    return rows[0].id;
+    return rows.length===1 ? rows[0].id : null;
   }
   async function session(req) {
     const token = String(req.headers.authorization || '').replace(/^Bearer /,'');
@@ -75,23 +74,28 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
   }));
   router.get('/torneo-visor/session',route(async(req,res)=>{const user=await session(req);res.json({nombre:user.nombre});}));
   router.post('/torneo-visor/logout',route(async(req,res)=>{const user=await session(req);await pool.query('DELETE FROM torneo_visor_sesiones WHERE token_hash=$1',[user.tokenHash]);res.json({ok:true});}));
-  router.get('/torneo-visor/grilla/:categoria',route(async(req,res)=>{
-    await session(req);
-    res.locals.lecturaVisor=true;
-    const id=await organizer(), category=req.params.categoria;
+  async function currentGrid(id,category,db,includeDraft=false) {
     if (!validCategory(category)) throw fail(400,'Categoría inválida.');
-    const {rows}=await pool.query(`SELECT g.*, s.orden,
+    const {rows}=await db.query(`SELECT g.*, s.orden,
       ARRAY(SELECT i.id::text FROM torneo_inscripciones i
         WHERE i.torneo_organizador_id=g.torneo_organizador_id AND i.categoria=ANY($3::text[])
           AND i.baja_at IS NULL AND i.corroborado AND i.estado_pago IN ('sena','total','efectivo')) AS habilitados
       FROM torneo_grillas g JOIN torneo_sorteos s USING (torneo_organizador_id,categoria)
-      WHERE g.torneo_organizador_id=$1 AND g.categoria=$2 AND s.visible_en_visor AND s.revision=g.sorteo_revision`,
-      [id,category,categories.valuesFor(category)]);
+      WHERE g.torneo_organizador_id=$1 AND g.categoria=$2 AND ($4::boolean OR g.publicada_at IS NOT NULL) AND s.revision=g.sorteo_revision`,
+      [id,category,categories.valuesFor(category),includeDraft]);
     const saved=rows[0];
     if (!saved || saved.habilitados.length<2 || !slots.validOrder(saved.orden,saved.habilitados,category,saved.orden.length)
         || saved.jugadores.length!==saved.orden.length || saved.jugadores.some((p,i)=>p.id!==saved.orden[i])) {
       throw fail(404,'Sorteo pendiente para esta categoría.');
     }
+    return saved;
+  }
+  router.get('/torneo-visor/grilla/:categoria',route(async(req,res)=>{
+    await session(req);
+    res.locals.lecturaVisor=true;
+    const id=await organizer(), category=req.params.categoria;
+    if (id===null) throw fail(503,'El visor del torneo todavía no está configurado.');
+    const saved=await currentGrid(id,category,pool);
     const players=saved.jugadores.map(player=>({
       id:player.id,nombre:player.nombre,position:player.position,ranking:player.ranking,wo:player.wo,fotoUrl:photoUrl(player)
     }));
@@ -123,7 +127,25 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
   }));
   router.get('/torneo-organizador/grilla/:categoria/llamados',requireTorneoOrganizador,route(async(req,res)=>{
     const saved=await readGrid(req.user.torneoOrganizadorId,req.params.categoria);
-    res.json({assignments:await assignments(req.user.torneoOrganizadorId,req.params.categoria,saved.sorteo_revision)});
+    res.json({canPublish:req.user.torneoOrganizadorId===await organizer(),published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,assignments:await assignments(req.user.torneoOrganizadorId,req.params.categoria,saved.sorteo_revision)});
+  }));
+  router.post('/torneo-organizador/grilla/:categoria/publicar',requireTorneoOrganizador,route(async(req,res)=>{
+    const id=req.user.torneoOrganizadorId, category=req.params.categoria;
+    if (id!==await organizer()) throw fail(403,'Este organizador no administra el visor del evento.');
+    const client=await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('LOCK TABLE torneo_inscripciones IN SHARE MODE');
+      await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[id]);
+      const saved=await currentGrid(id,category,client,true);
+      if (saved.sorteo_revision!==req.body?.drawRevision || saved.revision!==req.body?.revision) {
+        throw fail(409,'La grilla cambió. Recargá la categoría antes de publicarla.');
+      }
+      await client.query(`UPDATE torneo_grillas SET publicada_at=COALESCE(publicada_at,NOW())
+        WHERE torneo_organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3`,[id,category,saved.sorteo_revision]);
+      await client.query('COMMIT');
+    } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+    res.json({published:true});
   }));
   async function matchContext(req, allowFinished=false) {
     const category=req.params.categoria, saved=await readGrid(req.user.torneoOrganizadorId,category);

@@ -18,7 +18,9 @@ function fixture(){
     if(sql.includes('SELECT id,nombre FROM jugadores'))return result(players.filter(p=>p.dni===args[0]).map(p=>({id:p.jugador_id,nombre:p.nombre})));
     if(sql.includes('SELECT id FROM torneo_organizadores'))return result([{id:1}]);
     if(sql.includes('SELECT g.* FROM torneo_grillas'))return result(args[1]==='primera'?[saved]:[]);
-    if(sql.includes('AS habilitados') && sql.includes('AND s.visible_en_visor') && sql.includes('s.revision=g.sorteo_revision'))return result(draw.visible && args[1]==='primera'?[{...saved,...draw}]:[]);
+    if(sql.includes('AS habilitados') && sql.includes('g.publicada_at IS NOT NULL') && sql.includes('s.revision=g.sorteo_revision'))return result((args[3] || draw.visible) && args[1]==='primera'?[{...saved,...draw}]:[]);
+    if(sql.startsWith('LOCK TABLE'))return result([]);
+    if(sql.startsWith('UPDATE torneo_grillas SET publicada_at')){draw.visible=true;return result([]);}
     if(sql.includes('DISTINCT ON(match_id)'))return result(llamados);
     if(sql.includes('FROM torneo_inscripciones i'))return result(players.filter(p=>args[1].includes(p.id)).map(p=>({...p,whatsapp:'1123456789'})));
     if(sql.includes('INSERT INTO torneo_llamados')){llamados.push({match_id:args[3],a:args[4],b:args[5],mesa:args[6],piso:args[7]});return result([{id:llamados.length}]);}
@@ -56,7 +58,12 @@ else test('DNI session, read-only API, private calls and organizer authorization
     draw.visible=false;
     const hidden=await request('torneo-visor/grilla/primera',null,login.token);
     assert.equal(hidden.status,404);assert.deepEqual(await hidden.json(),{error:'Sorteo pendiente para esta categoría.'});
-    draw.visible=true;
+    const publish={drawRevision:1,revision:0};
+    assert.equal((await request('torneo-organizador/grilla/primera/publicar',publish,login.token)).status,403);
+    assert.equal((await request('torneo-organizador/grilla/primera/publicar',{...publish,drawRevision:2},null,true)).status,409);
+    assert.equal(draw.visible,false);
+    assert.equal((await request('torneo-organizador/grilla/primera/publicar',publish,null,true)).status,200);
+    assert.equal(draw.visible,true);
     draw.habilitados.push('99');
     assert.equal((await request('torneo-visor/grilla/primera',null,login.token)).status,404);
     draw.habilitados.pop();
@@ -72,10 +79,12 @@ else test('DNI session, read-only API, private calls and organizer authorization
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{},login.token)).status,403);
     const match=require('../../frontend/torneos/grilla-engine').build(saved.jugadores,{},'primera').matches.find(m=>m.a&&m.b&&!m.bye);
     const call={matchId:match.id,revision:0,drawRevision:1,mesa:19,piso:'arriba'};
+    draw.visible=false;
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{...call,mesa:20},null,true)).status,400);
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',{...call,revision:9},null,true)).status,409);
     assert.equal((await request('torneo-organizador/grilla/primera/llamar',call,null,true)).status,200);
     assert.equal(avisos.length,2);assert.match(avisos[0].mensaje,/Mesa 19 · Piso arriba/);
+    assert.equal((await request('torneo-visor/grilla/primera',null,login.token)).status,404);
     const inbox=await (await request('torneo-visor/avisos?after=0',null,login.token)).json();assert.equal(inbox.avisos.length,1);
     const other=await (await request('torneo-visor/login',{dni:'30000007'})).json();
     assert.equal((await (await request('torneo-visor/avisos?after=0',null,other.token)).json()).avisos.length,0);

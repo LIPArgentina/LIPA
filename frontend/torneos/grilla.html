@@ -10,7 +10,7 @@
   <script src="../config.js?v=rodry-1"></script>
   <script src="./grilla-engine.js?v=mixed-two-rounds-1" defer></script>
   <script src="./grilla-layout.js?v=rodry-1" defer></script>
-  <script src="./grilla.js?v=rodry-1" defer></script>
+  <script src="./grilla.js?v=publicar-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -27,6 +27,7 @@
       <div class="view-controls"><button type="button" id="viewToggle">VISUALIZACIÓN · DOBLE</button><button type="button" id="fitView">AJUSTAR</button><label for="zoom">Zoom <input id="zoom" type="range" min="35" max="120" value="100"><output id="zoomValue">100%</output></label></div>
     </div>
     <div class="savebar"><span id="saveStatus" role="status">Cargando grilla…</span><button id="retrySave" type="button" hidden>Reintentar guardado</button><button id="reload" type="button" hidden>Recargar</button></div>
+    <div class="savebar" id="publication" hidden><span id="publicationStatus" role="status"></span><button id="publishGrid" type="button">Publicar grilla</button></div>
     <section id="bracketPanel" role="tabpanel" aria-labelledby="tab-primera">
       <div id="emptyState" hidden></div>
       <section id="mainSection" class="bracket-section" hidden><div class="section-heading"><div><small>PRIMERAS DOS RONDAS</small><h2>Llave de ganadores</h2></div><span class="badge">Doble eliminación</span></div><div class="board-scroll"><div id="mainFrame" class="board-frame"><div id="mainBoard" class="board"></div></div></div></section>
