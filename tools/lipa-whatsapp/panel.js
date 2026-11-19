@@ -86,7 +86,7 @@ $('start').addEventListener('click',async()=>{
       const ready=await prepareChat(workTab,contact,()=>stopping);
       if(stopping){contact.status='pending';break;}
       if(!ready.ready)throw Error(ready.error||'No se pudo preparar el chat.');
-      if(job.media){await prepareMedia(contact);if(stopping){contact.status='pending';break;}}
+      if(job.media){$('status').textContent='Adjuntando '+job.media.name+' en WhatsApp…';await prepareMedia(contact);if(stopping){contact.status='pending';break;}}
       // Persist uncertainty before the click. A crash must never lead to an automatic duplicate.
       contact.status='attempting';contact.attemptedAt=new Date().toISOString();history[contact.key]={at:contact.attemptedAt,status:'attempting'};
       await persist();render();
@@ -136,8 +136,7 @@ function showMedia(){
   $('mediaName').textContent=job.media.name+' · '+(job.media.size/1048576).toFixed(1)+' MB';$('mediaCaption').textContent=job.message;
   if(mediaFile){mediaURL=URL.createObjectURL(mediaFile);const el=document.createElement(job.media.type.startsWith('video/')?'video':'img');el.src=mediaURL;if(el.tagName==='VIDEO'){el.controls=true;el.preload='metadata';}else el.alt='Vista previa del adjunto';$('mediaVisual').append(el);}
 }
-async function prepareMedia(contact){
- let clickedMenu=false;
+async function prepareMedia(contact){ let clickedMenu=false,lastError='';
  for(let i=0;i<10;i++){
   if(stopping)throw Error('Tanda detenida.');const result=await step(contact,'attach');
   if(result.attached)break;
@@ -147,7 +146,7 @@ async function prepareMedia(contact){
  }
  for(let i=0;i<120;i++){
   if(stopping)throw Error('Tanda detenida.');const result=await step(contact,'mediaPrepare');if(result.ready)return;
-  if(result.fatal)throw Error(result.error);await pause(500);
+  if(result.fatal)throw Error(result.error);lastError=result.error||lastError;await pause(500);
  }
- throw Error('No se pudo comprobar la vista previa del archivo en WhatsApp. No se envió nada.');
+ throw Error('No se pudo comprobar el adjunto: '+(lastError||'no apareció la vista previa')+'. No se envió nada.');
 }

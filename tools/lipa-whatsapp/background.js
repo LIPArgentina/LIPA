@@ -2,6 +2,7 @@
 if(typeof importScripts==='function')importScripts('media.js');
 let preparing = false;
 chrome.runtime.onMessage.addListener((request, sender, respond) => {
+  if(request.type==='capabilities'&&sender.tab&&sender.url?.startsWith('https://lipa.ar/torneos/privados.html')){respond({sharedMedia:true,version:'1.3.1'});return;}
   if(request.type==='delay') {
     // At most 10s, below the worker's 30s idle timeout. Only our panel can request it.
     if(sender.id!==chrome.runtime.id || sender.url!==chrome.runtime.getURL('panel.html'))return;

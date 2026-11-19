@@ -302,10 +302,20 @@
     }
   });
   $('#closeDiffusion').addEventListener('click', () => $('#diffusionModal').close());
-  document.addEventListener('click', event => {
-    if (event.target.closest('[data-diffusion]') && !diffusionMessage.trim()) {
-      event.preventDefault(); openDiffusionMessage();
-      $('#diffusionStatus').textContent = 'Guardá un mensaje y luego tocá el ícono dorado del jugador.';
+  document.addEventListener('click', async event => {
+    const diffusionLink=event.target.closest('[data-diffusion]');
+    if(diffusionLink){
+      event.preventDefault();
+      const entry=entries.find(item=>String(item.id)===diffusionLink.closest('tr')?.querySelector('[data-category-id]')?.dataset.categoryId);
+      if(!entry)return;
+      const previewTab=window.open('about:blank','_blank');
+      try{
+        const saved=await api('/torneo-organizador/mensaje-difusion');diffusionMessage=saved.mensaje;diffusionMedia=saved.media;
+        if(!diffusionMessage.trim()){previewTab?.close();await openDiffusionMessage();return;}
+        if(diffusionMedia){previewTab?.close();const contacts=window.LipaBatch.collect([entry]).contacts;if(!contacts.length)throw Error('El jugador no tiene un teléfono válido.');await prepareBatch(contacts,'Difusión individual · '+(entry.nombre_oficial||entry.nombre_ingresado));}
+        else{const href='https://api.whatsapp.com/send?phone='+String(entry.whatsapp).replace(/\D/g,'')+'&text='+encodeURIComponent(diffusionMessage);if(previewTab)previewTab.location.href=href;else throw Error('Permití abrir ventanas emergentes para abrir WhatsApp.');}
+      }catch(e){previewTab?.close();setMessage(e.message);}
+      return;
     }
     const emoji = event.target.closest('[data-emoji]');
     if (emoji) {
