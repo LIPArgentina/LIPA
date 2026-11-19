@@ -21,7 +21,7 @@ function driverFixture(type='image/png'){
  const document={body:{},querySelector:s=>s==='#main'?main:null,querySelectorAll:s=>s.includes('contenteditable')?[caption]:[],elementFromPoint:()=>send};
  const expected={phone:'5491112345678',message:'Hola 👋',media:{hash:'abc',type}},ctx={document,location:{origin:'https://web.whatsapp.com'},setTimeout,Date,globalThis:null};ctx.globalThis=ctx;ctx.__lipaMedia={main,header,label:header.textContent,phone:expected.phone,hash:'abc',at:Date.now(),captionSet:true};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/driver.js'),'utf8'),ctx);
- return {expected,ctx,header,caption,setMedia:v=>withMedia=v,add:()=>added=true,step:action=>ctx.lipaWhatsAppStep(expected,action)};
+ return {expected,ctx,header,caption,preview,visual,setMedia:v=>withMedia=v,add:()=>added=true,step:action=>ctx.lipaWhatsAppStep(expected,action)};
 }
 test('media prepare/arm checks recipient and exact caption without clicking send',async()=>{
  const f=driverFixture();assert.equal((await f.step('mediaPrepare')).ready,true);assert.equal((await f.step('send')).armed,true);
@@ -50,4 +50,15 @@ test('media opens a blank verified composer and pastes the file without enabling
  const expected={phone:'5491112345678',message:'Descripción que no debe ir sola',media:meta,mediaData:'data:image/png;base64,'+bytes.toString('base64')};
  assert.equal((await ctx.lipaWhatsAppStep(expected,'prepare')).ready,true);assert.equal((await ctx.lipaWhatsAppStep(expected,'attach')).attached,true);assert(focused);assert.equal(pasted.type,'paste');assert.equal(pasted.clipboardData.files[0].size,bytes.length);assert.equal(input.childNodes.length,0);
  const send=await ctx.lipaWhatsAppStep(expected,'send');assert(!send.armed);assert(send.error);
+});
+
+test('caption in preview footer and data URL image are recognized; caption fills before send becomes available',async()=>{
+ const f=driverFixture();f.visual.src='data:image/png;base64,AAAA';
+ f.caption.closest=s=>s.split(',').includes('footer')?{}:null;f.preview.querySelector=s=>s==='footer'?{}:null;
+ f.ctx.__lipaMedia.captionSet=false;f.caption.childNodes=[];f.caption.focus=()=>{};
+ f.ctx.getSelection=()=>({removeAllRanges(){},addRange(){}});f.ctx.document.createRange=()=>({selectNodeContents(){}});
+ f.ctx.document.execCommand=(command,unused,value)=>{assert.equal(command,'insertText');f.caption.childNodes=[{nodeType:3,nodeValue:value}];};
+ const realQuery=f.preview.querySelectorAll;f.preview.querySelectorAll=s=>s==='img'?[f.visual]:[];
+ assert((await f.step('mediaPrepare')).error);assert.equal(f.caption.childNodes[0].nodeValue,f.expected.message);assert((await f.step('send')).error);
+ f.preview.querySelectorAll=realQuery;assert.equal((await f.step('mediaPrepare')).ready,true);assert.equal((await f.step('send')).armed,true);
 });

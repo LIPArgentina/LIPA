@@ -104,15 +104,16 @@ async function lipaWhatsAppStep(expected, action) {
     return proof&&proof.hash===expected.media?.hash&&proof.phone===expected.phone&&proof.main===main&&proof.header===headerIdentity(main)&&proof.label===headerIdentity(main)?.textContent&&Date.now()-proof.at<180000?proof:null;
   }
   function mediaEditor(){
-    const editors=[...document.querySelectorAll('[contenteditable="true"][role="textbox"]')].filter(el=>visible(el)&&!el.closest('footer,#pane-side,header'));
+    const editors=[...document.querySelectorAll('[contenteditable="true"]')].filter(el=>visible(el)&&el!==globalThis.__lipaMedia?.composer&&!el.closest('#pane-side,header,[data-id]'));
     const candidates=[];
     for(const editor of editors){
-      let root=editor.parentElement;
+      let root=editor.parentElement,found=null;
       while(root&&root!==document.body){
-        const sends=[...new Set([...root.querySelectorAll('button[aria-label="Enviar"],button[aria-label="Send"],[data-icon="send"],[data-icon="wds-ic-send-filled"]')].filter(visible).map(el=>el.closest('button,[role="button"]')).filter(Boolean))];
-        const media=[...root.querySelectorAll(expected.media.type.startsWith('video/')?'video':'img')].filter(el=>visible(el)&&(el.currentSrc||el.src||'').startsWith('blob:'));
-        if(sends.length===1&&media.length>=1&&!root.querySelector('footer')){candidates.push({editor,send:sends[0],media:media[0]});break;}root=root.parentElement;
+        const sends=[...new Set([...root.querySelectorAll('button[aria-label="Enviar"],button[aria-label="Send"],[role="button"][aria-label="Enviar"],[role="button"][aria-label="Send"],[data-icon="send"],[data-icon="wds-ic-send-filled"]')].filter(visible).map(el=>el.closest('button,[role="button"]')).filter(Boolean))];
+        const media=[...root.querySelectorAll(expected.media.type.startsWith('video/')?'video':'img')].filter(el=>visible(el)&&['blob:','data:image/','data:video/'].some(prefix=>(el.currentSrc||el.src||'').startsWith(prefix))&&!el.closest?.('[data-id],header,#pane-side'));
+        if(media.length>=1){found={editor,send:sends.length===1?sends[0]:null,media:media[0]};if(found.send)break;}root=root.parentElement;
       }
+      if(found)candidates.push(found);
     }
     return candidates.length===1?candidates[0]:null;
   }
@@ -126,7 +127,7 @@ async function lipaWhatsAppStep(expected, action) {
     if(!remembered(current.main))return {error:'Se perdió la comprobación del contacto.'};
     const file=new File([bytes],expected.media.name,{type:expected.media.type}),transfer=new DataTransfer();transfer.items.add(file);
     current.input.focus();
-    globalThis.__lipaMedia={main:current.main,header:headerIdentity(current.main),label:headerIdentity(current.main)?.textContent,phone:expected.phone,hash,at:Date.now(),captionSet:false};
+    globalThis.__lipaMedia={main:current.main,header:headerIdentity(current.main),label:headerIdentity(current.main)?.textContent,phone:expected.phone,hash,at:Date.now(),captionSet:false,composer:current.input};
     // Use WhatsApp's paste handler on the verified composer, not an unrelated hidden file input.
     current.input.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:transfer}));return {attached:true};
   }
@@ -138,6 +139,7 @@ async function lipaWhatsAppStep(expected, action) {
       preview.editor.focus();const selection=getSelection(),range=document.createRange();range.selectNodeContents(preview.editor);selection.removeAllRanges();selection.addRange(range);document.execCommand('insertText',false,expected.message);proof.captionSet=true;return {error:'Comprobando descripción.'};
     }
     if(text(preview.editor)!==normalize(expected.message))return {fatal:true,error:'La descripción del archivo no coincide con el mensaje revisado.'};
+    if(!preview.send)return {error:'La imagen y la descripción están listas; no se pudo identificar un único botón Enviar del adjunto.'};
     if(preview.send.getAttribute('aria-disabled')==='true'||preview.send.disabled)return {error:'Esperando a que WhatsApp prepare el archivo.'};
     const target=point(preview.send);if(!target)return {error:'El botón de envío del archivo está tapado.'};
     if(action==='mediaPrepare')return {ready:true};
