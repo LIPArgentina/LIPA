@@ -132,7 +132,7 @@
       tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td class="${entry.equipo_actual ? 'team-current' : 'team-history'}" title="${entry.equipo_nombre ? (entry.equipo_actual ? 'Equipo actual' : 'Último equipo histórico') : 'Sin registro'}">${escapeHtml(entry.equipo_nombre || 'Sin registro')}</td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
         <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp">${whatsappContact(entry.whatsapp)}${verified ? whatsappContact(entry.whatsapp, true) : ''}<button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
-        <td>${entry.baja_at ? `<span class="inactive-date" title="Fecha de baja">Baja: ${dateFormatter.format(new Date(entry.baja_at))}</span>` : `<button class="delete-button" data-delete="${entry.id}">Dar de baja</button>`}</td>`;
+        <td>${entry.baja_at ? `<span class="inactive-date" title="Fecha de baja">Baja: ${dateFormatter.format(new Date(entry.baja_at))}</span><button type="button" class="restore-button" data-restore="${entry.id}">Volver a inscribir</button>` : `<button class="delete-button" data-delete="${entry.id}">Dar de baja</button>`}</td>`;
       [...tr.children].forEach((cell,index)=>cell.dataset.label=['Jugador','Equipo','DNI','Categoría','WhatsApp','Pago','Inscripción','Acciones'][index]);
       if(entry.baja_at){
         tr.querySelectorAll('select,input').forEach(control=>control.disabled=true);
@@ -393,6 +393,16 @@
         setTimeout(() => { contactButton.textContent = 'Guardar'; }, 1200);
         await load();
       } catch (error) { alert(error.message); }
+      return;
+    }
+    const restoreButton = event.target.closest('[data-restore]');
+    if(restoreButton){
+      restoreButton.disabled=true;
+      try {
+        await api(`/torneo-organizador/inscripciones/${restoreButton.dataset.restore}/reactivar`, {method:'PATCH'});
+        await load();
+        setMessage('Jugador reinscripto. Se conservaron su contacto, categoría y pago.',true);
+      } catch(error){alert(error.message);restoreButton.disabled=false;}
       return;
     }
     const button = event.target.closest('[data-delete]');

@@ -677,6 +677,20 @@ module.exports = function createTorneosPrivadosRouter() {
     }
   });
 
+  router.patch('/torneo-organizador/inscripciones/:id/reactivar', requireTorneoOrganizador, async (req, res) => {
+    try {
+      await ensureSchema();
+      const result = await pool.query(
+        'UPDATE torneo_inscripciones SET baja_at=NULL, updated_at=NOW() WHERE id=$1 AND torneo_organizador_id=$2 AND baja_at IS NOT NULL RETURNING *',
+        [Number(req.params.id), req.user.torneoOrganizadorId]);
+      if (!result.rowCount) return res.status(404).json({ ok:false, error:'No se encontró una inscripción dada de baja.' });
+      res.json({ ok:true, inscripcion:result.rows[0] });
+    } catch (error) {
+      console.error('PATCH reactivar inscripción', error);
+      res.status(500).json({ ok:false, error:'No se pudo volver a inscribir al jugador.' });
+    }
+  });
+
   router.delete('/torneo-organizador/inscripciones/:id', requireTorneoOrganizador, async (req, res) => {
     try {
       await ensureSchema();
