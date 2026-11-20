@@ -1066,9 +1066,3 @@
   .promo-video-popup__panel p{ margin: 9px 4px; }
 }
 
-/* Public TV links remain usable without JavaScript or a session. */
-.topbar{flex-wrap:wrap}
-.tv-links{width:100%;flex:0 0 100%;grid-column:1 / -1;text-align:center;padding-top:8px}
-.tv-links a{display:inline-block;margin:3px;padding:9px 13px;border:1px solid #c59d28;border-radius:9px;background:#15171c;color:#ffd245;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;text-decoration:none}
-.tv-links a:hover,.tv-links a:focus{background:#ffd245;color:#111;outline:2px solid #fff;outline-offset:2px}
-@media(max-width:768px){.tv-links{padding-top:2px}.tv-links a{width:46%;margin:3px 1%;padding:9px 4px;font-size:11px}}
