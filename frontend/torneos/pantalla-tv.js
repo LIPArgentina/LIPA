@@ -2,7 +2,7 @@
  'use strict';
  const params=new URLSearchParams(location.search),viewer=params.get('visor')==='1',rotating=params.get('vista')==='rotativa',mode=document.body.dataset.screen;
  const board=document.getElementById('tv'),status=document.getElementById('screenStatus'),API=String(window.APP_CONFIG?.API_BASE_URL||'').replace(/\/+$/,'');
- const back=document.getElementById('back');back.href=viewer?'./visor.html':'./grilla.html';
+ const back=document.getElementById('back');back.href='/tv/';
  const categories=['tercera','segunda'],cache=new Map(),errors=new Map();let page=0,loading=false,signature='';
  const ns='http://www.w3.org/2000/svg';
  function photo(p){const img=document.createElement('img');img.alt='';img.src=p?.fotoUrl?new URL(p.fotoUrl,API||location.origin).href:'../logo_liga.png';img.onerror=()=>{img.onerror=null;img.src='../logo_liga.png';};return img;}
