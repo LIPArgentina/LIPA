@@ -2,13 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const source=fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/panel.js'),'utf8');
 test('reuses an existing WhatsApp tab across contacts without creating or closing it',async()=>{
  const calls=[];const ctx={workTab:null,job:{workTabId:7},stopping:false,pause:async()=>{},chrome:{tabs:{query:async()=>[{id:7,url:'https://web.whatsapp.com/'}],get:async()=>({url:'https://web.whatsapp.com/',status:'complete'}),update:async(id,options)=>calls.push({id,options}),create:async()=>{throw Error('Must reuse existing tab');}}}};
- vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('async function reuseWhatsAppTab'),source.indexOf('async function selectChat')),ctx);await ctx.reuseWhatsAppTab();await ctx.reuseWhatsAppTab();assert.equal(ctx.workTab,7);assert.equal(calls.length,2);assert(calls.every(c=>!('url' in c.options)));assert(!source.includes('chrome.tabs.remove'));assert(!source.includes('chrome.tabs.create'));
-});
-test('opens every direct recipient in the same WhatsApp tab',async()=>{
- const calls=[];const ctx={workTab:7,job:{message:'Hola desde LIPA',media:null},stopping:false,pause:async()=>{},browserControl:{release:async()=>calls.push({release:true})},chrome:{tabs:{update:async(id,options)=>calls.push({id,options}),get:async()=>({id:7,status:'complete'})}}};
- vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('async function selectChat')),ctx);
- await ctx.selectChat({phone:'5491111111111'});await ctx.selectChat({phone:'5491122222222'});
- const navigations=calls.filter(call=>call.options);assert.deepEqual(navigations.map(call=>call.id),[7,7]);assert.match(navigations[0].options.url,/send\?phone=5491111111111&text=Hola%20desde%20LIPA$/);assert.match(navigations[1].options.url,/send\?phone=5491122222222&text=Hola%20desde%20LIPA$/);assert(navigations.every(call=>call.options.active===true));
+ vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('async function reuseWhatsAppTab'),source.indexOf('async function selectChat')),ctx);await ctx.reuseWhatsAppTab();await ctx.reuseWhatsAppTab();assert.equal(ctx.workTab,7);assert.equal(calls.length,2);assert(calls.every(c=>!('url' in c.options)));assert(!source.includes('chrome.tabs.remove'));assert(!source.includes('chrome.tabs.create'));assert(!source.includes('/send?phone='));
 });
 
 function fixture(items){
@@ -25,6 +19,17 @@ test('number search resolves saved alias and unsaved number with the same path',
  assert(fixture([{text:'Mi amigo del pool'}]).run().target);
  assert(fixture([{text:'+54 9 11 1234-5678'},{text:'+54 9 11 1234-5678',y:130}]).run().target);
  assert(fixture([{text:'Mi amigo',role:'row'}]).run().target);
+});
+test('number result clicks the complete interactive row instead of its text span',()=>{
+ const inputRect={x:100,y:10,width:400,height:40},rowRect={x:100,y:80,width:400,height:80},spanRect={x:140,y:100,width:120,height:20};
+ const row={textContent:'+54 9 11 1234-5678',getClientRects:()=>[{}],getBoundingClientRect:()=>rowRect,closest:()=>null,contains:el=>el===span,querySelector:()=>span,parentElement:null,getAttribute:key=>key==='role'?'row':null};
+ const span={textContent:'+54 9 11 1234-5678',innerText:'+54 9 11 1234-5678',getClientRects:()=>[{}],getBoundingClientRect:()=>spanRect,closest:selector=>selector.includes('[role="row"]')?row:null,contains:()=>false,querySelector:()=>null,parentElement:row,getAttribute:()=>null};
+ const input={value:'+5491112345678',getClientRects:()=>[{}],getBoundingClientRect:()=>inputRect,closest:()=>null,contains:()=>false,getAttribute:()=>null};
+ const pane={querySelectorAll:()=>[span],parentElement:null};row.parentElement=pane;input.parentElement=pane;
+ const body={};pane.parentElement=body;
+ const document={body,activeElement:input,querySelectorAll:()=>[input],elementFromPoint:(x,y)=>y<60?input:(x>=spanRect.x&&x<=spanRect.x+spanRect.width&&y>=spanRect.y&&y<=spanRect.y+spanRect.height?span:row)};
+ const ctx={location:{origin:'https://web.whatsapp.com'},document};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
+ const result=ctx.lipaOpenChat({phone:'5491112345678'},'result');assert.equal(result.target.x,300);assert.equal(result.target.y,120);assert.equal(result.diagnostic.surface,'row');
 });
 test('name and subtitle in a single avatar row count as one contact',()=>{
  const group={querySelector:()=>({}),contains:()=>false};

@@ -52,7 +52,24 @@ function lipaOpenChat(contact,stage){
  const eligible=el=>{const r=el.getBoundingClientRect();return visible(el)&&!el.closest('#main,header')&&r.y>=searchRect.y+searchRect.height&&r.x>=searchRect.x-32&&r.x+r.width<=searchRect.x+searchRect.width+32&&point(el);};
  const textOf=el=>String(el.innerText||el.textContent||el.getAttribute('title')||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim();
  const isPhone=text=>/^\+?[\d\s().-]+$/.test(text);
- function selected(el){const target=point(el);if(!target)return {waiting:true};globalThis.__lipaSelection={...globalThis.__lipaNavigation,phone:contact.phone,label:clean(el.querySelector?.("span[title],span[dir=auto]")?.textContent||textOf(el))};return {target,diagnostic:{reason:'selected-number-search-result',label:textOf(el)}};}
+ function selected(el){
+   // WhatsApp often renders the phone/name as a span inside the clickable
+   // result row. Clicking that span may focus text without opening the chat.
+   // Prefer the complete interactive row, or the nearest row-sized ancestor.
+   let surface=el.closest?.('[role="row"],[role="listitem"],[role="button"],[tabindex="0"]');
+   if(!surface||surface.closest('#main,header'))surface=null;
+   let parent=el.parentElement;
+   while(!surface&&parent&&parent!==pane){
+     if(typeof parent.getBoundingClientRect!=='function'){parent=parent.parentElement;continue;}
+     const r=parent.getBoundingClientRect();
+     if(visible(parent)&&!parent.closest('#main,header')&&r.y>=searchRect.y+searchRect.height&&r.height>=32&&r.height<=120&&r.width>=searchRect.width*.55&&r.x>=searchRect.x-96&&r.x+r.width<=searchRect.x+searchRect.width+96&&point(parent))surface=parent;
+     parent=parent.parentElement;
+   }
+   surface=surface||el;
+   const target=point(surface);if(!target)return {waiting:true};
+   globalThis.__lipaSelection={...globalThis.__lipaNavigation,phone:contact.phone,label:clean(surface.querySelector?.("span[title],span[dir=auto]")?.textContent||textOf(el))};
+   return {target,diagnostic:{reason:'selected-number-search-result',label:textOf(el),surface:surface===el?'text':'row'}};
+ }
  let pane=inputs[0].parentElement;
  while(pane&&pane!==document.body){
    const nodes=[...pane.querySelectorAll('[role="listitem"],[role="row"],span,[dir="auto"]')].filter(eligible);
