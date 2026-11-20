@@ -12,16 +12,16 @@ const pause=async ms=>{
 };
 const browserControl=lipaBrowserControl(chrome);
 async function rawStep(tabId,contact,action) {
-  const results=await chrome.scripting.executeScript({target:{tabId},func:lipaWhatsAppStep,args:[{phone:contact.phone,message:job.message,media:job.media||null,mediaData:action==='attach'?mediaData:null},action]});
+  const results=await chrome.scripting.executeScript({target:{tabId},func:lipaWhatsAppStep,args:[{phone:contact.phone,message:action==='prepareEmpty'||action==='composer'?'':job.message,prepareOnly:action==='prepareEmpty'||action==='composer',media:job.media||null,mediaData:action==='attach'?mediaData:null},action==='prepareEmpty'?'prepare':action]});
   if(results.length!==1||!results[0].result)throw Error('No se pudo verificar la respuesta de WhatsApp.');
   return results[0].result;
 }
-async function prepareChat(tabId,contact,cancelled=()=>false) {
+async function prepareChat(tabId,contact,cancelled=()=>false,empty=false) {
   await browserControl.connect(tabId);
   const interactions=new Set();let last;
   for(let i=0;i<60;i++) {
     if(cancelled())throw Error('Tanda detenida.');
-    last=await rawStep(tabId,contact,'prepare');
+    last=await rawStep(tabId,contact,empty?'prepareEmpty':'prepare');
     if(last.ready)return last;
     if(last.interaction&&!interactions.has(last.interaction)) {
       interactions.add(last.interaction);
@@ -64,8 +64,8 @@ $('selectAll').addEventListener('change',()=>{
   job.contacts.forEach(contact=>{if(selectable(contact))contact.selected=selected;});
   persist();render();
 });
-$('login').addEventListener('click',async()=>{if(workTab){try{await chrome.tabs.update(workTab,{active:true});return;}catch(_){}}const tab=await chrome.tabs.create({url:'https://web.whatsapp.com/'});workTab=tab.id;});
-$('stop').addEventListener('click',()=>{stopping=true;$('status').textContent='Deteniendo. Los próximos mensajes no se enviarán.';if(workTab)chrome.tabs.remove(workTab).catch(()=>{});});
+$('login').addEventListener('click',async()=>{try{stopping=false;await reuseWhatsAppTab();}catch(e){$('status').textContent=e.message;}});
+$('stop').addEventListener('click',()=>{stopping=true;$('status').textContent='Deteniendo. Los próximos mensajes no se enviarán.';});
 $('start').addEventListener('click',async()=>{
   if(running||mediaBusy||!job||job.media&&!mediaFile)return;
   const queue=job.contacts.filter(c=>selectable(c)&&c.selected!==false);
@@ -76,15 +76,12 @@ $('start').addEventListener('click',async()=>{
     if(stopping)break;
     try {
       contact.status='preparing';await persist();render();$('status').textContent='Abriendo el chat de '+contact.name+'…';
-      const url='https://web.whatsapp.com/send?phone='+contact.phone+(job.media?'':'&text='+encodeURIComponent(job.message));
-      if(workTab){try{await chrome.tabs.update(workTab,{url,active:true});}catch(_){workTab=null;}}
-      if(!workTab){const tab=await chrome.tabs.create({url,active:true});workTab=tab.id;}
+      await reuseWhatsAppTab();
       job.workTabId=workTab;await persist();
-      // Wait for the page to finish loading before injecting the DOM-only driver.
-      let loaded=false;
-      for(let i=0;i<90&&!stopping;i++){const t=await chrome.tabs.get(workTab);if(t.status==='complete'){loaded=true;break;}await pause(500);}
-      if(stopping){contact.status='pending';break;}
-      if(!loaded)throw Error('WhatsApp no terminó de cargar.');
+      await selectChat(contact);
+      const verified=await prepareChat(workTab,contact,()=>stopping,true);
+      if(!verified.ready)throw Error(verified.error||'No se pudo verificar el contacto.');
+      if(!job.media){const composer=await step(contact,'composer');if(!composer.target)throw Error(composer.error||'No se encontró el cuadro de mensaje.');await browserControl.fillCaption(workTab,composer.target,job.message,()=>stopping);}
       const ready=await prepareChat(workTab,contact,()=>stopping);
       if(stopping){contact.status='pending';break;}
       if(!ready.ready)throw Error(ready.error||'No se pudo preparar el chat.');
@@ -166,3 +163,18 @@ $('inspectSent').addEventListener('click',async()=>{
   $('status').textContent='Revisión sin envío: '+result.outgoingCount+' mensajes salientes ('+result.messageIdNodes+' bloques detectados); texto reconocido: '+matched+'; texto completo dentro del mensaje: '+contained+'; imágenes: '+rows.reduce((n,r)=>n+r.images.length,0)+'. Descargá el registro para revisar el detalle. No se envió nada.';
  }catch(e){$('status').textContent=e.message;}finally{$('inspectSent').disabled=false;}
 });
+
+async function reuseWhatsAppTab(){
+ if(workTab){try{const t=await chrome.tabs.get(workTab);if(!t.url?.startsWith('https://web.whatsapp.com/'))workTab=null;}catch(_){workTab=null;}}
+ if(!workTab){const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});const found=tabs.find(t=>t.id===job?.workTabId)||(tabs.length===1?tabs[0]:tabs.find(t=>t.active));if(found)workTab=found.id;else if(tabs.length)throw Error('Dejá una sola pestaña de WhatsApp Web abierta.');else workTab=(await chrome.tabs.create({url:'https://web.whatsapp.com/',active:true})).id;}
+ await chrome.tabs.update(workTab,{active:true});
+ for(let i=0;i<90;i++){if(stopping)throw Error('Tanda detenida.');if((await chrome.tabs.get(workTab)).status==='complete')return;await pause(250);}throw Error('WhatsApp no terminó de cargar.');
+}
+async function selectChat(contact){
+ await browserControl.connect(workTab);
+ async function inspect(stage){const rows=await chrome.scripting.executeScript({target:{tabId:workTab},func:lipaOpenChat,args:[contact,stage]});return rows[0]?.result||{error:'No se pudo leer WhatsApp.'};}
+ let result=await inspect('new');if(!result.target)throw Error(result.error);await browserControl.click(workTab,result.target,()=>stopping);
+ async function waitFor(stage){for(let i=0;i<60;i++){if(stopping)throw Error('Tanda detenida.');const r=await inspect(stage);if(r.target)return r;if(r.error)throw Error(r.error);await pause(250);}throw Error('No se encontró el contacto en Nuevo chat. No se recargó WhatsApp.');}
+ result=await waitFor('search');await browserControl.fillCaption(workTab,result.target,'+'+contact.phone,()=>stopping);
+ result=await waitFor('result');await browserControl.click(workTab,result.target,()=>stopping);
+}

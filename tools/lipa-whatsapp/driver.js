@@ -76,12 +76,13 @@ async function lipaWhatsAppStep(expected, action) {
     if(text(input)!==normalize(expected.media?'':expected.message))return {error:'El mensaje cargado no coincide exactamente con el revisado. Se detuvo para evitar un envío incorrecto.'};
     if(rightPhone(main))remember(main);
     if(!remembered(main))return {error:'No se pudo comprobar el número del chat. No se envió nada.',needPhone:true,main};
-    if(expected.media)return {main,input,send:null};
+    if(expected.media||expected.prepareOnly)return {main,input,send:null};
     const sends=[...new Set([...main.querySelectorAll('footer button[aria-label="Enviar"],footer button[aria-label="Send"],footer [data-icon="send"],footer [data-icon="wds-ic-send-filled"]')].filter(visible).map(el=>el.closest('button,[role="button"]')).filter(Boolean))];
     if(sends.length!==1)return {error:'No se pudo identificar con seguridad el botón Enviar.'};
     return {main,input,send:sends[0]};
   }
   if(location.origin!=='https://web.whatsapp.com')return {error:'La pestaña no es WhatsApp Web.'};
+  if(action==='composer'){const current=inspect();if(current.error)return {error:current.error};return {target:point(current.input)};}
   if(action==='prepare') {
     const current=inspect();
     if(current.needPhone) {
@@ -90,7 +91,7 @@ async function lipaWhatsAppStep(expected, action) {
       return target?{interaction:'contact',target}:{error:current.error};
     }
     if(current.error)return {error:current.error};
-    if(expected.media)return {ready:true};
+    if(expected.media||expected.prepareOnly)return {ready:true};
     const target=point(current.send);
     if(target)return {ready:true};
     const infoHeader=document.querySelector('[data-testid="contact-info-header"]');
