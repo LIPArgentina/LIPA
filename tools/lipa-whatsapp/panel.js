@@ -19,7 +19,7 @@ async function rawStep(tabId,contact,action) {
 async function prepareChat(tabId,contact,cancelled=()=>false,empty=false) {
   await browserControl.connect(tabId);
   const interactions=new Set();let last;
-  for(let i=0;i<60;i++) {
+  for(let i=0;i<100;i++) {
     if(cancelled())throw Error('Tanda detenida.');
     last=await rawStep(tabId,contact,empty?'prepareEmpty':'prepare');
     if(last.ready)return last;
@@ -27,7 +27,7 @@ async function prepareChat(tabId,contact,cancelled=()=>false,empty=false) {
       interactions.add(last.interaction);
       await browserControl.click(tabId,last.target,cancelled);
     }
-    await pause(250);
+    await pause(150);
   }
   return {error:last?.error||'No se pudo abrir y comprobar la ficha del contacto.'};
 }
@@ -99,8 +99,8 @@ $('start').addEventListener('click',async()=>{
       contact.status='sent';history[contact.key].status='sent';await persist();render();
       $('status').textContent='Mensaje observado en el chat de '+contact.name+'.';
       if(contact!==queue[queue.length-1]&&!stopping){
-        $('status').textContent='Mensaje observado en el chat de '+contact.name+'. Pausa de 3 segundos antes del siguiente.';
-        await pause(3000);
+        $('status').textContent='Mensaje observado en el chat de '+contact.name+'. Pausa de 1 segundo antes del siguiente.';
+        await pause(1000);
       }
     } catch(error) {
       contact.error=error.message;contact.status=history[contact.key]?'review':'pending';
@@ -137,12 +137,12 @@ function showMedia(){
   if(mediaFile){mediaURL=URL.createObjectURL(mediaFile);const el=document.createElement(job.media.type.startsWith('video/')?'video':'img');el.src=mediaURL;if(el.tagName==='VIDEO'){el.controls=true;el.preload='metadata';}else el.alt='Vista previa del adjunto';$('mediaVisual').append(el);}
 }
 async function prepareMedia(contact){ let clickedMenu=false,lastError='';
- for(let i=0;i<10;i++){
+ for(let i=0;i<25;i++){
   if(stopping)throw Error('Tanda detenida.');const result=await step(contact,'attach');
   if(result.attached)break;
   if(result.target&&!clickedMenu){await browserControl.click(workTab,result.target,()=>stopping);clickedMenu=true;}
   else if(result.error)throw Error(result.error);
-  if(i===9)throw Error('No se pudo adjuntar el archivo.');await pause(500);
+  if(i===24)throw Error('No se pudo adjuntar el archivo.');await pause(200);
  }
  for(let i=0;i<60;i++){
   if(stopping)throw Error('Tanda detenida.');const result=await step(contact,'mediaPrepare');if(result.ready)return;
@@ -166,18 +166,18 @@ $('inspectSent').addEventListener('click',async()=>{
 
 async function reuseWhatsAppTab(){
  if(workTab){try{const t=await chrome.tabs.get(workTab);if(!t.url?.startsWith('https://web.whatsapp.com/'))workTab=null;}catch(_){workTab=null;}}
- if(!workTab){const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});const found=tabs.find(t=>t.id===job?.workTabId)||(tabs.length===1?tabs[0]:tabs.find(t=>t.active));if(found)workTab=found.id;else if(tabs.length)throw Error('Dejá una sola pestaña de WhatsApp Web abierta.');else workTab=(await chrome.tabs.create({url:'https://web.whatsapp.com/',active:true})).id;}
+ if(!workTab){const tabs=await chrome.tabs.query({url:'https://web.whatsapp.com/*'});const found=tabs.find(t=>t.id===job?.workTabId)||(tabs.length===1?tabs[0]:tabs.find(t=>t.active));if(found)workTab=found.id;else if(tabs.length)throw Error('Dejá una sola pestaña de WhatsApp Web abierta.');else throw Error('Abrí WhatsApp Web y vinculá tu sesión antes de iniciar la tanda. Se usará esa misma pestaña.');}
  await chrome.tabs.update(workTab,{active:true});
  for(let i=0;i<90;i++){if(stopping)throw Error('Tanda detenida.');if((await chrome.tabs.get(workTab)).status==='complete')return;await pause(250);}throw Error('WhatsApp no terminó de cargar.');
 }
 async function selectChat(contact){
  await browserControl.connect(workTab);
  async function inspect(stage){const rows=await chrome.scripting.executeScript({target:{tabId:workTab},func:lipaOpenChat,args:[contact,stage]});return rows[0]?.result||{error:'No se pudo leer WhatsApp.'};}
- let result=await inspect('new');if(!result.target)throw Error(result.error);await browserControl.click(workTab,result.target,()=>stopping);
+ let result=await inspect('new');if(!result.ready){if(!result.target)throw Error(result.error);await browserControl.click(workTab,result.target,()=>stopping);}
  async function waitFor(stage){for(let i=0;i<60;i++){if(stopping)throw Error('Tanda detenida.');const r=await inspect(stage);if(r.diagnostic)contact.navigation=r.diagnostic;if(r.target)return r;if(r.error)throw Error(r.error);await pause(250);}throw Error(stage==='search'?'No se pudo identificar el buscador de Nuevo chat. No se escribió ni envió nada.':'El número se escribió, pero no se encontró un contacto único en Nuevo chat. No se envió nada.');}
  result=await waitFor('search');await browserControl.fillCaption(workTab,result.target,'+'+contact.phone,()=>stopping);
  let typed=false;for(let i=0;i<8;i++){if((await inspect('typed')).ready){typed=true;break;}await pause(250);}if(!typed)throw Error('WhatsApp no conservó el número en el buscador de Nuevo chat. No se envió nada.');
  result=await waitFor('result');await browserControl.click(workTab,result.target,()=>stopping);
- let opened=false;for(let i=0;i<32;i++){if(stopping)throw Error('Tanda detenida.');if((await inspect('closed')).closed){opened=true;break;}await pause(250);}
+ let opened=false;for(let i=0;i<54;i++){if(stopping)throw Error('Tanda detenida.');if((await inspect('closed')).closed){opened=true;break;}await pause(250);}
  if(!opened)throw Error('El resultado no abrió el chat: Nuevo chat sigue visible. No se envió nada.');
 }

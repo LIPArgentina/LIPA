@@ -9,12 +9,30 @@ function lipaOpenChat(contact,stage){
  const active=inputs.filter(el=>el===document.activeElement&&el.closest('[role="dialog"]'));
  return labeled.length?labeled:active.length?active:inputs;
  }
+ const clean=value=>String(value||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim();
+ const phoneKey=value=>{let n=clean(value).replace(/\D/g,'');if(n.startsWith('0054'))n=n.slice(2);if(n.startsWith('549')&&n.length===13)return n.slice(3);if(n.startsWith('54')&&n.length===12)return n.slice(2);return n;};
+ const samePhone=(a,b)=>phoneKey(a).length>=10&&phoneKey(a)===phoneKey(b);
+ const newChatOpen=()=>[...document.querySelectorAll('h1,h2,header,span')].some(el=>visible(el)&&/^(Nuevo chat|New chat)$/.test(clean(el.textContent)));
  if(stage==='closed'){
- const open=[...document.querySelectorAll('h1,h2,header,span')].some(el=>visible(el)&&String(el.textContent||'').trim()==='Nuevo chat');
- return {closed:!open};
+ const selection=globalThis.__lipaSelection;
+ if(newChatOpen()||!selection||selection.phone!==contact.phone)return {closed:false};
+ const main=document.querySelector('#main'),header=main?.querySelector('[data-testid="conversation-info-header-button"]')||main?.querySelector('header');
+ if(!header||!main.querySelector('footer [contenteditable="true"][role="textbox"]'))return {closed:false};
+ const labels=[...header.querySelectorAll('span[title],span[dir],a[href^="tel:"]')].filter(visible).map(el=>clean(el.getAttribute('title')||el.textContent));
+ const matches=labels.some(label=>label===selection.label||samePhone(label,contact.phone));
+ const changed=header!==selection.previousHeader||header.textContent!==selection.previousLabel||selection.previouslySame;
+ if(!matches||!changed)return {closed:false,diagnostic:{reason:'waiting-selected-chat'}};
+ globalThis.__lipaRecipient={main,header,label:header.textContent,phone:contact.phone,at:Date.now()};
+ return {closed:true};
  }
+
  if(stage==='new'){
+ const main=document.querySelector('#main'),header=main?.querySelector('[data-testid="conversation-info-header-button"]')||main?.querySelector('header');
+ const proof=globalThis.__lipaRecipient;
+ globalThis.__lipaNavigation={previousHeader:header,previousLabel:header?.textContent,previouslySame:proof?.phone===contact.phone&&proof.header===header&&proof.label===header?.textContent};
+ delete globalThis.__lipaSelection;
  delete globalThis.__lipaRecipient;delete globalThis.__lipaMedia;delete globalThis.__lipaArmed;
+ if(newChatOpen())return {ready:true};
  const controls=[...new Set([...document.querySelectorAll('[aria-label="Nuevo chat"],[title="Nuevo chat"],[aria-label="New chat"],[title="New chat"],[data-icon="new-chat-outline"],[data-icon="new-chat"]')].filter(visible).map(el=>el.closest('button,[role="button"],[tabindex="0"]')).filter(Boolean))];
  if(controls.length===1&&point(controls[0]))return {target:point(controls[0])};return {error:'No se encontró el botón Nuevo chat. No se recargó WhatsApp.'};
  }
@@ -34,12 +52,13 @@ function lipaOpenChat(contact,stage){
  const eligible=el=>{const r=el.getBoundingClientRect();return visible(el)&&!el.closest('#main,header')&&r.y>=searchRect.y+searchRect.height&&r.x>=searchRect.x-32&&r.x+r.width<=searchRect.x+searchRect.width+32&&point(el);};
  const textOf=el=>String(el.innerText||el.textContent||el.getAttribute('title')||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim();
  const isPhone=text=>/^\+?[\d\s().-]+$/.test(text);
+ function selected(el){const target=point(el);if(!target)return {waiting:true};globalThis.__lipaSelection={...globalThis.__lipaNavigation,phone:contact.phone,label:clean(el.querySelector?.("span[title],span[dir=auto]")?.textContent||textOf(el))};return {target,diagnostic:{reason:'selected-number-search-result',label:textOf(el)}};}
  let pane=inputs[0].parentElement;
  while(pane&&pane!==document.body){
    const nodes=[...pane.querySelectorAll('[role="listitem"],[role="row"],span,[dir="auto"]')].filter(eligible);
-   const phones=nodes.filter(el=>isPhone(textOf(el))&&digits(textOf(el))===digits(contact.phone));
+   const phones=nodes.filter(el=>isPhone(textOf(el))&&samePhone(textOf(el),contact.phone));
    // A repeated phone heading/subtitle identifies the same destination.
-   if(phones.length)return {target:point(phones[0])};
+   if(phones.length)return selected(phones[0]);
    const rows=nodes.filter(el=>['row','listitem'].includes(el.getAttribute('role')));
    const leafRows=rows.filter(el=>!rows.some(other=>other!==el&&el.contains(other)));
    const labels=nodes.filter(el=>textOf(el)&&!isPhone(textOf(el))&&!/^(usuarios que|contacts|contactos|nuevo |new |buscar|search)/i.test(textOf(el)));
@@ -55,7 +74,7 @@ function lipaOpenChat(contact,stage){
      }
      const entries=[...groups.entries()];
      const unique=entries.filter(([group])=>!entries.some(([other])=>other!==group&&other.contains(group)));
-     if(unique.length===1)return {target:point(unique[0][1])};
+     if(unique.length===1)return selected(unique[0][1]);
      return {waiting:true,diagnostic:{reason:'multiple-results',rows:leafRows.length,labels:labels.length,groups:unique.length}};
    }
    pane=pane.parentElement;

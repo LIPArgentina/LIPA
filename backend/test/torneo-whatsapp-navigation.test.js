@@ -36,8 +36,30 @@ test('phone text with WhatsApp directional marks remains an exact number match',
 
 test('navigation clears all previous recipient proofs and requires New chat to close',()=>{
  let open=true;const heading={textContent:'Nuevo chat',getClientRects:()=>[{}],closest:()=>null};
- const ctx={location:{origin:'https://web.whatsapp.com'},__lipaRecipient:{phone:'old'},__lipaMedia:{},__lipaArmed:{},document:{querySelectorAll:()=>open?[heading]:[],elementFromPoint:()=>null}};
+ const ctx={location:{origin:'https://web.whatsapp.com'},__lipaRecipient:{phone:'old'},__lipaMedia:{},__lipaArmed:{},document:{querySelector:()=>null,querySelectorAll:()=>open?[heading]:[],elementFromPoint:()=>null}};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
  ctx.lipaOpenChat({},'new');assert.equal(ctx.__lipaRecipient,undefined);assert.equal(ctx.__lipaMedia,undefined);assert.equal(ctx.__lipaArmed,undefined);
- assert.equal(ctx.lipaOpenChat({},'closed').closed,false);open=false;assert.equal(ctx.lipaOpenChat({},'closed').closed,true);
+ assert.equal(ctx.lipaOpenChat({},'closed').closed,false);open=false;assert.equal(ctx.lipaOpenChat({},'closed').closed,false);
+});
+
+test('unsaved national phone format resolves after international number search',()=>{
+ assert(fixture([{text:'11 1234-5678'}]).run().target);
+ assert(fixture([{text:'+54 11 1234-5678'}]).run().target);
+});
+test('selected alias binds to opened chat without the database name, but not to stale chat',()=>{
+ const phone='5491112345678';let open=true,label='Contacto anterior';
+ const visible={getClientRects:()=>[{}]};
+ const header={get textContent(){return label;},querySelectorAll:()=>[{...visible,getAttribute:()=>null,get textContent(){return label;}}]};
+ const main={querySelector:selector=>selector.includes('footer')?{}:header};
+ const ctx={location:{origin:'https://web.whatsapp.com'},document:{querySelector:()=>main,querySelectorAll:()=>open?[{...visible,textContent:'Nuevo chat'}]:[]},__lipaSelection:{phone,label:'Javi',previousHeader:header,previousLabel:'Contacto anterior'}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
+ assert.equal(ctx.lipaOpenChat({phone,name:'Javier Martino'},'closed').closed,false);
+ open=false;assert.equal(ctx.lipaOpenChat({phone},'closed').closed,false);
+ label='Javi';assert.equal(ctx.lipaOpenChat({phone,name:'Javier Martino'},'closed').closed,true);
+ assert.equal(ctx.__lipaRecipient.phone,phone);assert.equal(ctx.__lipaRecipient.main,main);
+});
+test('missing WhatsApp tab never creates one',async()=>{
+ const ctx={workTab:null,job:{},stopping:false,chrome:{tabs:{query:async()=>[],create:async()=>{throw Error('Unexpected tab');}}}};
+ vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('async function reuseWhatsAppTab'),source.indexOf('async function selectChat')),ctx);
+ await assert.rejects(ctx.reuseWhatsAppTab(),/Abrí WhatsApp Web/);
 });
