@@ -34,15 +34,17 @@ async function lipaWhatsAppStep(expected, action) {
       return visible(el)&&match&&numberMatches(match[1]);
     }))return true;
     if(header && [...header.querySelectorAll('span[title], span[dir], a[href^="tel:"]')].some(el=>visible(el)&&numberMatches(el.textContent)))return true;
-    // Existing chat message IDs include the remote JID on compatible versions.
-    if([...main.querySelectorAll('[data-id]')].some(el=>{
-      const match=String(el.dataset.id||'').match(/^(?:true|false)_(\d+)@(?:c\.us|s\.whatsapp\.net)_/);
-      return match && match[1]===expected.phone;
-    }))return true;
-    // Newer accounts may use opaque LIDs. Verify the displayed contact info instead.
-    const headings=[...document.querySelectorAll('h1,h2,header span,header div')].filter(el=>visible(el)&&/^(Información de(?:l)? contacto|Info\. de(?:l)? contacto|Contact info)$/i.test(el.textContent.trim()));
-    if(!headings.length)return false;
-    return [...document.querySelectorAll('span[dir],a[href^="tel:"]')].some(el=>visible(el)&&!el.closest('#main,#pane-side,nav')&&numberMatches(el.textContent));
+    // Read the phone only inside the actual contact-info panel, never search results.
+    const infoHeader=document.querySelector('[data-testid="contact-info-header"]');
+    if(!infoHeader||!visible(infoHeader))return false;
+    let panel=infoHeader.parentElement;
+    while(panel&&panel!==document.body){
+      if(panel.contains(main))return false;
+      const numbers=[...panel.querySelectorAll('span[dir],a[href^="tel:"]')].filter(el=>visible(el)&&numberMatches(el.textContent));
+      if(numbers.length)return true;
+      panel=panel.parentElement;
+    }
+    return false;
   }
   function headerIdentity(main) {
     return main.querySelector('[data-testid="conversation-info-header-button"]')||main.querySelector('header');
@@ -68,6 +70,7 @@ async function lipaWhatsAppStep(expected, action) {
     return null;
   }
   function inspect() {
+    if([...document.querySelectorAll('h1,h2,header,span')].some(el=>visible(el)&&/^(Nuevo chat|New chat)$/.test(String(el.textContent||'').trim())))return {error:'Nuevo chat sigue abierto. No se enviará al chat anterior.'};
     const main=document.querySelector('#main');
     if(!main)return {error:'Esperando el chat. Si aparece un QR, vinculá WhatsApp Web.'};
     const inputs=[...main.querySelectorAll('footer [contenteditable="true"][role="textbox"]')].filter(visible);

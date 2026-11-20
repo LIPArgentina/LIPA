@@ -178,4 +178,6 @@ async function selectChat(contact){
  result=await waitFor('search');await browserControl.fillCaption(workTab,result.target,'+'+contact.phone,()=>stopping);
  let typed=false;for(let i=0;i<8;i++){if((await inspect('typed')).ready){typed=true;break;}await pause(250);}if(!typed)throw Error('WhatsApp no conservó el número en el buscador de Nuevo chat. No se envió nada.');
  result=await waitFor('result');await browserControl.click(workTab,result.target,()=>stopping);
+ let opened=false;for(let i=0;i<32;i++){if(stopping)throw Error('Tanda detenida.');if((await inspect('closed')).closed){opened=true;break;}await pause(250);}
+ if(!opened)throw Error('El resultado no abrió el chat: Nuevo chat sigue visible. No se envió nada.');
 }

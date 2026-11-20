@@ -9,7 +9,12 @@ function lipaOpenChat(contact,stage){
  const active=inputs.filter(el=>el===document.activeElement&&el.closest('[role="dialog"]'));
  return labeled.length?labeled:active.length?active:inputs;
  }
+ if(stage==='closed'){
+ const open=[...document.querySelectorAll('h1,h2,header,span')].some(el=>visible(el)&&String(el.textContent||'').trim()==='Nuevo chat');
+ return {closed:!open};
+ }
  if(stage==='new'){
+ delete globalThis.__lipaRecipient;delete globalThis.__lipaMedia;delete globalThis.__lipaArmed;
  const controls=[...new Set([...document.querySelectorAll('[aria-label="Nuevo chat"],[title="Nuevo chat"],[aria-label="New chat"],[title="New chat"],[data-icon="new-chat-outline"],[data-icon="new-chat"]')].filter(visible).map(el=>el.closest('button,[role="button"],[tabindex="0"]')).filter(Boolean))];
  if(controls.length===1&&point(controls[0]))return {target:point(controls[0])};return {error:'No se encontró el botón Nuevo chat. No se recargó WhatsApp.'};
  }

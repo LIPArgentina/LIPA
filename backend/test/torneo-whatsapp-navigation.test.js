@@ -33,3 +33,11 @@ test('multiple contacts, wrong phone and stale search are not selected',()=>{
 test('phone text with WhatsApp directional marks remains an exact number match',()=>{
  assert(fixture([{text:'\u200e+54 9 11 1234-5678\u200f'}]).run().target);
 });
+
+test('navigation clears all previous recipient proofs and requires New chat to close',()=>{
+ let open=true;const heading={textContent:'Nuevo chat',getClientRects:()=>[{}],closest:()=>null};
+ const ctx={location:{origin:'https://web.whatsapp.com'},__lipaRecipient:{phone:'old'},__lipaMedia:{},__lipaArmed:{},document:{querySelectorAll:()=>open?[heading]:[],elementFromPoint:()=>null}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
+ ctx.lipaOpenChat({},'new');assert.equal(ctx.__lipaRecipient,undefined);assert.equal(ctx.__lipaMedia,undefined);assert.equal(ctx.__lipaArmed,undefined);
+ assert.equal(ctx.lipaOpenChat({},'closed').closed,false);open=false;assert.equal(ctx.lipaOpenChat({},'closed').closed,true);
+});
