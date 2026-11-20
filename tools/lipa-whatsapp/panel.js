@@ -174,7 +174,8 @@ async function selectChat(contact){
  await browserControl.connect(workTab);
  async function inspect(stage){const rows=await chrome.scripting.executeScript({target:{tabId:workTab},func:lipaOpenChat,args:[contact,stage]});return rows[0]?.result||{error:'No se pudo leer WhatsApp.'};}
  let result=await inspect('new');if(!result.target)throw Error(result.error);await browserControl.click(workTab,result.target,()=>stopping);
- async function waitFor(stage){for(let i=0;i<60;i++){if(stopping)throw Error('Tanda detenida.');const r=await inspect(stage);if(r.target)return r;if(r.error)throw Error(r.error);await pause(250);}throw Error('No se encontró el contacto en Nuevo chat. No se recargó WhatsApp.');}
+ async function waitFor(stage){for(let i=0;i<60;i++){if(stopping)throw Error('Tanda detenida.');const r=await inspect(stage);if(r.target)return r;if(r.error)throw Error(r.error);await pause(250);}throw Error(stage==='search'?'No se pudo identificar el buscador de Nuevo chat. No se escribió ni envió nada.':'El número se escribió, pero no se encontró un contacto único en Nuevo chat. No se envió nada.');}
  result=await waitFor('search');await browserControl.fillCaption(workTab,result.target,'+'+contact.phone,()=>stopping);
+ let typed=false;for(let i=0;i<8;i++){if((await inspect('typed')).ready){typed=true;break;}await pause(250);}if(!typed)throw Error('WhatsApp no conservó el número en el buscador de Nuevo chat. No se envió nada.');
  result=await waitFor('result');await browserControl.click(workTab,result.target,()=>stopping);
 }

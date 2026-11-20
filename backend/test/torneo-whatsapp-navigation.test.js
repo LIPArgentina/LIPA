@@ -9,3 +9,13 @@ test('search result selection does not choose an ambiguous contact or send any m
  const ctx={location:{origin:'https://web.whatsapp.com'},document:{querySelectorAll:()=>rows,elementFromPoint:()=>rows[0]}};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
  assert(ctx.lipaOpenChat({phone:'5491112345678',name:'Jugador'},'result').target);rows.push(make());assert(!ctx.lipaOpenChat({phone:'5491112345678',name:'Jugador'},'result').target);
 });
+
+test('search accepts exposed search input, ignores covered field and verifies written number',()=>{
+ const make=(value)=>({value,getAttribute:k=>k==='placeholder'?'Buscar nombre, núm. o @nombre de usuario':null,getClientRects:()=>[{}],closest:()=>null,contains:()=>false,getBoundingClientRect:()=>({x:1,y:1,width:20,height:20})});
+ const covered=make(''),search=make('');
+ const ctx={location:{origin:'https://web.whatsapp.com'},document:{querySelectorAll:selector=>{assert(selector.includes('input[type="search"]'));assert(selector.includes('[contenteditable="true"]'));return [covered,search];},elementFromPoint:()=>search}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
+ assert(ctx.lipaOpenChat({phone:'5491112345678'},'search').target);
+ assert.equal(ctx.lipaOpenChat({phone:'5491112345678'},'typed').ready,false);
+ search.value='+5491112345678';assert.equal(ctx.lipaOpenChat({phone:'5491112345678'},'typed').ready,true);
+});
