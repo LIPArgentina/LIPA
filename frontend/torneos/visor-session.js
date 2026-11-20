@@ -8,6 +8,9 @@ window.LipaViewer = (() => {
     const result=await response.json().catch(()=>({}));
     if(!response.ok){if(response.status===401)clear();throw Object.assign(new Error(result.error||'No se pudo conectar. Reintentá.'),{status:response.status});}return result;
   }
-  async function logout(){await api('logout',{});clear();location.replace('./torneos.html');}
+  async function logout(){
+    try{window.AndroidBridge?.clearTournamentPushSession?.();}catch(_){}
+    await api('logout',{});clear();location.replace('./torneos.html');
+  }
   return {read,save,clear,api,logout};
 })();

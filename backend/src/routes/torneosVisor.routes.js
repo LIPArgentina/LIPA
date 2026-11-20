@@ -324,7 +324,8 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       const messages=rows.map(({jugador_id,fcm_token})=>{
         const key=destinations.get(jugador_id);
         const notification={title:'LIPA · Llamado a mesa',body:mensaje};
-        return {token:fcm_token,notification,webpush:{headers:{Urgency:'high'},
+        return {token:fcm_token,notification,data:{type:'torneo',title:notification.title,body:notification.body,
+          url:'https://lipa.ar/torneos/visor.html#aviso='+key},webpush:{headers:{Urgency:'high'},
           notification:{...notification,tag:'lipa-llamado-'+key,requireInteraction:true,silent:false,vibrate:[350,120,350,120,550]},
           fcmOptions:{link:'https://lipa.ar/torneos/visor.html#aviso='+key}}};
       });

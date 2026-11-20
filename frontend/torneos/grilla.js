@@ -538,7 +538,15 @@
       .finally(()=>{if(requestId===0 && LipaViewer.read())load();});
     $('#logoutViewer').onclick=()=>LipaViewer.logout().catch(error=>status(error.message,true));
     $('#enablePush').onclick=async()=>{const button=$('#enablePush');button.disabled=true;try{await LipaViewerPush();$('#pushStatus').textContent='Notificaciones activadas.';}catch(error){$('#pushStatus').textContent=error.message;}finally{button.disabled=false;}};
-    if(window.AndroidBridge){$('#enablePush').hidden=true;$('#pushStatus').textContent='Mantené el visor abierto para recibir tus llamados a mesa.';}
+    if(window.AndroidBridge){
+      $('#enablePush').hidden=true;
+      $('#pushStatus').textContent='Activando notificaciones de la app…';
+      window.LipaNativePushResult=(ok,message)=>{$('#pushStatus').textContent=message||(ok?'Notificaciones de la app activadas.':'No se pudieron activar las notificaciones.');};
+      try{
+        const accepted=window.AndroidBridge.registerTournamentPush(LipaViewer.read()?.token||'');
+        if(!accepted)$('#pushStatus').textContent='Volvé a ingresar con tu DNI para activar las notificaciones.';
+      }catch(_){$('#pushStatus').textContent='No se pudieron activar las notificaciones de la app.';}
+    }
     let refreshing=false;
     async function refresh(){
       if(!requestId || document.hidden || refreshing)return;refreshing=true;
