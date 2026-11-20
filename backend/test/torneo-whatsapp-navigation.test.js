@@ -19,3 +19,15 @@ test('search accepts exposed search input, ignores covered field and verifies wr
  assert.equal(ctx.lipaOpenChat({phone:'5491112345678'},'typed').ready,false);
  search.value='+5491112345678';assert.equal(ctx.lipaOpenChat({phone:'5491112345678'},'typed').ready,true);
 });
+
+test('opens a unique saved alias under the exact number search, blocks multiple aliases and wrong search',()=>{
+ const make=(title,y)=>({getAttribute:k=>k==='title'?title:null,getClientRects:()=>[{}],closest:()=>null,contains:()=>false,getBoundingClientRect:()=>({x:1,y,width:20,height:20})});
+ let labels=[make('Leandro Solorzano Pool',100)];const pane={querySelectorAll:()=>labels,parentElement:null};
+ const input=make('',1);input.value='+5491155648537';input.parentElement=pane;
+ const ctx={location:{origin:'https://web.whatsapp.com'},document:{body:{},querySelectorAll:sel=>sel.includes('listitem')?[]:[input],elementFromPoint:(x,y)=>y<30?input:labels[0]}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
+ const contact={phone:'5491155648537',name:'Leandro  Solorzano'};
+ assert(ctx.lipaOpenChat(contact,'result').target);
+ input.value='+5491100000000';assert(!ctx.lipaOpenChat(contact,'result').target);
+ input.value='+5491155648537';labels.push(make('Otro contacto',100));labels[1].contains=hit=>hit===labels[0];assert(!ctx.lipaOpenChat(contact,'result').target);
+});

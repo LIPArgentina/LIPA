@@ -25,5 +25,22 @@ function lipaOpenChat(contact,stage){
  const numberMatches=rows.filter(el=>String(el.innerText||'').replace(/\D/g,'').includes(contact.phone));
  const nameMatches=rows.filter(el=>name&&String(el.innerText||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().split('\n').some(line=>line.trim()===name));
  const matches=(numberMatches.length?numberMatches:nameMatches).filter((el,_,all)=>!all.some(other=>other!==el&&other.contains(el)));
- if(matches.length===1&&point(matches[0]))return {target:point(matches[0])};return {waiting:true};
+ if(matches.length===1&&point(matches[0]))return {target:point(matches[0])};
+ if(matches.length>1)return {waiting:true};
+ // Saved contacts show the address-book name, not their phone or tournament name.
+ // Scope the fallback to the New chat pane containing the exact searched number.
+ const inputs=searchInputs();
+ if(inputs.length!==1||String(inputs[0].value??inputs[0].innerText??inputs[0].textContent??'').replace(/\D/g,'')!==String(contact.phone).replace(/\D/g,''))return {waiting:true};
+ const searchRect=inputs[0].getBoundingClientRect();
+ let pane=inputs[0].parentElement;
+ while(pane&&pane!==document.body){
+   const labels=[...pane.querySelectorAll('span[title][dir="auto"]')].filter(el=>visible(el)&&!el.closest('#main,header')&&String(el.getAttribute('title')||'').trim()&&el.getBoundingClientRect().y>=searchRect.y+searchRect.height&&point(el));
+   if(labels.length){
+     // Opening is not authorization to send: the driver still verifies the phone.
+     if(labels.length===1)return {target:point(labels[0])};
+     return {waiting:true};
+   }
+   pane=pane.parentElement;
+ }
+ return {waiting:true};
 }
