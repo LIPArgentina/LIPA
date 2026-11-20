@@ -2,7 +2,7 @@
  'use strict';
  const params=new URLSearchParams(location.search),viewer=params.get('visor')==='1',rotating=params.get('vista')==='rotativa',mode=document.body.dataset.screen;
  const board=document.getElementById('tv'),status=document.getElementById('screenStatus'),API=String(window.APP_CONFIG?.API_BASE_URL||'').replace(/\/+$/,'');
- const back=document.getElementById('back');back.href='/tv/';
+ const back=document.getElementById('back');back.href='/tv/';back.onclick=function(e){if(window.parent!==window){e.preventDefault();window.parent.postMessage('lipa-tv-menu',location.origin);}};
  const categories=['tercera','segunda'],cache=new Map(),errors=new Map();let page=0,loading=false,signature='';
  const ns='http://www.w3.org/2000/svg';
  function photo(p){const img=document.createElement('img');img.alt='';img.src=p?.fotoUrl?new URL(p.fotoUrl,API||location.origin).href:'../logo_liga.png';img.onerror=()=>{img.onerror=null;img.src='../logo_liga.png';};return img;}
@@ -11,21 +11,21 @@
  function line(d,x1,y1,x2,y2){const path=document.createElementNS(ns,'path'),mid=(x1+x2)/2;path.setAttribute('d','M '+x1+' '+y1+' H '+mid+' V '+y2+' H '+x2);d.svg.append(path);}
  function card(d,m,x,y,players,w=200){const el=document.createElement('div');el.className='tv-match';el.dataset.match=m.id;el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px';el.append(player(m.a,m.score[0],players,m.woA,m.winner),player(m.b,m.score[1],players,m.woB,m.winner));d.root.append(el);return {x,y,center:y+38,width:w};}
  function qualified(d,m,x,y,players,champion=false){const el=document.createElement('div');el.className='tv-qualified';el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+(champion?200:260)+'px';const title=document.createElement('strong');title.textContent=champion?'CAMPEÓN':'CLASIFICADO';const row=player(m.winner,null,players,false,null);row.lastElementChild.remove();el.append(title,row);d.root.append(el);}
- function groupTile(category,state,group,players){const d=drawing(category.toUpperCase()+' · GRUPO '+group.number,1680,570),pos=new Map();
+ function groupTile(category,state,group,players){const d=drawing(category.toUpperCase()+' · GRUPO '+group.number,1680,450),pos=new Map();
  const add=(m,x,y)=>pos.set(m.id,card(d,m,x,y,players,260));
- group.initial.forEach((m,i)=>add(m,840,90+i*110));group.winners.forEach((m,i)=>add(m,1120,145+i*220));group.losers.forEach((m,i)=>add(m,560,145+i*220));group.recovery.forEach((m,i)=>add(m,280,165+i*220));
+ group.initial.forEach((m,i)=>add(m,840,50+i*90));group.winners.forEach((m,i)=>add(m,1120,95+i*180));group.losers.forEach((m,i)=>add(m,560,95+i*180));group.recovery.forEach((m,i)=>add(m,280,110+i*180));
  for(const m of [...group.winners,...group.losers,...group.recovery])m.sources.forEach((src,i)=>{if(group.recovery.includes(m)&&i===1)return;const a=pos.get(src.matchId),b=pos.get(m.id),left=a.x>b.x;line(d,left?a.x:a.x+260,a.center,left?b.x+260:b.x,b.y+(i?57:19));});
- group.recovery.forEach((m,i)=>{qualified(d,m,0,190+i*220,players);line(d,280,pos.get(m.id).center,260,214+i*220);});
- group.winners.forEach((m,i)=>{qualified(d,m,1400,170+i*220,players);line(d,1380,pos.get(m.id).center,1400,194+i*220);});
+ group.recovery.forEach((m,i)=>{qualified(d,m,0,135+i*180,players);line(d,280,pos.get(m.id).center,260,159+i*180);});
+ group.winners.forEach((m,i)=>{qualified(d,m,1400,120+i*180,players);line(d,1380,pos.get(m.id).center,1400,144+i*180);});
  return d.tile;
  }
- function knockoutTile(category,state,players){const rounds=state.knockout,depth=rounds.length-1,width=(depth*2+1)*220,height=Math.max(360,rounds[0].length/2*94+100),d=drawing(category.toUpperCase(),width,height),pos=new Map();
- rounds[0].forEach((m,i)=>{const half=rounds[0].length/2,right=i>=half;pos.set(m.id,card(d,m,right?depth*440:0,60+(right?i-half:i)*94,players));});
+ function knockoutTile(category,state,players){const rounds=state.knockout,depth=rounds.length-1,width=(depth*2+1)*220,height=Math.max(360,rounds[0].length/2*82+62),d=drawing(category.toUpperCase(),width,height),pos=new Map();
+ rounds[0].forEach((m,i)=>{const half=rounds[0].length/2,right=i>=half;pos.set(m.id,card(d,m,right?depth*440:0,44+(right?i-half:i)*82,players));});
  for(let r=1;r<=depth;r++)rounds[r].forEach((m,i)=>{const a=pos.get(m.sources[0].matchId),b=pos.get(m.sources[1].matchId),right=i>=rounds[r].length/2,x=r===depth?depth*220:right?(depth*2-r)*220:r*220,y=(a.y+b.y)/2;pos.set(m.id,card(d,m,x,y,players));for(const from of [a,b])line(d,from.x>x?from.x:from.x+200,from.center,from.x>x?x+200:x,y+34);});
- const final=pos.get(state.final.id);qualified(d,state.final,final.x,final.y+125,players,true);line(d,final.x+100,final.y+70,final.x+100,final.y+125);return d.tile;
+ const final=pos.get(state.final.id);qualified(d,state.final,final.x,final.y+105,players,true);line(d,final.x+100,final.y+70,final.x+100,final.y+125);return d.tile;
  }
  function resize(){
- const count=board.children.length,small=window.innerWidth<=700,gap=small?5:10,top=small?48:52;
+ const count=board.children.length,small=window.innerWidth<=700,gap=small?3:5,top=small?42:46;
  const cols=mode==='groups'&&!rotating?(small?2:3):1,rows=Math.max(1,Math.ceil(count/cols));
  const availableW=board.clientWidth-gap*2,availableH=board.clientHeight-top-gap;
  for(let i=0;i<count;i++){const tile=board.children[i],row=Math.floor(i/cols);

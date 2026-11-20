@@ -1,9 +1,20 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LIPA · TV</title><link rel="icon" href="/logo_liga.png"><style>
 *{box-sizing:border-box}body{margin:0;background:#080c11;color:#ffd245;font-family:Arial,sans-serif;text-align:center;padding:35px 15px}img{width:90px;height:90px}h1{font-size:32px;margin:15px 0 30px}nav{max-width:1000px;margin:auto}a{display:inline-block;vertical-align:middle;width:46%;margin:1%;padding:35px 12px;border:2px solid #c59d28;border-radius:14px;color:#ffd245;background:#171b21;text-decoration:none;font-size:25px;font-weight:bold}a span{display:block;color:#fff;font-size:19px;margin-top:12px}a:hover,a:focus{background:#ffd245;color:#111;outline:3px solid white}a:hover span,a:focus span{color:#111}p{color:#b9b9b9;font-size:17px;margin-top:30px}@media(max-width:600px){a{width:96%;padding:20px 10px;font-size:21px}}
-</style></head><body><img src="/logo_liga.png" alt="LIPA"><h1>Pantallas del torneo</h1><nav aria-label="Elegir pantalla">
+button{border:2px solid #c59d28;border-radius:10px;background:#ffd245;color:#111;font:bold 20px Arial;padding:13px 24px;cursor:pointer}button:focus{outline:3px solid white}#screen{position:fixed;top:0;left:0;width:100%;height:100%;border:0;background:#080c11;display:none;z-index:50}#fullscreenStatus{font-size:16px;margin:12px}html:fullscreen,html:-webkit-full-screen{width:100%;height:100%;background:#080c11}</style></head><body><img src="/logo_liga.png" alt="LIPA"><h1>Pantallas del torneo</h1><button id="fullscreen" type="button">Pantalla completa</button><p id="fullscreenStatus" role="status"></p><nav aria-label="Elegir pantalla">
 <a href="/torneos/clasificacion.html?vista=todos">Clasificación<span>Todos los grupos</span></a>
 <a href="/torneos/clasificacion.html?vista=rotativa">Clasificación<span>Rotación automática</span></a>
 <a href="/torneos/eliminacion-directa.html?vista=todos">Eliminación directa<span>Ambas categorías</span></a>
 <a href="/torneos/eliminacion-directa.html?vista=rotativa">Eliminación directa<span>Rotación automática</span></a>
-</nav><p>Para cambiar de vista, tocá el logo de LIPA en la pantalla.</p></body></html>
+</nav><p>Para cambiar de vista, tocá el logo de LIPA en la pantalla.</p><iframe id="screen" title="Grillas del torneo" allowfullscreen></iframe><script>
+(function(){
+ var button=document.getElementById('fullscreen'),status=document.getElementById('fullscreenStatus'),frame=document.getElementById('screen');
+ function unavailable(){status.textContent='Este navegador no permite activar pantalla completa desde la página.';}
+ button.onclick=function(){var root=document.documentElement,enter=root.requestFullscreen||root.webkitRequestFullscreen||root.webkitRequestFullScreen||root.mozRequestFullScreen||root.msRequestFullscreen;var active=document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement;
+ try{if(active){var leave=document.exitFullscreen||document.webkitExitFullscreen||document.webkitCancelFullScreen||document.mozCancelFullScreen||document.msExitFullscreen;if(leave)leave.call(document);}else if(enter){var result=enter.call(root);if(result&&result.catch)result.catch(unavailable);}else unavailable();}catch(e){unavailable();}};
+ function changed(){button.textContent=(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement)?'Salir de pantalla completa':'Pantalla completa';status.textContent='';}
+ ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(function(name){document.addEventListener(name,changed);});
+ var links=document.querySelectorAll('nav a');for(var i=0;i<links.length;i++)links[i].onclick=function(e){e.preventDefault();frame.src=this.href;frame.style.display='block';frame.focus();};
+ window.addEventListener('message',function(e){if(e.origin!==location.origin||e.source!==frame.contentWindow||e.data!=='lipa-tv-menu')return;frame.style.display='none';frame.src='about:blank';button.focus();});
+}());
+</script></body></html>
