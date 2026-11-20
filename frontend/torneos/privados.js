@@ -72,7 +72,7 @@
   function whatsappContact(value, diffusion = false) {
     const base = whatsappHref(value);
     // wa.me redirects can replace non-BMP emojis with U+FFFD. Use the direct endpoint.
-    const href = diffusion && base !== '#' ? 'https://api.whatsapp.com/send?phone=' + String(value).replace(/\D/g, '') + '&text=' + encodeURIComponent(diffusionMessage) : base;
+    const href = diffusion && base !== '#' ? 'https://web.whatsapp.com/send?phone=' + String(value).replace(/\D/g, '') + '&text=' + encodeURIComponent(diffusionMessage) : base;
     const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l5.3-1.3A9.5 9.5 0 1 0 12 2Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.4 6.8c-.4 0-1.3.8-1.3 2 0 2.8 4.1 6.9 6.9 6.9 1.2 0 2-.9 2-1.3 0-.3-2-1.3-2.3-1.3-.3 0-.8.8-1 .8-.8 0-3.4-2.6-3.4-3.4 0-.2.8-.7.8-1 0-.3-1-2.7-1.7-2.7Z" fill="currentColor"/></svg>';
     if (diffusion) return base === '#'
       ? '<span class="whatsapp-contact diffusion-contact disabled" title="Difusión" aria-label="Difusión sin número">'+icon+'</span>'
@@ -312,8 +312,10 @@
       try{
         const saved=await api('/torneo-organizador/mensaje-difusion');diffusionMessage=saved.mensaje;diffusionMedia=saved.media;
         if(!diffusionMessage.trim()){previewTab?.close();await openDiffusionMessage();return;}
-        if(diffusionMedia){previewTab?.close();const contacts=window.LipaBatch.collect([entry]).contacts;if(!contacts.length)throw Error('El jugador no tiene un teléfono válido.');await prepareBatch(contacts,'Difusión individual · '+(entry.nombre_oficial||entry.nombre_ingresado));}
-        else{const href='https://api.whatsapp.com/send?phone='+String(entry.whatsapp).replace(/\D/g,'')+'&text='+encodeURIComponent(diffusionMessage);if(previewTab)previewTab.location.href=href;else throw Error('Permití abrir ventanas emergentes para abrir WhatsApp.');}
+        const href='https://web.whatsapp.com/send?phone='+String(entry.whatsapp).replace(/\D/g,'')+'&text='+encodeURIComponent(diffusionMessage);
+        if(!previewTab)throw Error('Permití abrir ventanas emergentes para abrir WhatsApp.');
+        previewTab.location.href=href;
+        if(diffusionMedia)setMessage('WhatsApp Web se abrió con el texto. El enlace directo no carga adjuntos: agregá la imagen o el video en WhatsApp.');
       }catch(e){previewTab?.close();setMessage(e.message);}
       return;
     }
