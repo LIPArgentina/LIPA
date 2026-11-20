@@ -19,3 +19,8 @@ body::before{top:0;right:0;bottom:0;left:0;z-index:0}
 .tv-player .points{font-size:21px;top:4px}
 .tv-player img{width:28px;height:28px;top:3px}
 .drawing h2{font-size:28px}
+
+.tv-rotation-controls{position:fixed;top:5px;right:10px;z-index:20;white-space:nowrap}
+.tv-rotation-controls button{display:inline-block;height:35px;min-width:44px;margin-left:5px;padding:4px 12px;border:1px solid #c59d28;border-radius:7px;background:#171b21;color:#ffd245;font:bold 17px Arial,sans-serif;cursor:pointer}
+.tv-rotation-controls button:hover,.tv-rotation-controls button:focus,.tv-rotation-controls button[aria-pressed="true"]{background:#ffd245;color:#111;outline:2px solid #fff}
+.has-rotation-controls #screenStatus{right:270px}

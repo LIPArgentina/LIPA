@@ -37,10 +37,19 @@
  for(const tile of board.children){const root=tile.querySelector('.drawing');if(!root)continue;const scale=Math.min(tile.clientWidth/Number(tile.dataset.width),tile.clientHeight/Number(tile.dataset.height));root.style.transform='scale('+scale+')';root.style.left=(tile.clientWidth-Number(tile.dataset.width)*scale)/2+'px';root.style.top=(tile.clientHeight-Number(tile.dataset.height)*scale)/2+'px';}}
  function render(){const tiles=[];for(const category of categories){const data=cache.get(category);if(!data)continue;const state=LipaBracket.build(data.players,data.results,category),players=new Map(data.players.filter(p=>p.id!==null).map(p=>[String(p.id),p]));if(mode==='groups')state.groups.forEach(g=>tiles.push(groupTile(category,state,g,players)));else tiles.push(knockoutTile(category,state,players));}
  board.className=mode==='groups'?(rotating?'rotation':'all-groups'):(rotating?'rotation single':'knockout');
- const perPage=mode==='groups'?2:1,pages=Math.max(1,Math.ceil(tiles.length/perPage));page%=pages;board.replaceChildren(...(rotating?tiles.slice(page*perPage,(page+1)*perPage):tiles));
+ const perPage=mode==='groups'?2:1,pages=Math.max(1,Math.ceil(tiles.length/perPage));page=((page%pages)+pages)%pages;board.replaceChildren(...(rotating?tiles.slice(page*perPage,(page+1)*perPage):tiles));
  if(!tiles.length){const empty=document.createElement('div');empty.className='tv-empty';empty.textContent='Sin cuadros disponibles';board.append(empty);}resize();}
  async function get(category){const response=await fetch(API+'/api/torneo-visor/tv/'+category,{credentials:'omit',cache:'no-store',signal:window.LipaTVSignal(20000)});const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'No se pudo actualizar'),{status:response.status});return data;}
  function timedGet(category){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('La conexión demoró demasiado')),22000);get(category).then(data=>{clearTimeout(timer);resolve(data);},error=>{clearTimeout(timer);reject(error);});});}
  async function refresh(){if(loading)return;loading=true;await Promise.all(categories.map(async category=>{try{const data=await timedGet(category);cache.set(category,data);errors.delete(category);}catch(e){errors.set(category,category.toUpperCase()+': '+(cache.has(category)?'sin actualizar':e.message));if(e.status===404||e.status===409||e.status===422)cache.delete(category);}}));loading=false;status.textContent=[...errors.values()].join(' · ');const next=JSON.stringify([...cache]);if(next!==signature){signature=next;render();}}
- window.addEventListener('resize',resize);if(window.ResizeObserver)new ResizeObserver(resize).observe(board);refresh();setInterval(refresh,10000);if(rotating)setInterval(()=>{page++;render();},mode==='groups'?10000:20000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+ window.addEventListener('resize',resize);if(window.ResizeObserver)new ResizeObserver(resize).observe(board);refresh();setInterval(refresh,10000);if(rotating){
+ let paused=false,timer=null;
+ const controls=document.createElement('nav');controls.className='tv-rotation-controls';controls.setAttribute('aria-label','Controles de rotación');
+ function button(text,label,action){const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',label);b.title=label;b.onclick=action;controls.append(b);return b;}
+ function schedule(){clearInterval(timer);if(!paused)timer=setInterval(()=>{page++;render();},mode==='groups'?10000:20000);}
+ button('◀','Cuadro anterior',()=>{page--;render();schedule();});
+ const toggle=button('Ⅱ Pausa','Pausar rotación',()=>{paused=!paused;toggle.textContent=paused?'▶ Reanudar':'Ⅱ Pausa';toggle.setAttribute('aria-label',paused?'Reanudar rotación':'Pausar rotación');toggle.setAttribute('aria-pressed',String(paused));schedule();});toggle.setAttribute('aria-pressed','false');
+ button('▶','Cuadro siguiente',()=>{page++;render();schedule();});
+ document.body.append(controls);document.body.className+=' has-rotation-controls';schedule();
+ }document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 })();
