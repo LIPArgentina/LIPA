@@ -178,10 +178,9 @@ async function lipaWhatsAppStep(expected, action) {
     if(!sent)return {settled:false,error:'Esperando que WhatsApp conserve el mensaje enviado.'};
     if(sent.querySelector('[data-icon="msg-error"],[data-testid="msg-error"]'))return {fatal:true,error:'WhatsApp marcó un error en el último mensaje. No se abrirá el siguiente chat.'};
     const pending=sent.querySelector('[role="progressbar"],[data-icon="msg-time"],[data-icon="msg-clock"],[data-testid="msg-time"]');
-    const receipt=sent.querySelector('[data-icon="msg-check"],[data-icon="msg-dblcheck"],[data-testid="msg-check"],[data-testid="msg-dblcheck"]');
     const preview=expected.media?mediaEditor():null;
     const draft=[...main.querySelectorAll('footer [contenteditable="true"][role="textbox"]')].some(el=>visible(el)&&text(el));
-    if(preview||draft||pending||!receipt)return {settled:false,error:preview?'Esperando que WhatsApp cierre el adjunto.':'Esperando la confirmación de WhatsApp.'};
+    if(preview||draft||pending)return {settled:false,error:preview?'Esperando que WhatsApp cierre el adjunto.':'Esperando que WhatsApp termine de preparar el envío.'};
     delete globalThis.__lipaLastSent;delete globalThis.__lipaMedia;
     return {settled:true};
   }
