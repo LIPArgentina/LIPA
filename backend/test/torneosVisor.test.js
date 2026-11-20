@@ -90,7 +90,7 @@ else test('DNI session, read-only API, private calls and organizer authorization
     assert.equal((await request('torneo-visor/login',{dni:'abc30000000'})).status,400);
     const login=await (await request('torneo-visor/login',{dni:'30.000.000'})).json();assert.match(login.token,/^[a-f0-9]{64}$/);
     draw.visible=false;
-    assert.equal((await request('torneo-visor/tv/primera')).status,404);
+    assert.equal((await request('torneo-visor/tv/primera')).status,200);
     const hidden=await request('torneo-visor/grilla/primera',null,login.token);
     assert.equal(hidden.status,404);assert.deepEqual(await hidden.json(),{error:'Sorteo pendiente para esta categoría.'});
     const publish={drawRevision:1,revision:0};
@@ -107,6 +107,7 @@ else test('DNI session, read-only API, private calls and organizer authorization
     assert.equal((await request('torneo-organizador/grilla/primera/publicar',publish,null,true)).status,200);
     assert.equal(draw.visible,true);
     draw.habilitados.push('99');
+    assert.equal((await request('torneo-visor/tv/primera')).status,404);
     assert.equal((await request('torneo-visor/grilla/primera',null,login.token)).status,404);
     draw.habilitados.pop();
     saved.jugadores[0].foto_path='30000000_1720000000000.jpg';
