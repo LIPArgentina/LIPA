@@ -141,6 +141,16 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     }
     return saved;
   }
+  // Public TV projection: published brackets only, no contact or payment details.
+  router.get('/torneo-visor/tv/:categoria',route(async(req,res)=>{
+    res.locals.lecturaVisor=true;
+    const id=await organizer(),category=req.params.categoria;
+    if(id===null)throw fail(503,'El visor del torneo todavía no está configurado.');
+    const saved=await currentGrid(id,category,pool);
+    const players=saved.jugadores.map(p=>({id:p.id,nombre:p.nombre,wo:p.wo,fotoUrl:photoUrl(p)}));
+    const state=bracket.build(players,saved.resultados,category);
+    res.json({players,results:state.clean,revision:saved.revision,drawRevision:saved.sorteo_revision});
+  }));
   router.get('/torneo-visor/grilla/:categoria',route(async(req,res)=>{
     await session(req);
     res.locals.lecturaVisor=true;
