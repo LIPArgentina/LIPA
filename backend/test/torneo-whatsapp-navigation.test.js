@@ -31,3 +31,14 @@ test('opens a unique saved alias under the exact number search, blocks multiple 
  input.value='+5491100000000';assert(!ctx.lipaOpenChat(contact,'result').target);
  input.value='+5491155648537';labels.push(make('Otro contacto',100));labels[1].contains=hit=>hit===labels[0];assert(!ctx.lipaOpenChat(contact,'result').target);
 });
+
+test('unsaved contact repeated phone labels without title are selectable; another number is not',()=>{
+ const make=(text,y)=>({innerText:text,getAttribute:()=>null,getClientRects:()=>[{}],closest:()=>null,contains:()=>false,getBoundingClientRect:()=>({x:1,y,width:20,height:20})});
+ const input=make('',1);input.value='+5491133140309';let phones=[make('+54 9 11 3314-0309',100),make('+54 9 11 3314-0309',130)];
+ const pane={querySelectorAll:sel=>sel==='span, [dir="auto"]'?phones:[],parentElement:null};input.parentElement=pane;
+ const ctx={location:{origin:'https://web.whatsapp.com'},document:{body:{},querySelectorAll:sel=>sel.includes('listitem')?[]:[input],elementFromPoint:(x,y)=>y<30?input:y<125?phones[0]:phones[1]}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
+ const contact={phone:'5491133140309',name:'David Navarro'};
+ assert(ctx.lipaOpenChat(contact,'result').target);
+ phones.forEach(p=>p.innerText='+54 9 11 1111-1111');assert(!ctx.lipaOpenChat(contact,'result').target);
+});

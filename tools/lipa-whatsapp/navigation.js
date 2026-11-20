@@ -34,6 +34,13 @@ function lipaOpenChat(contact,stage){
  const searchRect=inputs[0].getBoundingClientRect();
  let pane=inputs[0].parentElement;
  while(pane&&pane!==document.body){
+   // Unsaved contacts can display the same formatted phone twice, without title/role.
+   // Click the phone text itself, never the adjacent Add contact control.
+   const phones=[...pane.querySelectorAll('span, [dir="auto"]')].filter(el=>{
+     const text=String(el.innerText||el.textContent||'').trim();
+     return /^\+?[\d\s().-]+$/.test(text)&&text.replace(/\D/g,'')===String(contact.phone).replace(/\D/g,'')&&visible(el)&&!el.closest('#main,header,button')&&el.getBoundingClientRect().y>=searchRect.y+searchRect.height&&point(el);
+   });
+   if(phones.length)return {target:point(phones[0])};
    const labels=[...pane.querySelectorAll('span[title][dir="auto"]')].filter(el=>visible(el)&&!el.closest('#main,header')&&String(el.getAttribute('title')||'').trim()&&el.getBoundingClientRect().y>=searchRect.y+searchRect.height&&point(el));
    if(labels.length){
      // Opening is not authorization to send: the driver still verifies the phone.
