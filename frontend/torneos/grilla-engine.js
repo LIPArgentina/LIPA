@@ -44,12 +44,12 @@
     }
     const qualifiers=main.at(-1),count=qualifiers.length;
     // Pair undefeated players with recovered players from distant draw branches.
-    const grouped=size===64;
-    const mapping=[[14,13],[8,7],[12,11],[10,9],[2,1],[6,5],[15,16],[4,3]];
+    const grouped=size===64 || (size===32 && category==='segunda');
+    const mapping=size===32?[[8,7],[6,5],[3,2],[4,1]]:[[14,13],[8,7],[12,11],[10,9],[2,1],[6,5],[15,16],[4,3]];
     const groups=grouped?mapping.map((p,i)=>({number:i+1,initial:main[0].slice(i*4,i*4+4),winners:main[1].slice(i*2,i*2+2),losers:rep[0].slice(i*2,i*2+2),recovery:rep[1].slice(i*2,i*2+2),codes:{g:[(i*2+1)+'G',(i*2+2)+'G'],p:p.map(n=>n+'P')}})):[];
     groups.forEach(g=>{for(const [key,label] of [['initial','Inicial'],['winners','Ganadores'],['losers','Perdedores'],['recovery','Clasificación']])g[key].forEach((m,i)=>{m.label='Grupo '+g.number+' · '+label+' '+(i+1);});});
     const recovered=new Map();groups.forEach(g=>g.recovery.forEach((m,i)=>recovered.set(Number(g.codes.p[i].slice(0,-1)),m)));
-    const order=grouped?[1,3,5,7,9,11,13,15,2,4,6,8,10,12,14,16]:qualifiers.map((_,i)=>i+1);
+    const order=grouped?[...Array.from({length:count/2},(_,i)=>i*2+1),...Array.from({length:count/2},(_,i)=>i*2+2)]:qualifiers.map((_,i)=>i+1);
     const prefix=grouped?'gx-k':'mx-k';
     const knockout=[order.map((number,i)=>{
       const m=qualifiers[number-1];
@@ -61,7 +61,7 @@
     })];
     for(let r=1;knockout[r-1].length>1;r++)knockout.push(Array.from({length:knockout[r-1].length/2},(_,i)=>linked(prefix+r+'-'+i,source(knockout[r-1][i*2]),source(knockout[r-1][i*2+1]),'Eliminación directa · Ronda '+(r+1)+' · Partido '+(i+1))));
     const final=knockout.at(-1)[0];final.label='Final · Partido único';
-    return {format:grouped?'eight-groups-v1':'mixed-two-rounds-v1',groups,main,rep,knockout,final,matches,clean,capacity,bracketSize:size,champion:final.winner};
+    return {format:grouped?(size===32?'four-groups-v1':'eight-groups-v1'):'mixed-two-rounds-v1',groups,main,rep,knockout,final,matches,clean,capacity,bracketSize:size,champion:final.winner};
   }
 
   function invalidated(before, after, editedId) {

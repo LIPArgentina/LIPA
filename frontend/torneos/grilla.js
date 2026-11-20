@@ -369,7 +369,7 @@
     $('#viewToggle').textContent=`VISUALIZACIÓN · ${view==='double'?'DOBLE':'SIMPLE'}`;
     $('#viewToggle').setAttribute('aria-label',`Visualización ${view==='double'?'doble':'simple'}. Cambiar a ${view==='double'?'simple':'doble'}`);
     $('#mainSection h2').textContent=state.groups?.length?'Fase de grupos':'Llave de ganadores';
-    $('#mainSection .section-heading small').textContent=state.groups?.length?'8 GRUPOS · 4 CLASIFICADOS POR GRUPO':'PRIMERAS DOS RONDAS';
+    $('#mainSection .section-heading small').textContent=state.groups?.length?state.groups.length+' GRUPOS · 4 CLASIFICADOS POR GRUPO':'PRIMERAS DOS RONDAS';
     if(state.groups?.length)renderGroups();else renderBoard(state.main,'#mainBoard','#mainFrame');
     $('#repSection').hidden=Boolean(state.groups?.length)||!state.rep.length;
     if(!state.groups?.length&&state.rep.length)renderBoard(state.rep,'#repBoard','#repFrame',true);
