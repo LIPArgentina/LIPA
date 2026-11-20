@@ -3,7 +3,7 @@ function run(n,slots=n,category='tercera',reverse=false){
  const players=Array.from({length:slots},(_,i)=>({id:i<n?String(i+1):null}));let state=engine.build(players,{},category),steps=0;const losses=new Map(players.filter(p=>p.id).map(p=>[p.id,0]));const eliminated=new Set();
  while(!state.champion){const m=state.matches.find(m=>m.a&&m.b&&!m.resolved);assert(m,'blocked '+n+'/'+slots);assert.notEqual(m.a,m.b);assert(!eliminated.has(m.a));assert(!eliminated.has(m.b));
  if(m.id.startsWith('de-')){const expected=m.id.startsWith('de-w')?0:1;assert.equal(losses.get(m.a),expected);assert.equal(losses.get(m.b),expected);}
- const score=(steps%3===0)!==reverse?[1,0]:[0,1],loser=score[0]>score[1]?m.b:m.a;losses.set(loser,losses.get(loser)+1);if(m.id.startsWith('mx-')||losses.get(loser)===2)eliminated.add(loser);
+ const score=(steps%3===0)!==reverse?[1,0]:[0,1],loser=score[0]>score[1]?m.b:m.a;losses.set(loser,losses.get(loser)+1);if(/^(mx|gx)-/.test(m.id)||losses.get(loser)===2)eliminated.add(loser);
  state=engine.build(players,{...state.clean,[m.id]:{a:m.a,b:m.b,score}},category);assert(++steps<=n*2-2);
  }
  assert.equal(eliminated.size,n-1);assert(!eliminated.has(state.champion));assert.equal(state.main.length,Math.min(2,Math.log2(state.bracketSize)));assert.equal(state.rep.length,state.bracketSize>2?2:0);

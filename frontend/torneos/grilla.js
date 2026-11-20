@@ -26,8 +26,9 @@
   function status(text,error=false) { $('#saveStatus').textContent=text; $('#saveStatus').classList.toggle('error',error); }
   function matchLabel(match) {return match.label||match.id;}
   function sourceLabel(source){
+    if(source?.code)return source.code;
     if(!source?.matchId)return 'Por definir';
-    const parts=source.matchId.match(/^(?:de|mx)-([wlk])(\d+)-(\d+)$/);
+    const parts=source.matchId.match(/^(?:de|mx|gx)-([wlk])(\d+)-(\d+)$/);
     const code=parts?(parts[1]==='w'?'G':parts[1]==='l'?'P':'E')+(Number(parts[2])+1)+'-'+(Number(parts[3])+1):'Final';
     return (source.outcome==='loser'?'Pierde ':'Gana ')+code;
   }
@@ -78,7 +79,7 @@
     const wo=slot===0?match.woA:match.woB;
     row.className=`player ${id && id===match.winner?'winner':''} ${!p?'placeholder':''} ${wo?'wo':''}`;
     if(id && !data.present?.includes(id))row.classList.add('absent');
-    const number=document.createElement('span');number.className='position';number.textContent=p?.position || (wo && match.id.startsWith('de-w0-')?Number(match.id.split('-').at(-1))*2+slot+1:'—');
+    const number=document.createElement('span');number.className='position';number.textContent=match.sources?.[slot]?.code || p?.position || (wo && match.id.startsWith('de-w0-')?Number(match.id.split('-').at(-1))*2+slot+1:'—');
     const name=document.createElement('span');name.className='name';name.textContent=p?.nombre || (wo?'WO':label || sourceLabel(match.sources?.[slot]));
     enablePreview(name,p,match);
     const select=document.createElement('select');
@@ -321,6 +322,40 @@
     svg.setAttribute('height',boardHeight);
     dimensions.push({board,frame,width,height:boardHeight});
   }
+  function renderGroups(){
+    const board=$('#mainBoard'),frame=$('#mainFrame');board.replaceChildren();
+    const players=new Map(data.players.map(p=>[String(p.id),p]));
+    const width=1620,groupHeight=1000,height=state.groups.length*groupHeight;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('connectors');svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('aria-hidden','true');board.append(svg);
+    function textBox(text,x,y,cls='group-caption',w=240){const el=document.createElement('div');el.className=cls;el.textContent=text;el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px';board.append(el);return el;}
+    function line(a,b){const mid=(a.x+b.x)/2;const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M '+a.x+' '+a.y+' H '+mid+' V '+b.y+' H '+b.x);svg.append(path);}
+    state.groups.forEach(group=>{
+      const top=(group.number-1)*groupHeight,positions=new Map();
+      const heading=textBox('GRUPO '+group.number,0,top+10,'group-heading',width);
+      const groupCards=[];
+      textBox('PERDEDORES',240,top+65);textBox('PRIMERA RONDA',780,top+65);textBox('GANADORES',1050,top+65);
+      textBox('Clasificados',0,top+110);textBox('Cruce final',260,top+110);textBox('Primera instancia',520,top+110);textBox('8 jugadores',780,top+110);textBox('Segunda instancia',1040,top+110);textBox('Clasificados invictos',1300,top+110);
+      function place(m,x,y){const pos={x,y:top+y,center:top+y+64,width:240};positions.set(m.id,pos);groupCards.push(card(m,pos,board,players,false,x<780));}
+      group.initial.forEach((m,i)=>place(m,780,180+i*190));
+      group.winners.forEach((m,i)=>place(m,1040,275+i*380));
+      group.losers.forEach((m,i)=>place(m,520,275+i*380));
+      group.recovery.forEach((m,i)=>place(m,260,310+i*380));
+      if(!viewer)heading.append(LipaColumnSearch(groupCards,'Grupo '+group.number,[category,data.drawRevision,'group',group.number].join('/')));
+      for(const m of [...group.winners,...group.losers,...group.recovery]){
+        const to=positions.get(m.id);
+        m.sources.forEach((src,i)=>{const from=positions.get(src.matchId);if(!from)return;
+          if(group.recovery.includes(m)&&i===1)return;
+          const left=from.x>to.x;line({x:left?from.x:from.x+240,y:from.center},{x:left?to.x+240:to.x,y:to.y+(i?102:30)});
+        });
+      }
+      textBox('Pierde → A',1040,top+425);textBox('Pierde → B',1040,top+805);
+      textBox('B · viene del cruce inferior',260,top+460);textBox('A · viene del cruce superior',260,top+840);
+      function qualifier(m,code,x){const pos=positions.get(m.id),p=players.get(m.winner),el=textBox('',x,pos.center-28,'group-qualifier',240);const label=document.createElement('strong');label.textContent=code;const name=document.createElement('span');name.textContent=p?.nombre||'Por definir';enablePreview(name,p,m);el.append(label,photo(p),name);line({x:x<pos.x?pos.x:pos.x+240,y:pos.center},{x:x<pos.x?x+240:x,y:pos.center});}
+      group.winners.forEach((m,i)=>qualifier(m,group.codes.g[i],1300));group.recovery.forEach((m,i)=>qualifier(m,group.codes.p[i],0));
+      textBox('A cruza abajo · B cruza arriba · Dos derrotas eliminan · Cuatro clasificados',0,top+940,'group-footer',width);
+    });
+    dimensions.push({board,frame,width,height});
+  }
   function applyZoom() {
     dimensions.forEach(({board,frame,width,height})=>{board.style.width=`${width}px`;board.style.height=`${height}px`;board.style.transform=`scale(${zoom})`;frame.style.width=`${width*zoom}px`;frame.style.height=`${height*zoom}px`;});
     $('#zoom').value=Math.round(zoom*100);$('#zoomValue').textContent=`${Math.round(zoom*100)}%`;
@@ -333,9 +368,11 @@
     dimensions.length=0;
     $('#viewToggle').textContent=`VISUALIZACIÓN · ${view==='double'?'DOBLE':'SIMPLE'}`;
     $('#viewToggle').setAttribute('aria-label',`Visualización ${view==='double'?'doble':'simple'}. Cambiar a ${view==='double'?'simple':'doble'}`);
-    renderBoard(state.main,'#mainBoard','#mainFrame');
-    $('#repSection').hidden=!state.rep.length;
-    if(state.rep.length)renderBoard(state.rep,'#repBoard','#repFrame',true);
+    $('#mainSection h2').textContent=state.groups?.length?'Fase de grupos':'Llave de ganadores';
+    $('#mainSection .section-heading small').textContent=state.groups?.length?'8 GRUPOS · 4 CLASIFICADOS POR GRUPO':'PRIMERAS DOS RONDAS';
+    if(state.groups?.length)renderGroups();else renderBoard(state.main,'#mainBoard','#mainFrame');
+    $('#repSection').hidden=Boolean(state.groups?.length)||!state.rep.length;
+    if(!state.groups?.length&&state.rep.length)renderBoard(state.rep,'#repBoard','#repFrame',true);
     renderBoard(state.knockout,'#finalBoard','#finalFrame');
     $('#byeNote').textContent='Segunda oportunidad para quienes pierden en las primeras dos rondas. Sus ganadores se unen a los invictos en la eliminación directa. Los WO dan pase automático.';
     const realCount=data.players.filter(p=>p.id!==null).length;

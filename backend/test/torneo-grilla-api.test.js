@@ -62,5 +62,5 @@ test('mixed format keeps early scores, excludes old later rounds and saves knock
  }
  h.stored.resultados={...state.clean,'de-final':{a:'1',b:'2',score:[5,0]},'de-w2-0':{a:'1',b:'9',score:[5,0]}};
  const get=await h.request('get');assert(get.data.legacyResults);assert(get.data.results['de-w0-0']);assert(!get.data.results['de-final']);assert(!get.data.results['de-w2-0']);
- const m=state.knockout[0].find(m=>m.a&&m.b);const result=await h.request('patch',{matchId:m.id,score:[5,0],revision:0,drawRevision:1});assert.equal(result.status,200);assert(result.data.results[m.id]);assert(h.calls.some(sql=>sql.includes("id !~ '^(de-[wl][01]-|mx-k)'")));
+ const m=state.knockout[0].find(m=>m.a&&m.b);const result=await h.request('patch',{matchId:m.id,score:[5,0],revision:0,drawRevision:1});assert.equal(result.status,200);assert(result.data.results[m.id]);assert(h.calls.some(sql=>sql.includes("id !~ '^(de-[wl][01]-|mx-k|gx-k)'")));
 });
