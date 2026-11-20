@@ -208,16 +208,33 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     await pool.query('UPDATE torneo_visor_sesiones SET fcm_token=NULL WHERE fcm_token=$1',[token]);
     await pool.query('UPDATE torneo_visor_sesiones SET fcm_token=$1 WHERE token_hash=$2',[token,user.tokenHash]);res.json({ok:true});
   }));
+  const allTables=Object.entries(mesas.pisos).flatMap(([floor,numbers])=>numbers.map(number=>floor+'-'+number));
+  router.get('/torneo-organizador/sorteos/mesas',requireTorneoOrganizador,route(async(req,res)=>{
+    const {rows:[settings]}=await pool.query('SELECT mesas_habilitadas,mesas_revision FROM torneo_organizadores WHERE id=$1',[req.user.torneoOrganizadorId]);
+    if(!settings)throw fail(404,'No se encontró el organizador.');
+    res.json({enabled:settings.mesas_habilitadas??allTables,revision:settings.mesas_revision});
+  }));
+  router.put('/torneo-organizador/sorteos/mesas',requireTorneoOrganizador,route(async(req,res)=>{
+    const {enabled,revision}=req.body||{};
+    if(!Number.isInteger(revision) || !Array.isArray(enabled) || enabled.length>allTables.length ||
+       enabled.some(key=>!allTables.includes(key)) || new Set(enabled).size!==enabled.length)throw fail(400,'Revisá la selección de mesas.');
+    const ordered=allTables.filter(key=>enabled.includes(key));
+    const updated=await pool.query(`UPDATE torneo_organizadores SET mesas_habilitadas=$2,mesas_revision=mesas_revision+1
+      WHERE id=$1 AND mesas_revision=$3`,[req.user.torneoOrganizadorId,ordered,revision]);
+    if(!updated.rowCount)throw fail(409,'La selección cambió. Cerrá y volvé a abrir Administrar mesas.');
+    res.json({enabled:ordered,revision:revision+1});
+  }));
   router.get('/torneo-organizador/grilla/:categoria/llamados',requireTorneoOrganizador,route(async(req,res)=>{
     const id=req.user.torneoOrganizadorId,category=req.params.categoria;
     if(!validCategory(category))throw fail(400,'Categoría inválida.');
-    const {rows:[saved]}=await pool.query(`SELECT g.sorteo_revision,g.publicada_at,g.control_revision,g.revision,g.respaldo_reset->>'fecha' AS respaldo_fecha FROM torneo_grillas g JOIN torneo_sorteos s
+    const {rows:[saved]}=await pool.query(`SELECT g.sorteo_revision,g.publicada_at,g.control_revision,g.revision,o.mesas_habilitadas,g.respaldo_reset->>'fecha' AS respaldo_fecha FROM torneo_grillas g JOIN torneo_sorteos s
       ON s.torneo_organizador_id=g.torneo_organizador_id AND s.categoria=g.categoria AND s.revision=g.sorteo_revision
+      JOIN torneo_organizadores o ON o.id=g.torneo_organizador_id
       WHERE g.torneo_organizador_id=$1 AND g.categoria=$2`,[id,category]);
     if(!saved)throw fail(404,'No hay grilla para esta categoría.');
     res.locals.lecturaVisor=true;
     const [owner,locations,present,occupied]=await Promise.all([organizer(),organizerAssignments(id,category,saved.sorteo_revision),presentPlayers(id,category),occupiedTables(pool,id)]);
-    res.json({canPublish:id===owner,published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,revision:saved.revision,controlRevision:saved.control_revision,backupDate:saved.respaldo_fecha,assignments:locations,present,occupied});
+    res.json({canPublish:id===owner,published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,revision:saved.revision,controlRevision:saved.control_revision,backupDate:saved.respaldo_fecha,assignments:locations,present,occupied,enabledTables:saved.mesas_habilitadas??allTables});
   }));
   require('./torneosReset.routes')(router,{pool,route,requireTorneoOrganizador,readGrid,occupiedTables});
   router.post('/torneo-organizador/grilla/:categoria/:accion(publicar|ocultar)',requireTorneoOrganizador,route(async(req,res)=>{
@@ -255,7 +272,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const release=!calling && mesa===null && piso===null;
     if(!release && !mesas.valid(mesa,piso))throw fail(400,'Elegí una mesa disponible en ese piso.');
     const id=req.user.torneoOrganizadorId,category=req.params.categoria;
-    await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[id]);
+    const {rows:[settings]}=await client.query('SELECT mesas_habilitadas FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[id]);
     const context=await matchContext(req,false,client);
     const {saved,match,a,b}=context;
     const old=saved.mesas?.[match.id];
@@ -264,6 +281,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const selected=release?'':piso+'-'+mesa;
     if(req.body.previous!==undefined && req.body.previous!==key && selected!==key)throw fail(409,'La mesa de este partido cambió. Volvé a elegirla.');
     if(!release){
+      if(selected!==key && settings.mesas_habilitadas && !settings.mesas_habilitadas.includes(selected))throw fail(409,'Esa mesa está deshabilitada para el evento. Elegí otra mesa.');
       const missing=[a,b].filter(p=>!p.en_sala);
       if(missing.length)throw fail(409,'Falta marcar en sala a '+missing.map(p=>p.nombre).join(' y ')+'.');
       const occupied=await occupiedTables(client,id);

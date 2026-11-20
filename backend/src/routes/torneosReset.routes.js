@@ -33,14 +33,17 @@ module.exports=function mountGridResets(router,{pool,route,requireTorneoOrganiza
       publicada_at=NULL,revision=revision+1,updated_at=NOW() WHERE torneo_organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3`,
       [...keys,JSON.stringify(copy)]);
   }
-  async function restore(client,grid,keys){
+  async function restore(client,grid,keys,enabled){
     const copy=grid.respaldo_reset;
     if(!copy)throw fail(404,'Todavía no hay una copia para este sorteo.');
     const locations=tables.active(copy.mesas,bracket.build(grid.jugadores,copy.resultados,keys[1]));
     const occupied=await occupiedTables(client,keys[0]);
-    for(const location of Object.values(locations)){
-      const conflict=occupied.find(t=>t.category!==keys[1] && t.mesa===location.mesa && t.piso===location.piso);
-      if(conflict)throw fail(409,`La mesa ${location.mesa} de ${location.piso} está ocupada en ${conflict.category}. Liberala antes de recuperar esta copia.`);
+    for(const [matchId,location] of Object.entries(locations)){
+      const assigned=occupied.find(t=>t.mesa===location.mesa && t.piso===location.piso);
+      if(enabled && !enabled.includes(location.piso+'-'+location.mesa) && !(assigned?.category===keys[1] && assigned.matchId===matchId && assigned.a===location.a && assigned.b===location.b)){
+        throw fail(409,`Habilitá la mesa ${location.mesa} de ${location.piso} en Administrar mesas para recuperar esta copia.`);
+      }
+      if(assigned && assigned.category!==keys[1])throw fail(409,`La mesa ${location.mesa} de ${location.piso} está ocupada en ${assigned.category}. Liberala antes de recuperar esta copia.`);
     }
     await archive(client,keys,null);
     await client.query(`UPDATE torneo_llamados SET estado_grilla='recuperado' WHERE ${scope} AND id=ANY($4::bigint[])`,[...keys,copy.llamados]);
@@ -54,7 +57,7 @@ module.exports=function mountGridResets(router,{pool,route,requireTorneoOrganiza
     const client=await pool.connect();
     try{
       await client.query('BEGIN');
-      await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[id]);
+      const {rows:[settings]}=await client.query('SELECT mesas_habilitadas FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[id]);
       const grid=await readGrid(id,categoria,client);
       if(grid.sorteo_revision!==body.drawRevision || grid.revision!==body.revision || grid.control_revision!==body.controlRevision){
         throw fail(409,'La grilla cambió desde que la abriste. Recargala antes de continuar.');
@@ -62,7 +65,7 @@ module.exports=function mountGridResets(router,{pool,route,requireTorneoOrganiza
       const keys=[id,categoria,grid.sorteo_revision];
       if(accion==='partido')await resetMatch(client,grid,keys,body.matchId);
       if(accion==='resetear')await resetAll(client,grid,keys);
-      if(accion==='recuperar')await restore(client,grid,keys);
+      if(accion==='recuperar')await restore(client,grid,keys,settings.mesas_habilitadas);
       await client.query('COMMIT');
     }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
     res.json({ok:true});

@@ -156,8 +156,8 @@
       }
       grid.assignments=info.assignments;
       grid.backupDate=info.backupDate;grid.published=info.published;updatePublication();
-      if(JSON.stringify([grid.occupied,grid.present])!==JSON.stringify([info.occupied,info.present])){
-        grid.occupied=info.occupied;grid.present=info.present;syncRoomControls();
+      if(JSON.stringify([grid.occupied,grid.present,grid.enabledTables])!==JSON.stringify([info.occupied,info.present,info.enabledTables])){
+        grid.occupied=info.occupied;grid.present=info.present;grid.enabledTables=info.enabledTables;syncRoomControls();
       }
     }catch{/* Keep the last known confirmations until the next successful refresh. */}
     finally{readingCalls=false;}
@@ -217,6 +217,7 @@
         const group=document.createElement('optgroup');group.label=piso==='arriba'?'Arriba':'Abajo';
         for(const mesa of numbers){
           const selected=location?.piso===piso && location.mesa===mesa;
+          if(!selected && data.enabledTables && !data.enabledTables.includes(piso+'-'+mesa))continue;
           if(!selected && (!playable() || occupied.some(t=>t.piso===piso && t.mesa===mesa && !own(t))))continue;
           group.append(new Option('Mesa '+mesa+' · '+piso,piso+'-'+mesa));
         }
@@ -502,7 +503,7 @@
         if(!result.ok)throw new Error('No se pudieron cargar las mesas.');
         const info=await result.json();
         if(info.drawRevision!==undefined && info.drawRevision!==response.drawRevision)throw new Error('Cambió el sorteo. Recargá la categoría.');
-        Object.assign(response,{present:info.present,occupied:info.occupied,assignments:info.assignments,canPublish:info.canPublish,published:info.published,backupDate:info.backupDate});
+        Object.assign(response,{present:info.present,occupied:info.occupied,enabledTables:info.enabledTables,assignments:info.assignments,canPublish:info.canPublish,published:info.published,backupDate:info.backupDate});
       }
       if(request!==requestId)return;
       data=response;state=engine.build(data.players,data.results,category);

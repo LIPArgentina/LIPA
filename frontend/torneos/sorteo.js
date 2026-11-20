@@ -13,6 +13,51 @@
     if (!response.ok) throw Object.assign(new Error(data.error || 'No se pudo conectar con el servidor.'), { status: response.status });
     return data;
   }
+  const tableDialog=document.querySelector('#tableDialog'), tableForm=document.querySelector('#tableForm');
+  const manageTables=document.querySelector('#manageTables'), saveTables=document.querySelector('#saveTables');
+  const cancelTables=document.querySelector('#cancelTables'), tableStatus=document.querySelector('#tableStatus');
+  const tableFloors=document.querySelector('#tableFloors');
+  let tableRevision=null;
+  manageTables.onclick=async()=>{
+    manageTables.disabled=true;
+    tableRevision=null;saveTables.disabled=true;tableFloors.replaceChildren();
+    tableStatus.textContent='Cargando mesas…';tableDialog.showModal();
+    try{
+      const settings=await api('/mesas');
+      for(const [floor,numbers] of Object.entries(LipaMesas.pisos)){
+        const group=document.createElement('fieldset'),legend=document.createElement('legend'),list=document.createElement('div');
+        legend.textContent=floor==='arriba'?'Arriba':'Abajo';group.append(legend,list);
+        for(const number of numbers){
+          const label=document.createElement('label'),box=document.createElement('input');
+          box.type='checkbox';box.name='mesa';box.value=floor+'-'+number;box.checked=settings.enabled.includes(box.value);
+          label.append(box,'Mesa '+number);list.append(label);
+        }
+        tableFloors.append(group);
+      }
+      tableRevision=settings.revision;saveTables.disabled=false;tableStatus.textContent='';
+    }catch(error){tableStatus.textContent=error.message;}
+    finally{manageTables.disabled=false;}
+  };
+  cancelTables.onclick=()=>tableDialog.close();
+  tableDialog.addEventListener('cancel',event=>{if(cancelTables.disabled)event.preventDefault();});
+  tableForm.onsubmit=async event=>{
+    event.preventDefault();
+    if(saveTables.disabled || tableRevision===null)return;
+    const enabled=new FormData(tableForm).getAll('mesa');
+    saveTables.disabled=cancelTables.disabled=true;
+    for(const group of tableFloors.children)group.disabled=true;
+    tableStatus.textContent='Guardando mesas…';
+    try{
+      await api('/mesas',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled,revision:tableRevision})});
+      tableDialog.close();
+    }catch(error){
+      tableStatus.textContent=error.message;
+      saveTables.disabled=error.status===409;
+    }finally{
+      cancelTables.disabled=false;
+      for(const group of tableFloors.children)group.disabled=false;
+    }
+  };
   // Rejection sampling avoids modulo bias in Fisher-Yates.
   function randomIndex(max) {
     const limit = 4294967296 - (4294967296 % max);

@@ -22,6 +22,7 @@ function fixture(){
     if(sql.includes('SELECT g.categoria,g.sorteo_revision,g.mesas'))return result([saved]);
     if(sql.startsWith('UPDATE torneo_grillas SET mesas=')){saved.mesas=JSON.parse(args[0]);saved.control_revision++;return result([]);}
     if(sql.includes('SELECT id FROM torneo_organizadores'))return result([{id:1}]);
+    if(sql.includes('SELECT mesas_habilitadas FROM torneo_organizadores'))return result([{mesas_habilitadas:saved.mesas_habilitadas}]);
     if(sql.includes('SELECT g.* FROM torneo_grillas') || sql.includes('SELECT g.sorteo_revision,g.publicada_at'))return result(args[1]==='primera'?[saved]:[]);
     if(sql.startsWith('UPDATE torneo_grillas SET control_revision=')){saved.control_revision++;return result([]);}
     if(sql.includes('AS habilitados') && sql.includes('g.publicada_at IS NOT NULL') && sql.includes('s.revision=g.sorteo_revision'))return result((args[3] || draw.visible) && args[1]==='primera'?[{...saved,...draw}]:[]);
@@ -131,11 +132,18 @@ else test('DNI session, read-only API, private calls and organizer authorization
     saved.jugadores[1].en_sala=true;
     assert.equal((await request(reserve,{...call,piso:'abajo'},null,true)).status,400);
     const table1={...call,mesa:1};
+    saved.mesas_habilitadas=['abajo-1'];
+    assert.equal((await request(reserve,table1,null,true)).status,409);
+    assert.equal((await request(ring,table1,null,true)).status,409);
+    saved.mesas_habilitadas=['arriba-1','abajo-1'];
+    assert.equal((await request(reserve,table1,null,true)).status,200);
+    saved.mesas_habilitadas=['abajo-1'];
     assert.equal((await request(reserve,table1,null,true)).status,200);
     assert.equal((await request(reserve,{...table1,matchId:'de-w0-1'},null,true)).status,409);
     assert.equal((await request(ring,{...table1,matchId:'de-w0-1'},null,true)).status,409);
     assert.equal((await request(reserve,{...table1,matchId:'de-w0-1',piso:'abajo'},null,true)).status,200);
     assert.equal((await request(reserve,{...table1,mesa:null,piso:null},null,true)).status,200);
+    saved.mesas_habilitadas=null;
     assert.equal((await request(reserve,call,null,true)).status,200);
     assert.equal(avisos.length,0);
     const hide='torneo-organizador/grilla/primera/ocultar';

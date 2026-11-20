@@ -73,6 +73,8 @@ module.exports = function createTorneosPrivadosRouter() {
         );
 
         ALTER TABLE torneo_organizadores ADD COLUMN IF NOT EXISTS mensaje_difusion TEXT NOT NULL DEFAULT '';
+        ALTER TABLE torneo_organizadores ADD COLUMN IF NOT EXISTS mesas_habilitadas TEXT[],
+          ADD COLUMN IF NOT EXISTS mesas_revision INTEGER NOT NULL DEFAULT 0;
 
         CREATE TABLE IF NOT EXISTS torneo_inscripciones (
           id BIGSERIAL PRIMARY KEY,
