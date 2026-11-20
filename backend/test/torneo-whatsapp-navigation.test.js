@@ -29,3 +29,7 @@ test('multiple contacts, wrong phone and stale search are not selected',()=>{
  assert(!fixture([{text:'+54 9 11 0000-0000'}]).run().target);
  const f=fixture([{text:'Mi amigo'}]);f.input.value='otro';assert(!f.run().target);
 });
+
+test('phone text with WhatsApp directional marks remains an exact number match',()=>{
+ assert(fixture([{text:'\u200e+54 9 11 1234-5678\u200f'}]).run().target);
+});

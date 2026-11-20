@@ -26,12 +26,12 @@ function lipaOpenChat(contact,stage){
  const inputs=searchInputs();
  if(inputs.length!==1||digits(inputs[0].value??inputs[0].innerText??inputs[0].textContent)!==digits(contact.phone))return {waiting:true,diagnostic:{reason:'search-not-exact'}};
  const searchRect=inputs[0].getBoundingClientRect();
- const eligible=el=>visible(el)&&!el.closest('#main,header')&&el.getBoundingClientRect().y>=searchRect.y+searchRect.height&&point(el);
- const textOf=el=>String(el.innerText||el.textContent||el.getAttribute('title')||'').trim();
+ const eligible=el=>{const r=el.getBoundingClientRect();return visible(el)&&!el.closest('#main,header')&&r.y>=searchRect.y+searchRect.height&&r.x>=searchRect.x-32&&r.x+r.width<=searchRect.x+searchRect.width+32&&point(el);};
+ const textOf=el=>String(el.innerText||el.textContent||el.getAttribute('title')||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim();
  const isPhone=text=>/^\+?[\d\s().-]+$/.test(text);
  let pane=inputs[0].parentElement;
  while(pane&&pane!==document.body){
-   const nodes=[...pane.querySelectorAll('[role="listitem"],[role="row"],span[title],[dir="auto"]')].filter(eligible);
+   const nodes=[...pane.querySelectorAll('[role="listitem"],[role="row"],span,[dir="auto"]')].filter(eligible);
    const phones=nodes.filter(el=>isPhone(textOf(el))&&digits(textOf(el))===digits(contact.phone));
    // A repeated phone heading/subtitle identifies the same destination.
    if(phones.length)return {target:point(phones[0])};
