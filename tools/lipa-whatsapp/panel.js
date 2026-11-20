@@ -79,9 +79,6 @@ $('start').addEventListener('click',async()=>{
       await reuseWhatsAppTab();
       job.workTabId=workTab;await persist();
       await selectChat(contact);
-      const verified=await prepareChat(workTab,contact,()=>stopping,true);
-      if(!verified.ready)throw Error(verified.error||'No se pudo verificar el contacto.');
-      if(!job.media){const composer=await step(contact,'composer');if(!composer.target)throw Error(composer.error||'No se encontró el cuadro de mensaje.');await browserControl.fillCaption(workTab,composer.target,job.message,()=>stopping);}
       const ready=await prepareChat(workTab,contact,()=>stopping);
       if(stopping){contact.status='pending';break;}
       if(!ready.ready)throw Error(ready.error||'No se pudo preparar el chat.');
@@ -171,13 +168,18 @@ async function reuseWhatsAppTab(){
  for(let i=0;i<90;i++){if(stopping)throw Error('Tanda detenida.');if((await chrome.tabs.get(workTab)).status==='complete')return;await pause(250);}throw Error('WhatsApp no terminó de cargar.');
 }
 async function selectChat(contact){
- await browserControl.connect(workTab);
- async function inspect(stage){const rows=await chrome.scripting.executeScript({target:{tabId:workTab},func:lipaOpenChat,args:[contact,stage]});return rows[0]?.result||{error:'No se pudo leer WhatsApp.'};}
- let result=await inspect('new');if(!result.ready){if(!result.target)throw Error(result.error);await browserControl.click(workTab,result.target,()=>stopping);}
- async function waitFor(stage){for(let i=0;i<60;i++){if(stopping)throw Error('Tanda detenida.');const r=await inspect(stage);if(r.diagnostic)contact.navigation=r.diagnostic;if(r.target)return r;if(r.error)throw Error(r.error);await pause(250);}throw Error(stage==='search'?'No se pudo identificar el buscador de Nuevo chat. No se escribió ni envió nada.':'El número se escribió, pero no se encontró un contacto único en Nuevo chat. No se envió nada.');}
- result=await waitFor('search');await browserControl.fillCaption(workTab,result.target,'+'+contact.phone,()=>stopping);
- let typed=false;for(let i=0;i<8;i++){if((await inspect('typed')).ready){typed=true;break;}await pause(250);}if(!typed)throw Error('WhatsApp no conservó el número en el buscador de Nuevo chat. No se envió nada.');
- result=await waitFor('result');await browserControl.click(workTab,result.target,()=>stopping);
- let opened=false;for(let i=0;i<54;i++){if(stopping)throw Error('Tanda detenida.');if((await inspect('closed')).closed){opened=true;break;}await pause(250);}
- if(!opened)throw Error('El resultado no abrió el chat: Nuevo chat sigue visible. No se envió nada.');
+ // WhatsApp's New chat result does not consistently accept automated clicks.
+ // Use the proven direct-phone route in the already selected tab. This reloads
+ // WhatsApp, but never creates another tab and reliably opens saved/unsaved numbers.
+ await browserControl.release();
+ const url='https://web.whatsapp.com/send?phone='+contact.phone+(job.media?'':'&text='+encodeURIComponent(job.message));
+ await chrome.tabs.update(workTab,{url,active:true});
+ let loaded=false;
+ for(let i=0;i<90;i++){
+  if(stopping)throw Error('Tanda detenida.');
+  const tab=await chrome.tabs.get(workTab);
+  if(tab.status==='complete'){loaded=true;break;}
+  await pause(250);
+ }
+ if(!loaded)throw Error('WhatsApp no terminó de cargar.');
 }
