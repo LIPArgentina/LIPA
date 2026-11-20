@@ -20,34 +20,40 @@ function lipaOpenChat(contact,stage){
  if(stage==='typed')return {ready:String(el.value??el.innerText??el.textContent??'').replace(/\D/g,'')===String(contact.phone).replace(/\D/g,'')};
  return {target:point(el)};
  }
- const name=String(contact.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
- const rows=[...document.querySelectorAll('[role="listitem"],[role="row"]')].filter(el=>visible(el)&&!el.closest('#main'));
- const numberMatches=rows.filter(el=>String(el.innerText||'').replace(/\D/g,'').includes(contact.phone));
- const nameMatches=rows.filter(el=>name&&String(el.innerText||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().split('\n').some(line=>line.trim()===name));
- const matches=(numberMatches.length?numberMatches:nameMatches).filter((el,_,all)=>!all.some(other=>other!==el&&other.contains(el)));
- if(matches.length===1&&point(matches[0]))return {target:point(matches[0])};
- if(matches.length>1)return {waiting:true};
- // Saved contacts show the address-book name, not their phone or tournament name.
- // Scope the fallback to the New chat pane containing the exact searched number.
+
+ // Every result is resolved from the exact number search, never the LIPA name.
+ const digits=value=>String(value||'').replace(/\D/g,'');
  const inputs=searchInputs();
- if(inputs.length!==1||String(inputs[0].value??inputs[0].innerText??inputs[0].textContent??'').replace(/\D/g,'')!==String(contact.phone).replace(/\D/g,''))return {waiting:true};
+ if(inputs.length!==1||digits(inputs[0].value??inputs[0].innerText??inputs[0].textContent)!==digits(contact.phone))return {waiting:true,diagnostic:{reason:'search-not-exact'}};
  const searchRect=inputs[0].getBoundingClientRect();
+ const eligible=el=>visible(el)&&!el.closest('#main,header')&&el.getBoundingClientRect().y>=searchRect.y+searchRect.height&&point(el);
+ const textOf=el=>String(el.innerText||el.textContent||el.getAttribute('title')||'').trim();
+ const isPhone=text=>/^\+?[\d\s().-]+$/.test(text);
  let pane=inputs[0].parentElement;
  while(pane&&pane!==document.body){
-   // Unsaved contacts can display the same formatted phone twice, without title/role.
-   // Click the phone text itself, never the adjacent Add contact control.
-   const phones=[...pane.querySelectorAll('span, [dir="auto"]')].filter(el=>{
-     const text=String(el.innerText||el.textContent||'').trim();
-     return /^\+?[\d\s().-]+$/.test(text)&&text.replace(/\D/g,'')===String(contact.phone).replace(/\D/g,'')&&visible(el)&&!el.closest('#main,header,button')&&el.getBoundingClientRect().y>=searchRect.y+searchRect.height&&point(el);
-   });
+   const nodes=[...pane.querySelectorAll('[role="listitem"],[role="row"],span[title],[dir="auto"]')].filter(eligible);
+   const phones=nodes.filter(el=>isPhone(textOf(el))&&digits(textOf(el))===digits(contact.phone));
+   // A repeated phone heading/subtitle identifies the same destination.
    if(phones.length)return {target:point(phones[0])};
-   const labels=[...pane.querySelectorAll('span[title][dir="auto"]')].filter(el=>visible(el)&&!el.closest('#main,header')&&String(el.getAttribute('title')||'').trim()&&el.getBoundingClientRect().y>=searchRect.y+searchRect.height&&point(el));
-   if(labels.length){
-     // Opening is not authorization to send: the driver still verifies the phone.
-     if(labels.length===1)return {target:point(labels[0])};
-     return {waiting:true};
+   const rows=nodes.filter(el=>['row','listitem'].includes(el.getAttribute('role')));
+   const leafRows=rows.filter(el=>!rows.some(other=>other!==el&&el.contains(other)));
+   const labels=nodes.filter(el=>textOf(el)&&!isPhone(textOf(el))&&!/^(usuarios que|contacts|contactos|nuevo |new |buscar|search)/i.test(textOf(el)));
+   const candidates=leafRows.length?leafRows:labels;
+   if(candidates.length){
+     const groups=new Map();
+     for(const el of candidates){
+       let group=el.closest('[role="row"],[role="listitem"]');
+       // Name and subtitle may both carry title/dir attributes. Group by avatar row.
+       if(!group){let parent=el.parentElement;while(parent&&parent!==pane){if(parent.querySelector('img,[data-icon="default-user"],[data-icon="default-contact"]')){group=parent;break;}parent=parent.parentElement;}}
+       group=group||el;
+       if(!groups.has(group))groups.set(group,el);
+     }
+     const entries=[...groups.entries()];
+     const unique=entries.filter(([group])=>!entries.some(([other])=>other!==group&&other.contains(group)));
+     if(unique.length===1)return {target:point(unique[0][1])};
+     return {waiting:true,diagnostic:{reason:'multiple-results',rows:leafRows.length,labels:labels.length,groups:unique.length}};
    }
    pane=pane.parentElement;
  }
- return {waiting:true};
+ return {waiting:true,diagnostic:{reason:'no-result-elements'}};
 }
