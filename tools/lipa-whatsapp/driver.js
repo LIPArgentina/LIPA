@@ -171,6 +171,20 @@ async function lipaWhatsAppStep(expected, action) {
     globalThis.__lipaArmed={phone:expected.phone,message:expected.message,main:current.main,at:Date.now(),...snapshot(current.main)};
     return {armed:true,target};
   }
+  if(action==='settle') {
+    const proof=globalThis.__lipaLastSent,main=document.querySelector('#main');
+    if(!proof||proof.phone!==expected.phone||proof.message!==expected.message||proof.mediaHash!==(expected.media?.hash)||proof.main!==main)return {fatal:true,error:'No se pudo comprobar que WhatsApp terminó el envío. No se abrirá el siguiente chat.'};
+    const sent=outgoingNodes(main).find(el=>proof.key&&messageKey(el)===proof.key)||(outgoingNodes(main).includes(proof.node)?proof.node:null);
+    if(!sent)return {settled:false,error:'Esperando que WhatsApp conserve el mensaje enviado.'};
+    if(sent.querySelector('[data-icon="msg-error"],[data-testid="msg-error"]'))return {fatal:true,error:'WhatsApp marcó un error en el último mensaje. No se abrirá el siguiente chat.'};
+    const pending=sent.querySelector('[role="progressbar"],[data-icon="msg-time"],[data-icon="msg-clock"],[data-testid="msg-time"]');
+    const receipt=sent.querySelector('[data-icon="msg-check"],[data-icon="msg-dblcheck"],[data-testid="msg-check"],[data-testid="msg-dblcheck"]');
+    const preview=expected.media?mediaEditor():null;
+    const draft=[...main.querySelectorAll('footer [contenteditable="true"][role="textbox"]')].some(el=>visible(el)&&text(el));
+    if(preview||draft||pending||!receipt)return {settled:false,error:preview?'Esperando que WhatsApp cierre el adjunto.':'Esperando la confirmación de WhatsApp.'};
+    delete globalThis.__lipaLastSent;delete globalThis.__lipaMedia;
+    return {settled:true};
+  }
   if(action!=='confirm'&&action!=='audit')return {error:'Acción desconocida.'};
   const armed=globalThis.__lipaArmed;
   if(!armed||armed.phone!==expected.phone||armed.message!==expected.message||armed.mediaHash!==(expected.media?.hash)||(action==='confirm'&&Date.now()-armed.at>30000))return {error:'No hay un envío preparado para comprobar.',clicked:true};
@@ -192,7 +206,7 @@ async function lipaWhatsAppStep(expected, action) {
       const caption=[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[text(part),part.innerText].filter(v=>typeof v==='string').some(value=>expectedTexts.includes(compact(value))));
       const media=!expected.media||(expected.media.type.startsWith('video/')?el.querySelector('video,[data-icon="video-play"],[data-icon="media-play"],[data-icon="play"]'):el.querySelector('img[src^="blob:"],img[src^="data:image/"],img[data-testid="media-url-provider"],img[alt="Imagen"],img[alt="Image"]'));
       if(caption&&media&&!el.querySelector('[role="progressbar"],[data-icon="msg-error"]')){
-        if(action!=='audit')delete globalThis.__lipaArmed;return {sent:true,clicked:true};
+        if(action!=='audit'){globalThis.__lipaLastSent={phone:expected.phone,message:expected.message,mediaHash:expected.media?.hash,main,node:el,key:messageKey(el),at:Date.now()};delete globalThis.__lipaArmed;}return {sent:true,clicked:true};
       }
     }
     if(action==='audit')return {error:'No se pudo confirmar el mensaje en este chat. No se reenvió nada.'};

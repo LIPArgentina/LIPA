@@ -31,6 +31,19 @@ test('media prepare/arm checks recipient and exact caption without clicking send
 test('confirmation requires a new outgoing attachment plus matching caption for images and videos',async()=>{
  for(const type of ['image/png','video/mp4']){const f=driverFixture(type);assert.equal((await f.step('send')).armed,true);f.add();f.setMedia(false);assert((await f.step('audit')).error);f.setMedia(true);assert.equal((await f.step('confirm')).sent,true);}
 });
+test('next chat waits until media preview closes and WhatsApp shows a server receipt',async()=>{
+ const f=driverFixture();assert((await f.step('send')).armed);f.add();assert((await f.step('confirm')).sent);
+ let receipt=false;
+ f.outgoing.querySelector=selector=>{
+  if(selector.includes('msg-check'))return receipt?{}:null;
+  if(selector.includes('msg-error')||selector.includes('msg-time')||selector.includes('progressbar'))return null;
+  if(selector.includes('img'))return f.visual;
+  return null;
+ };
+ receipt=true;let result=await f.step('settle');assert.equal(result.settled,false);assert.match(result.error,/cierre el adjunto/);
+ f.ctx.document.querySelectorAll=()=>[];receipt=false;result=await f.step('settle');assert.equal(result.settled,false);assert.match(result.error,/confirmación/);
+ receipt=true;result=await f.step('settle');assert.equal(result.settled,true);
+});
 test('extension receives saved attachment, verifies bytes and stores a complete batch snapshot',async()=>{
  const source=fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/background.js'),'utf8');let listener,job,storedFile,created=0;
  const bytes=Buffer.from('sample'),file=new File([bytes],'torneo.png',{type:'image/png'}),metadata=await media.validate(file);

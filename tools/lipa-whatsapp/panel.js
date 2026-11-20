@@ -31,6 +31,17 @@ async function prepareChat(tabId,contact,cancelled=()=>false,empty=false) {
   }
   return {error:last?.error||'No se pudo abrir y comprobar la ficha del contacto.'};
 }
+async function waitForSettled(contact) {
+  let last;
+  for(let i=0;i<120;i++){
+    if(stopping)throw Error('Tanda detenida. Revisá el último chat.');
+    last=await step(contact,'settle');
+    if(last.settled)return;
+    if(last.fatal)throw Error(last.error);
+    await pause(500);
+  }
+  throw Error(last?.error||'WhatsApp no terminó de confirmar el envío. No se abrió el siguiente chat.');
+}
 async function fingerprint(contact) {
   const raw=job.organizer+'\n'+contact.phone+'\n'+job.message+(job.media?'\nmedia:'+job.media.hash:'');
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(n=>n.toString(16).padStart(2,'0')).join('');
@@ -93,6 +104,8 @@ $('start').addEventListener('click',async()=>{
       $('status').textContent='Comprobando el mensaje de '+contact.name+'…';
       const result=await step(contact,'confirm');
       if(!result.sent)throw Error(result.error||'No se pudo confirmar el envío.');
+      $('status').textContent='Esperando que WhatsApp termine el envío de '+contact.name+'…';
+      await waitForSettled(contact);
       contact.status='sent';history[contact.key].status='sent';await persist();render();
       $('status').textContent='Mensaje observado en el chat de '+contact.name+'.';
       if(contact!==queue[queue.length-1]&&!stopping){
