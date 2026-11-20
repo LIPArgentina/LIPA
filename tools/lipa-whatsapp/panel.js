@@ -109,8 +109,8 @@ $('start').addEventListener('click',async()=>{
       contact.status='sent';history[contact.key].status='sent';await persist();render();
       $('status').textContent='Mensaje observado en el chat de '+contact.name+'.';
       if(contact!==queue[queue.length-1]&&!stopping){
-        $('status').textContent='Mensaje observado en el chat de '+contact.name+'. Pausa de 1 segundo antes del siguiente.';
-        await pause(1000);
+        $('status').textContent='Mensaje observado en el chat de '+contact.name+'. Pausa de 2 segundos antes del siguiente.';
+        await pause(2000);
       }
     } catch(error) {
       contact.error=error.message;contact.status=history[contact.key]?'review':'pending';
