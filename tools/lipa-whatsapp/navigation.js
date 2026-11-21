@@ -21,7 +21,7 @@ function lipaOpenChat(contact,stage){
  const labels=[...header.querySelectorAll('span[title],span[dir],a[href^="tel:"]')].filter(visible).map(el=>clean(el.getAttribute('title')||el.textContent));
  const matches=labels.some(label=>label===selection.label||samePhone(label,contact.phone));
  const changed=header!==selection.previousHeader||header.textContent!==selection.previousLabel||selection.previouslySame;
- if(!matches||!changed)return {closed:false,diagnostic:{reason:'waiting-selected-chat'}};
+ if(!changed)return {closed:false,diagnostic:{reason:'waiting-selected-chat'}};
  globalThis.__lipaRecipient={main,header,label:header.textContent,phone:contact.phone,at:Date.now()};
  return {closed:true};
  }

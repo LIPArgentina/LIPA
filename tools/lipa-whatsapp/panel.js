@@ -181,19 +181,22 @@ async function reuseWhatsAppTab(){
  for(let i=0;i<90;i++){if(stopping)throw Error('Tanda detenida.');if((await chrome.tabs.get(workTab)).status==='complete')return;await pause(250);}throw Error('WhatsApp no terminó de cargar.');
 }
 async function selectChat(contact){
- // WhatsApp's New chat result does not consistently accept automated clicks.
- // Use the proven direct-phone route in the already selected tab. This reloads
- // WhatsApp, but never creates another tab and reliably opens saved/unsaved numbers.
- const url='https://web.whatsapp.com/send?phone='+contact.phone+(job.media?'':'&text='+encodeURIComponent(job.message));
- await browserControl.navigate(workTab,async()=>{
- await chrome.tabs.update(workTab,{url,active:true});
- let loaded=false;
- for(let i=0;i<90;i++){
+ await browserControl.connect(workTab);
+ async function probe(stage){
   if(stopping)throw Error('Tanda detenida.');
-  const tab=await chrome.tabs.get(workTab);
-  if(tab.status==='complete'&&!tab.pendingUrl&&tab.url===url){loaded=true;break;}
-  await pause(250);
+  const results=await chrome.scripting.executeScript({target:{tabId:workTab},func:lipaOpenChat,args:[contact,stage]});
+  const r=results[0]?.result;if(!r)throw Error('No se pudo leer Nuevo chat.');return r;
  }
- if(!loaded)throw Error('WhatsApp no terminó de cargar.');
- },()=>stopping);
+ async function wait(stage,ready){let last;for(let i=0;i<60;i++){last=await probe(stage);if(ready(last))return last;if(last.error)throw Error(last.error);await pause(200);}throw Error('No se pudo completar '+stage+' sin recargar WhatsApp. '+(last?.diagnostic?.reason||''));}
+ const opening=await probe('new');if(opening.error)throw Error(opening.error);
+ if(opening.target)await browserControl.click(workTab,opening.target,()=>stopping);
+ const search=await wait('search',r=>r.target);
+ await browserControl.fillCaption(workTab,search.target,'+'+contact.phone,()=>stopping);
+ await wait('typed',r=>r.ready);
+ // Wait for the result of this search, not a row left from the previous query.
+ await pause(400);
+ const result=await wait('result',r=>r.target);
+ await browserControl.click(workTab,result.target,()=>stopping);
+ await wait('closed',r=>r.closed);
+ if(!job.media){const composer=await rawStep(workTab,contact,'composer');if(!composer.target)throw Error(composer.error||'No se encontró el campo de mensaje.');await browserControl.fillCaption(workTab,composer.target,job.message,()=>stopping);}
 }
