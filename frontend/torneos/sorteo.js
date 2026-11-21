@@ -6,6 +6,23 @@
   }
   const API = String(window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const states = [];
+  const alphabetical=document.querySelector('#alphabetical');
+  let ordering=false;
+  alphabetical.onclick=async()=>{
+    if(ordering||states.length!==2||states.some(s=>s.timer||s.saving||s.dirty||s.invalidSize))return;
+    if(!confirm('¿Reemplazar los sorteos de prueba de Segunda y Tercera por orden alfabético? Se reiniciarán sus grillas.'))return;
+    ordering=true;alphabetical.disabled=true;alphabetical.textContent='ORDENANDO…';
+    try{
+      for(const state of states){
+        const sorted=state.players.filter(p=>p.id!==null).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base',numeric:true}));
+        let i=0;state.players=state.players.map(p=>p.id===null?p:sorted[i++]);
+        state.dirty=true;state.resetResults=true;renderRows(state);await save(state);
+        if(state.dirty)throw Error('No se pudo guardar '+state.label+'. '+state.status.textContent);
+      }
+      document.querySelector('#pageMessage').textContent='Segunda y Tercera guardadas en orden alfabético.';
+    }catch(error){document.querySelector('#pageMessage').textContent=error.message;}
+    finally{ordering=false;alphabetical.textContent='Ordenar listas A–Z';alphabetical.disabled=false;}
+  };
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   async function api(path, options = {}) {
     const response = await fetch(`${API}/api/torneo-organizador/sorteos${path}`, { credentials: 'include', ...options });
@@ -81,6 +98,7 @@
     });
   }
   function updateExports(state) {
+    alphabetical.disabled=ordering||states.length!==2||states.some(s=>s.timer||s.saving||s.dirty||s.invalidSize);
     state.card.querySelectorAll('[data-export]').forEach(button => {
       button.disabled = Boolean(state.sizeChanged || state.invalidSize || state.dirty || state.saving || state.exporting || !state.players.some(player => player.id != null));
       button.title = state.dirty || state.saving ? 'Detené el sorteo y guardá el orden antes de exportar.' : '';
@@ -199,7 +217,7 @@
     }
   }
   async function toggle(state) {
-    if (state.saving || state.exporting || state.invalidSize) return;
+    if (ordering || state.saving || state.exporting || state.invalidSize) return;
     if (state.conflict) { location.reload(); return; }
     if (state.timer) {
       clearInterval(state.timer); state.timer = null;
