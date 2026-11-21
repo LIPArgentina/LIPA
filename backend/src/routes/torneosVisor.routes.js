@@ -134,7 +134,8 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       await client.query('COMMIT');
       const active=new Set(grids.map(g=>g.categoria+'/'+g.sorteo_revision));
       const history=logs.flatMap(g=>g.entries.map(e=>({...e,category:g.categoria,drawRevision:g.sorteo_revision,current:active.has(g.categoria+'/'+g.sorteo_revision)&&!e.archived})));
-      const waiting=history.filter(e=>e.current&&e.status==='waiting').sort((a,b)=>a.readyAt.localeCompare(b.readyAt)||a.category.localeCompare(b.category)||a.matchId.localeCompare(b.matchId));
+      const {rows:arrivals}=await pool.query('SELECT id::text,en_sala,llegada_at FROM torneo_inscripciones WHERE torneo_organizador_id=$1 AND baja_at IS NULL',[id]);
+      const waiting=timing.waitingList(history,arrivals);
       res.json({waiting,history,players:grids.flatMap(g=>g.jugadores.filter(p=>p.id).map(p=>({id:p.id,nombre:p.nombre,category:g.categoria}))),serverTime:Date.now()});
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   }));

@@ -127,6 +127,8 @@ module.exports = function createTorneosPrivadosRouter() {
 
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS baja_at TIMESTAMPTZ;
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS en_sala BOOLEAN NOT NULL DEFAULT false;
+        ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS llegada_at TIMESTAMPTZ;
+        UPDATE torneo_inscripciones SET llegada_at=NOW() WHERE en_sala AND llegada_at IS NULL;
         ALTER TABLE torneo_grillas ADD COLUMN IF NOT EXISTS mesas JSONB;
         ALTER TABLE torneo_grillas ALTER COLUMN mesas SET DEFAULT '{}'::jsonb;
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS lista_espera BOOLEAN NOT NULL DEFAULT false;
@@ -653,7 +655,7 @@ module.exports = function createTorneosPrivadosRouter() {
     }
     try{
       await ensureSchema();
-      const {rows}=await pool.query(`UPDATE torneo_inscripciones SET en_sala=$1
+      const {rows}=await pool.query(`UPDATE torneo_inscripciones SET en_sala=$1, llegada_at=CASE WHEN $1 THEN CASE WHEN en_sala THEN COALESCE(llegada_at,NOW()) ELSE NOW() END ELSE NULL END
         WHERE torneo_organizador_id=$2 AND baja_at IS NULL AND id=ANY($3::bigint[]) RETURNING id::text`,
         [enSala,req.user.torneoOrganizadorId,ids]);
       res.json({ids:rows.map(row=>row.id)});
@@ -663,7 +665,7 @@ module.exports = function createTorneosPrivadosRouter() {
     if(typeof req.body?.enSala!=='boolean' || !/^[1-9]\d{0,17}$/.test(req.params.id))return res.status(400).json({error:'Presencia inválida.'});
     try{
       await ensureSchema();
-      const {rows}=await pool.query(`UPDATE torneo_inscripciones SET en_sala=$1
+      const {rows}=await pool.query(`UPDATE torneo_inscripciones SET en_sala=$1, llegada_at=CASE WHEN $1 THEN CASE WHEN en_sala THEN COALESCE(llegada_at,NOW()) ELSE NOW() END ELSE NULL END
         WHERE id=$2 AND torneo_organizador_id=$3 AND baja_at IS NULL RETURNING en_sala`,[req.body.enSala,req.params.id,req.user.torneoOrganizadorId]);
       if(!rows.length)return res.status(404).json({error:'La inscripción ya no está activa.'});
       res.json(rows[0]);

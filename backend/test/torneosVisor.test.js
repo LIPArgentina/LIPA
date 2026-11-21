@@ -21,6 +21,7 @@ function fixture(){
     if(sql.includes('DELETE FROM torneo_visor_sesiones')){sessions.delete(args[0]);return result([]);}
     if(sql.includes('SELECT id,nombre FROM jugadores'))return result(players.filter(p=>p.dni===args[0]).map(p=>({id:p.jugador_id,nombre:p.nombre})));
     if(sql.includes('SELECT i.categoria FROM torneo_inscripciones'))return result(players.filter(p=>p.jugador_id===args[1]));
+    if(sql.startsWith('SELECT id::text,en_sala,llegada_at'))return result(players.map(p=>({...p,llegada_at:'2026-11-22T10:00:00.000Z'})));
     if(sql.includes('AND en_sala AND baja_at'))return result(players.filter(p=>p.en_sala));
     if(sql.includes('SELECT g.categoria,g.sorteo_revision,g.mesas'))return result([saved]);
     if(sql.startsWith('UPDATE torneo_grillas SET mesas=')){saved.mesas=JSON.parse(args[0]);saved.control_revision++;return result([]);}

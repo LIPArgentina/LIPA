@@ -28,4 +28,12 @@ async function sync(db,id,category,saved,event={}){
  ON CONFLICT(organizador_id,categoria,sorteo_revision) DO UPDATE SET entries=EXCLUDED.entries`,[id,category,saved.sorteo_revision,JSON.stringify(entries)]);
  return current(entries);
 }
-module.exports={evolve,current,read,sync};
+function waitingList(history,arrivals){
+ const present=new Map(arrivals.filter(p=>p.en_sala&&p.llegada_at).map(p=>[String(p.id),new Date(p.llegada_at).toISOString()]));
+ return history.filter(e=>e.current&&e.status==='waiting').flatMap(e=>{
+  if(!e.matchId.startsWith('de-w0-'))return [e];
+  if(!present.has(e.a)||!present.has(e.b))return [];
+  return [{...e,readyAt:[present.get(e.a),present.get(e.b)].sort().at(-1)}];
+ }).sort((a,b)=>a.readyAt.localeCompare(b.readyAt)||a.category.localeCompare(b.category)||a.matchId.localeCompare(b.matchId));
+}
+module.exports={evolve,current,read,sync,waitingList};

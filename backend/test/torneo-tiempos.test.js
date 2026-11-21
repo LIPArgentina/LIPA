@@ -19,3 +19,16 @@ test('new opponents create waiting entry immediately; WO never creates timed gam
  entries=evolve(entries,players,results,'segunda',{score:true},'2026-11-21T11:00:00Z');const next=engine.build(players,results,'segunda').groups[0].winners[0];assert.equal(current(entries)[next.id].readyAt,'2026-11-21T11:00:00Z');
  const wo=players.map((p,i)=>i===0?{id:null,wo:true}:p);entries=evolve([],wo,{},'segunda');assert(!current(entries)[first[0].id]);
 });
+
+test('initial waiting requires both arrivals and sorts by the later arrival, later rounds enter immediately',()=>{
+ const {waitingList}=require('../src/torneoTiempos');
+ const entry=(matchId,a,b,readyAt='2026-11-20T10:00:00Z')=>({matchId,a,b,readyAt,status:'waiting',current:true,category:'tercera'});
+ const history=[entry('de-w0-0','1','2'),entry('de-w0-1','3','4'),entry('de-w0-2','5','6'),entry('de-w1-0','7','8','2026-11-22T10:03:00.000Z')];
+ const arrival=(id,time)=>({id,en_sala:true,llegada_at:'2026-11-22T10:'+time+':00.000Z'});
+ const arrivals=[arrival('1','00'),arrival('2','05'),arrival('3','01'),arrival('4','02'),arrival('5','00')];
+ const list=waitingList(history,arrivals);
+ assert.deepEqual(list.map(e=>e.matchId),['de-w0-1','de-w1-0','de-w0-0']);
+ assert.equal(list[0].readyAt,'2026-11-22T10:02:00.000Z');
+ arrivals[3].en_sala=false;assert(!waitingList(history,arrivals).some(e=>e.matchId==='de-w0-1'));
+ history[0].status='playing';assert(!waitingList(history,arrivals).some(e=>e.matchId==='de-w0-0'));
+});
