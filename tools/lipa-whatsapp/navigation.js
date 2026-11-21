@@ -15,7 +15,7 @@ function lipaOpenChat(contact,stage){
  const newChatOpen=()=>[...document.querySelectorAll('h1,h2,header,span')].some(el=>visible(el)&&/^(Nuevo chat|New chat)$/.test(clean(el.textContent)));
  if(stage==='closed'){
  const selection=globalThis.__lipaSelection;
- if(newChatOpen()||!selection||selection.phone!==contact.phone)return {closed:false};
+ if(newChatOpen()||!selection||selection.phone!==contact.phone)return {closed:false,diagnostic:{reason:newChatOpen()?'result-not-opened':'selection-missing'}};
  const main=document.querySelector('#main'),header=main?.querySelector('[data-testid="conversation-info-header-button"]')||main?.querySelector('header');
  if(!header||!main.querySelector('footer [contenteditable="true"][role="textbox"]'))return {closed:false};
  const labels=[...header.querySelectorAll('span[title],span[dir],a[href^="tel:"]')].filter(visible).map(el=>clean(el.getAttribute('title')||el.textContent));
@@ -48,6 +48,12 @@ function lipaOpenChat(contact,stage){
  const digits=value=>String(value||'').replace(/\D/g,'');
  const inputs=searchInputs();
  if(inputs.length!==1||digits(inputs[0].value??inputs[0].innerText??inputs[0].textContent)!==digits(contact.phone))return {waiting:true,diagnostic:{reason:'search-not-exact'}};
+ if(stage==='activate'){
+  const selection=globalThis.__lipaSelection;
+  if(!newChatOpen()||selection?.phone!==contact.phone||!selection.element?.isConnected||!visible(selection.element))return {waiting:true};
+  // Activate the actual result label; the click bubbles to WhatsApp's row handler.
+  selection.element.click();return {activated:true};
+ }
  const searchRect=inputs[0].getBoundingClientRect();
  const eligible=el=>{const r=el.getBoundingClientRect();return visible(el)&&!el.closest('#main,header')&&r.y>=searchRect.y+searchRect.height&&r.x>=searchRect.x-32&&r.x+r.width<=searchRect.x+searchRect.width+32&&point(el);};
  const textOf=el=>String(el.innerText||el.textContent||el.getAttribute('title')||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim();
@@ -66,8 +72,8 @@ function lipaOpenChat(contact,stage){
      parent=parent.parentElement;
    }
    surface=surface||el;
-   const target=point(surface);if(!target)return {waiting:true};
-   globalThis.__lipaSelection={...globalThis.__lipaNavigation,phone:contact.phone,label:clean(surface.querySelector?.("span[title],span[dir=auto]")?.textContent||textOf(el))};
+   const target=point(el)||point(surface);if(!target)return {waiting:true};
+   globalThis.__lipaSelection={...globalThis.__lipaNavigation,phone:contact.phone,element:el,label:clean(surface.querySelector?.("span[title],span[dir=auto]")?.textContent||textOf(el))};
    return {target,diagnostic:{reason:'selected-number-search-result',label:textOf(el),surface:surface===el?'text':'row'}};
  }
  let pane=inputs[0].parentElement;

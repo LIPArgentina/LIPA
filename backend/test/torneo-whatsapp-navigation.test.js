@@ -26,7 +26,7 @@ test('number search resolves saved alias and unsaved number with the same path',
  assert(fixture([{text:'+54 9 11 1234-5678'},{text:'+54 9 11 1234-5678',y:130}]).run().target);
  assert(fixture([{text:'Mi amigo',role:'row'}]).run().target);
 });
-test('number result clicks the complete interactive row instead of its text span',()=>{
+test('number result targets the visible label inside the contact row',()=>{
  const inputRect={x:100,y:10,width:400,height:40},rowRect={x:100,y:80,width:400,height:80},spanRect={x:140,y:100,width:120,height:20};
  const row={textContent:'+54 9 11 1234-5678',getClientRects:()=>[{}],getBoundingClientRect:()=>rowRect,closest:()=>null,contains:el=>el===span,querySelector:()=>span,parentElement:null,getAttribute:key=>key==='role'?'row':null};
  const span={textContent:'+54 9 11 1234-5678',innerText:'+54 9 11 1234-5678',getClientRects:()=>[{}],getBoundingClientRect:()=>spanRect,closest:selector=>selector.includes('[role="row"]')?row:null,contains:()=>false,querySelector:()=>null,parentElement:row,getAttribute:()=>null};
@@ -35,7 +35,7 @@ test('number result clicks the complete interactive row instead of its text span
  const body={};pane.parentElement=body;
  const document={body,activeElement:input,querySelectorAll:()=>[input],elementFromPoint:(x,y)=>y<60?input:(x>=spanRect.x&&x<=spanRect.x+spanRect.width&&y>=spanRect.y&&y<=spanRect.y+spanRect.height?span:row)};
  const ctx={location:{origin:'https://web.whatsapp.com'},document};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
- const result=ctx.lipaOpenChat({phone:'5491112345678'},'result');assert.equal(result.target.x,300);assert.equal(result.target.y,120);assert.equal(result.diagnostic.surface,'row');
+ const result=ctx.lipaOpenChat({phone:'5491112345678'},'result');assert.equal(result.target.x,200);assert.equal(result.target.y,110);assert.equal(result.diagnostic.surface,'row');
 });
 test('name and subtitle in a single avatar row count as one contact',()=>{
  const group={querySelector:()=>({}),contains:()=>false};
@@ -79,4 +79,18 @@ test('missing WhatsApp tab never creates one',async()=>{
  const ctx={workTab:null,job:{},stopping:false,chrome:{tabs:{query:async()=>[],create:async()=>{throw Error('Unexpected tab');}}}};
  vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('async function reuseWhatsAppTab'),source.indexOf('async function selectChat')),ctx);
  await assert.rejects(ctx.reuseWhatsAppTab(),/Abrí WhatsApp Web/);
+});
+
+test('fallback activates only the selected connected result for the current number',()=>{
+ const f=fixture([{text:'Lucas Pool'}]);
+ // Existing fixture exercises selection; activation below uses a visible current search.
+ assert(f.run().target);
+ let clicks=0;const input={value:'+5491112345678',getAttribute:()=>null,getClientRects:()=>[{}],closest:()=>null,getBoundingClientRect:()=>({x:0,y:0,width:100,height:30}),contains:()=>false};
+ const heading={textContent:'Nuevo chat',getClientRects:()=>[{}]};
+ const element={isConnected:true,getClientRects:()=>[{}],click(){clicks++;}};
+ const ctx={location:{origin:'https://web.whatsapp.com'},__lipaSelection:{phone:'5491112345678',element},document:{querySelectorAll:selector=>selector==='h1,h2,header,span'?[heading]:[input],elementFromPoint:()=>input}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
+ assert(ctx.lipaOpenChat({phone:'5491112345678'},'activate').activated);assert.equal(clicks,1);
+ input.value='+5491199999999';ctx.lipaOpenChat({phone:'5491112345678'},'activate');assert.equal(clicks,1);
+ input.value='+5491112345678';element.isConnected=false;ctx.lipaOpenChat({phone:'5491112345678'},'activate');assert.equal(clicks,1);
 });
