@@ -32,3 +32,5 @@ dialog.player-preview{position:fixed;inset:auto;margin:0;width:min(340px,calc(10
 .group-heading .column-search{position:absolute;right:30px;top:4px;width:240px;font-size:12px}
 
 .topbar nav{flex-wrap:wrap;justify-content:flex-end}.topbar{flex-wrap:wrap}
+
+.section-heading > .column-search{width:300px;max-width:100%;flex:0 1 300px;margin:0 0 0 auto}.section-heading{flex-wrap:wrap}

@@ -7,8 +7,8 @@
   const engine = window.LipaBracket, $ = s => document.querySelector(s);
   const API = String(window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const requestedCategory=new URLSearchParams(location.search).get('categoria');
-  let category=['primera','segunda','tercera'].includes(requestedCategory)?requestedCategory:'primera', data=null, state=null, pending=null, saving=false, requestId=0, conflicted=false;
-  let view='double', zoom=1;
+  let category=(viewer?['primera','segunda','tercera']:['segunda','tercera']).includes(requestedCategory)?requestedCategory:(viewer?'primera':'segunda'), data=null, state=null, pending=null, saving=false, requestId=0, conflicted=false;
+  let view='double', zoom=1, fitBoards=false;
   try { view=localStorage.getItem('lipa.bracket.view') || 'double'; } catch (_) {}
   if(!['simple','double'].includes(view)) view='double';
   document.querySelectorAll('[data-category]').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.category===category)));
@@ -303,7 +303,7 @@
     for(const [x,column] of [...columns].sort((a,b)=>a[0]-b[0])){
       const el=document.createElement('div');el.className='round-title';
       el.style.cssText=`left:${x}px;width:${W}px`;el.textContent=column.title.toUpperCase();
-      if(!viewer)el.append(LipaColumnSearch(column.cards,column.title,[category,data.drawRevision,view,boardId,x].join('/')));
+
       board.append(el);
     }
     let boardHeight=height+headerSpace;
@@ -326,7 +326,7 @@
   function renderGroups(){
     const board=$('#mainBoard'),frame=$('#mainFrame');board.replaceChildren();
     const players=new Map(data.players.map(p=>[String(p.id),p]));
-    const width=1620,groupHeight=1000,height=state.groups.length*groupHeight;
+    const width=1020,groupHeight=1000,height=state.groups.length*groupHeight;
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('connectors');svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('aria-hidden','true');board.append(svg);
     function textBox(text,x,y,cls='group-caption',w=240){const el=document.createElement('div');el.className=cls;el.textContent=text;el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px';board.append(el);return el;}
     function line(a,b){const mid=(a.x+b.x)/2;const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M '+a.x+' '+a.y+' H '+mid+' V '+b.y+' H '+b.x);svg.append(path);}
@@ -334,14 +334,14 @@
       const top=(group.number-1)*groupHeight,positions=new Map();
       const heading=textBox('GRUPO '+group.number,0,top+10,'group-heading',width);
       const groupCards=[];
-      textBox('PERDEDORES',240,top+65);textBox('PRIMERA RONDA',780,top+65);textBox('GANADORES',1050,top+65);
-      textBox('Clasificados',0,top+110);textBox('Cruce final',260,top+110);textBox('Primera instancia',520,top+110);textBox('8 jugadores',780,top+110);textBox('Segunda instancia',1040,top+110);textBox('Clasificados invictos',1300,top+110);
-      function place(m,x,y){const pos={x,y:top+y,center:top+y+64,width:240};positions.set(m.id,pos);groupCards.push(card(m,pos,board,players,false,x<780));}
-      group.initial.forEach((m,i)=>place(m,780,180+i*190));
-      group.winners.forEach((m,i)=>place(m,1040,275+i*380));
-      group.losers.forEach((m,i)=>place(m,520,275+i*380));
-      group.recovery.forEach((m,i)=>place(m,260,310+i*380));
-      if(!viewer)heading.append(LipaColumnSearch(groupCards,'Grupo '+group.number,[category,data.drawRevision,'group',group.number].join('/')));
+      textBox('PERDEDORES',0,top+65);textBox('PRIMERA RONDA',520,top+65);textBox('GANADORES',780,top+65);
+      textBox('Cruce final',0,top+110);textBox('Primera instancia',260,top+110);textBox('8 jugadores',520,top+110);textBox('Segunda instancia',780,top+110);
+      function place(m,x,y){const pos={x,y:top+y,center:top+y+64,width:240};positions.set(m.id,pos);groupCards.push(card(m,pos,board,players,false,x<520));}
+      group.initial.forEach((m,i)=>place(m,520,180+i*190));
+      group.winners.forEach((m,i)=>place(m,780,275+i*380));
+      group.losers.forEach((m,i)=>place(m,260,275+i*380));
+      group.recovery.forEach((m,i)=>place(m,0,310+i*380));
+
       for(const m of [...group.winners,...group.losers,...group.recovery]){
         const to=positions.get(m.id);
         m.sources.forEach((src,i)=>{const from=positions.get(src.matchId);if(!from)return;
@@ -349,19 +349,19 @@
           const left=from.x>to.x;line({x:left?from.x:from.x+240,y:from.center},{x:left?to.x+240:to.x,y:to.y+(i?102:30)});
         });
       }
-      textBox('Pierde → A',1040,top+425);textBox('Pierde → B',1040,top+805);
-      textBox('B · viene del cruce inferior',260,top+460);textBox('A · viene del cruce superior',260,top+840);
-      function qualifier(m,code,x){const pos=positions.get(m.id),p=players.get(m.winner),el=textBox('',x,pos.center-28,'group-qualifier',240);const label=document.createElement('strong');label.textContent=code;const name=document.createElement('span');name.textContent=p?.nombre||'Por definir';enablePreview(name,p,m);el.append(label,photo(p),name);line({x:x<pos.x?pos.x:pos.x+240,y:pos.center},{x:x<pos.x?x+240:x,y:pos.center});}
-      group.winners.forEach((m,i)=>qualifier(m,group.codes.g[i],1300));group.recovery.forEach((m,i)=>qualifier(m,group.codes.p[i],0));
+      textBox('Pierde → A',780,top+425);textBox('Pierde → B',780,top+805);
+      textBox('B · viene del cruce inferior',0,top+460);textBox('A · viene del cruce superior',0,top+840);
+      function qualifier(m,code,x,i){const pos=positions.get(m.id),p=players.get(m.winner),el=textBox('',x,top+(i?590:500),'group-qualifier',240);const label=document.createElement('strong');label.textContent=code;const name=document.createElement('span');name.textContent=p?.nombre||'Por definir';enablePreview(name,p,m);el.append(label,photo(p),name);line({x:x+120,y:i?top+648:pos.y+128},{x:x+120,y:i?pos.y:top+500});}
+      group.winners.forEach((m,i)=>qualifier(m,group.codes.g[i],780,i));group.recovery.forEach((m,i)=>qualifier(m,group.codes.p[i],0,i));
       textBox('A cruza abajo · B cruza arriba · Dos derrotas eliminan · Cuatro clasificados',0,top+940,'group-footer',width);
     });
     dimensions.push({board,frame,width,height});
   }
   function applyZoom() {
-    dimensions.forEach(({board,frame,width,height})=>{board.style.width=`${width}px`;board.style.height=`${height}px`;board.style.transform=`scale(${zoom})`;frame.style.width=`${width*zoom}px`;frame.style.height=`${height*zoom}px`;});
+    dimensions.forEach(({board,frame,width,height})=>{const scale=fitBoards?Math.max(.35,Math.min(1.2,(frame.parentElement.clientWidth-24)/width)):zoom;board.style.width=`${width}px`;board.style.height=`${height}px`;board.style.transform=`scale(${scale})`;frame.style.width=`${width*scale}px`;frame.style.height=`${height*scale}px`;});
     $('#zoom').value=Math.round(zoom*100);$('#zoomValue').textContent=`${Math.round(zoom*100)}%`;
   }
-  function fit() { if(!dimensions.length)return; const width=$('#mainFrame').parentElement.clientWidth-24;zoom=Math.max(.35,Math.min(1,width/Math.max(...dimensions.map(d=>d.width))));if(innerWidth<760)zoom=.85;applyZoom(); }
+  function fit() { if(!dimensions.length)return;fitBoards=innerWidth>=760;zoom=fitBoards?Math.max(.35,Math.min(1.2,($('#mainFrame').parentElement.clientWidth-24)/dimensions[0].width)):.85;applyZoom(); }
   function render() {
     closeCallHint();
     updatePublication();
@@ -375,6 +375,10 @@
     $('#repSection').hidden=Boolean(state.groups?.length)||!state.rep.length;
     if(!state.groups?.length&&state.rep.length)renderBoard(state.rep,'#repBoard','#repFrame',true);
     renderBoard(state.knockout,'#finalBoard','#finalFrame');
+    if(!viewer)for(const [section,board,title] of [['#mainSection','#mainBoard','fase de grupos'],['#finalSection','#finalBoard','eliminación directa']]){
+      const heading=$(section+' .section-heading');heading.querySelector('.column-search')?.remove();
+      heading.append(LipaColumnSearch([$(board)],title,[category,data.drawRevision,section].join('/')));
+    }
     $('#byeNote').textContent='Segunda oportunidad para quienes pierden en las primeras dos rondas. Sus ganadores se unen a los invictos en la eliminación directa. Los WO dan pase automático.';
     const realCount=data.players.filter(p=>p.id!==null).length;
     $('#mainSection .badge').textContent=`${realCount} jugadores · ${state.bracketSize-realCount} pases automáticos`;
@@ -521,7 +525,7 @@
     $('#bracketPanel').setAttribute('aria-labelledby',button.id);load();
   }));
   $('#viewToggle').addEventListener('click',()=>{view=view==='double'?'simple':'double';try{localStorage.setItem('lipa.bracket.view',view);}catch(_){}render();fit();});
-  $('#zoom').addEventListener('input',event=>{zoom=Number(event.target.value)/100;applyZoom();});
+  $('#zoom').addEventListener('input',event=>{fitBoards=false;zoom=Number(event.target.value)/100;applyZoom();});
   $('#fitView').addEventListener('click',fit);$('#retrySave').addEventListener('click',persist);
   $('#reload').addEventListener('click',()=>{pending=null;lockTabs(false);$('#retrySave').hidden=true;load();});
   window.addEventListener('beforeunload',event=>{if(pending || saving){event.preventDefault();event.returnValue='';}});

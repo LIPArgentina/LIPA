@@ -6,13 +6,13 @@
   <title>Grilla del torneo | LIPA</title>
   <link rel="icon" href="../logo_liga.png">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./grilla.css?v=groups-segunda-1">
+  <link rel="stylesheet" href="./grilla.css?v=compact-groups-1">
   <script src="../config.js?v=rodry-1"></script>
   <script src="./mesas.js?v=1" defer></script>
   <script src="./grilla-engine.js?v=groups-segunda-1" defer></script>
   <script src="./grilla-layout.js?v=groups-segunda-1" defer></script>
   <script src="./grilla-busqueda.js?v=1" defer></script>
-  <script src="./grilla.js?v=mesas-evento-1" defer></script>
+  <script src="./grilla.js?v=compact-groups-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -22,7 +22,6 @@
   <main>
     <div class="toolbar">
       <div class="tabs" role="tablist" aria-label="Categorías">
-        <button type="button" role="tab" id="tab-primera" aria-controls="bracketPanel" aria-selected="true" data-category="primera">PRIMERA</button>
         <button type="button" role="tab" id="tab-segunda" aria-controls="bracketPanel" aria-selected="false" data-category="segunda">SEGUNDA</button>
         <button type="button" role="tab" id="tab-tercera" aria-controls="bracketPanel" aria-selected="false" data-category="tercera">TERCERA</button>
       </div>
@@ -30,7 +29,7 @@
     </div>
     <div class="savebar"><span id="saveStatus" role="status">Cargando grilla…</span><button id="retrySave" type="button" hidden>Reintentar guardado</button><button id="reload" type="button" hidden>Recargar</button></div>
     <div class="savebar" id="publication" hidden><span id="publicationStatus" role="status"></span><button id="publishGrid" type="button">Publicar grilla</button><button id="resetGrid" type="button">Resetear grilla completa</button><button id="restoreGrid" type="button" disabled>Recargar última grilla</button></div>
-    <section id="bracketPanel" role="tabpanel" aria-labelledby="tab-primera">
+    <section id="bracketPanel" role="tabpanel" aria-labelledby="tab-segunda">
       <div id="emptyState" hidden></div>
       <section id="mainSection" class="bracket-section" hidden><div class="section-heading"><div><small>PRIMERAS DOS RONDAS</small><h2>Llave de ganadores</h2></div><span class="badge">Doble eliminación</span></div><div class="board-scroll"><div id="mainFrame" class="board-frame"><div id="mainBoard" class="board"></div></div></div></section>
       <section id="repSection" class="bracket-section repechage" hidden><div class="section-heading"><div><small>SEGUNDA OPORTUNIDAD</small><h2>Llave de perdedores</h2></div><span class="badge">Segunda oportunidad</span></div><p id="byeNote" class="bye-note"></p><div class="board-scroll"><div id="repFrame" class="board-frame"><div id="repBoard" class="board"></div></div></div></section>
