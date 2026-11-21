@@ -103,3 +103,11 @@ test('selects title name with emoji instead of broad result row or status subtit
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
  const result=ctx.lipaOpenChat({phone:'5491112345678',name:'Nombre distinto en LIPA'},'result');assert.equal(result.target.x,180);assert.equal(result.target.y,112);assert.equal(result.diagnostic.label,'Germán 👨🏻‍🏭 Pool');assert.equal(ctx.__lipaSelection.element,label);
 });
+
+test('unsaved-number loading message is not clicked; real number is selected when ready',()=>{
+ for(const text of ['Buscando fuera de tus contactos…','Buscando fuera de tus contactos...','Searching outside your contacts…','Cargando…']){
+  const pending=fixture([{text}]).run();assert(!pending.target,text);assert.equal(pending.diagnostic.reason,'number-search-in-progress');
+ }
+ const ready=fixture([{text:'+54 9 11 1234-5678'}]).run();assert(ready.target);assert.equal(ready.diagnostic.label,'+54 9 11 1234-5678');
+ assert(!fixture([{text:'Buscando fuera de tus contactos…'},{text:'Contacto anterior',y:130}]).run().target);
+});

@@ -91,17 +91,20 @@ function lipaOpenChat(contact,stage){
  }
  let pane=inputs[0].parentElement;
  while(pane&&pane!==document.body){
+   const nodes=[...pane.querySelectorAll('[role="listitem"],[role="row"],span,[dir="auto"]')].filter(eligible);
+   // WhatsApp searches unsaved numbers asynchronously; these are status messages,
+   // never a contact row. Wait until the search has actually completed.
+   if(nodes.some(el=>/^(buscando(?:\s|[.…])|searching(?:\s|[.…])|cargando(?:\s|[.…])|loading(?:\s|[.…]))/i.test(textOf(el))))return {waiting:true,diagnostic:{reason:'number-search-in-progress'}};
    const named=[...pane.querySelectorAll('span[title][dir=auto]')].filter(el=>eligible(el)&&el.getAttribute('title'));
    const exact=named.filter(el=>isPhone(el.getAttribute('title'))&&samePhone(el.getAttribute('title'),contact.phone));
    if(exact.length===1)return selected(exact[0]);
    if(named.length===1&&!isPhone(named[0].getAttribute('title')))return selected(named[0]);
-   const nodes=[...pane.querySelectorAll('[role="listitem"],[role="row"],span,[dir="auto"]')].filter(eligible);
    const phones=nodes.filter(el=>isPhone(textOf(el))&&samePhone(textOf(el),contact.phone));
    // A repeated phone heading/subtitle identifies the same destination.
    if(phones.length)return selected(phones[0]);
    const rows=nodes.filter(el=>['row','listitem'].includes(el.getAttribute('role')));
    const leafRows=rows.filter(el=>!rows.some(other=>other!==el&&el.contains(other)));
-   const labels=nodes.filter(el=>textOf(el)&&!isPhone(textOf(el))&&!/^(usuarios que|contacts|contactos|nuevo |new |buscar|search)/i.test(textOf(el)));
+   const labels=nodes.filter(el=>textOf(el)&&!isPhone(textOf(el))&&!/^(usuarios que|contacts|contactos|nuevo |new |busca|search|cargando|loading)/i.test(textOf(el)));
    const candidates=leafRows.length?leafRows:labels;
    if(candidates.length){
      const groups=new Map();
