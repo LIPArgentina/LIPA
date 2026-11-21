@@ -43,6 +43,20 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
         FROM (SELECT DISTINCT ON(match_id) match_id,a,b,piso,mesa FROM torneo_llamados
           WHERE organizador_id=g.torneo_organizador_id AND categoria=g.categoria AND sorteo_revision=g.sorteo_revision
           ORDER BY match_id,id DESC) m),'{}'::jsonb) WHERE g.mesas IS NULL;
+
+      -- Requested pre-tournament cleanup: one execution per organizer, with backup.
+      CREATE TABLE IF NOT EXISTS torneo_limpiezas_historial (
+        organizador_id INTEGER NOT NULL REFERENCES torneo_organizadores(id),
+        clave TEXT NOT NULL, respaldo JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY(organizador_id,clave));
+      WITH limpieza AS (
+        INSERT INTO torneo_limpiezas_historial(organizador_id,clave,respaldo)
+        SELECT o.id,'pre-torneo-2026-11-22',COALESCE((
+          SELECT jsonb_agg(to_jsonb(t)) FROM torneo_partidos_tiempos t WHERE t.organizador_id=o.id
+        ),'[]'::jsonb)
+        FROM torneo_organizadores o WHERE o.slug='rodry-baygo-torneos'
+        ON CONFLICT(organizador_id,clave) DO NOTHING RETURNING organizador_id
+      ) DELETE FROM torneo_partidos_tiempos t USING limpieza l WHERE t.organizador_id=l.organizador_id;
     `).catch(error => { ready = null; throw error; });
     return ready;
   }
