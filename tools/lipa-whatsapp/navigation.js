@@ -48,6 +48,15 @@ function lipaOpenChat(contact,stage){
  const digits=value=>String(value||'').replace(/\D/g,'');
  const inputs=searchInputs();
  if(inputs.length!==1||digits(inputs[0].value??inputs[0].innerText??inputs[0].textContent)!==digits(contact.phone))return {waiting:true,diagnostic:{reason:'search-not-exact'}};
+ if(stage==='focusResult'){
+  const selection=globalThis.__lipaSelection,el=selection?.element;
+  if(!newChatOpen()||selection?.phone!==contact.phone||!el?.isConnected||!visible(el)||!point(el))return {focused:false};
+  const target=el.closest('[tabindex],[role=button],[role=row],[role=listitem]')||el;
+  if(target.closest('#main,header'))return {focused:false};
+  if(!target.hasAttribute('tabindex'))target.setAttribute('tabindex','-1');
+  target.focus({preventScroll:true});
+  return {focused:document.activeElement===target};
+ }
  if(stage==='activate'){
   const selection=globalThis.__lipaSelection;
   if(!newChatOpen()||selection?.phone!==contact.phone||!selection.element?.isConnected||!visible(selection.element))return {waiting:true};

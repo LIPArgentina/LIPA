@@ -60,6 +60,15 @@ function lipaBrowserControl(api) {
       try{await api.debugger.sendCommand({tabId},'Page.disable',{});}catch(_){}
     }
   }
-  return {connect,click,fillCaption,release,navigate};
+  async function activateResult(tabId,contact,cancelled=()=>false){
+    await verify(tabId);if(attached!==tabId||cancelled())throw Error('Tanda detenida.');
+    const result=await api.scripting.executeScript({target:{tabId},func:lipaOpenChat,args:[contact,'focusResult']});
+    if(!result[0]?.result?.focused)return false;
+    if(cancelled())return false;
+    await api.debugger.sendCommand({tabId},'Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+    await api.debugger.sendCommand({tabId},'Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+    return true;
+  }
+  return {connect,click,fillCaption,release,navigate,activateResult};
 }
 if(typeof module==='object')module.exports=lipaBrowserControl;

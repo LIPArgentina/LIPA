@@ -199,6 +199,6 @@ async function selectChat(contact){
  await browserControl.click(workTab,result.target,()=>stopping);
  await pause(600);
  const opened=await probe('closed');
- if(!opened.closed){if(opened.diagnostic?.reason==='result-not-opened')await probe('activate');await wait('closed',r=>r.closed);}
+ if(!opened.closed){if(opened.diagnostic?.reason==='result-not-opened')await browserControl.activateResult(workTab,contact,()=>stopping);await wait('closed',r=>r.closed);}
  if(!job.media){const composer=await rawStep(workTab,contact,'composer');if(!composer.target)throw Error(composer.error||'No se encontró el campo de mensaje.');await browserControl.fillCaption(workTab,composer.target,job.message,()=>stopping);}
 }

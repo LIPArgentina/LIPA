@@ -45,3 +45,13 @@ test('navigation handles only its own beforeunload and removes handler afterward
  assert(!commands.some(c=>c.m.startsWith('Input.')));
  removed=false;await assert.rejects(control.navigate(7,async()=>{throw Error('timeout');}));assert(removed);
 });
+
+test('result activation sends Enter only after focusing the current search result',async()=>{
+ const vm=require('node:vm'),fs=require('node:fs');const calls=[];let focused=false;
+ const api={tabs:{get:async()=>({active:true,url:'https://web.whatsapp.com/'})},permissions:{contains:async()=>true},scripting:{executeScript:async()=>[{result:{focused}}]},debugger:{attach:async()=>{},detach:async()=>{},sendCommand:async(t,m,p)=>calls.push({m,p}),onDetach:{addListener(){}}}};
+ const ctx={URL,lipaOpenChat(){},api};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/control'),'utf8'),ctx);
+ const control=ctx.lipaBrowserControl(api);await control.connect(7);
+ assert.equal(await control.activateResult(7,{phone:'123'}),false);assert.equal(calls.length,0);
+ focused=true;assert.equal(await control.activateResult(7,{phone:'123'}),true);assert.deepEqual(calls.map(c=>c.p.type),['keyDown','keyUp']);
+ assert(calls.every(c=>c.p.key==='Enter'));assert.equal(await control.activateResult(7,{phone:'123'},()=>false),true);
+});
