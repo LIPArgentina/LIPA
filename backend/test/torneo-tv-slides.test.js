@@ -9,4 +9,3 @@ test('TV starts with eight Tercera groups, adds assigned Segunda and knockout, r
  data.timings[state.knockout[0][0].id]={assignedAt:'2026-11-21T10:00:00Z'};assert.equal(select(state,category,data).knockout,true);
  }
 });
-
