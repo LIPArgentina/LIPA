@@ -11,12 +11,12 @@
  function line(d,x1,y1,x2,y2){const path=document.createElementNS(ns,'path'),mid=(x1+x2)/2;path.setAttribute('d','M '+x1+' '+y1+' H '+mid+' V '+y2+' H '+x2);d.svg.append(path);}
  function card(d,m,x,y,players,w=200){const el=document.createElement('div');el.className='tv-match';el.dataset.match=m.id;el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px';el.append(player(m.a,m.score[0],players,m.woA,m.winner),player(m.b,m.score[1],players,m.woB,m.winner));d.root.append(el);return {x,y,center:y+38,width:w};}
  function qualified(d,m,x,y,players,champion=false){const el=document.createElement('div');el.className='tv-qualified';el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+(champion?200:260)+'px';const title=document.createElement('strong');title.textContent=champion?'CAMPEÓN':'CLASIFICADO';const row=player(m.winner,null,players,false,null);row.lastElementChild.remove();el.append(title,row);d.root.append(el);}
- function groupTile(category,state,group,players){const d=drawing(category.toUpperCase()+' · GRUPO '+group.number,1680,450),pos=new Map();
+ function groupTile(category,state,group,players){const d=drawing(category.toUpperCase()+' · GRUPO '+group.number,1360,480),pos=new Map();
  const add=(m,x,y)=>pos.set(m.id,card(d,m,x,y,players,260));
- group.initial.forEach((m,i)=>add(m,840,50+i*90));group.winners.forEach((m,i)=>add(m,1120,95+i*180));group.losers.forEach((m,i)=>add(m,560,95+i*180));group.recovery.forEach((m,i)=>add(m,280,110+i*180));
+ group.initial.forEach((m,i)=>add(m,690,70+i*84));group.winners.forEach((m,i)=>add(m,970,95+i*290));group.losers.forEach((m,i)=>add(m,410,95+i*290));group.recovery.forEach((m,i)=>add(m,130,95+i*290));
  for(const m of [...group.winners,...group.losers,...group.recovery])m.sources.forEach((src,i)=>{if(group.recovery.includes(m)&&i===1)return;const a=pos.get(src.matchId),b=pos.get(m.id),left=a.x>b.x;line(d,left?a.x:a.x+260,a.center,left?b.x+260:b.x,b.y+(i?57:19));});
- group.recovery.forEach((m,i)=>{qualified(d,m,0,135+i*180,players);line(d,280,pos.get(m.id).center,260,159+i*180);});
- group.winners.forEach((m,i)=>{qualified(d,m,1400,120+i*180,players);line(d,1380,pos.get(m.id).center,1400,144+i*180);});
+ group.recovery.forEach((m,i)=>{const y=220+i*90,p=pos.get(m.id);qualified(d,m,0,y,players);line(d,p.x+130,i?p.y:p.y+76,130,i?y+56:y);});
+ group.winners.forEach((m,i)=>{const y=220+i*90,p=pos.get(m.id);qualified(d,m,1100,y,players);line(d,p.x+130,i?p.y:p.y+76,1230,i?y+56:y);});
  return d.tile;
  }
  function knockoutTile(category,state,players){const rounds=state.knockout,depth=rounds.length-1,width=(depth*2+1)*220,height=Math.max(360,rounds[0].length/2*82+62),d=drawing(category.toUpperCase(),width,height),pos=new Map();
