@@ -5,13 +5,16 @@ const express=require('express');
 const path=require('path');
 const mount=require('../src/routes/torneosVisor.routes');
 function fixture(){
-  const sessions=new Map(),avisos=[],llamados=[];
+  const sessions=new Map(),avisos=[],llamados=[],times=new Map();
   const players=Array.from({length:8},(_,i)=>({id:String(i+1),jugador_id:i+101,nombre:'Jugador de prueba '+(i+1),position:i+1,foto_path:'',dni:String(30000000+i)}));
   players.forEach(p=>{p.en_sala=true;p.categoria='primera';});
   const saved={jugadores:players,resultados:{},revision:0,sorteo_revision:1,control_revision:0,categoria:'primera',mesas:{}};
   const draw={visible:true,orden:players.map(p=>p.id),habilitados:players.map(p=>p.id)};
   const result=rows=>({rows});
   const pool={release(){},async connect(){return pool;},async query(sql,args=[]){
+    if(sql.startsWith('SELECT categoria,sorteo_revision,entries FROM torneo_partidos_tiempos'))return result([...times].map(([key,entries])=>({categoria:key.split('|')[1],sorteo_revision:Number(key.split('|')[2]),entries})));
+    if(sql.startsWith('SELECT entries FROM torneo_partidos_tiempos'))return result([{entries:times.get(args.slice(0,3).join('|'))||[]}]);
+    if(sql.startsWith('INSERT INTO torneo_partidos_tiempos')){times.set(args.slice(0,3).join('|'),JSON.parse(args[3]));return result([]);}
     if(sql.includes('CREATE TABLE')||sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK')return result([]);
     if(sql.includes('INSERT INTO torneo_visor_sesiones')){sessions.set(args[0],{jugador_id:args[1]});return result([]);}
     if(sql.includes('SELECT s.jugador_id')){const s=sessions.get(args[0]);return result(s?[{...s,nombre:players.find(p=>p.jugador_id===s.jugador_id).nombre}]:[]);}
@@ -23,7 +26,7 @@ function fixture(){
     if(sql.startsWith('UPDATE torneo_grillas SET mesas=')){saved.mesas=JSON.parse(args[0]);saved.control_revision++;return result([]);}
     if(sql.includes('SELECT id FROM torneo_organizadores'))return result([{id:1}]);
     if(sql.includes('SELECT mesas_habilitadas FROM torneo_organizadores'))return result([{mesas_habilitadas:saved.mesas_habilitadas}]);
-    if(sql.includes('SELECT g.* FROM torneo_grillas') || sql.includes('SELECT g.sorteo_revision,g.publicada_at'))return result(args[1]==='primera'?[saved]:[]);
+    if(sql.includes('SELECT g.* FROM torneo_grillas') || sql.includes('SELECT g.sorteo_revision,g.publicada_at'))return result(args.length===1||args[1]==='primera'?[saved]:[]);
     if(sql.startsWith('UPDATE torneo_grillas SET control_revision=')){saved.control_revision++;return result([]);}
     if(sql.includes('AS habilitados') && sql.includes('g.publicada_at IS NOT NULL') && sql.includes('s.revision=g.sorteo_revision'))return result((args[3] || draw.visible) && args[1]==='primera'?[{...saved,...draw}]:[]);
     if(sql.startsWith('LOCK TABLE'))return result([]);
@@ -79,12 +82,14 @@ else test('DNI session, read-only API, private calls and organizer authorization
   });}
   try{
     assert.equal((await request('torneo-visor/grilla/primera')).status,401);
+    assert.equal((await request('torneo-organizador/lista-espera')).status,403);
+    const queue=await request('torneo-organizador/lista-espera',null,null,true);assert.equal(queue.status,200);assert.equal((await queue.json()).waiting.length,4);
     const tv=await request('torneo-visor/tv/primera');
     assert.equal(tv.status,200);
     const tvGrid=await tv.json();
     assert.equal(tvGrid.players.length,8);
     assert.deepEqual(Object.keys(tvGrid.players[0]).sort(),['fotoUrl','id','nombre']);
-    assert.equal(tvGrid.assignments,undefined);
+    assert.deepEqual(tvGrid.assignments,{});
     assert.equal((await request('torneo-visor/tv/invalid')).status,400);
     assert.equal((await request('torneo-visor/tv/primera',{},null,false,'PATCH')).status,404);
     assert.equal((await request('torneo-visor/login',{dni:'99999999'})).status,403);

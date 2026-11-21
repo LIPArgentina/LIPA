@@ -34,3 +34,9 @@ dialog.player-preview{position:fixed;inset:auto;margin:0;width:min(340px,calc(10
 .topbar nav{flex-wrap:wrap;justify-content:flex-end}.topbar{flex-wrap:wrap}
 
 .section-heading > .column-search{width:300px;max-width:100%;flex:0 1 300px;margin:0 0 0 auto}.section-heading{flex-wrap:wrap}
+
+.match-playing{outline:1px solid #42db79}.match-finished{outline:1px solid #e76060}
+.match-playing:before,.match-finished:before{position:absolute;top:-13px;right:2px;font:700 9px Arial;letter-spacing:.03em;content:'EN JUEGO';color:#42db79}
+.match-finished:before{content:'TERMINADO';color:#e76060}
+.match-clock{position:absolute;top:100%;left:0;right:0;text-align:center;font:600 10px Arial;color:#d7d4bc;line-height:14px}
+.waiting-target{box-shadow:0 0 0 3px #ffd245,0 0 20px #ffd245}

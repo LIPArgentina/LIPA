@@ -1,3 +1,4 @@
+const timing=require('../torneoTiempos');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const bracket = require('../../../frontend/torneos/grilla-engine');
@@ -123,6 +124,20 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     await pool.query(`INSERT INTO torneo_visor_sesiones(token_hash,jugador_id,expires_at,installation_id) VALUES($1,$2,NOW()+INTERVAL '180 days',$3)`,[hash(token),rows[0].id,String(req.body?.installationId || '').slice(0,160)]);
     res.json({token,nombre:rows[0].nombre,categoria:await playerDivision(rows[0].id)});
   }));
+  router.get('/torneo-organizador/lista-espera',requireTorneoOrganizador,route(async(req,res)=>{
+    const id=req.user.torneoOrganizadorId,client=await pool.connect();
+    try{
+      await client.query('BEGIN');await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE',[id]);
+      const {rows:grids}=await client.query('SELECT g.* FROM torneo_grillas g JOIN torneo_sorteos s USING(torneo_organizador_id,categoria) WHERE g.torneo_organizador_id=$1 AND g.sorteo_revision=s.revision',[id]);
+      for(const g of grids)await timing.sync(client,id,g.categoria,g);
+      const {rows:logs}=await client.query('SELECT categoria,sorteo_revision,entries FROM torneo_partidos_tiempos WHERE organizador_id=$1 ORDER BY categoria,sorteo_revision',[id]);
+      await client.query('COMMIT');
+      const active=new Set(grids.map(g=>g.categoria+'/'+g.sorteo_revision));
+      const history=logs.flatMap(g=>g.entries.map(e=>({...e,category:g.categoria,drawRevision:g.sorteo_revision,current:active.has(g.categoria+'/'+g.sorteo_revision)&&!e.archived})));
+      const waiting=history.filter(e=>e.current&&e.status==='waiting').sort((a,b)=>a.readyAt.localeCompare(b.readyAt)||a.category.localeCompare(b.category)||a.matchId.localeCompare(b.matchId));
+      res.json({waiting,history,players:grids.flatMap(g=>g.jugadores.filter(p=>p.id).map(p=>({id:p.id,nombre:p.nombre,category:g.categoria}))),serverTime:Date.now()});
+    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  }));
   router.get('/torneo-visor/session',route(async(req,res)=>{const user=await session(req);res.json({nombre:user.nombre,categoria:await playerDivision(user.jugador_id)});}));
   router.post('/torneo-visor/logout',route(async(req,res)=>{const user=await session(req);await pool.query('DELETE FROM torneo_visor_sesiones WHERE token_hash=$1',[user.tokenHash]);res.json({ok:true});}));
   async function currentGrid(id,category,db,includeDraft=false) {
@@ -149,7 +164,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const saved=await currentGrid(id,category,pool,true);
     const players=saved.jugadores.map(p=>({id:p.id,nombre:p.nombre,wo:p.wo,fotoUrl:photoUrl(p)}));
     const state=bracket.build(players,saved.resultados,category);
-    res.json({players,results:state.clean,revision:saved.revision,drawRevision:saved.sorteo_revision});
+    res.json({timings:timing.current(await timing.read(pool,id,category,saved.sorteo_revision)),serverTime:Date.now(),assignments:{...await assignments(id,category,saved.sorteo_revision),...(saved.mesas||{})},players,results:state.clean,revision:saved.revision,drawRevision:saved.sorteo_revision});
   }));
   router.get('/torneo-visor/grilla/:categoria',route(async(req,res)=>{
     await session(req);
@@ -163,7 +178,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const state=bracket.build(players,saved.resultados,category);
     const registered=new Set(players.map(p=>p.id)),reservations=mesas.active(saved.mesas,state);
     const present=(await presentPlayers(id,category)).filter(entrant=>registered.has(entrant));
-    res.json({players,results:state.clean,revision:saved.revision,drawRevision:saved.sorteo_revision,present,
+    res.json({timings:timing.current(await timing.read(pool,id,category,saved.sorteo_revision)),serverTime:Date.now(),players,results:state.clean,revision:saved.revision,drawRevision:saved.sorteo_revision,present,
       assignments:{...await assignments(id,category,saved.sorteo_revision),...reservations},reservations});
   }));
   router.get('/torneo-visor/avisos',route(async(req,res)=>{
@@ -234,7 +249,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     if(!saved)throw fail(404,'No hay grilla para esta categoría.');
     res.locals.lecturaVisor=true;
     const [owner,locations,present,occupied]=await Promise.all([organizer(),organizerAssignments(id,category,saved.sorteo_revision),presentPlayers(id,category),occupiedTables(pool,id)]);
-    res.json({canPublish:id===owner,published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,revision:saved.revision,controlRevision:saved.control_revision,backupDate:saved.respaldo_fecha,assignments:locations,present,occupied,enabledTables:saved.mesas_habilitadas??allTables});
+    res.json({timings:timing.current(await timing.read(pool,id,category,saved.sorteo_revision)),serverTime:Date.now(),canPublish:id===owner,published:Boolean(saved.publicada_at),drawRevision:saved.sorteo_revision,revision:saved.revision,controlRevision:saved.control_revision,backupDate:saved.respaldo_fecha,assignments:locations,present,occupied,enabledTables:saved.mesas_habilitadas??allTables});
   }));
   require('./torneosReset.routes')(router,{pool,route,requireTorneoOrganizador,readGrid,occupiedTables});
   router.post('/torneo-organizador/grilla/:categoria/:accion(publicar|ocultar)',requireTorneoOrganizador,route(async(req,res)=>{
@@ -293,6 +308,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       if(release)delete locations[match.id];else locations[match.id]={mesa,piso,a:match.a,b:match.b};
       await client.query('UPDATE torneo_grillas SET mesas=$1::jsonb,control_revision=control_revision+1 WHERE torneo_organizador_id=$2 AND categoria=$3',[JSON.stringify(locations),id,category]);
     }
+    await timing.sync(client,id,category,saved,{matchId:match.id,table:release?null:{mesa,piso},release});
     return context;
   }
   router.post('/torneo-organizador/grilla/:categoria/mesa',requireTorneoOrganizador,route(async(req,res)=>{
@@ -317,6 +333,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       callId=String(rows[0].id);
       for (const player of [a,b]) await client.query('INSERT INTO torneo_avisos(llamado_id,jugador_id,mensaje,clave_pendiente,inscripcion_id) VALUES($1,$2,$3,$4,$5)',[callId,player.jugador_id,mensaje,destinations.get(player.jugador_id),player.id]);
       await client.query('UPDATE torneo_grillas SET control_revision=control_revision+1 WHERE torneo_organizador_id=$1 AND categoria=$2',[req.user.torneoOrganizadorId,req.params.categoria]);
+      await timing.sync(client,req.user.torneoOrganizadorId,req.params.categoria,saved,{matchId:match.id,call:true,table:{mesa,piso}});
       await client.query('COMMIT');
     } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
     if (firebase) {

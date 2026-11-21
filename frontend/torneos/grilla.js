@@ -122,6 +122,7 @@
     node.title=match.label+' — '+match.sources.map(sourceLabel).join(' / ');
     node.append(label,playerRow(match.a,match,0,players),callControls(match),playerRow(match.b,match,1,players));
     if(!viewer)updateReceipts(node,data.assignments?.[match.id]);
+    LipaMatchClock.paint(node,data.timings?.[match.id],data.timeOffset||0);
     board.append(node);
     return node;
   }
@@ -154,6 +155,8 @@
           updateReceipts(card,assignment);
         }
       }
+      grid.timings=info.timings||{};grid.timeOffset=info.serverTime?info.serverTime-Date.now():0;
+      for(const node of document.querySelectorAll('article[data-match-id]'))LipaMatchClock.paint(node,grid.timings[node.dataset.matchId],info.serverTime?info.serverTime-Date.now():0);
       grid.assignments=info.assignments;
       grid.backupDate=info.backupDate;grid.published=info.published;updatePublication();
       if(JSON.stringify([grid.occupied,grid.present,grid.enabledTables])!==JSON.stringify([info.occupied,info.present,info.enabledTables])){
@@ -408,7 +411,7 @@
     if(!pending || saving)return;saving=true;$('#retrySave').hidden=true;status('Guardando resultado…');
     try {
       const result=await api('PATCH',pending);
-      data.results=result.results;data.revision=result.revision;state=engine.build(data.players,data.results,category);
+      data.results=result.results;data.timings=result.timings||data.timings;data.revision=result.revision;state=engine.build(data.players,data.results,category);
       data.occupied=(data.occupied || []).filter(t=>t.category!==category || state.matches.some(m=>m.id===t.matchId && !m.winner && m.a===t.a && m.b===t.b));
       pending=null;status(result.cleared.length?'Guardado. Se actualizaron los cruces afectados.':'Todos los resultados guardados.');lockTabs(false);
     } catch(error) {
@@ -507,11 +510,13 @@
         if(!result.ok)throw new Error('No se pudieron cargar las mesas.');
         const info=await result.json();
         if(info.drawRevision!==undefined && info.drawRevision!==response.drawRevision)throw new Error('Cambió el sorteo. Recargá la categoría.');
-        Object.assign(response,{present:info.present,occupied:info.occupied,enabledTables:info.enabledTables,assignments:info.assignments,canPublish:info.canPublish,published:info.published,backupDate:info.backupDate});
+        Object.assign(response,{timings:info.timings,timeOffset:info.serverTime?info.serverTime-Date.now():0,serverTime:info.serverTime,present:info.present,occupied:info.occupied,enabledTables:info.enabledTables,assignments:info.assignments,canPublish:info.canPublish,published:info.published,backupDate:info.backupDate});
       }
       if(request!==requestId)return;
       data=response;state=engine.build(data.players,data.results,category);
       $('#mainSection').hidden=false;$('#repSection').hidden=false;$('#finalSection').hidden=false;status(viewer?'Actualización automática cada 10 segundos.':data.legacyResults?'Formato actualizado: se conservan las primeras dos rondas compatibles; los resultados de las etapas reemplazadas quedan archivados.':'Resultados guardados automáticamente.');render();fit();
+      const target=new URLSearchParams(location.search).get('partido');
+      if(target){const node=[...document.querySelectorAll('article[data-match-id]')].find(el=>el.dataset.matchId===target);if(node){node.scrollIntoView({block:'center',inline:'center'});node.classList.add('waiting-target');}}
     } catch(error) {
       if(request!==requestId)return;
       if(viewer && error.status===404){showPendingDraw();return;}

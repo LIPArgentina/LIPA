@@ -91,3 +91,5 @@ html{font-size:14px}button,.organizer-card a{font-family:inherit;font-size:.78re
 }
 
 #diffusionModal{max-height:90vh;overflow-y:auto}#diffusionVisual img,#diffusionVisual video{display:block;max-width:100%;max-height:240px;object-fit:contain;margin:10px auto}#diffusionCaption{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}#diffusionFileName{font-size:11px;overflow-wrap:anywhere}#diffusionAttachment{max-width:100%}
+
+.waiting-link{color:#ffcf39;text-decoration:none;border:1px solid #b98f00;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:bold}

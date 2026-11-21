@@ -24,3 +24,10 @@ body::before{top:0;right:0;bottom:0;left:0;z-index:0}
 .tv-rotation-controls button{display:inline-block;height:35px;min-width:44px;margin-left:5px;padding:4px 12px;border:1px solid #c59d28;border-radius:7px;background:#171b21;color:#ffd245;font:bold 17px Arial,sans-serif;cursor:pointer}
 .tv-rotation-controls button:hover,.tv-rotation-controls button:focus,.tv-rotation-controls button[aria-pressed="true"]{background:#ffd245;color:#111;outline:2px solid #fff}
 .has-rotation-controls #screenStatus{right:270px}
+
+.match-playing{outline:1px solid #42db79}.match-finished{outline:1px solid #e76060}
+.match-playing:before,.match-finished:before{position:absolute;top:-13px;right:2px;font:700 9px Arial;letter-spacing:.03em;content:'EN JUEGO';color:#42db79}
+.match-finished:before{content:'TERMINADO';color:#e76060}
+.match-clock{position:absolute;top:100%;left:0;right:0;text-align:center;font:600 10px Arial;color:#d7d4bc;line-height:14px}
+.waiting-target{box-shadow:0 0 0 3px #ffd245,0 0 20px #ffd245}
+.has-rotation-controls #screenStatus{right:420px}

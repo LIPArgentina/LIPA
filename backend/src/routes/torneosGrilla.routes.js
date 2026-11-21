@@ -1,3 +1,4 @@
+const timing=require('../torneoTiempos');
 const bracket = require('../../../frontend/torneos/grilla-engine');
 const { photoUrl } = require('../torneoFoto');
 const categories = require('../../../frontend/torneos/categorias');
@@ -53,13 +54,14 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
       const players = saved.jugadores.map(p=>({...p,
         nombre:currentPlayers.get(p.id).nombre, foto_path:currentPlayers.get(p.id).foto_path
       }));
+      const timings=await timing.sync(client,organizer,category,{...saved,jugadores:players});
       await client.query('COMMIT');
       res.set('Cache-Control','no-store');
       const publicPlayers=players.map(player=>{
         const {foto_path,...info}=player;
         return {...info,fotoUrl:photoUrl(player)};
       });
-      res.json({players:publicPlayers, results:bracket.build(players,saved.resultados,category).clean, legacyResults:Object.keys(saved.resultados||{}).some(id=>!bracket.build(players,{},category).matches.some(m=>m.id===id)), revision:saved.revision, drawRevision:saved.sorteo_revision});
+      res.json({timings,players:publicPlayers, results:bracket.build(players,saved.resultados,category).clean, legacyResults:Object.keys(saved.resultados||{}).some(id=>!bracket.build(players,{},category).matches.some(m=>m.id===id)), revision:saved.revision, drawRevision:saved.sorteo_revision});
     } catch(error) {
       if(client) await client.query('ROLLBACK').catch(()=>{});
       if(!error.status) console.error('GET torneo grilla',error);
@@ -91,8 +93,9 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
       const {rows: updated}=await client.query(`UPDATE torneo_grillas SET resultados_anteriores=CASE WHEN EXISTS (SELECT 1 FROM jsonb_object_keys(resultados) AS k(id) WHERE id !~ '^(de-[wl][01]-|mx-k|gx-k)' OR (((jsonb_array_length(jugadores)>32 AND jsonb_array_length(jugadores)<=64) OR (categoria='segunda' AND jsonb_array_length(jugadores)>16 AND jsonb_array_length(jugadores)<=32)) AND id ~ '^mx-k')) THEN resultados_anteriores || resultados ELSE resultados_anteriores END,
         resultados=$1::jsonb, revision=revision+1,updated_at=NOW(),mesas=$4::jsonb
         WHERE torneo_organizador_id=$2 AND categoria=$3 RETURNING revision`,[JSON.stringify(after.clean),organizer,category,remaining]);
+      const timings=await timing.sync(client,organizer,category,{...saved,resultados:after.clean},{score:true,matchId});
       await client.query('COMMIT');
-      res.json({results:after.clean,revision:updated[0].revision,cleared});
+      res.json({timings,results:after.clean,revision:updated[0].revision,cleared});
     } catch(error) {
       if(client) await client.query('ROLLBACK').catch(()=>{});
       if(!error.status) console.error('PATCH torneo grilla',error);

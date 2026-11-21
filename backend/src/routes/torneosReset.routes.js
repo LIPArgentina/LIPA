@@ -1,3 +1,4 @@
+const timing=require('../torneoTiempos');
 const bracket=require('../../../frontend/torneos/grilla-engine');
 const tables=require('../../../frontend/torneos/mesas');
 
@@ -17,6 +18,7 @@ module.exports=function mountGridResets(router,{pool,route,requireTorneoOrganiza
     const affected=after.matches.filter(m=>m.id===matchId || m.a!==previous.get(m.id).a || m.b!==previous.get(m.id).b).map(m=>m.id);
     const locations={...grid.mesas};
     for(const id of affected){delete results[id];delete locations[id];}
+    await timing.sync(client,keys[0],keys[1],{...grid,resultados:results},{reset:affected});
     await archive(client,keys,affected);
     await client.query(`UPDATE torneo_grillas SET resultados=$4::jsonb,mesas=$5::jsonb,revision=revision+1,updated_at=NOW()
       WHERE torneo_organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3`,[...keys,JSON.stringify(results),JSON.stringify(locations)]);
@@ -27,7 +29,8 @@ module.exports=function mountGridResets(router,{pool,route,requireTorneoOrganiza
     if(!rows.length && !Object.keys(grid.resultados).length && !Object.keys(grid.mesas||{}).length){
       throw fail(400,'Esta categoría ya está en blanco.');
     }
-    const copy={fecha:new Date().toISOString(),resultados:grid.resultados,mesas:grid.mesas||{},llamados:rows.map(r=>r.callId)};
+    const copy={timings:await timing.read(client,...keys),fecha:new Date().toISOString(),resultados:grid.resultados,mesas:grid.mesas||{},llamados:rows.map(r=>r.callId)};
+    await timing.sync(client,keys[0],keys[1],{...grid,resultados:{}},{reset:bracket.build(grid.jugadores,grid.resultados,keys[1]).matches.map(m=>m.id)});
     await archive(client,keys,null);
     await client.query(`UPDATE torneo_grillas SET respaldo_reset=$4::jsonb,resultados='{}',mesas='{}',
       publicada_at=NULL,revision=revision+1,updated_at=NOW() WHERE torneo_organizador_id=$1 AND categoria=$2 AND sorteo_revision=$3`,
@@ -45,6 +48,7 @@ module.exports=function mountGridResets(router,{pool,route,requireTorneoOrganiza
       }
       if(assigned && assigned.category!==keys[1])throw fail(409,`La mesa ${location.mesa} de ${location.piso} está ocupada en ${assigned.category}. Liberala antes de recuperar esta copia.`);
     }
+    if(copy.timings){const previous=await timing.read(client,...keys);const restored=new Set(copy.timings.map(e=>e.key+'|'+e.readyAt));const archived=previous.filter(e=>!restored.has(e.key+'|'+e.readyAt)).map(e=>({...e,archived:e.archived||new Date().toISOString()}));await client.query('INSERT INTO torneo_partidos_tiempos(organizador_id,categoria,sorteo_revision,entries) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(organizador_id,categoria,sorteo_revision) DO UPDATE SET entries=EXCLUDED.entries',[...keys,JSON.stringify([...archived,...copy.timings])]);}
     await archive(client,keys,null);
     await client.query(`UPDATE torneo_llamados SET estado_grilla='recuperado' WHERE ${scope} AND id=ANY($4::bigint[])`,[...keys,copy.llamados]);
     await client.query(`UPDATE torneo_grillas SET resultados=$4::jsonb,mesas=$5::jsonb,publicada_at=NULL,
