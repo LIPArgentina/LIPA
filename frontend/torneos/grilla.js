@@ -14,7 +14,8 @@
   }
   const API = String(window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const requestedCategory=new URLSearchParams(location.search).get('categoria');
-  let category=(viewer?['primera','segunda','tercera']:['segunda','tercera']).includes(requestedCategory)?requestedCategory:(viewer?'primera':'segunda'), data=null, state=null, pending=null, saving=false, requestId=0, conflicted=false;
+  const availableCategories=[...document.querySelectorAll('[data-category]')].map(tab=>tab.dataset.category);
+  let category=availableCategories.includes(requestedCategory)?requestedCategory:'segunda', data=null, state=null, pending=null, saving=false, requestId=0, conflicted=false;
   let view='double', zoom=1, fitBoards=false;
   try { view=localStorage.getItem('lipa.bracket.view') || 'double'; } catch (_) {}
   if(!['simple','double'].includes(view)) view='double';
@@ -545,7 +546,7 @@
     if(!LipaViewer.read()){location.replace('./torneos.html');return;}
     LipaViewer.api('session').then(user=>{
       $('#viewerName').textContent=user.nombre;
-      if(requestId===0 && !['primera','segunda','tercera'].includes(requestedCategory) && ['primera','segunda','tercera'].includes(user.categoria)){
+      if(requestId===0 && !availableCategories.includes(requestedCategory) && availableCategories.includes(user.categoria)){
         category=user.categoria;
         document.querySelectorAll('[data-category]').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.category===category)));
         $('#bracketPanel').setAttribute('aria-labelledby','tab-'+category);

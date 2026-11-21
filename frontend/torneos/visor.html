@@ -16,7 +16,7 @@
   <script src="./visor-sonido.js?v=alarma-3" defer></script>
   <script src="./visor-llamados.js?v=recibidos-1" defer></script>
   <script src="./partido-reloj.js?v=1" defer></script>
-  <script src="./grilla.js?v=tiempos-1" defer></script>
+  <script src="./grilla.js?v=visor-sin-primera-1" defer></script>
 </head>
 <body data-viewer="true">
   <header class="topbar" hidden>
@@ -29,14 +29,13 @@
     <p id="pushStatus" role="status"></p>
     <div class="toolbar">
       <div class="tabs" role="tablist" aria-label="Categorías">
-        <button type="button" role="tab" id="tab-primera" aria-controls="bracketPanel" aria-selected="true" data-category="primera">PRIMERA</button>
-        <button type="button" role="tab" id="tab-segunda" aria-controls="bracketPanel" aria-selected="false" data-category="segunda">SEGUNDA</button>
+        <button type="button" role="tab" id="tab-segunda" aria-controls="bracketPanel" aria-selected="true" data-category="segunda">SEGUNDA</button>
         <button type="button" role="tab" id="tab-tercera" aria-controls="bracketPanel" aria-selected="false" data-category="tercera">TERCERA</button>
       </div>
       <div class="view-controls"><button type="button" id="viewToggle">VISUALIZACIÓN · DOBLE</button><button type="button" id="fitView">AJUSTAR</button><label for="zoom">Zoom <input id="zoom" type="range" min="35" max="120" value="100"><output id="zoomValue">100%</output></label></div>
     </div>
     <div class="savebar"><span id="saveStatus" role="status">Cargando grilla…</span><button id="retrySave" type="button" hidden>Reintentar guardado</button><button id="reload" type="button" hidden>Recargar</button></div>
-    <section id="bracketPanel" role="tabpanel" aria-labelledby="tab-primera">
+    <section id="bracketPanel" role="tabpanel" aria-labelledby="tab-segunda">
       <div id="emptyState" hidden></div>
       <section id="mainSection" class="bracket-section" hidden><div class="section-heading"><div><small>PRIMERAS DOS RONDAS</small><h2>Llave de ganadores</h2></div><span class="badge">Doble eliminación</span></div><div class="board-scroll"><div id="mainFrame" class="board-frame"><div id="mainBoard" class="board"></div></div></div></section>
       <section id="repSection" class="bracket-section repechage" hidden><div class="section-heading"><div><small>SEGUNDA OPORTUNIDAD</small><h2>Llave de perdedores</h2></div><span class="badge">Segunda oportunidad</span></div><p id="byeNote" class="bye-note"></p><div class="board-scroll"><div id="repFrame" class="board-frame"><div id="repBoard" class="board"></div></div></div></section>
