@@ -186,14 +186,24 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     if (!/^\d{1,20}$/.test(after)) throw fail(400,'Consulta inválida.');
     res.locals.lecturaVisor=true;
     const {rows}=await pool.query(`SELECT id::text,mensaje,created_at FROM torneo_avisos WHERE jugador_id=$1 AND id>$2::bigint AND created_at>NOW()-INTERVAL '12 hours'
-      AND EXISTS(SELECT 1 FROM torneo_llamados l WHERE l.id=llamado_id AND l.estado_grilla='activo') ORDER BY torneo_avisos.id LIMIT 30`,[user.jugador_id,after]);
+      AND EXISTS(SELECT 1 FROM torneo_llamados l WHERE l.id=llamado_id AND l.estado_grilla='activo' AND EXISTS (
+        SELECT 1 FROM torneo_sorteos vigente JOIN torneo_grillas grilla
+          ON grilla.torneo_organizador_id=vigente.torneo_organizador_id AND grilla.categoria=vigente.categoria
+          AND grilla.sorteo_revision=vigente.revision
+        WHERE vigente.torneo_organizador_id=l.organizador_id AND vigente.categoria=l.categoria
+          AND vigente.revision=l.sorteo_revision)) ORDER BY torneo_avisos.id LIMIT 30`,[user.jugador_id,after]);
     res.json({avisos:rows,serverTime:Date.now()});
   }));
   router.get('/torneo-visor/llamados',route(async(req,res)=>{
     const user=await session(req);
     res.locals.lecturaVisor=true;
     const {rows}=await pool.query(`SELECT id::text,mensaje,clave_pendiente FROM torneo_avisos
-      WHERE jugador_id=$1 AND clave_pendiente IS NOT NULL AND EXISTS(SELECT 1 FROM torneo_llamados l WHERE l.id=llamado_id AND l.estado_grilla='activo')
+      WHERE jugador_id=$1 AND clave_pendiente IS NOT NULL AND EXISTS(SELECT 1 FROM torneo_llamados l WHERE l.id=llamado_id AND l.estado_grilla='activo' AND EXISTS (
+        SELECT 1 FROM torneo_sorteos vigente JOIN torneo_grillas grilla
+          ON grilla.torneo_organizador_id=vigente.torneo_organizador_id AND grilla.categoria=vigente.categoria
+          AND grilla.sorteo_revision=vigente.revision
+        WHERE vigente.torneo_organizador_id=l.organizador_id AND vigente.categoria=l.categoria
+          AND vigente.revision=l.sorteo_revision))
       ORDER BY torneo_avisos.id DESC`,[user.jugador_id]);
     res.json({avisos:rows});
   }));
@@ -202,7 +212,12 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     if(!/^[1-9]\d{0,18}$/.test(id) || BigInt(id)>9223372036854775807n)throw fail(400,'Aviso inválido.');
     const result=await pool.query(`UPDATE torneo_avisos SET confirmado_at=CASE WHEN clave_pendiente IS NOT NULL THEN NOW() ELSE confirmado_at END,
       clave_pendiente=NULL WHERE jugador_id=$1 AND id=$2 AND EXISTS(SELECT 1 FROM torneo_llamados l
-        WHERE l.id=llamado_id AND l.estado_grilla='activo') RETURNING id`,[user.jugador_id,id]);
+        WHERE l.id=llamado_id AND l.estado_grilla='activo' AND EXISTS (
+        SELECT 1 FROM torneo_sorteos vigente JOIN torneo_grillas grilla
+          ON grilla.torneo_organizador_id=vigente.torneo_organizador_id AND grilla.categoria=vigente.categoria
+          AND grilla.sorteo_revision=vigente.revision
+        WHERE vigente.torneo_organizador_id=l.organizador_id AND vigente.categoria=l.categoria
+          AND vigente.revision=l.sorteo_revision)) RETURNING id`,[user.jugador_id,id]);
     if(!result.rowCount)throw fail(404,'Aviso inexistente.');
     res.json({ok:true});
   }));

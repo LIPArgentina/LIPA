@@ -46,6 +46,11 @@ function fixture(){
     if(sql.includes('FROM torneo_inscripciones i'))return result(players.filter(p=>args[1].includes(p.id)).map(p=>({...p,whatsapp:'1123456789'})));
     if(sql.includes('INSERT INTO torneo_llamados')){llamados.push({callId:String(llamados.length+1),match_id:args[3],a:args[4],b:args[5],mesa:args[6],piso:args[7]});return result([{id:llamados.length}]);}
     if(sql.includes('INSERT INTO torneo_avisos')){avisos.push({id:String(avisos.length+1),llamado_id:args[0],jugador_id:args[1],mensaje:args[2],clave_pendiente:args[3],inscripcion_id:args[4],created_at:new Date().toISOString()});return result([]);}
+    if(sql.includes('FROM torneo_avisos') && (sql.includes('SELECT id::text')||sql.includes('UPDATE torneo_avisos'))){
+      assert(sql.includes('vigente.revision=l.sorteo_revision'));
+      assert(sql.includes('grilla.sorteo_revision=vigente.revision'));
+      if(saved.sorteo_revision!==1)return {rows:[],rowCount:0};
+    }
     if(sql.includes('SELECT id::text,mensaje,clave_pendiente FROM torneo_avisos'))return result(avisos.filter(a=>a.jugador_id===args[0] && a.clave_pendiente).reverse());
     if(sql.includes('UPDATE torneo_avisos')){
       const item=avisos.find(a=>a.jugador_id===args[0] && a.id===args[1]);
@@ -195,6 +200,11 @@ else test('DNI session, read-only API, private calls and organizer authorization
     const other=await (await request('torneo-visor/login',{dni:'30000007'})).json();
     assert.equal((await (await request('torneo-visor/avisos?after=0',null,other.token)).json()).avisos.length,0);
     const contact=await (await request('torneo-organizador/grilla/primera/contactar',{...call,playerId:match.a},null,true)).json();assert.match(contact.url,/^https:\/\/wa.me\/5491123456789\?text=/);assert.match(decodeURIComponent(contact.url),/Mesa 19/);
+    saved.sorteo_revision=2;
+    assert.equal((await list()).length,0,'Previous draw pending calls must disappear');
+    assert.equal((await (await request('torneo-visor/avisos?after=0',null,login.token)).json()).avisos.length,0);
+    assert.equal((await request(confirm(calls[0].id),{},login.token)).status,404);
+    assert(avisos.length>0,'Keep historical records');
     assert.equal((await request('torneo-visor/logout',{},login.token)).status,200);
     assert.equal((await request('torneo-visor/session',null,login.token)).status,401);
   }finally{}
