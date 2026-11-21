@@ -37,3 +37,4 @@
 .category-tercera .table-wrap{display:flex;gap:14px;align-items:flex-start}
 .category-tercera table{width:calc((100% - 14px)/2);flex:0 0 calc((100% - 14px)/2)}
 @media(max-width:760px){.categories{grid-template-columns:1fr}.category-tercera .table-wrap{gap:6px}.category-tercera table{width:calc((100% - 6px)/2);flex-basis:calc((100% - 6px)/2)}th:first-child{width:28px}}
+.draw-header{position:sticky;top:0;z-index:100;background:#0d0f13f5;box-shadow:0 8px 18px #0007;backdrop-filter:blur(10px)}

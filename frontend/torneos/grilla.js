@@ -5,6 +5,13 @@
     location.replace(`/auth/login.html?return=${encodeURIComponent(location.pathname)}`); return;
   }
   const engine = window.LipaBracket, $ = s => document.querySelector(s);
+  const topbar=$('.topbar');
+  if(topbar){
+    const syncHeaderHeight=()=>document.documentElement.style.setProperty('--tournament-header-height',`${topbar.getBoundingClientRect().height}px`);
+    syncHeaderHeight();
+    if('ResizeObserver' in window)new ResizeObserver(syncHeaderHeight).observe(topbar);
+    else window.addEventListener('resize',syncHeaderHeight);
+  }
   const API = String(window.APP_CONFIG?.API_BASE_URL || '').replace(/\/+$/, '');
   const requestedCategory=new URLSearchParams(location.search).get('categoria');
   let category=(viewer?['primera','segunda','tercera']:['segunda','tercera']).includes(requestedCategory)?requestedCategory:(viewer?'primera':'segunda'), data=null, state=null, pending=null, saving=false, requestId=0, conflicted=false;

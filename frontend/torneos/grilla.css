@@ -40,3 +40,5 @@ dialog.player-preview{position:fixed;inset:auto;margin:0;width:min(340px,calc(10
 .match-finished:before{content:'TERMINADO';color:#e76060}
 .match-clock{position:absolute;top:100%;left:0;right:0;text-align:center;font:600 10px Arial;color:#d7d4bc;line-height:14px}
 .waiting-target{box-shadow:0 0 0 3px #ffd245,0 0 20px #ffd245}
+.topbar{position:sticky;top:0;z-index:100;background:#0d0f13f5;box-shadow:0 8px 18px #0007;backdrop-filter:blur(10px)}
+.toolbar{top:var(--tournament-header-height,73px)}
