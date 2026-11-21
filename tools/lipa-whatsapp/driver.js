@@ -196,14 +196,14 @@ async function lipaWhatsAppStep(expected, action) {
     const main=document.querySelector('#main');
     if(main!==armed.main||!(rightPhone(main)||remembered(main)||expected.media&&mediaProof()))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
     const outgoing=outgoingNodes(main);
-    // Grouped outgoing photos can omit tail/check decorations. Correlate only a
-    // new message after our armed send, with the verified media and full caption,
-    // once the attachment editor has closed. Snapshot includes ALL older messages.
-    const correlatedMedia=Boolean(expected.media&&!mediaEditor());
+    // Grouped messages can omit tail/check decorations. Correlate only a new
+    // matching message after our armed send once the composer is cleared (text)
+    // or preview closed (media). Snapshot includes ALL older messages.
+    const correlatedMedia=expected.media?Boolean(!mediaEditor()):[...main.querySelectorAll('footer [contenteditable="true"][role="textbox"]')].some(el=>visible(el)&&!text(el));
     const candidates=correlatedMedia?messageNodes(main).filter(el=>!messageKey(el).startsWith('false_')):outgoing;
     const added=candidates.filter(el=>messageKey(el)?!armed.ids.has(messageKey(el)):!armed.nodes.has(el)&&!armed.signatures.has(messageSignature(el)));
     const compact=value=>normalize(value).replace(/\s+/g,' ');
-    const expectedTexts=[expected.message,renderedMessage].map(compact);
+    const expectedTexts=[expected.message,renderedMessage,expected.message.replace(/\*\*([^\n]+?)\*\*/g,'*$1*')].map(compact);
     for(const el of added){
       // WhatsApp may collapse a long caption. Expand only a read-more control
       // inside this newly observed outgoing message, never another chat control.

@@ -127,3 +127,21 @@ test('media without outgoing decorations is correlated only when new and preview
  const old=driverFixture();undecorated(old);old.add();assert((await old.step('send')).armed);old.ctx.document.querySelectorAll=()=>[];assert((await old.step('audit')).error);
  const incoming=driverFixture();undecorated(incoming);assert((await incoming.step('send')).armed);incoming.outgoing.dataset.id='false_incoming';incoming.add();incoming.ctx.document.querySelectorAll=()=>[];assert((await incoming.step('audit')).error);
 });
+
+test('text without outgoing decorations confirms only a new matching message after composer clears',async()=>{
+ function setup(){
+  const f=driverFixture();delete f.expected.media;f.expected.message='Aviso **Tercera División:** y **Segunda División:**';
+  f.caption.childNodes=[{nodeType:3,nodeValue:'Aviso *Tercera División:* y *Segunda División:*'}];
+  f.outgoing.dataset={id:'opaque-text'};f.outgoing.matches=()=>false;f.outgoing.closest=()=>null;f.outgoing.querySelector=()=>null;
+  f.outgoing.querySelectorAll=s=>s.includes('selectable-text')?[f.caption]:[];
+  let draft='pendiente';const input={getAttribute:()=>null,nodeName:'DIV',nodeType:1,getClientRects:()=>[{}],get childNodes(){return [{nodeType:3,nodeValue:draft}];}};
+  const query=f.ctx.__lipaMedia.main.querySelectorAll;const main=f.ctx.__lipaMedia.main;
+  main.querySelectorAll=s=>s.startsWith('footer ')?[input]:query(s);
+  f.ctx.__lipaRecipient={main,header:f.header,label:f.header.textContent,phone:f.expected.phone,at:Date.now()};
+  f.ctx.__lipaArmed={main,phone:f.expected.phone,message:f.expected.message,at:Date.now(),ids:new Set(),nodes:new Set(),signatures:new Set()};
+  f.clear=()=>draft='';return f;
+ }
+ const f=setup();f.add();assert((await f.step('audit')).error);f.clear();assert((await f.step('confirm')).sent);assert((await f.step('settle')).settled);
+ const old=setup();old.add();old.clear();old.ctx.__lipaArmed.ids.add('opaque-text');assert((await old.step('audit')).error);
+ const incoming=setup();incoming.add();incoming.clear();incoming.outgoing.dataset.id='false_incoming';assert((await incoming.step('audit')).error);
+});
