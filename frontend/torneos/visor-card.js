@@ -18,7 +18,13 @@
     try{
       let installationId='';try{installationId=window.AndroidBridge?.getInstallationId?.()||'';}catch(_){}
       const user=await session.api('login',{dni:form.dni.value,installationId});session.save(user);error.textContent='';
-      location.assign(gridUrl(user));
+      returning.querySelector('a').href=gridUrl(user);
+      const dialog=document.createElement('dialog'),title=document.createElement('h2');
+      title.textContent=`Bienvenido, ${user.nombre}`;
+      const go=document.createElement('button');go.className='btn-ver-ubicacion';go.textContent='VER GRILLA';
+      go.onclick=()=>location.assign(gridUrl(user));dialog.append(title,go);document.body.append(dialog);
+      dialog.addEventListener('close',()=>{dialog.remove();showSession(user.nombre);});
+      dialog.showModal();
     }catch(e){error.textContent=e.message;}finally{button.disabled=false;}
   });
 })();
