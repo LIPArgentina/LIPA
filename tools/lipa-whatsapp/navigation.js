@@ -68,6 +68,10 @@ function lipaOpenChat(contact,stage){
  const textOf=el=>String(el.innerText||el.textContent||el.getAttribute('title')||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim();
  const isPhone=text=>/^\+?[\d\s().-]+$/.test(text);
  function selected(el){
+   // Prefer the title-bearing name label, including emoji images, to a row's
+   // centre (which may be an unrelated grid cell or status subtitle).
+   const titleLabel=el.matches?.('span[title][dir=auto]')?el:el.querySelector?.('span[title][dir=auto]');
+   if(titleLabel&&eligible(titleLabel))el=titleLabel;
    // WhatsApp often renders the phone/name as a span inside the clickable
    // result row. Clicking that span may focus text without opening the chat.
    // Prefer the complete interactive row, or the nearest row-sized ancestor.
@@ -83,10 +87,14 @@ function lipaOpenChat(contact,stage){
    surface=surface||el;
    const target=point(el)||point(surface);if(!target)return {waiting:true};
    globalThis.__lipaSelection={...globalThis.__lipaNavigation,phone:contact.phone,element:el,label:clean(surface.querySelector?.("span[title],span[dir=auto]")?.textContent||textOf(el))};
-   return {target,diagnostic:{reason:'selected-number-search-result',label:textOf(el),surface:surface===el?'text':'row'}};
+   return {target,diagnostic:{reason:'selected-number-search-result',label:el.getAttribute('title')||textOf(el),tag:el.tagName,role:el.getAttribute('role'),target,surface:surface===el?'text':'row'}};
  }
  let pane=inputs[0].parentElement;
  while(pane&&pane!==document.body){
+   const named=[...pane.querySelectorAll('span[title][dir=auto]')].filter(el=>eligible(el)&&el.getAttribute('title'));
+   const exact=named.filter(el=>isPhone(el.getAttribute('title'))&&samePhone(el.getAttribute('title'),contact.phone));
+   if(exact.length===1)return selected(exact[0]);
+   if(named.length===1&&!isPhone(named[0].getAttribute('title')))return selected(named[0]);
    const nodes=[...pane.querySelectorAll('[role="listitem"],[role="row"],span,[dir="auto"]')].filter(eligible);
    const phones=nodes.filter(el=>isPhone(textOf(el))&&samePhone(textOf(el),contact.phone));
    // A repeated phone heading/subtitle identifies the same destination.

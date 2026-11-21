@@ -94,3 +94,12 @@ test('fallback activates only the selected connected result for the current numb
  input.value='+5491199999999';ctx.lipaOpenChat({phone:'5491112345678'},'activate');assert.equal(clicks,1);
  input.value='+5491112345678';element.isConnected=false;ctx.lipaOpenChat({phone:'5491112345678'},'activate');assert.equal(clicks,1);
 });
+
+test('selects title name with emoji instead of broad result row or status subtitle',()=>{
+ const input={value:'+5491112345678',getAttribute:()=>null,getClientRects:()=>[{}],closest:()=>null,getBoundingClientRect:()=>({x:50,y:10,width:300,height:30}),contains:()=>false};
+ const label={tagName:'SPAN',textContent:'Germán  Pool',getAttribute:k=>k==='title'?'Germán 👨🏻‍🏭 Pool':k==='dir'?'auto':null,getClientRects:()=>[{}],closest:()=>null,getBoundingClientRect:()=>({x:120,y:100,width:120,height:24}),contains:()=>false,matches:s=>s==='span[title][dir=auto]',querySelector:()=>null};
+ const pane={querySelectorAll:()=>[label],parentElement:null};input.parentElement=pane;label.parentElement=pane;
+ const ctx={location:{origin:'https://web.whatsapp.com'},document:{body:{},querySelectorAll:()=>[input],elementFromPoint:(x,y)=>y<40?input:label}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../../tools/lipa-whatsapp/navigation.js'),'utf8'),ctx);
+ const result=ctx.lipaOpenChat({phone:'5491112345678',name:'Nombre distinto en LIPA'},'result');assert.equal(result.target.x,180);assert.equal(result.target.y,112);assert.equal(result.diagnostic.label,'Germán 👨🏻‍🏭 Pool');assert.equal(ctx.__lipaSelection.element,label);
+});

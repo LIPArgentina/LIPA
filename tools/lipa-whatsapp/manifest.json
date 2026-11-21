@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LIPA · Tanda de WhatsApp",
-  "version": "1.4.17",
+  "version": "1.4.18",
   "description": "Revisar e iniciar una tanda de mensajes desde los filtros de LIPA.",
   "permissions": [
     "storage",

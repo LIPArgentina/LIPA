@@ -185,7 +185,8 @@ async function selectChat(contact){
  async function probe(stage){
   if(stopping)throw Error('Tanda detenida.');
   const results=await chrome.scripting.executeScript({target:{tabId:workTab},func:lipaOpenChat,args:[contact,stage]});
-  const r=results[0]?.result;if(!r)throw Error('No se pudo leer Nuevo chat.');return r;
+  const r=results[0]?.result;if(!r)throw Error('No se pudo leer Nuevo chat.');
+  if(r.diagnostic||r.target){contact.navigation=contact.navigation||[];const entry={stage,...r.diagnostic,target:r.target};if(JSON.stringify(contact.navigation.at(-1))!==JSON.stringify(entry)){contact.navigation.push(entry);contact.navigation=contact.navigation.slice(-12);}}return r;
  }
  async function wait(stage,ready){let last;for(let i=0;i<60;i++){last=await probe(stage);if(ready(last))return last;if(last.error)throw Error(last.error);await pause(200);}throw Error('No se pudo completar '+stage+' sin recargar WhatsApp. '+(last?.diagnostic?.reason||''));}
  const opening=await probe('new');if(opening.error)throw Error(opening.error);
