@@ -1,12 +1,13 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const engine=require('../../frontend/torneos/grilla-engine');
 const players=Array.from({length:64},(_,i)=>({id:String(i+1)}));
-const mapping=[[14,13],[8,7],[12,11],[10,9],[2,1],[6,5],[15,16],[4,3]];
+const mapping=[[1,2],[3,4],[5,6],[7,8],[9,10],[11,12],[13,14],[15,16]];
+const winnerMapping=[[15,16],[13,14],[9,10],[11,12],[5,6],[7,8],[3,4],[1,2]];
 test('eight consecutive groups preserve initial draw, crossed recovery and approved output codes',()=>{
  const s=engine.build(players);assert.equal(s.groups.length,8);
  s.groups.forEach((g,i)=>{
  assert.deepEqual(g.initial.flatMap(m=>[m.a,m.b]),players.slice(i*8,i*8+8).map(p=>p.id));
- assert.deepEqual(g.codes,{g:[(i*2+1)+'G',(i*2+2)+'G'],p:mapping[i].map(n=>n+'P')});
+ assert.deepEqual(g.codes,{g:winnerMapping[i].map(n=>n+'G'),p:mapping[i].map(n=>n+'P')});
  assert.equal(g.recovery[0].sources[1].matchId,g.winners[1].id);
  assert.equal(g.recovery[1].sources[1].matchId,g.winners[0].id);
  });
@@ -17,7 +18,7 @@ test('knockout has odds on left and evens on right, each code mapped to its exac
  const expected=[1,3,5,7,9,11,13,15,2,4,6,8,10,12,14,16];
  assert.deepEqual(s.knockout[0].map(m=>m.qualifierNumber),expected);
  s.knockout[0].forEach((m,i)=>{
- const n=expected[i],g=s.groups[Math.floor((n-1)/2)];assert.equal(m.a,g.winners[(n-1)%2].winner);
+ const n=expected[i],g=s.groups[winnerMapping.findIndex(pair=>pair.includes(n))];assert.equal(m.a,g.winners[(n-1)%2].winner);
  const gi=mapping.findIndex(pair=>pair.includes(n)),pi=mapping[gi].indexOf(n);assert.equal(m.b,s.groups[gi].recovery[pi].winner);
  assert.deepEqual(m.sources.map(src=>src.code),[n+'G',n+'P']);
  });

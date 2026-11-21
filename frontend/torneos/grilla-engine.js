@@ -45,14 +45,16 @@
     const qualifiers=main.at(-1),count=qualifiers.length;
     // Pair undefeated players with recovered players from distant draw branches.
     const grouped=size===64 || (size===32 && category==='segunda');
-    const mapping=size===32?[[8,7],[6,5],[3,2],[4,1]]:[[14,13],[8,7],[12,11],[10,9],[2,1],[6,5],[15,16],[4,3]];
-    const groups=grouped?mapping.map((p,i)=>({number:i+1,initial:main[0].slice(i*4,i*4+4),winners:main[1].slice(i*2,i*2+2),losers:rep[0].slice(i*2,i*2+2),recovery:rep[1].slice(i*2,i*2+2),codes:{g:[(i*2+1)+'G',(i*2+2)+'G'],p:p.map(n=>n+'P')}})):[];
+    const mapping=size===32?[[1,2],[3,4],[5,6],[7,8]]:[[1,2],[3,4],[5,6],[7,8],[9,10],[11,12],[13,14],[15,16]];
+    const winnerMapping=size===32?[[7,8],[5,6],[1,2],[3,4]]:[[15,16],[13,14],[9,10],[11,12],[5,6],[7,8],[3,4],[1,2]];
+    const groups=grouped?mapping.map((p,i)=>({number:i+1,initial:main[0].slice(i*4,i*4+4),winners:main[1].slice(i*2,i*2+2),losers:rep[0].slice(i*2,i*2+2),recovery:rep[1].slice(i*2,i*2+2),codes:{g:winnerMapping[i].map(n=>n+'G'),p:p.map(n=>n+'P')}})):[];
     groups.forEach(g=>{for(const [key,label] of [['initial','Inicial'],['winners','Ganadores'],['losers','Perdedores'],['recovery','Clasificación']])g[key].forEach((m,i)=>{m.label='Grupo '+g.number+' · '+label+' '+(i+1);});});
     const recovered=new Map();groups.forEach(g=>g.recovery.forEach((m,i)=>recovered.set(Number(g.codes.p[i].slice(0,-1)),m)));
+    const winners=new Map();groups.forEach(g=>g.winners.forEach((m,i)=>winners.set(Number(g.codes.g[i].slice(0,-1)),m)));
     const order=grouped?[...Array.from({length:count/2},(_,i)=>i*2+1),...Array.from({length:count/2},(_,i)=>i*2+2)]:qualifiers.map((_,i)=>i+1);
     const prefix=grouped?'gx-k':'mx-k';
     const knockout=[order.map((number,i)=>{
-      const m=qualifiers[number-1];
+      const m=grouped?winners.get(number):qualifiers[number-1];
       const a=source(m),b=rep.length?source(grouped?recovered.get(number):rep[1][count>=4?(i+count/2)%count:i]):source(m,'loser');
       if(grouped){a.code=number+'G';b.code=number+'P';}
       const result=linked(prefix+'0-'+i,a,b,'Eliminación directa · Ronda 1 · Partido '+(i+1));
