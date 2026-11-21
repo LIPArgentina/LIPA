@@ -326,9 +326,9 @@
   function renderGroups(){
     const board=$('#mainBoard'),frame=$('#mainFrame');board.replaceChildren();
     const players=new Map(data.players.map(p=>[String(p.id),p]));
-    const width=1020,groupHeight=1000,height=state.groups.length*groupHeight;
+    const width=1260,groupHeight=1000,height=state.groups.length*groupHeight;
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('connectors');svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('aria-hidden','true');board.append(svg);
-    function textBox(text,x,y,cls='group-caption',w=240){const el=document.createElement('div');el.className=cls;el.textContent=text;el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px';board.append(el);return el;}
+    function textBox(text,x,y,cls='group-caption',w=240){if(cls!=='group-heading'&&cls!=='group-footer')x+=120;const el=document.createElement('div');el.className=cls;el.textContent=text;el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px';board.append(el);return el;}
     function line(a,b){const mid=(a.x+b.x)/2;const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M '+a.x+' '+a.y+' H '+mid+' V '+b.y+' H '+b.x);svg.append(path);}
     state.groups.forEach(group=>{
       const top=(group.number-1)*groupHeight,positions=new Map();
@@ -336,8 +336,8 @@
       const groupCards=[];
       textBox('PERDEDORES',0,top+65);textBox('PRIMERA RONDA',520,top+65);textBox('GANADORES',780,top+65);
       textBox('Cruce final',0,top+110);textBox('Primera instancia',260,top+110);textBox('8 jugadores',520,top+110);textBox('Segunda instancia',780,top+110);
-      function place(m,x,y){const pos={x,y:top+y,center:top+y+64,width:240};positions.set(m.id,pos);groupCards.push(card(m,pos,board,players,false,x<520));}
-      group.initial.forEach((m,i)=>place(m,520,180+i*190));
+      function place(m,x,y){x+=120;const pos={x,y:top+y,center:top+y+64,width:240};positions.set(m.id,pos);groupCards.push(card(m,pos,board,players,false,x<640));}
+      group.initial.forEach((m,i)=>place(m,520,225+i*160));
       group.winners.forEach((m,i)=>place(m,780,275+i*380));
       group.losers.forEach((m,i)=>place(m,260,275+i*380));
       group.recovery.forEach((m,i)=>place(m,0,310+i*380));
@@ -351,8 +351,8 @@
       }
       textBox('Pierde → A',780,top+425);textBox('Pierde → B',780,top+805);
       textBox('B · viene del cruce inferior',0,top+460);textBox('A · viene del cruce superior',0,top+840);
-      function qualifier(m,code,x,i){const pos=positions.get(m.id),p=players.get(m.winner),el=textBox('',x,top+(i?590:500),'group-qualifier',240);const label=document.createElement('strong');label.textContent=code;const name=document.createElement('span');name.textContent=p?.nombre||'Por definir';enablePreview(name,p,m);el.append(label,photo(p),name);line({x:x+120,y:i?top+648:pos.y+128},{x:x+120,y:i?pos.y:top+500});}
-      group.winners.forEach((m,i)=>qualifier(m,group.codes.g[i],780,i));group.recovery.forEach((m,i)=>qualifier(m,group.codes.p[i],0,i));
+      function qualifier(m,code,x,i){const pos=positions.get(m.id),p=players.get(m.winner),el=textBox('',x,top+(i?590:500),'group-qualifier',240);const label=document.createElement('strong');label.textContent=code;const name=document.createElement('span');name.textContent=p?.nombre||'Por definir';enablePreview(name,p,m);el.append(label,photo(p),name);line({x:pos.x+120,y:i?pos.y:pos.y+128},{x:x+240,y:i?top+648:top+500});}
+      group.winners.forEach((m,i)=>qualifier(m,group.codes.g[i],900,i));group.recovery.forEach((m,i)=>qualifier(m,group.codes.p[i],-120,i));
       textBox('A cruza abajo · B cruza arriba · Dos derrotas eliminan · Cuatro clasificados',0,top+940,'group-footer',width);
     });
     dimensions.push({board,frame,width,height});
