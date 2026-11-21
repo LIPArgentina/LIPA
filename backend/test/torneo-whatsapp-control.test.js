@@ -31,3 +31,17 @@ test('multiline caption preserves blank lines and emojis using Shift+Enter, neve
  assert.deepEqual(calls.filter(c=>c.method==='Input.insertText').map(c=>c.args.text),['Hola 👋','El alias es:','lipa.trebol']);
  const enter=calls.filter(c=>c.args.key==='Enter');assert.equal(enter.length,6);assert(enter.every(c=>c.args.modifiers===8));
 });
+
+test('navigation handles only its own beforeunload and removes handler afterwards',async()=>{
+ let listener,removed=false;const commands=[];
+ const api={tabs:{get:async()=>({url:'https://web.whatsapp.com/',active:true})},permissions:{contains:async()=>true},debugger:{attach:async()=>{},detach:async()=>{},sendCommand:async(t,m,p)=>commands.push({m,p}),onDetach:{addListener(){}},onEvent:{addListener(fn){listener=fn;},removeListener(fn){assert.equal(fn,listener);removed=true;}}}};
+ const control=create(api);
+ await control.navigate(7,async()=>{
+ listener({tabId:8},'Page.javascriptDialogOpening',{type:'beforeunload'});
+ listener({tabId:7},'Page.javascriptDialogOpening',{type:'confirm'});
+ listener({tabId:7},'Page.javascriptDialogOpening',{type:'beforeunload'});
+ });
+ assert.deepEqual(commands.filter(c=>c.m==='Page.handleJavaScriptDialog'),[{m:'Page.handleJavaScriptDialog',p:{accept:true}}]);assert(removed);
+ assert(!commands.some(c=>c.m.startsWith('Input.')));
+ removed=false;await assert.rejects(control.navigate(7,async()=>{throw Error('timeout');}));assert(removed);
+});

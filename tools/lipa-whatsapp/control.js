@@ -42,6 +42,24 @@ function lipaBrowserControl(api) {
       if(lines[i])await command('Input.insertText',{text:lines[i]});
     }
   }
-  return {connect,click,fillCaption,release};
+
+  async function navigate(tabId,action,cancelled=()=>false){
+    await connect(tabId);
+    let failure=null,pending=Promise.resolve();
+    const listener=(source,method,params)=>{
+      if(source.tabId!==tabId||method!=='Page.javascriptDialogOpening'||params.type!=='beforeunload')return;
+      pending=api.debugger.sendCommand({tabId},'Page.handleJavaScriptDialog',{accept:!cancelled()}).catch(error=>{failure=error;});
+    };
+    api.debugger.onEvent.addListener(listener);
+    try{
+      await api.debugger.sendCommand({tabId},'Page.enable',{});
+      if(cancelled())throw Error('Tanda detenida.');
+      await action();await pending;if(failure)throw failure;
+    }finally{
+      api.debugger.onEvent.removeListener(listener);
+      try{await api.debugger.sendCommand({tabId},'Page.disable',{});}catch(_){}
+    }
+  }
+  return {connect,click,fillCaption,release,navigate};
 }
 if(typeof module==='object')module.exports=lipaBrowserControl;

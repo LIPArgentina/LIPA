@@ -184,15 +184,16 @@ async function selectChat(contact){
  // WhatsApp's New chat result does not consistently accept automated clicks.
  // Use the proven direct-phone route in the already selected tab. This reloads
  // WhatsApp, but never creates another tab and reliably opens saved/unsaved numbers.
- await browserControl.release();
  const url='https://web.whatsapp.com/send?phone='+contact.phone+(job.media?'':'&text='+encodeURIComponent(job.message));
+ await browserControl.navigate(workTab,async()=>{
  await chrome.tabs.update(workTab,{url,active:true});
  let loaded=false;
  for(let i=0;i<90;i++){
   if(stopping)throw Error('Tanda detenida.');
   const tab=await chrome.tabs.get(workTab);
-  if(tab.status==='complete'){loaded=true;break;}
+  if(tab.status==='complete'&&!tab.pendingUrl&&tab.url===url){loaded=true;break;}
   await pause(250);
  }
  if(!loaded)throw Error('WhatsApp no terminó de cargar.');
+ },()=>stopping);
 }
