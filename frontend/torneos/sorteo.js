@@ -71,10 +71,10 @@
   }
   function fit(state) {
     const wrap = state.card.querySelector('.table-wrap');
-    const rowHeight = Math.max(14, Math.min(28, Math.floor((wrap.clientHeight - 21) / Math.max(1, state.players.length))));
+    const rowHeight = Math.max(14, Math.min(28, Math.floor((wrap.clientHeight - 21) / Math.max(1, state.category==='tercera'?Math.ceil(state.players.length/2):state.players.length))));
     state.card.style.setProperty('--row-height', `${rowHeight}px`);
     state.card.style.setProperty('--name-size', `${Math.max(11, Math.min(14, rowHeight - 2))}px`);
-    state.body.querySelectorAll('.name').forEach(name => {
+    state.card.querySelectorAll('.name').forEach(name => {
       name.style.transform = '';
       const available = name.clientWidth;
       if (available && name.scrollWidth > available) name.style.transform = `scaleX(${available / name.scrollWidth})`;
@@ -143,7 +143,8 @@
   }
   function renderRows(state, animate = false) {
     updateExports(state);
-    state.body.replaceChildren();
+    const bodies=[...state.card.querySelectorAll('tbody')];bodies.forEach(body=>body.replaceChildren());
+    const split=Math.ceil(state.players.length/2);
     state.players.forEach((player, index) => {
       const row = document.createElement('tr');
       const position = document.createElement('td');
@@ -155,7 +156,7 @@
       row.classList.toggle('wo-row', player.id === null);
       cell.append(name);
       row.append(position, cell);
-      state.body.append(row);
+      bodies[state.category==='tercera'&&index>=split?1:0].append(row);
       if (animate && player.id !== null && !reducedMotion && cell.animate) cell.animate([{ opacity: .25 }, { opacity: 1 }], { duration: 260 });
     });
     if (!state.players.length) {
@@ -223,7 +224,7 @@
     document.querySelector('#pageMessage').textContent = missing
       ? `${missing} jugador(es) confirmado(s) sin categoría: asignala en Inscripciones para incluirlos.`
       : '';
-    for (const [category, label] of [['primera', 'Primera'], ['segunda', 'Segunda'], ['tercera', 'Tercera']]) {
+    for (const [category, label] of [['segunda', 'Segunda'], ['tercera', 'Tercera']]) {
       let players = data.jugadores.filter(player => window.LipaCategories.includes(player.categoria, category));
       const realCount = players.length;
       const saved = data.sorteos.find(draw => draw.categoria === category);
@@ -233,8 +234,12 @@
       const chosenSize=saved?Math.max(2,order.length):Math.max(2,realCount);
       players = valid ? order.map(id=>id===null?{id:null,nombre:'WO',wo:true}:byId.get(id)) : window.LipaSlots.fill(players,category,Math.max(chosenSize,realCount));
       const card = document.createElement('section');
-      card.className = 'category'; card.setAttribute('aria-labelledby', `heading-${category}`);
+      card.className = 'category category-' + category; card.setAttribute('aria-labelledby', `heading-${category}`);
       card.innerHTML = `<div class="category-heading"><h2 id="heading-${category}">${label.toUpperCase()}</h2><label class="size-label">Lugares <input class="draw-size" type="number" min="2" step="1" value="${chosenSize}" aria-label="Cantidad de lugares de ${label}"></label><span class="count">${realCount} jugadores${players.length>realCount?` · ${players.length-realCount} WO`:''}</span></div><div class="table-wrap"><table aria-label="Posiciones de ${label}"><thead><tr><th scope="col">N.º</th><th scope="col">Jugador</th></tr></thead><tbody></tbody></table></div><div class="category-footer"><p class="status" role="status"></p><div class="draw-actions"><button type="button" class="draw-button" aria-describedby="status-${category}">SORTEAR POSICIÓN</button><a class="grid-link" href="./grilla.html?categoria=${category}" aria-label="Ver grilla de ${label}">VER GRILLA</a></div><div class="export-actions" aria-label="Exportar ${label}"><button type="button" data-export="image">Exportar imagen</button><button type="button" data-export="text">Exportar texto</button></div></div>`;
+      if(category==='tercera'){
+        const wrap=card.querySelector('.table-wrap'),second=wrap.querySelector('table').cloneNode(true);
+        second.setAttribute('aria-label','Posiciones de Tercera · segunda columna');wrap.append(second);
+      }
       document.querySelector('#categories').append(card);
       const state = { category, label, players, card, body: card.querySelector('tbody'), status: card.querySelector('.status'), button: card.querySelector('.draw-button'), revision: saved?.revision || 0, drawn: Boolean(saved), dirty: false, timer: null, saving: false };
       state.sizeInput=card.querySelector('.draw-size');

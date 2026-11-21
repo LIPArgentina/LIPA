@@ -32,3 +32,8 @@
 #saveTables{background:var(--gold);color:#16120a}
 .table-actions button:disabled{opacity:.5}
 @media(max-width:760px){#manageTables{padding:6px 10px}}
+
+.categories{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+.category-tercera .table-wrap{display:flex;gap:14px;align-items:flex-start}
+.category-tercera table{width:calc((100% - 14px)/2);flex:0 0 calc((100% - 14px)/2)}
+@media(max-width:760px){.categories{grid-template-columns:1fr}.category-tercera .table-wrap{gap:6px}.category-tercera table{width:calc((100% - 6px)/2);flex-basis:calc((100% - 6px)/2)}th:first-child{width:28px}}
