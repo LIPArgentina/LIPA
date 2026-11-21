@@ -120,3 +120,10 @@ test('diagnostics retain unclassified message blocks instead of an empty report'
  const f=driverFixture();f.add();f.outgoing.querySelectorAll=s=>s.includes('selectable-text')?[f.caption]:[];f.outgoing.dataset={id:'opaque-message'};f.outgoing.matches=()=>false;f.outgoing.closest=()=>null;f.outgoing.querySelector=()=>null;
  const result=f.ctx.lipaInspectSent(f.expected);assert.equal(result.outgoingCount,0);assert.equal(result.candidates.length,1);assert.equal(result.candidates[0].recognizedOutgoing,false);
 });
+
+test('media without outgoing decorations is correlated only when new and preview closed',async()=>{
+ function undecorated(f){f.outgoing.dataset={id:'opaque-photo'};f.outgoing.matches=()=>false;f.outgoing.closest=()=>null;const query=f.outgoing.querySelector;f.outgoing.querySelector=s=>s.includes('tail-out')||s==='.message-out'?null:query(s);}
+ const f=driverFixture();undecorated(f);assert((await f.step('send')).armed);f.add();assert((await f.step('audit')).error);f.ctx.document.querySelectorAll=()=>[];assert((await f.step('confirm')).sent);assert(f.ctx.__lipaLastSent.correlatedMedia);
+ const old=driverFixture();undecorated(old);old.add();assert((await old.step('send')).armed);old.ctx.document.querySelectorAll=()=>[];assert((await old.step('audit')).error);
+ const incoming=driverFixture();undecorated(incoming);assert((await incoming.step('send')).armed);incoming.outgoing.dataset.id='false_incoming';incoming.add();incoming.ctx.document.querySelectorAll=()=>[];assert((await incoming.step('audit')).error);
+});

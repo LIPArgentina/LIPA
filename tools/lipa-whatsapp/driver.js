@@ -103,6 +103,10 @@ async function lipaWhatsAppStep(expected, action) {
     const closePoint=point(close);
     return closePoint?{interaction:'closeContact',target:closePoint}:{error:'El botón Enviar está tapado por otra ventana o extensión.'};
   }
+  function messageNodes(main){
+    const nodes=[...main.querySelectorAll('[data-id],[data-message-id],.message-out,[data-testid="msg-container"]')];
+    return nodes.filter(el=>!nodes.some(other=>other!==el&&other.contains(el)));
+  }
   function outgoingNodes(main){
     const selfChat=/env[ií]a mensajes a este mismo n[uú]mero|message yourself|messages? to yourself/i.test(main.querySelector('header')?.innerText||main.querySelector('header')?.textContent||'');
     const nodes=[...main.querySelectorAll('[data-id],[data-message-id],.message-out,[data-testid="msg-container"]')].filter(el=>selfChat||el.matches('.message-out')||el.querySelector('.message-out')||el.closest('.message-out')||String(el.dataset.id||el.getAttribute?.('data-message-id')||'').startsWith('true_')||el.querySelector('[data-icon="tail-out"],[data-testid="tail-out"],[data-icon="msg-check"],[data-icon="msg-dblcheck"]'));
@@ -110,7 +114,7 @@ async function lipaWhatsAppStep(expected, action) {
   }
   const messageKey=el=>el.dataset.id||el.getAttribute?.('data-message-id')||'';
   const messageSignature=el=>normalize(el.innerText||el.textContent)+'|'+[...el.querySelectorAll('img,video')].map(n=>n.currentSrc||n.src||'').join('|');
-  function snapshot(main){const nodes=outgoingNodes(main);return {ids:new Set(nodes.map(messageKey).filter(Boolean)),nodes:new Set(nodes),signatures:new Set(nodes.map(messageSignature))};}
+  function snapshot(main){const nodes=messageNodes(main);return {ids:new Set(nodes.map(messageKey).filter(Boolean)),nodes:new Set(nodes),signatures:new Set(nodes.map(messageSignature))};}
   function mediaProof(){
     const proof=globalThis.__lipaMedia,main=document.querySelector('#main');
     return proof&&proof.hash===expected.media?.hash&&proof.phone===expected.phone&&proof.main===main&&proof.header===headerIdentity(main)&&proof.label===headerIdentity(main)?.textContent&&Date.now()-proof.at<180000?proof:null;
@@ -174,7 +178,8 @@ async function lipaWhatsAppStep(expected, action) {
   if(action==='settle') {
     const proof=globalThis.__lipaLastSent,main=document.querySelector('#main');
     if(!proof||proof.phone!==expected.phone||proof.message!==expected.message||proof.mediaHash!==(expected.media?.hash)||proof.main!==main)return {fatal:true,error:'No se pudo comprobar que WhatsApp terminó el envío. No se abrirá el siguiente chat.'};
-    const sent=outgoingNodes(main).find(el=>proof.key&&messageKey(el)===proof.key)||(outgoingNodes(main).includes(proof.node)?proof.node:null);
+    const observed=proof.correlatedMedia?messageNodes(main):outgoingNodes(main);
+    const sent=observed.find(el=>proof.key&&messageKey(el)===proof.key)||(observed.includes(proof.node)?proof.node:null);
     if(!sent)return {settled:false,error:'Esperando que WhatsApp conserve el mensaje enviado.'};
     if(sent.querySelector('[data-icon="msg-error"],[data-testid="msg-error"]'))return {fatal:true,error:'WhatsApp marcó un error en el último mensaje. No se abrirá el siguiente chat.'};
     const pending=sent.querySelector('[role="progressbar"],[data-icon="msg-time"],[data-icon="msg-clock"],[data-testid="msg-time"]');
@@ -190,7 +195,13 @@ async function lipaWhatsAppStep(expected, action) {
   for(let i=0;i<(expected.media?60:40);i++) {
     const main=document.querySelector('#main');
     if(main!==armed.main||!(rightPhone(main)||remembered(main)||expected.media&&mediaProof()))return {error:'El chat cambió. Revisá el envío manualmente.',clicked:true};
-    const added=outgoingNodes(main).filter(el=>messageKey(el)?!armed.ids.has(messageKey(el)):!armed.nodes.has(el)&&!armed.signatures.has(messageSignature(el)));
+    const outgoing=outgoingNodes(main);
+    // Grouped outgoing photos can omit tail/check decorations. Correlate only a
+    // new message after our armed send, with the verified media and full caption,
+    // once the attachment editor has closed. Snapshot includes ALL older messages.
+    const correlatedMedia=Boolean(expected.media&&!mediaEditor());
+    const candidates=correlatedMedia?messageNodes(main).filter(el=>!messageKey(el).startsWith('false_')):outgoing;
+    const added=candidates.filter(el=>messageKey(el)?!armed.ids.has(messageKey(el)):!armed.nodes.has(el)&&!armed.signatures.has(messageSignature(el)));
     const compact=value=>normalize(value).replace(/\s+/g,' ');
     const expectedTexts=[expected.message,renderedMessage].map(compact);
     for(const el of added){
@@ -205,7 +216,7 @@ async function lipaWhatsAppStep(expected, action) {
       const caption=[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[text(part),part.innerText].filter(v=>typeof v==='string').some(value=>expectedTexts.includes(compact(value))));
       const media=!expected.media||(expected.media.type.startsWith('video/')?el.querySelector('video,[data-icon="video-play"],[data-icon="media-play"],[data-icon="play"]'):el.querySelector('img[src^="blob:"],img[src^="data:image/"],img[data-testid="media-url-provider"],img[alt="Imagen"],img[alt="Image"]'));
       if(caption&&media&&!el.querySelector('[role="progressbar"],[data-icon="msg-error"]')){
-        if(action!=='audit'){globalThis.__lipaLastSent={phone:expected.phone,message:expected.message,mediaHash:expected.media?.hash,main,node:el,key:messageKey(el),at:Date.now()};delete globalThis.__lipaArmed;}return {sent:true,clicked:true};
+        if(action!=='audit'){globalThis.__lipaLastSent={phone:expected.phone,message:expected.message,mediaHash:expected.media?.hash,main,node:el,key:messageKey(el),correlatedMedia:!outgoing.includes(el),at:Date.now()};delete globalThis.__lipaArmed;}return {sent:true,clicked:true};
       }
     }
     if(action==='audit')return {error:'No se pudo confirmar el mensaje en este chat. No se reenvió nada.'};

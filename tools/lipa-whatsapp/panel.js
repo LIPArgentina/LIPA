@@ -114,6 +114,8 @@ $('start').addEventListener('click',async()=>{
       }
     } catch(error) {
       contact.error=error.message;contact.status=history[contact.key]?'review':'pending';
+      if(contact.status==='review'&&workTab){try{const rows=await chrome.scripting.executeScript({target:{tabId:workTab},func:lipaInspectSent,args:[{message:job.message}]});job.lastInspection={at:new Date().toISOString(),...rows[0]?.result};}catch(_){}}
+
       $('status').textContent='Tanda detenida: '+contact.name+'. '+error.message;
       stopping=true;await persist();break;
     }
