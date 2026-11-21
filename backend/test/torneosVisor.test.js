@@ -46,7 +46,7 @@ function fixture(){
     if(sql.includes('FROM torneo_inscripciones i'))return result(players.filter(p=>args[1].includes(p.id)).map(p=>({...p,whatsapp:'1123456789'})));
     if(sql.includes('INSERT INTO torneo_llamados')){llamados.push({callId:String(llamados.length+1),match_id:args[3],a:args[4],b:args[5],mesa:args[6],piso:args[7]});return result([{id:llamados.length}]);}
     if(sql.includes('INSERT INTO torneo_avisos')){avisos.push({id:String(avisos.length+1),llamado_id:args[0],jugador_id:args[1],mensaje:args[2],clave_pendiente:args[3],inscripcion_id:args[4],created_at:new Date().toISOString()});return result([]);}
-    if(sql.includes('FROM torneo_avisos') && (sql.includes('SELECT id::text')||sql.includes('UPDATE torneo_avisos'))){
+    if((sql.includes('FROM torneo_avisos') && sql.includes('SELECT id::text'))||sql.includes('UPDATE torneo_avisos')){
       assert(sql.includes('vigente.revision=l.sorteo_revision'));
       assert(sql.includes('grilla.sorteo_revision=vigente.revision'));
       if(saved.sorteo_revision!==1)return {rows:[],rowCount:0};
