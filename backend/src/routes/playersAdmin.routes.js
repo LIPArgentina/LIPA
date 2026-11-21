@@ -1947,6 +1947,75 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   });
 
+  router.post('/players-admin/correct-identity-dni', requireAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await ensureSchema();
+      const playerIds = [...new Set(
+        (Array.isArray(req.body?.playerIds) ? req.body.playerIds : [req.body?.playerId])
+          .map((value) => Number(value))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      )];
+      const newDni = normalizeDni(req.body?.dni);
+
+      if (!playerIds.length || playerIds.length > 20) {
+        return res.status(400).json({ ok: false, error: 'Jugadores inválidos' });
+      }
+      if (!newDni) return res.status(400).json({ ok: false, error: 'Falta el DNI correcto' });
+
+      await client.query('BEGIN');
+      const selected = await client.query(
+        `SELECT id, nombre, nombre_normalizado, dni
+           FROM jugadores
+          WHERE id = ANY($1::int[])
+          ORDER BY id
+          FOR UPDATE`,
+        [playerIds]
+      );
+
+      if (selected.rowCount !== playerIds.length) {
+        throw new Error('No se encontraron todos los registros del jugador. No se modificó nada.');
+      }
+
+      const identities = new Set(
+        selected.rows.map((row) => normalizeText(row.nombre_normalizado || row.nombre || ''))
+      );
+      if (identities.size !== 1 || identities.has('')) {
+        throw new Error('Los registros seleccionados no pertenecen a la misma identidad. No se modificó nada.');
+      }
+
+      const externalOwner = await client.query(
+        `SELECT id, nombre
+           FROM jugadores
+          WHERE dni = $1
+            AND NOT (id = ANY($2::int[]))
+          LIMIT 1`,
+        [newDni, playerIds]
+      );
+      if (externalOwner.rowCount) {
+        throw new Error('El DNI correcto ya pertenece a otro jugador. No se modificó nada.');
+      }
+
+      const updated = await client.query(
+        `UPDATE jugadores
+            SET dni = $1,
+                updated_at = NOW()
+          WHERE id = ANY($2::int[])
+          RETURNING id, nombre, dni`,
+        [newDni, playerIds]
+      );
+
+      await client.query('COMMIT');
+      return res.json({ ok: true, players: updated.rows });
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      console.error('players-admin/correct-identity-dni', err);
+      return res.status(400).json({ ok: false, error: err.message || 'No se pudo corregir el DNI' });
+    } finally {
+      client.release();
+    }
+  });
+
   router.post('/players-admin/save', requireAdmin, (req, res) => {
     upload.single('foto')(req, res, async (err) => {
       if (err) return res.status(400).json({ ok: false, error: err.message || 'No se pudo subir la foto' });
