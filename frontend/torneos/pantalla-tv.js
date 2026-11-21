@@ -49,7 +49,7 @@
  let paused=false,timer=null;
  const controls=document.createElement('nav');controls.className='tv-rotation-controls';controls.setAttribute('aria-label','Controles de rotación');
  function button(text,label,action){const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',label);b.title=label;b.onclick=action;controls.append(b);return b;}
- function schedule(){clearInterval(timer);if(!paused)timer=setTimeout(()=>{page++;render();schedule();},slideKind==='groups'?3000:6000);}
+ function schedule(){clearInterval(timer);if(!paused)timer=setTimeout(()=>{page++;render();schedule();},slideKind==='groups'?10000:20000);}
  button('◀','Cuadro anterior',()=>{page--;render();schedule();});
  const toggle=button('Ⅱ Pausa','Pausar rotación',()=>{paused=!paused;toggle.textContent=paused?'▶ Reanudar':'Ⅱ Pausa';toggle.setAttribute('aria-label',paused?'Reanudar rotación':'Pausar rotación');toggle.setAttribute('aria-pressed',String(paused));schedule();});toggle.setAttribute('aria-pressed','false');
  button('▶','Cuadro siguiente',()=>{page++;render();schedule();});
