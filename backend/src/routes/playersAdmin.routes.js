@@ -2016,6 +2016,132 @@ module.exports = function createPlayersAdminRouter(deps = {}) {
     }
   });
 
+  router.post('/players-admin/merge-duplicate-identity', requireAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await ensureSchema();
+      const primaryPlayerId = Number(req.body?.primaryPlayerId);
+      const duplicatePlayerIds = [...new Set(
+        (Array.isArray(req.body?.duplicatePlayerIds) ? req.body.duplicatePlayerIds : [])
+          .map((value) => Number(value))
+          .filter((value) => Number.isInteger(value) && value > 0 && value !== primaryPlayerId)
+      )];
+      const playerIds = [primaryPlayerId, ...duplicatePlayerIds];
+      const dni = normalizeDni(req.body?.dni);
+
+      if (!Number.isInteger(primaryPlayerId) || primaryPlayerId <= 0 || !duplicatePlayerIds.length) {
+        return res.status(400).json({ ok: false, error: 'Registros duplicados inválidos' });
+      }
+      if (!dni) return res.status(400).json({ ok: false, error: 'Falta el DNI correcto' });
+
+      await client.query('BEGIN');
+      const selected = await client.query(
+        `SELECT id, nombre, nombre_normalizado, dni, fecha_nacimiento, foto_path, categoria_actual
+           FROM jugadores
+          WHERE id = ANY($1::int[])
+          ORDER BY id
+          FOR UPDATE`,
+        [playerIds]
+      );
+      if (selected.rowCount !== playerIds.length) {
+        throw new Error('No se encontraron todos los registros duplicados. No se modificó nada.');
+      }
+
+      const identities = new Set(
+        selected.rows.map((row) => normalizeText(row.nombre_normalizado || row.nombre || ''))
+      );
+      if (identities.size !== 1 || identities.has('')) {
+        throw new Error('Los registros no pertenecen a la misma identidad. No se modificó nada.');
+      }
+
+      const externalOwner = await client.query(
+        `SELECT id FROM jugadores
+          WHERE dni = $1
+            AND NOT (id = ANY($2::int[]))
+          LIMIT 1`,
+        [dni, playerIds]
+      );
+      if (externalOwner.rowCount) {
+        throw new Error('El DNI correcto ya pertenece a otro jugador. No se modificó nada.');
+      }
+
+      const associations = await client.query(
+        `SELECT id, jugador_id, categoria, activo
+           FROM jugador_equipos
+          WHERE jugador_id = ANY($1::int[])
+          ORDER BY CASE WHEN jugador_id = $2 THEN 0 ELSE 1 END, id`,
+        [playerIds, primaryPlayerId]
+      );
+      const activeCategories = new Set();
+      for (const association of associations.rows) {
+        if (!association.activo) continue;
+        const category = normalizeCategory(association.categoria);
+        if (activeCategories.has(category)) {
+          await client.query(
+            `UPDATE jugador_equipos
+                SET activo = false,
+                    hasta = COALESCE(hasta, CURRENT_DATE),
+                    updated_at = NOW()
+              WHERE id = $1`,
+            [association.id]
+          );
+        } else {
+          activeCategories.add(category);
+        }
+      }
+
+      const movedAssociations = await client.query(
+        `UPDATE jugador_equipos
+            SET jugador_id = $1,
+                updated_at = NOW()
+          WHERE jugador_id = ANY($2::int[])
+          RETURNING id`,
+        [primaryPlayerId, duplicatePlayerIds]
+      );
+
+      const movedReferences = {};
+      for (const table of ['jugador_resultados', 'torneo_inscripciones', 'torneo_visor_sesiones', 'torneo_avisos']) {
+        const exists = await client.query(`SELECT to_regclass($1) AS table_name`, [`public.${table}`]);
+        if (!exists.rows[0]?.table_name) continue;
+        const result = await client.query(
+          `UPDATE ${table} SET jugador_id = $1 WHERE jugador_id = ANY($2::int[])`,
+          [primaryPlayerId, duplicatePlayerIds]
+        );
+        movedReferences[table] = result.rowCount;
+      }
+
+      const profileSource = selected.rows.find((row) => Number(row.id) !== primaryPlayerId) || {};
+      await client.query(
+        `UPDATE jugadores
+            SET dni = $1,
+                fecha_nacimiento = COALESCE(fecha_nacimiento, $2::date),
+                foto_path = COALESCE(NULLIF(foto_path, ''), NULLIF($3, '')),
+                categoria_actual = COALESCE(NULLIF(categoria_actual, ''), NULLIF($4, '')),
+                updated_at = NOW()
+          WHERE id = $5`,
+        [dni, profileSource.fecha_nacimiento || null, profileSource.foto_path || '', profileSource.categoria_actual || '', primaryPlayerId]
+      );
+
+      await client.query(`DELETE FROM jugadores WHERE id = ANY($1::int[])`, [duplicatePlayerIds]);
+      await client.query('COMMIT');
+
+      const players = await readPlayer(primaryPlayerId);
+      return res.json({
+        ok: true,
+        player: players[0] || null,
+        mergedPlayerIds: duplicatePlayerIds,
+        movedAssociations: movedAssociations.rowCount,
+        movedReferences,
+      });
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      console.error('players-admin/merge-duplicate-identity', err);
+      return res.status(400).json({ ok: false, error: err.message || 'No se pudieron consolidar los registros' });
+    } finally {
+      client.release();
+    }
+  });
+
   router.post('/players-admin/save', requireAdmin, (req, res) => {
     upload.single('foto')(req, res, async (err) => {
       if (err) return res.status(400).json({ ok: false, error: err.message || 'No se pudo subir la foto' });
