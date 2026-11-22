@@ -51,7 +51,7 @@
     groups.forEach(g=>{for(const [key,label] of [['initial','Inicial'],['winners','Ganadores'],['losers','Perdedores'],['recovery','Clasificación']])g[key].forEach((m,i)=>{m.label='Grupo '+g.number+' · '+label+' '+(i+1);});});
     const recovered=new Map();groups.forEach(g=>g.recovery.forEach((m,i)=>recovered.set(Number(g.codes.p[i].slice(0,-1)),m)));
     const winners=new Map();groups.forEach(g=>g.winners.forEach((m,i)=>winners.set(Number(g.codes.g[i].slice(0,-1)),m)));
-    const order=grouped?[...Array.from({length:count/2},(_,i)=>i*2+1),...Array.from({length:count/2},(_,i)=>i*2+2)]:qualifiers.map((_,i)=>i+1);
+    const order=grouped&&size===32&&category==='segunda'?[1,3,5,7,2,4,8,6]:grouped?[...Array.from({length:count/2},(_,i)=>i*2+1),...Array.from({length:count/2},(_,i)=>i*2+2)]:qualifiers.map((_,i)=>i+1);
     const prefix=grouped?'gx-k':'mx-k';
     const knockout=[order.map((number,i)=>{
       const m=grouped?winners.get(number):qualifiers[number-1];
