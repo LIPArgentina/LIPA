@@ -490,17 +490,18 @@
     const replaceButton=event.target.closest('[data-replace]');
     if(replaceButton){
       const source=entries.find(p=>String(p.id)===replaceButton.dataset.replace);
-      const dni=prompt('DNI del jugador ya inscripto que ocupará este lugar:');
-      if(!dni)return;
-      const target=entries.find(p=>!p.baja_at&&String(p.dni)===dni.replace(/\D/g,''));
-      if(!target){alert('No se encontró una inscripción activa con ese DNI.');return;}
-      if(!confirm(`Reemplazar a ${source.nombre_oficial} por ${target.nombre_oficial} en ${source.categoria}. Se conservan el lugar sorteado, el pago de origen y las otras categorías del reemplazante.`))return;
+      const modal=document.createElement('dialog');
+      const candidates=entries.filter(p=>!p.baja_at&&p.corroborado&&String(p.id)!==String(source.id)&&!window.LipaCategories.includes(p.categoria,source.categoria));
+      modal.innerHTML=`<form method="dialog"><h2>Reemplazar a ${escapeHtml(source.nombre_oficial)}</h2><p>Categoría: ${escapeHtml(source.categoria)}. Se conservan el lugar sorteado y el pago de origen, además de las otras categorías y pagos del reemplazante.</p><label>Jugador reemplazante<select name="destino">${candidates.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre_oficial)} · DNI ${escapeHtml(p.dni)}</option>`).join('')}</select></label><p><button value="cancel">Cancelar</button> <button value="replace" ${candidates.length?'':'disabled'}>Confirmar reemplazo</button></p></form>`;
+      document.body.append(modal);modal.showModal();
+      const target=await new Promise(resolve=>modal.addEventListener('close',()=>{const selected=modal.querySelector('select').value;resolve(modal.returnValue==='replace'?candidates.find(p=>String(p.id)===selected):null);modal.remove();},{once:true}));
+      if(!target)return;
       replaceButton.disabled=true;
       try{
         const result=await api(`/torneo-organizador/inscripciones/${source.id}/reemplazar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({destinoId:String(target.id)})});
         $('#registeredSearch').value=target.nombre_oficial;
         await load();setMessage(`${result.nombre} reemplazó al jugador en ${result.categoria}, posición ${result.position}. Pagos conservados.`,true);
-      }catch(error){alert(error.message);replaceButton.disabled=false;}
+      }catch(error){setMessage(error.message);replaceButton.disabled=false;}
       return;
     }
     const photoButton = event.target.closest('[data-photo-path]');
