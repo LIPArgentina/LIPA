@@ -126,6 +126,11 @@ module.exports = function createTorneosPrivadosRouter() {
           ON torneo_inscripciones(torneo_organizador_id, corroborado, created_at DESC);
 
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS baja_at TIMESTAMPTZ;
+        ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS pagos_categoria JSONB;
+        CREATE TABLE IF NOT EXISTS torneo_reemplazos (
+          id BIGSERIAL PRIMARY KEY, organizador_id INTEGER NOT NULL REFERENCES torneo_organizadores(id),
+          origen_id BIGINT NOT NULL, destino_id BIGINT NOT NULL, categoria TEXT NOT NULL,
+          respaldo JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS en_sala BOOLEAN NOT NULL DEFAULT false;
         ALTER TABLE torneo_inscripciones ADD COLUMN IF NOT EXISTS llegada_at TIMESTAMPTZ;
         UPDATE torneo_inscripciones SET llegada_at=NOW() WHERE en_sala AND llegada_at IS NULL;
@@ -400,6 +405,7 @@ module.exports = function createTorneosPrivadosRouter() {
   });
 
   mountGrillaRoutes(router, { pool, ensureSchema, requireTorneoOrganizador, getTournamentRanking });
+  require('./torneosReemplazos.routes')(router, { pool, ensureSchema, requireTorneoOrganizador });
   require('./torneosVisor.routes')(router, { pool, ensureSchema, requireTorneoOrganizador });
 
   router.get('/torneo-organizador/sorteos', requireTorneoOrganizador, async (req, res) => {
@@ -408,8 +414,8 @@ module.exports = function createTorneosPrivadosRouter() {
       const id = req.user.torneoOrganizadorId;
       const organizador = await findOrganizador({ id, includeInactive: true });
       const { rows: jugadores } = await pool.query(`
-        SELECT id, nombre_oficial AS nombre, categoria FROM torneo_inscripciones
-        WHERE torneo_organizador_id=$1 AND baja_at IS NULL AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')
+        SELECT id, nombre_oficial AS nombre, categoria, pagos_categoria FROM torneo_inscripciones
+        WHERE torneo_organizador_id=$1 AND baja_at IS NULL AND corroborado=true AND (estado_pago IN ('sena', 'total', 'efectivo') OR pagos_categoria IS NOT NULL)
         ORDER BY nombre_oficial, id`, [id]);
       const { rows: sorteos } = await pool.query(
         `SELECT s.categoria, s.orden, s.revision, s.updated_at,
@@ -443,8 +449,8 @@ module.exports = function createTorneosPrivadosRouter() {
       await client.query('LOCK TABLE torneo_inscripciones IN SHARE MODE');
       await client.query('SELECT id FROM torneo_organizadores WHERE id=$1 FOR UPDATE', [req.user.torneoOrganizadorId]);
       const { rows } = await client.query(`SELECT id FROM torneo_inscripciones
-        WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND baja_at IS NULL AND corroborado=true AND estado_pago IN ('sena', 'total', 'efectivo')`,
-        [req.user.torneoOrganizadorId, categories.valuesFor(categoria)]);
+        WHERE torneo_organizador_id=$1 AND categoria = ANY($2::text[]) AND baja_at IS NULL AND corroborado=true AND COALESCE(pagos_categoria->($3::text)->>'estado_pago',estado_pago) IN ('sena', 'total', 'efectivo')`,
+        [req.user.torneoOrganizadorId, categories.valuesFor(categoria),categoria]);
       const ids = new Set(rows.map(row => String(row.id)));
       if (!slots.validOrder(orden, [...ids], categoria, orden.length)) {
         await client.query('ROLLBACK');
@@ -488,7 +494,7 @@ module.exports = function createTorneosPrivadosRouter() {
       const organizador = await findOrganizador({ id: req.user.torneoOrganizadorId, includeInactive: true });
       const { rows } = await pool.query(`
         SELECT i.id, i.jugador_id, i.nombre_ingresado, i.nombre_oficial, i.dni, i.whatsapp, i.categoria, i.en_sala,
-               i.estado_pago, i.monto_sena, i.corroborado, i.created_at, i.updated_at, i.baja_at,
+               i.estado_pago, i.monto_sena, i.pagos_categoria, i.corroborado, i.created_at, i.updated_at, i.baja_at,
                COALESCE(j.foto_path, '') AS foto_path, team.nombre AS equipo_nombre, team.actual AS equipo_actual
           FROM torneo_inscripciones i
           LEFT JOIN jugadores j ON j.id = i.jugador_id
@@ -635,6 +641,14 @@ module.exports = function createTorneosPrivadosRouter() {
       if (!['total', 'sena', 'sin_sena', 'efectivo'].includes(estado)) return res.status(400).json({ ok: false, error: 'Estado de pago inválido' });
       if (estado === 'sena' && montoSena === null) return res.status(400).json({ ok: false, error: 'Ingresá un monto de seña válido' });
       await ensureSchema();
+      const {rows:paymentRows}=await pool.query('SELECT pagos_categoria FROM torneo_inscripciones WHERE id=$1 AND torneo_organizador_id=$2',[Number(req.params.id),req.user.torneoOrganizadorId]);
+      if(paymentRows[0]?.pagos_categoria){
+        const paymentCategory=req.body?.categoria;
+        if(!Object.hasOwn(paymentRows[0].pagos_categoria,paymentCategory))return res.status(400).json({error:'Elegí la categoría del pago.'});
+        const result=await pool.query(`UPDATE torneo_inscripciones SET pagos_categoria=jsonb_set(pagos_categoria,ARRAY[$1]::text[],$2::jsonb),updated_at=NOW()
+          WHERE id=$3 AND torneo_organizador_id=$4 RETURNING *`,[paymentCategory,JSON.stringify({estado_pago:estado,monto_sena:montoSena}),Number(req.params.id),req.user.torneoOrganizadorId]);
+        return res.json({ok:true,inscripcion:result.rows[0]});
+      }
       const result = await pool.query(`
         UPDATE torneo_inscripciones
            SET estado_pago=$1, monto_sena=$2, updated_at=NOW()

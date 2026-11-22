@@ -85,6 +85,7 @@
     return entry?.estado_pago === '50' ? 'sena' : String(entry?.estado_pago || 'sin_sena');
   }
   function paymentSummary(rows) {
+    rows=rows.flatMap(entry=>entry.pagos_categoria?Object.entries(entry.pagos_categoria).filter(([c])=>categoryFilter==='all'||categoryFilter===c).map(([categoria,p])=>({...entry,...p,categoria,pagos_categoria:null})): [entry]);
     const fullAmounts = {tercera:55000, segunda:70000, primera:80000, segunda_tercera:125000, primera_segunda:150000};
     let amount=0, missing=0;
     for(const entry of rows){
@@ -105,11 +106,12 @@
     return normalized <= 99999000 ? normalized : null;
   }
   function paymentSelect(entry) {
+    if(entry.pagos_categoria)return Object.entries(entry.pagos_categoria).map(([categoria,p])=>`<div><small>${escapeHtml(categoria)}</small>${paymentSelect({...entry,...p,pagos_categoria:null,paymentCategory:categoria})}</div>`).join('');
     const state = paymentState(entry);
     const storedAmount = Number(entry.monto_sena || 0) || (entry.estado_pago === '50' ? 50000 : '');
     const paymentClass = state === 'efectivo' ? 'payment-cash' : state === 'total' ? 'payment-total' : state === 'sena' ? 'payment-deposit' : 'payment-none';
     return `<div class="payment-editor">
-      <select class="payment-select ${paymentClass}" data-id="${entry.id}">
+      <select class="payment-select ${paymentClass}" data-id="${entry.id}" data-payment-category="${entry.paymentCategory||''}">
         <option value="sin_sena" ${state === 'sin_sena' ? 'selected' : ''}>Sin seña</option>
         <option value="sena" ${state === 'sena' ? 'selected' : ''}>Seña</option>
         <option value="efectivo" ${state === 'efectivo' ? 'selected' : ''}>Efectivo</option>
@@ -150,7 +152,7 @@
       tr.innerHTML = `<td><div class="player-name-cell">${playerPhotoButton(entry, name)}<strong>${escapeHtml(name)}</strong></div></td><td class="${entry.equipo_actual ? 'team-current' : 'team-history'}" title="${entry.equipo_nombre ? (entry.equipo_actual ? 'Equipo actual' : 'Último equipo histórico') : 'Sin registro'}">${escapeHtml(entry.equipo_nombre || 'Sin registro')}</td><td>${escapeHtml(entry.dni)}</td><td>${categorySelect(entry)}</td>
         <td><div class="contact-editor"><input class="contact-input" inputmode="tel" value="${escapeHtml(entry.whatsapp || '')}" placeholder="Agregar WhatsApp">${whatsappContact(entry.whatsapp)}${verified ? whatsappContact(entry.whatsapp, true) : ''}<button type="button" data-save-contact="${entry.id}">Guardar</button></div></td>
         <td>${paymentSelect(entry)}</td><td>${dateFormatter.format(new Date(entry.created_at))}</td>
-        <td>${entry.baja_at ? `<span class="inactive-date" title="Fecha de baja">Baja: ${dateFormatter.format(new Date(entry.baja_at))}</span><button type="button" class="restore-button" data-restore="${entry.id}">Volver a inscribir</button>` : `<button class="delete-button" data-delete="${entry.id}">Dar de baja</button>`}</td>`;
+        <td>${entry.baja_at ? `<span class="inactive-date" title="Fecha de baja">Baja: ${dateFormatter.format(new Date(entry.baja_at))}</span><button type="button" class="restore-button" data-restore="${entry.id}">Volver a inscribir</button>` : `<button class="delete-button" data-delete="${entry.id}">Dar de baja</button><button type="button" data-replace="${entry.id}">Reemplazar</button>`}</td>`;
       const presence=tr.insertCell(0);
       presence.innerHTML=`<input class="presence-check" type="checkbox" data-presence="${entry.id}" aria-label="En sala: ${escapeHtml(name)}" ${entry.en_sala?'checked':''}>`;
       [...tr.children].forEach((cell,index)=>cell.dataset.label=['En sala','Jugador','Equipo','DNI','Categoría','WhatsApp','Pago','Inscripción','Acciones'][index]);
@@ -176,7 +178,7 @@
       });
     });
     const filtered = entries.filter(item => {
-      const paymentMatches = paymentFilter === 'all' || paymentState(item) === paymentFilter;
+      const paymentMatches = paymentFilter === 'all' || (item.pagos_categoria ? Object.entries(item.pagos_categoria).some(([c,p])=>(categoryFilter==='all'||categoryFilter===c)&&paymentState(p)===paymentFilter) : paymentState(item) === paymentFilter);
       const categoryMatches = categoryFilter === 'all'
         || (categoryFilter === 'sin_definir' ? !item.categoria : window.LipaCategories.matches(item.categoria, categoryFilter));
       return paymentMatches && categoryMatches;
@@ -480,11 +482,27 @@
       return;
     }
     try {
-      await api(`/torneo-organizador/inscripciones/${select.dataset.id}/pago`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ estadoPago:select.value, montoSena }) });
+      await api(`/torneo-organizador/inscripciones/${select.dataset.id}/pago`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ estadoPago:select.value, montoSena, categoria:select.dataset.paymentCategory }) });
       await load();
     } catch (error) { alert(error.message); await load(); }
   });
   document.addEventListener('click', async event => {
+    const replaceButton=event.target.closest('[data-replace]');
+    if(replaceButton){
+      const source=entries.find(p=>String(p.id)===replaceButton.dataset.replace);
+      const dni=prompt('DNI del jugador ya inscripto que ocupará este lugar:');
+      if(!dni)return;
+      const target=entries.find(p=>!p.baja_at&&String(p.dni)===dni.replace(/\D/g,''));
+      if(!target){alert('No se encontró una inscripción activa con ese DNI.');return;}
+      if(!confirm(`Reemplazar a ${source.nombre_oficial} por ${target.nombre_oficial} en ${source.categoria}. Se conservan el lugar sorteado, el pago de origen y las otras categorías del reemplazante.`))return;
+      replaceButton.disabled=true;
+      try{
+        const result=await api(`/torneo-organizador/inscripciones/${source.id}/reemplazar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({destinoId:String(target.id)})});
+        $('#registeredSearch').value=target.nombre_oficial;
+        await load();setMessage(`${result.nombre} reemplazó al jugador en ${result.categoria}, posición ${result.position}. Pagos conservados.`,true);
+      }catch(error){alert(error.message);replaceButton.disabled=false;}
+      return;
+    }
     const photoButton = event.target.closest('[data-photo-path]');
     if (photoButton && photoButton.dataset.photoPath) {
       $('#photoName').textContent = photoButton.dataset.photoName || 'Foto del jugador';

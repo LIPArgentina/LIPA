@@ -243,7 +243,7 @@
       ? `${missing} jugador(es) confirmado(s) sin categoría: asignala en Inscripciones para incluirlos.`
       : '';
     for (const [category, label] of [['segunda', 'Segunda'], ['tercera', 'Tercera']]) {
-      let players = data.jugadores.filter(player => window.LipaCategories.includes(player.categoria, category));
+      let players = data.jugadores.filter(player => window.LipaCategories.includes(player.categoria, category) && (!player.pagos_categoria?.[category] || ['sena','total','efectivo'].includes(player.pagos_categoria[category].estado_pago)));
       const realCount = players.length;
       const saved = data.sorteos.find(draw => draw.categoria === category);
       const byId = new Map(players.map(player => [String(player.id), player]));

@@ -14,7 +14,7 @@ module.exports = function mountGrillaRoutes(router, { pool, ensureSchema, requir
     if (!draw) throw fail(422, 'Primero guardá el sorteo de esta categoría.');
     const { rows } = await client.query(`SELECT i.id::text AS id, i.jugador_id, i.nombre_oficial AS nombre, COALESCE(j.foto_path,'') AS foto_path
       FROM torneo_inscripciones i LEFT JOIN jugadores j ON j.id=i.jugador_id
-      WHERE i.torneo_organizador_id=$1 AND i.categoria = ANY($2::text[]) AND i.baja_at IS NULL AND i.corroborado=true AND i.estado_pago IN ('sena', 'total', 'efectivo')`, [organizer, categories.valuesFor(category)]);
+      WHERE i.torneo_organizador_id=$1 AND i.categoria = ANY($2::text[]) AND i.baja_at IS NULL AND i.corroborado=true AND COALESCE(i.pagos_categoria->($3::text)->>'estado_pago',i.estado_pago) IN ('sena', 'total', 'efectivo')`, [organizer, categories.valuesFor(category),category]);
     const ids = draw.orden.map(id=>id===null?null:String(id)), players = new Map(rows.map(p => [p.id,p]));
     const capacity=ids.length;
     if (rows.length<2 || ids.length!==capacity) throw fail(422, 'Se necesitan al menos dos jugadores; guardá un nuevo sorteo con los participantes actuales.');

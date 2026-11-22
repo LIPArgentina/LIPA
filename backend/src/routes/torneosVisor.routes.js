@@ -160,7 +160,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
     const {rows}=await db.query(`SELECT g.*, s.orden,
       ARRAY(SELECT i.id::text FROM torneo_inscripciones i
         WHERE i.torneo_organizador_id=g.torneo_organizador_id AND i.categoria=ANY($3::text[])
-          AND i.baja_at IS NULL AND i.corroborado AND i.estado_pago IN ('sena','total','efectivo')) AS habilitados
+          AND i.baja_at IS NULL AND i.corroborado AND COALESCE(i.pagos_categoria->($2::text)->>'estado_pago',i.estado_pago) IN ('sena','total','efectivo')) AS habilitados
       FROM torneo_grillas g JOIN torneo_sorteos s USING (torneo_organizador_id,categoria)
       WHERE g.torneo_organizador_id=$1 AND g.categoria=$2 AND ($4::boolean OR g.publicada_at IS NOT NULL) AND s.revision=g.sorteo_revision`,
       [id,category,categories.valuesFor(category),includeDraft]);
