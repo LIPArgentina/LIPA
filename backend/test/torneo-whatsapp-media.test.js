@@ -145,3 +145,11 @@ test('text without outgoing decorations confirms only a new matching message aft
  const old=setup();old.add();old.clear();old.ctx.__lipaArmed.ids.add('opaque-text');assert((await old.step('audit')).error);
  const incoming=setup();incoming.add();incoming.clear();incoming.outgoing.dataset.id='false_incoming';assert((await incoming.step('audit')).error);
 });
+
+test('sent video-content wrapper confirms without video element or play icon; old video and wrong caption do not',async()=>{
+ function video(f){f.outgoing.querySelector=s=>s.includes('[data-testid="video-content"]')?f.visual:null;f.outgoing.querySelectorAll=s=>s.includes('selectable-text')?[f.caption]:[];}
+ const f=driverFixture('video/mp4');video(f);assert((await f.step('send')).armed);f.add();f.ctx.document.querySelectorAll=()=>[];assert((await f.step('confirm')).sent);assert((await f.step('settle')).settled);
+ const old=driverFixture('video/mp4');video(old);old.add();assert((await old.step('send')).armed);assert((await old.step('audit')).error);
+ const wrong=driverFixture('video/mp4');video(wrong);assert((await wrong.step('send')).armed);wrong.add();wrong.caption.childNodes[0].nodeValue='Otro texto';assert((await wrong.step('audit')).error);
+ const noVideo=driverFixture('video/mp4');noVideo.outgoing.querySelector=()=>null;noVideo.outgoing.querySelectorAll=s=>s.includes('selectable-text')?[noVideo.caption]:[];assert((await noVideo.step('send')).armed);noVideo.add();assert((await noVideo.step('audit')).error);
+});

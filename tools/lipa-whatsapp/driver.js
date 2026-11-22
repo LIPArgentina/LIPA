@@ -214,7 +214,7 @@ async function lipaWhatsAppStep(expected, action) {
         }
       }
       const caption=[...el.querySelectorAll('.selectable-text,[data-testid="selectable-text"]')].some(part=>[text(part),part.innerText].filter(v=>typeof v==='string').some(value=>expectedTexts.includes(compact(value))));
-      const media=!expected.media||(expected.media.type.startsWith('video/')?el.querySelector('video,[data-icon="video-play"],[data-icon="media-play"],[data-icon="play"]'):el.querySelector('img[src^="blob:"],img[src^="data:image/"],img[data-testid="media-url-provider"],img[alt="Imagen"],img[alt="Image"]'));
+      const media=!expected.media||(expected.media.type.startsWith('video/')?el.querySelector('video,[data-testid="video-content"],[data-icon="video-play"],[data-icon="media-play"],[data-icon="play"]'):el.querySelector('img[src^="blob:"],img[src^="data:image/"],img[data-testid="media-url-provider"],img[alt="Imagen"],img[alt="Image"]'));
       if(caption&&media&&!el.querySelector('[role="progressbar"],[data-icon="msg-error"]')){
         if(action!=='audit'){globalThis.__lipaLastSent={phone:expected.phone,message:expected.message,mediaHash:expected.media?.hash,main,node:el,key:messageKey(el),correlatedMedia:!outgoing.includes(el),at:Date.now()};delete globalThis.__lipaArmed;}return {sent:true,clicked:true};
       }
