@@ -150,7 +150,7 @@ module.exports = function mountViewer(router, { pool, ensureSchema, requireTorne
       const history=logs.flatMap(g=>g.entries.map(e=>({...e,category:g.categoria,drawRevision:g.sorteo_revision,current:active.has(g.categoria+'/'+g.sorteo_revision)&&!e.archived})));
       const {rows:arrivals}=await pool.query('SELECT id::text,en_sala,llegada_at FROM torneo_inscripciones WHERE torneo_organizador_id=$1 AND baja_at IS NULL',[id]);
       const waiting=timing.waitingList(history,arrivals);
-      res.json({waiting,history,players:grids.flatMap(g=>g.jugadores.filter(p=>p.id).map(p=>({id:p.id,nombre:p.nombre,category:g.categoria}))),serverTime:Date.now()});
+      res.json({waiting,history,players:grids.flatMap(g=>g.jugadores.filter(p=>p.id).map(p=>({id:p.id,nombre:p.nombre,category:g.categoria,llegadaAt:arrivals.find(a=>String(a.id)===String(p.id))?.llegada_at||null}))),serverTime:Date.now()});
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   }));
   router.get('/torneo-visor/session',route(async(req,res)=>{const user=await session(req);res.json({nombre:user.nombre,categoria:await playerDivision(user.jugador_id)});}));
