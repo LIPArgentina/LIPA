@@ -128,3 +128,5 @@ header img{height:34px;width:auto;display:block;}
 
 .rodry-flyer img{object-fit:contain;object-position:center;}
 .rodry-access [hidden]{display:none!important;}
+.torneo-card__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media(max-width:390px){.torneo-card__actions{grid-template-columns:1fr;}}
