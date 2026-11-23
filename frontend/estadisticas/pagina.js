@@ -1,6 +1,7 @@
 (()=>{
  const container=document.querySelector('#categories'),status=document.querySelector('#status');
  let data=[],busy=false;
+ container.addEventListener('error',event=>{const image=event.target;if(image.tagName==='IMG'&&!image.dataset.fallback){image.dataset.fallback='1';image.src='/logo_liga.png';}},true);
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  function render(){
