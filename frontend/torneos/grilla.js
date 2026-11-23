@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const viewer=document.body.dataset.viewer==='true';
+  const publicViewer=viewer && document.body.dataset.public==='true';
   if (!viewer && window.LPI_AUTH?.readSession?.()?.role !== 'torneo') {
     location.replace(`/auth/login.html?return=${encodeURIComponent(location.pathname)}`); return;
   }
@@ -22,7 +23,16 @@
   document.querySelectorAll('[data-category]').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.category===category)));
   const dimensions=[];
   async function api(method, body, suffix='') {
-    if(viewer){if(method!=='GET')throw new Error('El visor es de solo lectura.');return LipaViewer.api('grilla/'+category);}
+    if(viewer){
+      if(method!=='GET')throw new Error('El visor es de solo lectura.');
+      if(publicViewer){
+        const response=await fetch(`${API}/api/torneo-visor/tv/${category}`,{credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(20000)});
+        const result=await response.json();
+        if(!response.ok)throw Object.assign(new Error(result.error||'No se pudo cargar la grilla.'),{status:response.status});
+        return {...result,players:result.players.map((p,i)=>({...p,position:i+1})),present:result.players.map(p=>p.id)};
+      }
+      return LipaViewer.api('grilla/'+category);
+    }
     const response=await fetch(`${API}/api/torneo-organizador/grilla/${category}${suffix}`, {
       method, credentials:'include', headers:{'Content-Type':'application/json'},
       ...(body ? {body:JSON.stringify(body)} : {}), signal:AbortSignal.timeout(20000)
@@ -543,6 +553,11 @@
   $('#reload').addEventListener('click',()=>{pending=null;lockTabs(false);$('#retrySave').hidden=true;load();});
   window.addEventListener('beforeunload',event=>{if(pending || saving){event.preventDefault();event.returnValue='';}});
   if(viewer){
+    if(publicViewer){
+      $('#viewerName').textContent='Visor público';
+      for(const id of ['logoutViewer','enablePush','testSound'])$('#'+id).hidden=true;
+      load();
+    }else{
     if(!LipaViewer.read()){location.replace('./torneos.html');return;}
     LipaViewer.api('session').then(user=>{
       $('#viewerName').textContent=user.nombre;
@@ -564,6 +579,7 @@
         if(!accepted)$('#pushStatus').textContent='Volvé a ingresar con tu DNI para activar las notificaciones.';
       }catch(_){$('#pushStatus').textContent='No se pudieron activar las notificaciones de la app.';}
     }
+    }
     let refreshing=false;
     async function refresh(){
       if(!requestId || document.hidden || refreshing)return;refreshing=true;
@@ -582,7 +598,7 @@
       }catch(error){if(request!==requestId)return;if(error.status===401){location.replace('./torneos.html');return;}if(error.status===404){showPendingDraw();return;}status(error.message,true);}
       finally{refreshing=false;}
     }
-    LipaViewerCalls();
+    if(!publicViewer)LipaViewerCalls();
     setInterval(refresh,10000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   }
   if(!viewer){
