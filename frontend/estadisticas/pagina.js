@@ -1,5 +1,4 @@
 (()=>{
- const API=String(window.APP_CONFIG?.API_BASE_URL||'').replace(/\/$/,'');
  const container=document.querySelector('#categories'),status=document.querySelector('#status');
  let data=[],busy=false;
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -15,8 +14,12 @@
  }
  async function load(){
   if(busy)return;busy=true;document.querySelector('#refresh').disabled=true;status.textContent='Actualizando resultados…';
-  data=await Promise.all(['segunda','tercera'].map(async category=>{try{const response=await fetch(API+'/api/torneo-visor/tv/'+category,{cache:'no-store'});if(!response.ok)throw Error('No se pudieron cargar los resultados. Intentá actualizar.');return {category,...window.LipaEstadisticas.calculate(await response.json(),category)};}catch(error){return {category,error:error.message};}}));
-  render();status.textContent=data.some(d=>d.error)?'Hay una categoría pendiente de carga.':'Actualizado · '+new Date().toLocaleString('es-AR');busy=false;document.querySelector('#refresh').disabled=false;
+  try{
+   const response=await fetch('./resultados.json',{cache:'no-store'});if(!response.ok)throw Error('No se pudieron cargar los resultados. Intentá actualizar.');
+   const snapshot=await response.json();data=['segunda','tercera'].map(category=>({category,...window.LipaEstadisticas.calculate(snapshot.categories[category],category)}));
+   render();status.textContent='Resultados publicados · '+new Date(snapshot.capturedAt).toLocaleDateString('es-AR',{timeZone:'America/Argentina/Buenos_Aires'});
+  }catch(error){status.textContent='No se pudieron cargar los resultados. Tocá Actualizar para reintentar.';}
+  busy=false;document.querySelector('#refresh').disabled=false;
  }
  document.querySelector('#search').addEventListener('input',render);document.querySelector('#refresh').addEventListener('click',load);document.querySelector('#print').addEventListener('click',()=>window.print());load();
 })();
