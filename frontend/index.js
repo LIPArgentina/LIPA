@@ -123,8 +123,8 @@ function ensureCrucesViewButton() {
   ensureAdminHeaderLink("btnCrucesView", "./cruces/cruces_fecha_view.html");
 }
 
-function redirectAfterLogin() {
-  const sess = readSession();
+function redirectAfterLogin(session = null) {
+  const sess = session || readSession();
   const role = (sess?.role || "").toLowerCase();
   const slug = sess?.slug || getSlug();
 
@@ -159,11 +159,17 @@ function setupAuthBridge() {
     if (event.origin !== window.location.origin) return;
     const data = event.data || {};
     if (data.type === "lpi:auth-success") {
+      const incomingSession = data.session;
+      if (incomingSession?.token) {
+        try {
+          localStorage.setItem("lpi.session", JSON.stringify(incomingSession));
+        } catch {}
+      }
       ensureManageTeamButton();
       ensureConsultasButton();
       ensureJugadoresViewButton();
       ensureCrucesViewButton();
-      redirectAfterLogin();
+      redirectAfterLogin(incomingSession);
     }
   });
 

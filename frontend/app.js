@@ -63,7 +63,13 @@ function wireIncomingAuthEvents() {
     if (event.origin !== window.location.origin) return;
     const data = event.data || {};
     if (data.type === "lpi:auth-success") {
-      renderSession(readSession());
+      const incomingSession = data.session;
+      if (incomingSession?.token) {
+        try {
+          localStorage.setItem(sessionKey, JSON.stringify(incomingSession));
+        } catch {}
+      }
+      renderSession(readSession() || incomingSession || null);
       window.dispatchEvent(new Event("login:success"));
     }
   });
