@@ -77,6 +77,8 @@ let CURRENT_STANDINGS = null;
 let currentPublicVisible = currentEdition < 6;
 
 function readSession(){
+  const managedSession = window.LPI_AUTH?.readSession?.();
+  if (managedSession) return managedSession;
   try {
     const raw = localStorage.getItem('lpi.session') || sessionStorage.getItem('lpi.session');
     return raw ? JSON.parse(raw) : null;
@@ -1114,6 +1116,13 @@ async function renderCategory(category){
 
 
 async function bootstrap(){
+  const session = readSession();
+  if (!session?.token || String(session.role || '').toLowerCase() !== 'admin') {
+    const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.replace(`/auth/login.html?return=${encodeURIComponent(returnPath)}`);
+    return;
+  }
+
   document.querySelectorAll('.edition-btn[data-edition]').forEach(item => {
     const active = parseEdition(item.dataset.edition) === currentEdition;
     item.classList.toggle('active', active);
