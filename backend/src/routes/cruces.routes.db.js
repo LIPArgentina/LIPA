@@ -1434,18 +1434,23 @@ router.post('/validate', async (req, res) => {
       ? (mine?.status_json || rival?.status_json || {})
       : (rival?.status_json || mine?.status_json || {});
 
+    const matchContext = await resolveResultMatchContext({
+      fechaISO, localSlug, visitanteSlug, snapshot: validatedSnapshot
+    });
     const fixtureSync = await syncValidatedMatchIntoFixture({
       fechaISO,
       localSlug,
       visitanteSlug,
-      snapshot: validatedSnapshot
+      snapshot: validatedSnapshot,
+      matchContext
     });
 
     const llavesSync = await syncValidatedMatchIntoLlaves({
       fechaISO,
       localSlug,
       visitanteSlug,
-      snapshot: validatedSnapshot
+      snapshot: validatedSnapshot,
+      matchContext
     });
 
     invalidateValidatedStatsCache();
@@ -1548,12 +1553,12 @@ router.get('/lock-status', async (req, res) => {
 
 async function findLlavesSeriesForMatch({ fechaISO, localSlug, visitanteSlug }) {
   const dateKey = normalizeDateOnly(fechaISO);
-  const { category, localInfo, visitanteInfo } = await inferCategoryFromMatch(localSlug, visitanteSlug);
-  if (!category) return { found: false, reason: 'category_not_found' };
+  const context = await resolveResultMatchContext({ fechaISO, localSlug, visitanteSlug });
+  if (!context.category) return { found: false, reason: context.reason || 'category_not_found' };
+  const { category, edition, localInfo, visitanteInfo } = context;
 
   const localCandidates = buildLlavesTeamCandidates(localInfo, localSlug);
   const visitanteCandidates = buildLlavesTeamCandidates(visitanteInfo, visitanteSlug);
-  const edition = await inferEditionFromDate(dateKey, category);
   const { rows } = await pool.query(
     `SELECT data FROM llaves_data WHERE category = $1 AND edicion = $2 LIMIT 1`,
     [category, edition]
@@ -1571,7 +1576,7 @@ async function findLlavesSeriesForMatch({ fechaISO, localSlug, visitanteSlug }) 
       const homeIsVisitante = llavesTeamMatches(leg?.home?.team, visitanteCandidates);
       const awayIsLocal = llavesTeamMatches(leg?.away?.team, localCandidates);
       if ((homeIsLocal && awayIsVisitante) || (homeIsVisitante && awayIsLocal)) {
-        return { found: true, category, data, round, legs, leg, legIndex, localCandidates, visitanteCandidates, localInfo, visitanteInfo };
+        return { found: true, category, edition, data, round, legs, leg, legIndex, localCandidates, visitanteCandidates, localInfo, visitanteInfo };
       }
     }
   }
@@ -1816,7 +1821,9 @@ function fixtureTeamMatches(item = {}, candidates = []) {
   return !!equipo && candidates.includes(equipo);
 }
 
-async function inferCategoryFromMatch(localSlug, visitanteSlug, categoryHint = '') {
+async function resolveResultMatchContext({ fechaISO, localSlug, visitanteSlug, snapshot, scheduled } = {}) {
+  const dateKey = normalizeDateOnly(fechaISO);
+  const hint = String(snapshot?.category || snapshot?.categoria || '').trim().toLowerCase();
   const [localOptions, visitanteOptions] = await Promise.all([
     resolveEquipoInfosBySlug(localSlug),
     resolveEquipoInfosBySlug(visitanteSlug)
@@ -1831,45 +1838,71 @@ async function inferCategoryFromMatch(localSlug, visitanteSlug, categoryHint = '
       .filter(division => division && localDivisions.has(division))
   )];
 
-  const normalizedHint = String(categoryHint || '').trim().toLowerCase();
-  const category = normalizedHint && commonDivisions.includes(normalizedHint)
-    ? normalizedHint
-    : (commonDivisions.length === 1 ? commonDivisions[0] : null);
-  const localInfo = category
-    ? localOptions.find(item => String(item?.division || '').trim().toLowerCase() === category)
-    : (localOptions[0] || null);
-  const visitanteInfo = category
-    ? visitanteOptions.find(item => String(item?.division || '').trim().toLowerCase() === category)
-    : (visitanteOptions[0] || null);
+  const teamIn = (options, category) => options.find(item => String(item.division || '').trim().toLowerCase() === category);
+  const contextFor = (category, edition) => ({
+    category, edition,
+    localInfo: teamIn(localOptions, category) || localOptions[0] || null,
+    visitanteInfo: teamIn(visitanteOptions, category) || visitanteOptions[0] || null
+  });
 
-  const localDivision = String(localInfo?.division || '').trim().toLowerCase();
-  const visitanteDivision = String(visitanteInfo?.division || '').trim().toLowerCase();
-  const inferredCategory = category || localDivision || visitanteDivision || null;
+  // The manual endpoint has already verified this category and edition against the schedule.
+  if (scheduled) return contextFor(scheduled.category, scheduled.edition);
+  if (commonDivisions.length === 1) {
+    const [category] = commonDivisions;
+    return contextFor(category, await inferEditionFromDate(dateKey, category));
+  }
 
-  return { category: inferredCategory, localInfo, visitanteInfo };
+  // Bare team slugs may also refer to an inactive registration in another division.
+  // Resolve ambiguous identities by matching both teams and the date, never by row order.
+  const divisions = commonDivisions.length ? commonDivisions : ['segunda', 'tercera'];
+  const [{ rows: fixtures }, { rows: brackets }] = await Promise.all([
+    pool.query(`SELECT category, edicion, data FROM fixtures WHERE category = ANY($1::text[]) AND kind IN ('ida', 'vuelta')`, [divisions]),
+    pool.query(`SELECT category, edicion, data FROM llaves_data WHERE category = ANY($1::text[])`, [divisions])
+  ]);
+  const matches = new Map();
+  const add = row => matches.set(`${row.category}:${row.edicion}`, contextFor(row.category, Number(row.edicion)));
+  for (const row of fixtures) {
+    if (fixtureHasScheduledMatch([row], { fechaISO: dateKey, localSlug, visitanteSlug })) add(row);
+  }
+  const bracketHasMatch = (row, data) => {
+    const { localInfo, visitanteInfo } = contextFor(row.category);
+    return findLlavesLegInData(data, {
+      dateKey,
+      localCandidates: buildLlavesTeamCandidates(localInfo, localSlug),
+      visitanteCandidates: buildLlavesTeamCandidates(visitanteInfo, visitanteSlug)
+    }).found;
+  };
+  for (const row of brackets) {
+    if (bracketHasMatch(row, row.data)) add(row);
+  }
+  if (!matches.size) {
+    for (const row of brackets) {
+      const autoData = await buildLlavesAutoData(row.data, row.category, Number(row.edicion));
+      if (bracketHasMatch(row, autoData)) add(row);
+    }
+  }
+
+  const candidates = [...matches.values()];
+  if (candidates.length === 1) return candidates[0];
+  const inHint = candidates.filter(item => item.category === hint);
+  if (inHint.length === 1) return inHint[0];
+  return { reason: candidates.length ? 'ambiguous_scheduled_match' : 'scheduled_match_not_found' };
 }
 
 async function syncValidatedMatchIntoFixture({
   fechaISO,
   localSlug,
   visitanteSlug,
-  snapshot
+  snapshot,
+  matchContext
 }) {
   const dateKey = normalizeDateOnly(fechaISO);
   if (!dateKey || !snapshot) {
     return { updated: false, reason: 'missing_data' };
   }
 
-  const categoryHint = snapshot?.category || snapshot?.categoria || '';
-  const { category, localInfo, visitanteInfo } = await inferCategoryFromMatch(
-    localSlug,
-    visitanteSlug,
-    categoryHint
-  );
-  if (!category) {
-    return { updated: false, reason: 'category_not_found' };
-  }
-  const edition = await inferEditionFromDate(dateKey, category);
+  const { category, edition, localInfo, visitanteInfo, reason } = matchContext;
+  if (!category) return { updated: false, reason };
 
   const localCandidates = buildTeamMatchCandidates(localInfo, localSlug);
   const visitanteCandidates = buildTeamMatchCandidates(visitanteInfo, visitanteSlug);
@@ -2432,18 +2465,16 @@ async function syncValidatedMatchIntoLlaves({
   fechaISO,
   localSlug,
   visitanteSlug,
-  snapshot
+  snapshot,
+  matchContext
 }) {
   const dateKey = normalizeDateOnly(fechaISO);
   if (!dateKey || !snapshot) {
     return { updated: false, reason: 'missing_data' };
   }
 
-  const { category, localInfo, visitanteInfo } = await inferCategoryFromMatch(localSlug, visitanteSlug);
-  if (!category) {
-    return { updated: false, reason: 'category_not_found' };
-  }
-  const edition = await inferEditionFromDate(dateKey, category);
+  const { category, edition, localInfo, visitanteInfo, reason } = matchContext;
+  if (!category) return { updated: false, reason };
 
   const localCandidates = buildLlavesTeamCandidates(localInfo, localSlug);
   const visitanteCandidates = buildLlavesTeamCandidates(visitanteInfo, visitanteSlug);
@@ -2682,7 +2713,7 @@ async function syncTiebreakIntoLlaves({ fechaISO, localSlug, visitanteSlug, snap
      VALUES ($1, $2, $3::jsonb, NOW(), NOW())
      ON CONFLICT (edicion, category)
      DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-    [found.category, await inferEditionFromDate(dateKey, found.category), JSON.stringify(found.data)]
+    [found.category, found.edition, JSON.stringify(found.data)]
   );
 
   return { updated: true, category: found.category, roundId: round?.id || null, legIndex: 2, date: dateKey };
@@ -2938,6 +2969,9 @@ router.post('/manual-save', requireAdmin, async (req, res) => {
         error: 'Ese partido no existe en el fixture ni en las llaves de la categoría, edición y fecha seleccionadas.'
       });
     }
+    const matchContext = await resolveResultMatchContext({
+      fechaISO, localSlug, visitanteSlug, scheduled: { category, edition }
+    });
 
     const normalizedStatus = {
       ...status,
@@ -3002,8 +3036,8 @@ router.post('/manual-save', requireAdmin, async (req, res) => {
     transactionOpen = false;
 
     const syncResults = await Promise.allSettled([
-      syncValidatedMatchIntoFixture({ fechaISO, localSlug, visitanteSlug, snapshot: normalizedStatus }),
-      syncValidatedMatchIntoLlaves({ fechaISO, localSlug, visitanteSlug, snapshot: normalizedStatus })
+      syncValidatedMatchIntoFixture({ fechaISO, localSlug, visitanteSlug, snapshot: normalizedStatus, matchContext }),
+      syncValidatedMatchIntoLlaves({ fechaISO, localSlug, visitanteSlug, snapshot: normalizedStatus, matchContext })
     ]);
     const fixtureSync = syncResults[0].status === 'fulfilled'
       ? syncResults[0].value
@@ -5340,5 +5374,8 @@ module.exports.__test = {
   ensureRankingRowForPlayer,
   buildPlayerRowsFromResults,
   sortPlayerRankingRows,
-  collectLlavesMatchKeys
+  collectLlavesMatchKeys,
+  resolveResultMatchContext,
+  compareFullStatus,
+  buildLlavesAutoData
 };
